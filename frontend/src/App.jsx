@@ -3,9 +3,10 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
-// Point this at your running FastAPI backend.
-// Default assumes `uvicorn api:app --reload` running locally.
-const API_BASE = "http://127.0.0.1:8000";
+// Points at the live FastAPI backend deployed on Azure Container Apps.
+// For local development against `uvicorn api:app --reload`, swap this
+// back to "http://127.0.0.1:8000".
+const API_BASE = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
 
 const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific"];
 

@@ -1,0 +1,55 @@
+# Azure Pipelines - Backend CI/CD
+#
+# Triggers on any push to main that touches the backend/ folder.
+# Builds the Docker image locally on the pipeline agent (not via ACR Tasks,
+# since ACR Tasks cloud builds are blocked on free-trial subscriptions),
+# pushes it to Azure Container Registry, then tells the running Container
+# App to pull and use the new image.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - backend/*
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  acrName: "nhldashboardacr"
+  acrLoginServer: "nhldashboardacr.azurecr.io"
+  imageName: "nhl-dashboard-api"
+  resourceGroup: "nhl-dashboard-rg"
+  containerAppName: "nhl-dashboard-api"
+  # Each run gets a unique tag from the built-in build ID, so every
+  # deploy is traceable back to the exact pipeline run that produced it.
+  imageTag: "$(Build.BuildId)"
+
+steps:
+  - task: AzureCLI@2
+    displayName: "Build image, push to ACR, update Container App"
+    inputs:
+      azureSubscription: "azure-subscription-connection" # matches the service connection name you created
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -e
+
+        echo "Logging in to ACR..."
+        az acr login --name $(acrName)
+
+        echo "Building image..."
+        docker build -t $(acrLoginServer)/$(imageName):$(imageTag) ./backend
+
+        echo "Pushing image..."
+        docker push $(acrLoginServer)/$(imageName):$(imageTag)
+
+        echo "Updating Container App to use new image..."
+        az containerapp update \
+          --name $(containerAppName) \
+          --resource-group $(resourceGroup) \
+          --image $(acrLoginServer)/$(imageName):$(imageTag)
+
+        echo "Deploy complete: $(acrLoginServer)/$(imageName):$(imageTag)"

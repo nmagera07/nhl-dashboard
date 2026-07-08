@@ -87,6 +87,33 @@ def latest_standings():
         conn.close()
 
 
+@app.get("/standings/{team_abbrev}/seasons")
+def team_season_history(team_abbrev: str):
+    """
+    Final standings for one team across past completed seasons, e.g.
+    /standings/PIT/seasons. Ordered oldest to newest.
+
+    Note: relocated/renamed franchises (e.g. Arizona Coyotes -> Utah) are
+    tracked under their historical abbreviation, so this only covers the
+    seasons played under the given team_abbrev.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT *
+                FROM season_final_standings
+                WHERE team_abbrev = %s
+                ORDER BY season_id ASC
+                """,
+                (team_abbrev.upper(),),
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 @app.get("/standings/{team_abbrev}")
 def team_history(team_abbrev: str, start: Optional[date] = None, end: Optional[date] = None):
     """

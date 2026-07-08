@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 // Points at the live FastAPI backend deployed on Azure Container Apps.
@@ -178,35 +178,83 @@ function TeamCard({ team }) {
   );
 }
 
-function TrendChart({ history, teamAbbrev }) {
-  const data = history.map((h) => ({
+function formatSeasonLabel(seasonId) {
+  const str = String(seasonId);
+  return `${str.slice(2, 4)}-${str.slice(6, 8)}`;
+}
+
+function YearlyBar({ x, y, width, height, payload }) {
+  const fill = payload?.madePlayoffs ? "#3b82f6" : "#4b5563";
+  return <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} />;
+}
+
+const chartTooltipStyle = {
+  contentStyle: {
+    background: "#12151c",
+    border: "1px solid #1f2937",
+    borderRadius: 6,
+    fontSize: 12,
+  },
+  labelStyle: { color: "#e5e7eb" },
+};
+
+function TrendChart({ mode, onModeChange, history, seasonHistory, teamAbbrev }) {
+  const dailyData = history.map((h) => ({
     date: h.snapshot_date,
     points: h.points,
+  }));
+
+  const yearlyData = seasonHistory.map((s) => ({
+    season: formatSeasonLabel(s.season_id),
+    points: s.points,
+    madePlayoffs: s.made_playoffs,
   }));
 
   return (
     <div className="trend-panel">
       <div className="trend-header">
-        <span className="trend-eyebrow">SEASON TREND</span>
+        <span className="trend-eyebrow">{mode === "years" ? "LAST 5 YEARS" : "SEASON TREND"}</span>
         <span className="trend-team">{teamAbbrev}</span>
+        <div className="trend-toggle">
+          <button
+            className={mode === "season" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
+            onClick={() => onModeChange("season")}
+          >
+            This Season
+          </button>
+          <button
+            className={mode === "years" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
+            onClick={() => onModeChange("years")}
+          >
+            Last 5 Years
+          </button>
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={data} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-          <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" stroke="#6b7280" tick={{ fontSize: 11 }} />
-          <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
-          <Tooltip
-            contentStyle={{
-              background: "#12151c",
-              border: "1px solid #1f2937",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-            labelStyle={{ color: "#e5e7eb" }}
-          />
-          <Line type="monotone" dataKey="points" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
-        </LineChart>
+        {mode === "years" ? (
+          <BarChart data={yearlyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="season" stroke="#6b7280" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
+            <Tooltip {...chartTooltipStyle} />
+            <Bar dataKey="points" shape={<YearlyBar />} isAnimationActive={false} />
+          </BarChart>
+        ) : (
+          <LineChart data={dailyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="date" stroke="#6b7280" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
+            <Tooltip {...chartTooltipStyle} />
+            <Line type="monotone" dataKey="points" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
+          </LineChart>
+        )}
       </ResponsiveContainer>
+      {mode === "years" && (
+        <div className="years-legend">
+          <span><span className="legend-dot legend-dot-playoff" /> Made playoffs</span>
+          <span><span className="legend-dot legend-dot-missed" /> Missed playoffs</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -214,6 +262,8 @@ function TrendChart({ history, teamAbbrev }) {
 export default function NHLDashboard() {
   const [standings, setStandings] = useState([]);
   const [history, setHistory] = useState([]);
+  const [seasonHistory, setSeasonHistory] = useState([]);
+  const [trendMode, setTrendMode] = useState("season"); // season | years
   const [selectedTeam, setSelectedTeam] = useState("PIT");
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [activeDivision, setActiveDivision] = useState(null);
@@ -237,6 +287,10 @@ export default function NHLDashboard() {
       .then((res) => res.json())
       .then((data) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]));
+    fetch(`${API_BASE}/standings/${selectedTeam}/seasons`)
+      .then((res) => res.json())
+      .then((data) => setSeasonHistory(Array.isArray(data) ? data : []))
+      .catch(() => setSeasonHistory([]));
   }, [selectedTeam]);
 
   const divisions = useMemo(() => {
@@ -584,7 +638,43 @@ export default function NHLDashboard() {
           font-weight: 700;
           font-size: 18px;
           color: var(--accent);
+          flex: 1;
         }
+        .trend-toggle {
+          display: flex;
+          gap: 4px;
+        }
+        .toggle-btn {
+          background: var(--bg);
+          border: 1px solid var(--border);
+          color: var(--text-dim);
+          font-size: 11px;
+          font-weight: 600;
+          padding: 5px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+        .toggle-btn-active {
+          color: var(--accent);
+          border-color: var(--accent);
+          background: rgba(59, 130, 246, 0.1);
+        }
+        .years-legend {
+          display: flex;
+          gap: 16px;
+          margin-top: 8px;
+          font-size: 11px;
+          color: var(--text-dim);
+        }
+        .legend-dot {
+          display: inline-block;
+          width: 8px;
+          height: 8px;
+          border-radius: 2px;
+          margin-right: 6px;
+        }
+        .legend-dot-playoff { background: #3b82f6; }
+        .legend-dot-missed { background: #4b5563; }
         .status-line {
           font-size: 13px;
           color: var(--text-dim);
@@ -618,7 +708,13 @@ export default function NHLDashboard() {
           {history.length > 0 && (
             <div className="detail-grid">
               <TeamCard team={selectedRow} />
-              <TrendChart history={history} teamAbbrev={selectedTeam} />
+              <TrendChart
+                mode={trendMode}
+                onModeChange={setTrendMode}
+                history={history}
+                seasonHistory={seasonHistory}
+                teamAbbrev={selectedTeam}
+              />
             </div>
           )}
         </>

@@ -47,3 +47,34 @@ CREATE TABLE IF NOT EXISTS standings_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_team_date
     ON standings_snapshots (team_abbrev, snapshot_date);
+
+-- One row per team per completed season -- backfilled once from the NHL API's
+-- historical /v1/standings/{date} endpoint using each season's final date.
+-- Kept separate from standings_snapshots since mixing one-point-per-year
+-- with a season's dense daily points doesn't make sense on one chart.
+-- team_abbrev is NOT a foreign key here (unlike standings_snapshots) --
+-- relocated/renamed franchises (e.g. Arizona Coyotes -> Utah, 'ARI' -> 'UTA')
+-- show up under their historical abbreviation, which won't exist in `teams`.
+CREATE TABLE IF NOT EXISTS season_final_standings (
+    id                      SERIAL PRIMARY KEY,
+    season_id               INTEGER NOT NULL,       -- e.g. 20232024
+    team_abbrev             VARCHAR(3) NOT NULL,
+    games_played            INTEGER,
+    wins                    INTEGER,
+    losses                  INTEGER,
+    ot_losses               INTEGER,
+    points                  INTEGER,
+    point_pctg              NUMERIC(6,4),
+    goal_for                INTEGER,
+    goal_against            INTEGER,
+    goal_differential       INTEGER,
+    division_sequence       INTEGER,
+    conference_sequence     INTEGER,
+    league_sequence         INTEGER,
+    made_playoffs           BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, team_abbrev)
+);
+
+CREATE INDEX IF NOT EXISTS idx_season_final_team
+    ON season_final_standings (team_abbrev, season_id);

@@ -16,75 +16,106 @@ function StreakBadge({ code, count }) {
   return <span className={cls}>{code}{count}</span>;
 }
 
-function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
-  const byDivision = useMemo(() => {
-    const groups = {};
-    rows.forEach((r) => {
-      const d = r.division || "League";
-      if (!groups[d]) groups[d] = [];
-      groups[d].push(r);
-    });
-    return groups;
-  }, [rows]);
-
-  const divisions = Object.keys(byDivision).sort(
-    (a, b) => DIVISION_ORDER.indexOf(a) - DIVISION_ORDER.indexOf(b)
-  );
-
+function TopNav({ search, onSearchChange }) {
   return (
-    <div className="standings-wrap">
+    <div className="topnav">
+      <div className="brand">
+        <span className="brand-dot" />
+        <span className="brand-name">NHL Standings</span>
+      </div>
+      <div className="nav-tabs">
+        <button className="nav-tab nav-tab-active">Standings</button>
+        <button className="nav-tab nav-tab-disabled" disabled>
+          Player Stats <span className="soon-badge">SOON</span>
+        </button>
+      </div>
+      <div className="nav-right">
+        <input
+          className="search-input"
+          placeholder="Find a team..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        <span className="live-badge">
+          <span className="live-dot" /> LIVE
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function DivisionTabs({ divisions, active, onSelect, disabled }) {
+  return (
+    <div className={disabled ? "division-tabs division-tabs-disabled" : "division-tabs"}>
       {divisions.map((div) => (
-        <div key={div} className="division-block">
-          <div className="division-label">{div}</div>
-          <table className="standings-table">
-            <thead>
-              <tr>
-                <th className="col-rank">#</th>
-                <th className="col-team">Team</th>
-                <th>GP</th>
-                <th>W</th>
-                <th>L</th>
-                <th>OT</th>
-                <th className="col-pts">PTS</th>
-                <th>GF</th>
-                <th>GA</th>
-                <th>DIFF</th>
-                <th>L10</th>
-                <th>STRK</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byDivision[div]
-                .sort((a, b) => a.division_sequence - b.division_sequence)
-                .map((row) => (
-                  <tr
-                    key={row.team_abbrev}
-                    className={row.team_abbrev === selectedTeam ? "row-selected" : ""}
-                    onClick={() => onSelectTeam(row.team_abbrev)}
-                  >
-                    <td className="col-rank">{row.division_sequence}</td>
-                    <td className="col-team">
-                      <span className="team-abbrev">{row.team_abbrev}</span>
-                      <span className="team-name">{row.team_name}</span>
-                    </td>
-                    <td>{row.games_played}</td>
-                    <td>{row.wins}</td>
-                    <td>{row.losses}</td>
-                    <td>{row.ot_losses}</td>
-                    <td className="col-pts">{row.points}</td>
-                    <td>{row.goal_for}</td>
-                    <td>{row.goal_against}</td>
-                    <td className={row.goal_differential >= 0 ? "diff-pos" : "diff-neg"}>
-                      {row.goal_differential > 0 ? "+" : ""}{row.goal_differential}
-                    </td>
-                    <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
-                    <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
+        <button
+          key={div}
+          className={div === active ? "division-tab division-tab-active" : "division-tab"}
+          onClick={() => onSelect(div)}
+          disabled={disabled}
+        >
+          {div.toUpperCase()}
+        </button>
       ))}
+    </div>
+  );
+}
+
+function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
+  return (
+    <div className="table-card">
+      <table className="standings-table">
+        <thead>
+          <tr>
+            <th className="col-rank"></th>
+            <th className="col-team">TEAM</th>
+            <th>GP</th>
+            <th>W</th>
+            <th>L</th>
+            <th>OT</th>
+            <th className="col-pts">PTS</th>
+            <th>GF</th>
+            <th>GA</th>
+            <th>DIFF</th>
+            <th>L10</th>
+            <th>STRK</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={11} className="no-results">No teams match your search.</td>
+            </tr>
+          )}
+          {rows
+            .sort((a, b) => a.division_sequence - b.division_sequence)
+            .map((row) => (
+              <tr
+                key={row.team_abbrev}
+                className={row.team_abbrev === selectedTeam ? "row-selected" : ""}
+                onClick={() => onSelectTeam(row.team_abbrev)}
+              >
+                <td className="col-rank">{row.division_sequence}</td>
+                <td className="col-team">
+                  <span className="team-abbrev">{row.team_abbrev}</span>
+                  <span className="team-name">{row.team_name}</span>
+                </td>
+                <td>{row.games_played}</td>
+                <td>{row.wins}</td>
+                <td>{row.losses}</td>
+                <td>{row.ot_losses}</td>
+                <td className="col-pts">{row.points}</td>
+                <td>{row.goal_for}</td>
+                <td>{row.goal_against}</td>
+                <td className={row.goal_differential >= 0 ? "diff-pos" : "diff-neg"}>
+                  {row.goal_differential > 0 ? "+" : ""}{row.goal_differential}
+                </td>
+                <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
+                <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -93,7 +124,6 @@ function TrendChart({ history, teamAbbrev }) {
   const data = history.map((h) => ({
     date: h.snapshot_date,
     points: h.points,
-    goalDiff: h.goal_differential,
   }));
 
   return (
@@ -102,22 +132,21 @@ function TrendChart({ history, teamAbbrev }) {
         <span className="trend-eyebrow">SEASON TREND</span>
         <span className="trend-team">{teamAbbrev}</span>
       </div>
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-          <CartesianGrid stroke="#2a3142" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" stroke="#6b7690" tick={{ fontSize: 11, fontFamily: "var(--font-mono)" }} />
-          <YAxis stroke="#6b7690" tick={{ fontSize: 11, fontFamily: "var(--font-mono)" }} />
+          <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="date" stroke="#6b7280" tick={{ fontSize: 11 }} />
+          <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
           <Tooltip
             contentStyle={{
-              background: "#12151f",
-              border: "1px solid #2a3142",
-              borderRadius: 4,
-              fontFamily: "var(--font-mono)",
+              background: "#12151c",
+              border: "1px solid #1f2937",
+              borderRadius: 6,
               fontSize: 12,
             }}
-            labelStyle={{ color: "#e8ecf1" }}
+            labelStyle={{ color: "#e5e7eb" }}
           />
-          <Line type="monotone" dataKey="points" stroke="#e2231a" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="points" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -129,6 +158,8 @@ export default function NHLDashboard() {
   const [history, setHistory] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("PIT");
   const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [activeDivision, setActiveDivision] = useState(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch(`${API_BASE}/standings/latest`)
@@ -136,6 +167,8 @@ export default function NHLDashboard() {
       .then((data) => {
         setStandings(data);
         setStatus("ready");
+        const firstDivision = data.find((d) => d.division)?.division;
+        if (firstDivision) setActiveDivision(firstDivision);
       })
       .catch(() => setStatus("error"));
   }, []);
@@ -148,118 +181,230 @@ export default function NHLDashboard() {
       .catch(() => setHistory([]));
   }, [selectedTeam]);
 
+  const divisions = useMemo(() => {
+    const set = new Set(standings.map((r) => r.division).filter(Boolean));
+    return Array.from(set).sort(
+      (a, b) => DIVISION_ORDER.indexOf(a) - DIVISION_ORDER.indexOf(b)
+    );
+  }, [standings]);
+
+  const isSearching = search.trim().length > 0;
+
+  const visibleRows = useMemo(() => {
+    let rows = standings;
+    if (isSearching) {
+      const q = search.trim().toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.team_name.toLowerCase().includes(q) ||
+          r.team_abbrev.toLowerCase().includes(q)
+      );
+    } else if (activeDivision) {
+      rows = rows.filter((r) => r.division === activeDivision);
+    }
+    return rows;
+  }, [standings, activeDivision, search, isSearching]);
+
   return (
     <div className="dashboard">
       <style>{`
         .dashboard {
-          --font-display: 'Oswald', 'Arial Narrow', sans-serif;
-          --font-mono: 'JetBrains Mono', 'Courier New', monospace;
-          --font-body: 'Inter', system-ui, sans-serif;
-          background: #0c0e14;
-          color: #e8ecf1;
-          font-family: var(--font-body);
-          padding: 32px 24px;
+          --accent: #3b82f6;
+          --bg: #0a0b0f;
+          --card: #12141a;
+          --border: #1f2430;
+          --text: #e5e7eb;
+          --text-dim: #8b93a3;
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Inter', system-ui, sans-serif;
           min-height: 100%;
+          padding: 0 0 32px 0;
         }
-        .header {
+        .topnav {
           display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          border-bottom: 3px solid #e2231a;
-          padding-bottom: 16px;
-          margin-bottom: 24px;
+          align-items: center;
+          gap: 24px;
+          padding: 16px 24px;
+          border-bottom: 1px solid var(--border);
+          margin-bottom: 20px;
         }
-        .header h1 {
-          font-family: var(--font-display);
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .brand-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--accent);
+        }
+        .brand-name {
           font-weight: 700;
-          font-size: 32px;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
-          margin: 0;
+          font-size: 15px;
+          color: var(--text);
         }
-        .header .subtitle {
-          font-family: var(--font-mono);
-          font-size: 12px;
-          color: #6b7690;
-          letter-spacing: 0.08em;
+        .nav-tabs {
+          display: flex;
+          gap: 4px;
+          flex: 1;
         }
-        .status-line {
-          font-family: var(--font-mono);
+        .nav-tab {
+          background: none;
+          border: none;
+          color: var(--text-dim);
+          font-size: 14px;
+          font-weight: 500;
+          padding: 8px 4px;
+          cursor: pointer;
+          border-bottom: 2px solid transparent;
+        }
+        .nav-tab-active {
+          color: var(--text);
+          border-bottom: 2px solid var(--accent);
+        }
+        .nav-tab-disabled {
+          cursor: default;
+          opacity: 0.6;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .soon-badge {
+          font-size: 9px;
+          background: #2a2f3a;
+          color: var(--text-dim);
+          padding: 2px 6px;
+          border-radius: 3px;
+          letter-spacing: 0.05em;
+        }
+        .nav-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .search-input {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 7px 12px;
+          color: var(--text);
           font-size: 13px;
-          color: #6b7690;
+          width: 200px;
+        }
+        .search-input::placeholder { color: var(--text-dim); }
+        .live-badge {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          color: #22c55e;
+          background: rgba(34, 197, 94, 0.1);
+          padding: 5px 10px;
+          border-radius: 12px;
+          letter-spacing: 0.05em;
+        }
+        .live-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #22c55e;
+        }
+        .division-tabs {
+          display: flex;
+          gap: 8px;
+          padding: 0 24px;
           margin-bottom: 16px;
         }
-        .status-error {
-          color: #e2231a;
+        .division-tab {
+          background: var(--card);
+          border: 1px solid var(--border);
+          color: var(--text-dim);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          padding: 6px 14px;
+          border-radius: 6px;
+          cursor: pointer;
         }
-        .division-block { margin-bottom: 28px; }
-        .division-label {
-          font-family: var(--font-display);
-          font-size: 13px;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          color: #8a93ab;
-          margin-bottom: 8px;
-          padding-left: 4px;
+        .division-tab-active {
+          color: var(--accent);
+          border-color: var(--accent);
+          background: rgba(59, 130, 246, 0.1);
+        }
+        .division-tabs-disabled .division-tab {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+        .no-results {
+          text-align: center;
+          color: var(--text-dim);
+          padding: 24px 14px;
+        }
+        .table-card {
+          margin: 0 24px;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          overflow: hidden;
         }
         .standings-table {
           width: 100%;
           border-collapse: collapse;
-          font-family: var(--font-mono);
           font-size: 13px;
         }
         .standings-table thead th {
           text-align: right;
-          font-weight: 400;
-          color: #6b7690;
+          font-weight: 500;
+          color: var(--text-dim);
           font-size: 11px;
           letter-spacing: 0.05em;
-          padding: 6px 10px;
-          border-bottom: 1px solid #2a3142;
+          padding: 12px 14px;
+          border-bottom: 1px solid var(--border);
         }
         .standings-table th.col-team, .standings-table td.col-team { text-align: left; }
         .standings-table td {
           text-align: right;
-          padding: 8px 10px;
-          border-bottom: 1px solid #1a1f2e;
+          padding: 10px 14px;
+          border-bottom: 1px solid var(--border);
         }
+        .standings-table tbody tr:last-child td { border-bottom: none; }
         .standings-table tbody tr {
           cursor: pointer;
           transition: background 0.12s ease;
         }
-        .standings-table tbody tr:hover { background: #12151f; }
-        .row-selected { background: #1a1420 !important; }
-        .row-selected .team-abbrev { color: #e2231a; }
-        .col-rank { color: #6b7690; width: 28px; }
-        .col-pts { font-weight: 700; color: #e8ecf1; }
+        .standings-table tbody tr:hover { background: #171a22; }
+        .row-selected { background: #161d2e !important; }
+        .row-selected .team-abbrev { color: var(--accent); }
+        .col-rank { color: var(--text-dim); width: 28px; }
+        .col-pts { font-weight: 700; color: var(--accent); }
         .team-abbrev {
-          font-family: var(--font-display);
           font-weight: 700;
           margin-right: 10px;
         }
         .team-name {
-          color: #8a93ab;
-          font-family: var(--font-body);
+          color: var(--text-dim);
           font-size: 12px;
         }
-        .diff-pos { color: #3fb950; }
-        .diff-neg { color: #e2231a; }
+        .diff-pos { color: #22c55e; }
+        .diff-neg { color: #ef4444; }
         .streak {
-          font-family: var(--font-mono);
           font-size: 11px;
           font-weight: 700;
-          padding: 2px 6px;
-          border-radius: 2px;
+          padding: 3px 8px;
+          border-radius: 4px;
         }
-        .streak-w { background: #143d24; color: #3fb950; }
-        .streak-l { background: #3d1414; color: #e2231a; }
-        .streak-ot { background: #3d3414; color: #e8b93f; }
-        .streak-none { color: #6b7690; }
+        .streak-w { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+        .streak-l { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .streak-ot { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+        .streak-none { color: var(--text-dim); }
         .trend-panel {
-          margin-top: 32px;
-          background: #12151f;
-          border: 1px solid #2a3142;
-          border-radius: 6px;
+          margin: 24px 24px 0 24px;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 10px;
           padding: 20px;
         }
         .trend-header {
@@ -269,35 +414,42 @@ export default function NHLDashboard() {
           margin-bottom: 8px;
         }
         .trend-eyebrow {
-          font-family: var(--font-mono);
           font-size: 11px;
           letter-spacing: 0.1em;
-          color: #6b7690;
+          color: var(--text-dim);
         }
         .trend-team {
-          font-family: var(--font-display);
           font-weight: 700;
-          font-size: 20px;
-          color: #e2231a;
+          font-size: 18px;
+          color: var(--accent);
         }
+        .status-line {
+          font-size: 13px;
+          color: var(--text-dim);
+          padding: 0 24px;
+        }
+        .status-error { color: #ef4444; }
       `}</style>
 
-      <div className="header">
-        <h1>NHL Standings</h1>
-        <span className="subtitle">LIVE FROM NEON POSTGRES</span>
-      </div>
+      <TopNav search={search} onSearchChange={setSearch} />
 
       {status === "loading" && <div className="status-line">Loading standings…</div>}
       {status === "error" && (
         <div className="status-line status-error">
-          Couldn't reach the API at {API_BASE}. Make sure `uvicorn api:app --reload` is running.
+          Couldn't reach the API at {API_BASE}.
         </div>
       )}
 
       {status === "ready" && (
         <>
+          <DivisionTabs
+            divisions={divisions}
+            active={activeDivision}
+            onSelect={setActiveDivision}
+            disabled={isSearching}
+          />
           <StandingsTable
-            rows={standings}
+            rows={visibleRows}
             selectedTeam={selectedTeam}
             onSelectTeam={setSelectedTeam}
           />

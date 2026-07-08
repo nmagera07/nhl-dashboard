@@ -1,0 +1,62 @@
+# NHL Dashboard — Feature Brainstorm
+
+A running list of ideas for future work. Not commitments, just a parking lot.
+Add to this as new ideas come up; check items off or move them to "In Progress"
+when you actually start building them.
+
+---
+
+## In Progress
+- (nothing yet)
+
+---
+
+## Up Next
+- **"My Team" drill-down view** — click a team → team detail panel (full stats,
+  roster) → click a player → player detail (stats, trend chart over season)
+  - New tables needed: `players`, `player_stats_snapshots` (same daily-snapshot
+    pattern as `standings_snapshots`)
+  - New endpoints: `GET /teams/{team_abbrev}/roster`, `GET /players/{player_id}`
+  - New ingestion: pull from NHL API's roster + player stats endpoints
+
+---
+
+## Ideas Backlog
+
+### Fan-focused
+- Pinned "my team" view — Penguins front and center, rest of league secondary
+- Rivalry tracker — head-to-head record vs a specific team over the season
+- Playoff odds / "would we make it if the season ended today" widget
+
+### Data-nerd
+- Player-level stats (goals, assists, +/-, TOI) — ties into the drill-down view above
+- Advanced stats overlay (Corsi, xG) from MoneyPuck's public CSVs
+- Auto-flag teams on a 5+ game win/lose streak as a callout, not just a table column
+
+### Fun / gimmicky
+- Give teams a "type" based on playstyle (high-scoring = fire, defensive = steel, etc.)
+- Subjective "power rankings" tab layered over the objective stats
+
+### Infra / portfolio-flex
+- Email/text alert when the Penguins win (Azure Function, event-driven)
+- `/health` endpoint on the API
+- Redis caching layer in front of the API to reduce repeated Postgres hits
+- Terraform for infra provisioning (per original roadmap)
+- Historical season-over-season comparison views
+
+### Design
+- Redesign layout with Claude's design help — sidebar for trend chart instead of
+  below-the-fold, team logos, "favorite team" pinned card
+
+---
+
+## Done
+- ~~Backend: NHL API ingestion → Postgres (Neon)~~
+- ~~Daily scheduled ingestion (Windows Task Scheduler)~~
+- ~~FastAPI backend serving standings data~~
+- ~~React frontend: standings table + trend chart~~
+- ~~Dockerized backend~~
+- ~~Deployed backend to Azure Container Apps~~
+- ~~Deployed frontend to Azure Static Web Apps~~
+- ~~CI/CD: GitHub Actions (frontend), Azure DevOps Pipelines (backend)~~
+- ~~GitHub Codespaces + Codespaces secrets for working from any machine~~

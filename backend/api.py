@@ -75,7 +75,7 @@ def latest_standings():
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT s.*, t.team_name, t.common_name, t.division, t.conference
+                SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url
                 FROM standings_snapshots s
                 JOIN teams t ON t.team_abbrev = s.team_abbrev
                 WHERE s.snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)

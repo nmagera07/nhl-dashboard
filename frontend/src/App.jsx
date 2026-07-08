@@ -120,6 +120,64 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
   );
 }
 
+function TeamCard({ team }) {
+  if (!team) return null;
+
+  const pointPct = team.point_pctg != null ? `${(Number(team.point_pctg) * 100).toFixed(1)}%` : "—";
+  const inPlayoffs = team.division_sequence <= 3 || (team.wildcard_sequence != null && team.wildcard_sequence <= 2);
+
+  return (
+    <div className="team-card">
+      <div className="team-card-header">
+        {team.logo_url && <img className="team-logo" src={team.logo_url} alt="" />}
+        <div>
+          <div className="team-card-name">{team.team_name}</div>
+          <div className="team-card-division">{team.division} Division</div>
+        </div>
+      </div>
+
+      <div className={inPlayoffs ? "playoff-badge playoff-in" : "playoff-badge playoff-out"}>
+        {inPlayoffs ? "IN PLAYOFF SPOT" : "OUTSIDE LOOKING IN"}
+      </div>
+
+      <div className="team-card-record">
+        <span className="team-card-pts">{team.points} PTS</span>
+        <span className="team-card-sub">{team.wins}-{team.losses}-{team.ot_losses} &middot; {pointPct}</span>
+      </div>
+
+      <div className="team-card-splits">
+        <div className="split">
+          <span className="split-label">HOME</span>
+          <span className="split-value">{team.home_wins}-{team.home_losses}</span>
+        </div>
+        <div className="split">
+          <span className="split-label">ROAD</span>
+          <span className="split-value">{team.road_wins}-{team.road_losses}</span>
+        </div>
+        <div className="split">
+          <span className="split-label">L10</span>
+          <span className="split-value">{team.l10_wins}-{team.l10_losses}-{team.l10_ot_losses}</span>
+        </div>
+      </div>
+
+      <div className="team-card-ranks">
+        <div className="rank-item">
+          <span className="rank-value">#{team.division_sequence}</span>
+          <span className="rank-label">Division</span>
+        </div>
+        <div className="rank-item">
+          <span className="rank-value">#{team.conference_sequence}</span>
+          <span className="rank-label">Conference</span>
+        </div>
+        <div className="rank-item">
+          <span className="rank-value">#{team.league_sequence}</span>
+          <span className="rank-label">League</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TrendChart({ history, teamAbbrev }) {
   const data = history.map((h) => ({
     date: h.snapshot_date,
@@ -204,6 +262,11 @@ export default function NHLDashboard() {
     }
     return rows;
   }, [standings, activeDivision, search, isSearching]);
+
+  const selectedRow = useMemo(
+    () => standings.find((r) => r.team_abbrev === selectedTeam),
+    [standings, selectedTeam]
+  );
 
   return (
     <div className="dashboard">
@@ -400,8 +463,107 @@ export default function NHLDashboard() {
         .streak-l { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
         .streak-ot { background: rgba(234, 179, 8, 0.15); color: #eab308; }
         .streak-none { color: var(--text-dim); }
-        .trend-panel {
+        .detail-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
           margin: 24px 24px 0 24px;
+        }
+        .team-card {
+          flex: 0 1 260px;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 20px;
+        }
+        .team-card-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .team-logo {
+          width: 40px;
+          height: 40px;
+          object-fit: contain;
+        }
+        .team-card-name {
+          font-weight: 700;
+          font-size: 15px;
+        }
+        .team-card-division {
+          font-size: 12px;
+          color: var(--text-dim);
+        }
+        .playoff-badge {
+          display: inline-block;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          padding: 4px 10px;
+          border-radius: 12px;
+          margin-bottom: 14px;
+        }
+        .playoff-in { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+        .playoff-out { background: rgba(139, 147, 163, 0.15); color: var(--text-dim); }
+        .team-card-record {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .team-card-pts {
+          font-size: 24px;
+          font-weight: 700;
+          color: var(--accent);
+        }
+        .team-card-sub {
+          font-size: 12px;
+          color: var(--text-dim);
+        }
+        .team-card-splits {
+          display: flex;
+          justify-content: space-between;
+          border-top: 1px solid var(--border);
+          padding-top: 14px;
+          margin-bottom: 14px;
+        }
+        .split {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .split-label {
+          font-size: 10px;
+          letter-spacing: 0.05em;
+          color: var(--text-dim);
+        }
+        .split-value {
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .team-card-ranks {
+          display: flex;
+          justify-content: space-between;
+          border-top: 1px solid var(--border);
+          padding-top: 14px;
+        }
+        .rank-item {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .rank-value {
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .rank-label {
+          font-size: 10px;
+          color: var(--text-dim);
+        }
+        .trend-panel {
+          flex: 1 1 400px;
+          min-width: 0;
           background: var(--card);
           border: 1px solid var(--border);
           border-radius: 10px;
@@ -454,7 +616,10 @@ export default function NHLDashboard() {
             onSelectTeam={setSelectedTeam}
           />
           {history.length > 0 && (
-            <TrendChart history={history} teamAbbrev={selectedTeam} />
+            <div className="detail-grid">
+              <TeamCard team={selectedRow} />
+              <TrendChart history={history} teamAbbrev={selectedTeam} />
+            </div>
           )}
         </>
       )}

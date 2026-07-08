@@ -34,11 +34,13 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow a frontend running on a different port/origin to call this API.
-# Tighten this to your actual frontend URL once you deploy.
+# Only the deployed frontend (and local dev) can call this API.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://ashy-sky-01e4eba1e.7.azurestaticapps.net",
+        "http://localhost:5173",  # local Vite dev server
+    ],
     allow_methods=["GET"],
     allow_headers=["*"],
 )
@@ -50,7 +52,7 @@ def get_connection():
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "NHL Stats Dashboard API is running"}
+    return {"status": "ok", "message": "NHL Stats Dashboard API is running", "version": "ci-cd-test-v1"}
 
 
 @app.get("/teams")

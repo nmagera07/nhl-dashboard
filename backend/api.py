@@ -90,7 +90,7 @@ def team_roster(team_abbrev: str):
                     LIMIT 1
                 ) s ON true
                 WHERE p.team_abbrev = %s
-                ORDER BY p.position_code, COALESCE(s.points, 0) DESC
+                ORDER BY COALESCE(s.points, 0) DESC, COALESCE(s.wins, 0) DESC
                 """,
                 (team_abbrev.upper(),),
             )

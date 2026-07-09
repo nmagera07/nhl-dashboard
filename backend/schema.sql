@@ -165,3 +165,21 @@ CREATE TABLE IF NOT EXISTS player_advanced_stats (
 
 CREATE INDEX IF NOT EXISTS idx_player_advanced_player
     ON player_advanced_stats (player_id, season_id);
+
+-- Monte Carlo playoff-odds simulation. Multiple as_of_date rows per season
+-- are expected -- a "live" row updated as the season progresses, plus any
+-- backtest snapshots used to validate the model against a completed season.
+-- The API always serves the latest as_of_date. See simulate_playoff_odds.py.
+CREATE TABLE IF NOT EXISTS playoff_odds (
+    id                      SERIAL PRIMARY KEY,
+    season_id               INTEGER NOT NULL,
+    as_of_date              DATE NOT NULL,
+    team_abbrev             VARCHAR(3) NOT NULL REFERENCES teams(team_abbrev),
+    playoff_pct             NUMERIC(6,4) NOT NULL,
+    trials                  INTEGER NOT NULL,
+    computed_at             TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, as_of_date, team_abbrev)
+);
+
+CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
+    ON playoff_odds (season_id, as_of_date);

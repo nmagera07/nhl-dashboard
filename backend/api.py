@@ -67,6 +67,30 @@ def list_teams():
         conn.close()
 
 
+@app.get("/playoff-odds")
+def playoff_odds():
+    """
+    Monte Carlo playoff-odds simulation results for every team, as of the
+    most recently computed snapshot. See simulate_playoff_odds.py.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT po.*, t.team_name, t.division, t.conference, t.logo_url
+                FROM playoff_odds po
+                JOIN teams t ON t.team_abbrev = po.team_abbrev
+                WHERE po.as_of_date = (SELECT MAX(as_of_date) FROM playoff_odds WHERE season_id = po.season_id)
+                  AND po.season_id = (SELECT MAX(season_id) FROM playoff_odds)
+                ORDER BY po.playoff_pct DESC
+                """
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 @app.get("/teams/{team_abbrev}/roster")
 def team_roster(team_abbrev: str):
     """Current roster for one team, with each player's latest season stats."""

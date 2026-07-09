@@ -71,7 +71,17 @@ function DivisionTabs({ divisions, active, onSelect, disabled }) {
   );
 }
 
-function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
+function PlayoffOddsCell({ pct }) {
+  if (pct == null) return <td className="col-po">—</td>;
+  const value = Number(pct) * 100;
+  return (
+    <td className={value >= 50 ? "col-po po-in" : "col-po po-out"}>
+      {value.toFixed(0)}%
+    </td>
+  );
+}
+
+function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam }) {
   return (
     <div className="table-card">
       <table className="standings-table">
@@ -89,12 +99,13 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
             <th>DIFF</th>
             <th>L10</th>
             <th>STRK</th>
+            <th className="col-po">PO%</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={11} className="no-results">No teams match your search.</td>
+              <td colSpan={12} className="no-results">No teams match your search.</td>
             </tr>
           )}
           {rows
@@ -122,6 +133,7 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam }) {
                 </td>
                 <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
                 <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
+                <PlayoffOddsCell pct={playoffOddsByTeam?.[row.team_abbrev]} />
               </tr>
             ))}
         </tbody>
@@ -713,6 +725,7 @@ export default function NHLDashboard() {
   const [playerReturnView, setPlayerReturnView] = useState("roster");
   const [leaders, setLeaders] = useState([]);
   const [leadersStatus, setLeadersStatus] = useState("idle"); // idle | loading | ready | error
+  const [playoffOdds, setPlayoffOdds] = useState([]);
 
   useEffect(() => {
     fetch(`${API_BASE}/standings/latest`)
@@ -724,6 +737,11 @@ export default function NHLDashboard() {
         if (firstDivision) setActiveDivision(firstDivision);
       })
       .catch(() => setStatus("error"));
+
+    fetch(`${API_BASE}/playoff-odds`)
+      .then((res) => res.json())
+      .then((data) => setPlayoffOdds(Array.isArray(data) ? data : []))
+      .catch(() => setPlayoffOdds([]));
   }, []);
 
   useEffect(() => {
@@ -792,6 +810,14 @@ export default function NHLDashboard() {
       (a, b) => DIVISION_ORDER.indexOf(a) - DIVISION_ORDER.indexOf(b)
     );
   }, [standings]);
+
+  const playoffOddsByTeam = useMemo(() => {
+    const map = {};
+    playoffOdds.forEach((t) => {
+      map[t.team_abbrev] = t.playoff_pct;
+    });
+    return map;
+  }, [playoffOdds]);
 
   const isSearching = search.trim().length > 0;
 
@@ -1304,6 +1330,9 @@ export default function NHLDashboard() {
           margin-top: 10px;
           line-height: 1.5;
         }
+        .col-po { width: 48px; font-weight: 700; }
+        .po-in { color: #22c55e; }
+        .po-out { color: var(--text-dim); }
       `}</style>
 
       <TopNav
@@ -1332,6 +1361,7 @@ export default function NHLDashboard() {
             rows={visibleRows}
             selectedTeam={selectedTeam}
             onSelectTeam={setSelectedTeam}
+            playoffOddsByTeam={playoffOddsByTeam}
           />
           {history.length > 0 && (
             <div className="detail-grid">

@@ -78,3 +78,66 @@ CREATE TABLE IF NOT EXISTS season_final_standings (
 
 CREATE INDEX IF NOT EXISTS idx_season_final_team
     ON season_final_standings (team_abbrev, season_id);
+
+-- Current roster only -- one row per player currently on one of the 32
+-- team rosters (~750 players), from https://api-web.nhle.com/v1/roster/{team}/current.
+-- Re-running the ingestion just upserts, so released/traded players fall
+-- out naturally next time their old team's roster is re-pulled... except
+-- we never delete rows for players no longer listed, see ingest script note.
+CREATE TABLE IF NOT EXISTS players (
+    player_id           INTEGER PRIMARY KEY,        -- NHL API player id
+    team_abbrev         VARCHAR(3) NOT NULL REFERENCES teams(team_abbrev),
+    first_name          TEXT NOT NULL,
+    last_name           TEXT NOT NULL,
+    position_code       VARCHAR(1) NOT NULL,         -- C, L, R, D, G
+    sweater_number      INTEGER,
+    shoots_catches      VARCHAR(1),
+    height_in_inches    INTEGER,
+    weight_in_pounds    INTEGER,
+    birth_date          DATE,
+    birth_city          TEXT,
+    birth_country       TEXT,
+    headshot_url        TEXT,
+    updated_at          TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_players_team
+    ON players (team_abbrev);
+
+-- One row per player per season, refreshed each ingestion run (overwritten,
+-- not a daily snapshot -- the NHL API's player landing page always returns
+-- the season-to-date total in one call, so no need to poll daily like
+-- standings_snapshots does). Skater and goalie stats share this table;
+-- whichever set doesn't apply to a player's position stays NULL.
+CREATE TABLE IF NOT EXISTS player_season_stats (
+    id                      SERIAL PRIMARY KEY,
+    player_id               INTEGER NOT NULL REFERENCES players(player_id),
+    season_id               INTEGER NOT NULL,
+    games_played            INTEGER,
+    -- skater stats
+    goals                   INTEGER,
+    assists                 INTEGER,
+    points                  INTEGER,
+    plus_minus              INTEGER,
+    pim                     INTEGER,
+    shots                   INTEGER,
+    shooting_pctg           NUMERIC(6,4),
+    power_play_goals        INTEGER,
+    power_play_points       INTEGER,
+    shorthanded_goals       INTEGER,
+    shorthanded_points      INTEGER,
+    game_winning_goals      INTEGER,
+    ot_goals                INTEGER,
+    -- goalie stats
+    wins                    INTEGER,
+    losses                  INTEGER,
+    ot_losses               INTEGER,
+    goals_against_avg       NUMERIC(6,4),
+    save_pctg               NUMERIC(6,4),
+    shutouts                INTEGER,
+    updated_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_season_player
+    ON player_season_stats (player_id, season_id);

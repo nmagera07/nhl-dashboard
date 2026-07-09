@@ -99,6 +99,42 @@ def team_roster(team_abbrev: str):
         conn.close()
 
 
+@app.get("/players/leaders")
+def player_leaders():
+    """
+    Every rostered player with their latest season stats, for the league
+    leaderboard. Must be registered before /players/{player_id} so this
+    literal path wins the match instead of being parsed as a player id.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.*, t.team_name, t.logo_url AS team_logo_url,
+                       s.season_id, s.games_played, s.goals, s.assists, s.points,
+                       s.plus_minus, s.pim, s.shots, s.shooting_pctg,
+                       s.power_play_goals, s.power_play_points,
+                       s.shorthanded_goals, s.shorthanded_points,
+                       s.game_winning_goals, s.ot_goals,
+                       s.wins, s.losses, s.ot_losses, s.goals_against_avg,
+                       s.save_pctg, s.shutouts
+                FROM players p
+                JOIN teams t ON t.team_abbrev = p.team_abbrev
+                LEFT JOIN LATERAL (
+                    SELECT * FROM player_season_stats pss
+                    WHERE pss.player_id = p.player_id
+                    ORDER BY pss.season_id DESC
+                    LIMIT 1
+                ) s ON true
+                ORDER BY COALESCE(s.points, 0) DESC
+                """
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 @app.get("/players/{player_id}")
 def player_detail(player_id: int):
     """Bio plus season-by-season stats for one player."""

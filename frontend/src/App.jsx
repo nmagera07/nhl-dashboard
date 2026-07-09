@@ -16,7 +16,7 @@ function StreakBadge({ code, count }) {
   return <span className={cls}>{code}{count}</span>;
 }
 
-function TopNav({ search, onSearchChange }) {
+function TopNav({ section, onNavigate, search, onSearchChange }) {
   return (
     <div className="topnav">
       <div className="brand">
@@ -24,18 +24,28 @@ function TopNav({ search, onSearchChange }) {
         <span className="brand-name">NHL Standings</span>
       </div>
       <div className="nav-tabs">
-        <button className="nav-tab nav-tab-active">Standings</button>
-        <button className="nav-tab nav-tab-disabled" disabled>
-          Player Stats <span className="soon-badge">SOON</span>
+        <button
+          className={section === "standings" ? "nav-tab nav-tab-active" : "nav-tab"}
+          onClick={() => onNavigate("standings")}
+        >
+          Standings
+        </button>
+        <button
+          className={section === "players" ? "nav-tab nav-tab-active" : "nav-tab"}
+          onClick={() => onNavigate("players")}
+        >
+          Player Stats
         </button>
       </div>
       <div className="nav-right">
-        <input
-          className="search-input"
-          placeholder="Find a team..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
+        {section === "standings" && (
+          <input
+            className="search-input"
+            placeholder="Find a team..."
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        )}
         <span className="live-badge">
           <span className="live-dot" /> LIVE
         </span>
@@ -377,7 +387,7 @@ function GoalieTable({ players, onSelectPlayer }) {
 
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
 
-function PlayerPanel({ player, onBack }) {
+function PlayerPanel({ player, onBack, backLabel }) {
   if (!player) return null;
 
   const isGoalie = player.position_code === "G";
@@ -388,7 +398,7 @@ function PlayerPanel({ player, onBack }) {
 
   return (
     <div className="player-panel">
-      <button className="back-link" onClick={onBack}>&larr; Back to Roster</button>
+      <button className="back-link" onClick={onBack}>&larr; {backLabel}</button>
 
       <div className="player-header">
         {player.headshot_url && <img className="player-headshot" src={player.headshot_url} alt="" />}
@@ -493,6 +503,163 @@ function PlayerPanel({ player, onBack }) {
   );
 }
 
+const SKATER_COLUMNS = [
+  { key: "points", label: "PTS" },
+  { key: "goals", label: "G" },
+  { key: "assists", label: "A" },
+  { key: "plus_minus", label: "+/-" },
+  { key: "pim", label: "PIM" },
+  { key: "shots", label: "SHOTS" },
+  { key: "games_played", label: "GP" },
+];
+
+const GOALIE_COLUMNS = [
+  { key: "wins", label: "W" },
+  { key: "losses", label: "L" },
+  { key: "ot_losses", label: "OTL" },
+  { key: "goals_against_avg", label: "GAA" },
+  { key: "save_pctg", label: "SV%" },
+  { key: "shutouts", label: "SO" },
+  { key: "games_played", label: "GP" },
+];
+
+const LOWER_IS_BETTER = new Set(["goals_against_avg", "losses", "ot_losses", "pim"]);
+const LEADERBOARD_PAGE_SIZE = 50;
+
+function formatStatValue(key, value) {
+  if (value == null) return "—";
+  if (key === "goals_against_avg") return Number(value).toFixed(2);
+  if (key === "save_pctg") return Number(value).toFixed(3);
+  return value;
+}
+
+function LeaderboardPanel({ players, onSelectPlayer }) {
+  const [group, setGroup] = useState("skaters"); // skaters | goalies
+  const [sortKey, setSortKey] = useState("points");
+  const [sortDir, setSortDir] = useState("desc");
+  const [search, setSearch] = useState("");
+
+  const columns = group === "goalies" ? GOALIE_COLUMNS : SKATER_COLUMNS;
+
+  const handleGroupChange = (nextGroup) => {
+    setGroup(nextGroup);
+    setSortKey(nextGroup === "goalies" ? "wins" : "points");
+    setSortDir("desc");
+  };
+
+  const handleSort = (key) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir(LOWER_IS_BETTER.has(key) ? "asc" : "desc");
+    }
+  };
+
+  const isSearching = search.trim().length > 0;
+
+  const groupPlayers = useMemo(
+    () => players.filter((p) => (group === "goalies" ? p.position_code === "G" : p.position_code !== "G")),
+    [players, group]
+  );
+
+  const filtered = useMemo(() => {
+    if (!isSearching) return groupPlayers;
+    const q = search.trim().toLowerCase();
+    return groupPlayers.filter(
+      (p) =>
+        `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
+        p.team_abbrev.toLowerCase().includes(q)
+    );
+  }, [groupPlayers, search, isSearching]);
+
+  const sorted = useMemo(() => {
+    const withRank = [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? (sortDir === "asc" ? Infinity : -Infinity);
+      const bv = b[sortKey] ?? (sortDir === "asc" ? Infinity : -Infinity);
+      return sortDir === "asc" ? av - bv : bv - av;
+    });
+    return withRank;
+  }, [filtered, sortKey, sortDir]);
+
+  const displayed = isSearching ? sorted : sorted.slice(0, LEADERBOARD_PAGE_SIZE);
+
+  return (
+    <div className="leaderboard-panel">
+      <div className="leaderboard-controls">
+        <div className="leaderboard-group-tabs">
+          <button
+            className={group === "skaters" ? "division-tab division-tab-active" : "division-tab"}
+            onClick={() => handleGroupChange("skaters")}
+          >
+            SKATERS
+          </button>
+          <button
+            className={group === "goalies" ? "division-tab division-tab-active" : "division-tab"}
+            onClick={() => handleGroupChange("goalies")}
+          >
+            GOALIES
+          </button>
+        </div>
+        <input
+          className="search-input leaderboard-search"
+          placeholder="Find a player..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="status-line">
+        {isSearching
+          ? `${sorted.length} result${sorted.length === 1 ? "" : "s"} for "${search.trim()}"`
+          : `Showing top ${Math.min(LEADERBOARD_PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+      </div>
+
+      <div className="table-card leaderboard-table-card">
+        <table className="standings-table">
+          <thead>
+            <tr>
+              <th className="col-rank">#</th>
+              <th className="col-team">PLAYER</th>
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className={col.key === sortKey ? "sortable-col sortable-col-active" : "sortable-col"}
+                  onClick={() => handleSort(col.key)}
+                >
+                  {col.label}{col.key === sortKey ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.length === 0 && (
+              <tr>
+                <td colSpan={2 + columns.length} className="no-results">No players match your search.</td>
+              </tr>
+            )}
+            {displayed.map((p, i) => (
+              <tr key={p.player_id} onClick={() => onSelectPlayer(p.player_id)}>
+                <td className="col-rank">{i + 1}</td>
+                <td className="col-team">
+                  {p.team_logo_url && <img className="leaderboard-team-logo" src={p.team_logo_url} alt="" />}
+                  <span className="team-abbrev">{p.team_abbrev}</span>
+                  <span className="team-name">{p.first_name} {p.last_name}</span>
+                </td>
+                {columns.map((col) => (
+                  <td key={col.key} className={col.key === sortKey ? "col-pts" : ""}>
+                    {formatStatValue(col.key, p[col.key])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function NHLDashboard() {
   const [standings, setStandings] = useState([]);
   const [history, setHistory] = useState([]);
@@ -502,11 +669,14 @@ export default function NHLDashboard() {
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [activeDivision, setActiveDivision] = useState(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState("standings"); // standings | roster | player
+  const [view, setView] = useState("standings"); // standings | roster | player | leaderboard
   const [rosterTeamAbbrev, setRosterTeamAbbrev] = useState(null);
   const [roster, setRoster] = useState([]);
   const [viewedPlayerId, setViewedPlayerId] = useState(null);
   const [playerDetail, setPlayerDetail] = useState(null);
+  const [playerReturnView, setPlayerReturnView] = useState("roster");
+  const [leaders, setLeaders] = useState([]);
+  const [leadersStatus, setLeadersStatus] = useState("idle"); // idle | loading | ready | error
 
   useEffect(() => {
     fetch(`${API_BASE}/standings/latest`)
@@ -548,15 +718,37 @@ export default function NHLDashboard() {
       .catch(() => setPlayerDetail(null));
   }, [viewedPlayerId]);
 
+  useEffect(() => {
+    if (view !== "leaderboard" || leadersStatus !== "idle") return;
+    setLeadersStatus("loading");
+    fetch(`${API_BASE}/players/leaders`)
+      .then((res) => res.json())
+      .then((data) => {
+        setLeaders(Array.isArray(data) ? data : []);
+        setLeadersStatus("ready");
+      })
+      .catch(() => setLeadersStatus("error"));
+  }, [view, leadersStatus]);
+
   const handleViewRoster = (teamAbbrev) => {
     setRosterTeamAbbrev(teamAbbrev);
     setView("roster");
   };
 
   const handleSelectPlayer = (playerId) => {
+    setPlayerReturnView(view);
     setViewedPlayerId(playerId);
     setView("player");
   };
+
+  const handleNavigate = (section) => {
+    setView(section === "players" ? "leaderboard" : "standings");
+  };
+
+  const topNavSection =
+    view === "leaderboard" || (view === "player" && playerReturnView === "leaderboard")
+      ? "players"
+      : "standings";
 
   const divisions = useMemo(() => {
     const set = new Set(standings.map((r) => r.division).filter(Boolean));
@@ -650,21 +842,6 @@ export default function NHLDashboard() {
         .nav-tab-active {
           color: var(--text);
           border-bottom: 2px solid var(--accent);
-        }
-        .nav-tab-disabled {
-          cursor: default;
-          opacity: 0.6;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .soon-badge {
-          font-size: 9px;
-          background: #2a2f3a;
-          color: var(--text-dim);
-          padding: 2px 6px;
-          border-radius: 3px;
-          letter-spacing: 0.05em;
         }
         .nav-right {
           display: flex;
@@ -1061,9 +1238,36 @@ export default function NHLDashboard() {
         }
         .stat-tile-value { font-size: 24px; font-weight: 700; color: var(--accent); }
         .stat-tile-label { font-size: 10px; letter-spacing: 0.05em; color: var(--text-dim); }
+        .leaderboard-panel { padding-top: 0; }
+        .leaderboard-controls {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 0 24px;
+          margin-bottom: 16px;
+        }
+        .leaderboard-search { width: 220px; }
+        .leaderboard-group-tabs { display: flex; gap: 8px; }
+        .leaderboard-table-card { margin: 0 24px; }
+        .sortable-col { cursor: pointer; user-select: none; }
+        .sortable-col:hover { color: var(--text); }
+        .sortable-col-active { color: var(--accent); }
+        .leaderboard-team-logo {
+          width: 20px;
+          height: 20px;
+          object-fit: contain;
+          margin-right: 8px;
+          vertical-align: middle;
+        }
       `}</style>
 
-      <TopNav search={search} onSearchChange={setSearch} />
+      <TopNav
+        section={topNavSection}
+        onNavigate={handleNavigate}
+        search={search}
+        onSearchChange={setSearch}
+      />
 
       {status === "loading" && <div className="status-line">Loading standings…</div>}
       {status === "error" && (
@@ -1112,8 +1316,21 @@ export default function NHLDashboard() {
       {status === "ready" && view === "player" && (
         <PlayerPanel
           player={playerDetail}
-          onBack={() => setView("roster")}
+          onBack={() => setView(playerReturnView)}
+          backLabel={playerReturnView === "leaderboard" ? "Back to Leaderboard" : "Back to Roster"}
         />
+      )}
+
+      {status === "ready" && view === "leaderboard" && (
+        <>
+          {leadersStatus === "loading" && <div className="status-line">Loading players…</div>}
+          {leadersStatus === "error" && (
+            <div className="status-line status-error">Couldn't load player stats.</div>
+          )}
+          {leadersStatus === "ready" && (
+            <LeaderboardPanel players={leaders} onSelectPlayer={handleSelectPlayer} />
+          )}
+        </>
       )}
     </div>
   );

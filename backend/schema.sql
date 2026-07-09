@@ -141,3 +141,27 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
 
 CREATE INDEX IF NOT EXISTS idx_player_season_player
     ON player_season_stats (player_id, season_id);
+
+-- Corsi/Fenwick (5-on-5 shot-attempt possession stats), computed ourselves
+-- from the NHL API's official play-by-play + shift-chart endpoints rather
+-- than scraped from MoneyPuck/Natural Stat Trick, both of which block
+-- automated access. See ingest_advanced_stats.py for the on-ice-detection
+-- algorithm. Recomputed from scratch each run (not incremental), so this
+-- is always the full-season total as of the last ingestion.
+CREATE TABLE IF NOT EXISTS player_advanced_stats (
+    id                      SERIAL PRIMARY KEY,
+    player_id               INTEGER NOT NULL REFERENCES players(player_id),
+    season_id               INTEGER NOT NULL,
+    corsi_for               INTEGER NOT NULL DEFAULT 0,
+    corsi_against            INTEGER NOT NULL DEFAULT 0,
+    corsi_for_pct           NUMERIC(6,4),
+    fenwick_for             INTEGER NOT NULL DEFAULT 0,
+    fenwick_against         INTEGER NOT NULL DEFAULT 0,
+    fenwick_for_pct         NUMERIC(6,4),
+    games_processed         INTEGER NOT NULL DEFAULT 0,
+    updated_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, player_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_advanced_player
+    ON player_advanced_stats (player_id, season_id);

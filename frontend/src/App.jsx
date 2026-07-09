@@ -392,6 +392,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
   const isGoalie = player.position_code === "G";
   const seasonStats = player.season_stats?.[0];
+  const advancedStats = player.advanced_stats?.[0];
   const heightLabel = player.height_in_inches
     ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
     : "—";
@@ -496,6 +497,41 @@ function PlayerPanel({ player, onBack, backLabel }) {
                 <span className="stat-tile-label">GP</span>
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {!isGoalie && advancedStats && (
+        <div className="advanced-stats-panel">
+          <div className="trend-eyebrow advanced-stats-header">ADVANCED (5-ON-5)</div>
+          <div className="stat-tiles">
+            <div className="stat-tile">
+              <span className="stat-tile-value">
+                {advancedStats.corsi_for_pct != null ? `${(Number(advancedStats.corsi_for_pct) * 100).toFixed(1)}%` : "—"}
+              </span>
+              <span className="stat-tile-label">CORSI FOR %</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">{advancedStats.corsi_for}-{advancedStats.corsi_against}</span>
+              <span className="stat-tile-label">CF - CA</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">
+                {advancedStats.fenwick_for_pct != null ? `${(Number(advancedStats.fenwick_for_pct) * 100).toFixed(1)}%` : "—"}
+              </span>
+              <span className="stat-tile-label">FENWICK FOR %</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">{advancedStats.fenwick_for}-{advancedStats.fenwick_against}</span>
+              <span className="stat-tile-label">FF - FA</span>
+            </div>
+          </div>
+          {seasonStats && advancedStats.games_processed < seasonStats.games_played && (
+            <div className="advanced-stats-caveat">
+              Based on shift data from {advancedStats.games_processed} of {seasonStats.games_played} games played
+              this season &mdash; computed from official NHL play-by-play and shift data (the NHL's own shift-chart
+              data isn't complete for every game).
+            </div>
           )}
         </div>
       )}
@@ -1259,6 +1295,14 @@ export default function NHLDashboard() {
           object-fit: contain;
           margin-right: 8px;
           vertical-align: middle;
+        }
+        .advanced-stats-panel { margin: 20px 24px 0 24px; }
+        .advanced-stats-header { margin-bottom: 10px; }
+        .advanced-stats-caveat {
+          font-size: 11px;
+          color: var(--text-dim);
+          margin-top: 10px;
+          line-height: 1.5;
         }
       `}</style>
 

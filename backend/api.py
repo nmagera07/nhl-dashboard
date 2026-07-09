@@ -159,6 +159,12 @@ def player_detail(player_id: int):
                 (player_id,),
             )
             player["season_stats"] = cur.fetchall()
+
+            cur.execute(
+                "SELECT * FROM player_advanced_stats WHERE player_id = %s ORDER BY season_id DESC",
+                (player_id,),
+            )
+            player["advanced_stats"] = cur.fetchall()
             return player
     finally:
         conn.close()

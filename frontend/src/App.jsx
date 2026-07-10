@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo } from "react";
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 
 // Points at the live FastAPI backend deployed on Azure Container Apps.
@@ -209,9 +209,17 @@ function formatSeasonLabel(seasonId) {
   return `${str.slice(2, 4)}-${str.slice(6, 8)}`;
 }
 
-function YearlyBar({ x, y, width, height, payload }) {
+function YearlyDot({ cx, cy, payload }) {
   const fill = payload?.madePlayoffs ? "#3b82f6" : "#4b5563";
-  return <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} ry={4} />;
+  return <circle cx={cx} cy={cy} r={5} fill={fill} stroke="#0a0b0f" strokeWidth={2} />;
+}
+
+function YearlyPointLabel({ x, y, value }) {
+  return (
+    <text x={x} y={y - 14} textAnchor="middle" fill="#e5e7eb" fontSize={12} fontWeight={700}>
+      {value}
+    </text>
+  );
 }
 
 const chartTooltipStyle = {
@@ -258,13 +266,29 @@ function TrendChart({ mode, onModeChange, history, seasonHistory, teamAbbrev }) 
       </div>
       <ResponsiveContainer width="100%" height={260}>
         {mode === "years" ? (
-          <BarChart data={yearlyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+          <AreaChart data={yearlyData} margin={{ top: 24, right: 20, left: -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id="yearlyFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="season" stroke="#6b7280" tick={{ fontSize: 11 }} />
             <YAxis stroke="#6b7280" tick={{ fontSize: 11 }} />
             <Tooltip {...chartTooltipStyle} />
-            <Bar dataKey="points" shape={<YearlyBar />} isAnimationActive={false} />
-          </BarChart>
+            <Area
+              type="monotone"
+              dataKey="points"
+              stroke="#3b82f6"
+              strokeWidth={2.5}
+              fill="url(#yearlyFill)"
+              dot={<YearlyDot />}
+              isAnimationActive={false}
+            >
+              <LabelList dataKey="points" content={<YearlyPointLabel />} />
+            </Area>
+          </AreaChart>
         ) : (
           <LineChart data={dailyData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
             <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />

@@ -1,4 +1,7 @@
-﻿import { useState, useEffect, useMemo, useRef } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
+import {
+  Routes, Route, Navigate, useNavigate, useLocation, useParams,
+} from "react-router-dom";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
@@ -732,6 +735,177 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   );
 }
 
+function StandingsPage({
+  divisions,
+  activeDivision,
+  onSelectDivision,
+  isSearching,
+  visibleRows,
+  selectedTeam,
+  onSelectTeam,
+  playoffOddsByTeam,
+  playoffOddsStatus,
+  selectedRow,
+  history,
+  seasonHistory,
+  trendMode,
+  onTrendModeChange,
+  onViewRoster,
+}) {
+  return (
+    <>
+      <DivisionTabs
+        divisions={divisions}
+        active={activeDivision}
+        onSelect={onSelectDivision}
+        disabled={isSearching}
+      />
+      <StandingsTable
+        rows={visibleRows}
+        selectedTeam={selectedTeam}
+        onSelectTeam={onSelectTeam}
+        playoffOddsByTeam={playoffOddsByTeam}
+      />
+      {playoffOddsStatus === "error" && (
+        <div className="status-line status-error">
+          Playoff odds unavailable — the PO% column may be incomplete.
+        </div>
+      )}
+      {history.length > 0 && (
+        <div className="detail-grid">
+          <TeamCard team={selectedRow} onViewRoster={onViewRoster} />
+          <TrendChart
+            mode={trendMode}
+            onModeChange={onTrendModeChange}
+            history={history}
+            seasonHistory={seasonHistory}
+            teamAbbrev={selectedTeam}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function RosterPage({ standings }) {
+  const { teamAbbrev } = useParams();
+  const navigate = useNavigate();
+  const abbrev = teamAbbrev?.toUpperCase();
+
+  const [roster, setRoster] = useState([]);
+  const [rosterStatus, setRosterStatus] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    fetch(`${API_BASE}/teams/${abbrev}/roster`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRoster(Array.isArray(data) ? data : []);
+        setRosterStatus("ready");
+      })
+      .catch(() => setRosterStatus("error"));
+  }, [abbrev]);
+
+  const team = useMemo(
+    () => standings.find((r) => r.team_abbrev === abbrev),
+    [standings, abbrev]
+  );
+
+  const handleSelectPlayer = (playerId) => {
+    navigate(`/players/${playerId}`, { state: { from: "roster", teamAbbrev: abbrev } });
+  };
+
+  return (
+    <>
+      {rosterStatus === "loading" && <div className="status-line">Loading roster…</div>}
+      {rosterStatus === "error" && (
+        <div className="status-line status-error">Couldn't load the roster.</div>
+      )}
+      {rosterStatus === "ready" && (
+        <RosterPanel
+          team={team}
+          roster={roster}
+          onSelectPlayer={handleSelectPlayer}
+          onBack={() => navigate("/")}
+        />
+      )}
+    </>
+  );
+}
+
+function PlayerPage() {
+  const { playerId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [playerDetail, setPlayerDetail] = useState(null);
+  const [playerStatus, setPlayerStatus] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    fetch(`${API_BASE}/players/${playerId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setPlayerDetail(data);
+        setPlayerStatus("ready");
+      })
+      .catch(() => setPlayerStatus("error"));
+  }, [playerId]);
+
+  // Prefer the explicit "where did you come from" state passed at navigation
+  // time; a direct deep link (no state) falls back to the player's own team
+  // roster, which is always a sensible destination and doesn't depend on
+  // browser history existing at all.
+  const cameFromLeaderboard = location.state?.from === "leaderboard";
+  const backLabel = cameFromLeaderboard ? "Back to Leaderboard" : "Back to Roster";
+  const handleBack = () => {
+    if (cameFromLeaderboard) navigate("/leaderboard");
+    else navigate(playerDetail?.team_abbrev ? `/teams/${playerDetail.team_abbrev}` : "/");
+  };
+
+  return (
+    <>
+      {playerStatus === "loading" && <div className="status-line">Loading player…</div>}
+      {playerStatus === "error" && (
+        <div className="status-line status-error">Couldn't load player details.</div>
+      )}
+      {playerStatus === "ready" && (
+        <PlayerPanel player={playerDetail} onBack={handleBack} backLabel={backLabel} />
+      )}
+    </>
+  );
+}
+
+function LeaderboardPage() {
+  const navigate = useNavigate();
+  const [leaders, setLeaders] = useState([]);
+  const [leadersStatus, setLeadersStatus] = useState("loading"); // loading | ready | error
+
+  useEffect(() => {
+    fetch(`${API_BASE}/players/leaders`)
+      .then((res) => res.json())
+      .then((data) => {
+        setLeaders(Array.isArray(data) ? data : []);
+        setLeadersStatus("ready");
+      })
+      .catch(() => setLeadersStatus("error"));
+  }, []);
+
+  const handleSelectPlayer = (playerId) => {
+    navigate(`/players/${playerId}`, { state: { from: "leaderboard" } });
+  };
+
+  return (
+    <>
+      {leadersStatus === "loading" && <div className="status-line">Loading players…</div>}
+      {leadersStatus === "error" && (
+        <div className="status-line status-error">Couldn't load player stats.</div>
+      )}
+      {leadersStatus === "ready" && (
+        <LeaderboardPanel players={leaders} onSelectPlayer={handleSelectPlayer} />
+      )}
+    </>
+  );
+}
+
 export default function NHLDashboard() {
   const [standings, setStandings] = useState([]);
   const [history, setHistory] = useState([]);
@@ -741,18 +915,11 @@ export default function NHLDashboard() {
   const [status, setStatus] = useState("loading"); // loading | ready | error
   const [activeDivision, setActiveDivision] = useState(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState("standings"); // standings | roster | player | leaderboard
-  const [rosterTeamAbbrev, setRosterTeamAbbrev] = useState(null);
-  const [roster, setRoster] = useState([]);
-  const [rosterStatus, setRosterStatus] = useState("idle"); // idle | loading | ready | error
-  const [viewedPlayerId, setViewedPlayerId] = useState(null);
-  const [playerDetail, setPlayerDetail] = useState(null);
-  const [playerStatus, setPlayerStatus] = useState("idle"); // idle | loading | ready | error
-  const [playerReturnView, setPlayerReturnView] = useState("roster");
-  const [leaders, setLeaders] = useState([]);
-  const [leadersStatus, setLeadersStatus] = useState("idle"); // idle | loading | ready | error
   const [playoffOdds, setPlayoffOdds] = useState([]);
   const [playoffOddsStatus, setPlayoffOddsStatus] = useState("loading"); // loading | ready | error
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     fetch(`${API_BASE}/standings/latest`)
@@ -786,67 +953,12 @@ export default function NHLDashboard() {
       .catch(() => setSeasonHistory([]));
   }, [selectedTeam]);
 
-  useEffect(() => {
-    if (!rosterTeamAbbrev) return;
-    fetch(`${API_BASE}/teams/${rosterTeamAbbrev}/roster`)
-      .then((res) => res.json())
-      .then((data) => {
-        setRoster(Array.isArray(data) ? data : []);
-        setRosterStatus("ready");
-      })
-      .catch(() => setRosterStatus("error"));
-  }, [rosterTeamAbbrev]);
+  const handleViewRoster = (teamAbbrev) => navigate(`/teams/${teamAbbrev}`);
 
-  useEffect(() => {
-    if (!viewedPlayerId) return;
-    fetch(`${API_BASE}/players/${viewedPlayerId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setPlayerDetail(data);
-        setPlayerStatus("ready");
-      })
-      .catch(() => setPlayerStatus("error"));
-  }, [viewedPlayerId]);
-
-  const leadersFetchStarted = useRef(false);
-
-  useEffect(() => {
-    if (view !== "leaderboard" || leadersFetchStarted.current) return;
-    leadersFetchStarted.current = true;
-    fetch(`${API_BASE}/players/leaders`)
-      .then((res) => res.json())
-      .then((data) => {
-        setLeaders(Array.isArray(data) ? data : []);
-        setLeadersStatus("ready");
-      })
-      .catch(() => setLeadersStatus("error"));
-  }, [view]);
-
-  useEffect(() => {
-    if (view === "leaderboard" && leadersFetchStarted.current && leadersStatus === "idle") {
-      setLeadersStatus("loading");
-    }
-  }, [view, leadersStatus]);
-
-  const handleViewRoster = (teamAbbrev) => {
-    if (teamAbbrev !== rosterTeamAbbrev) setRosterStatus("loading");
-    setRosterTeamAbbrev(teamAbbrev);
-    setView("roster");
-  };
-
-  const handleSelectPlayer = (playerId) => {
-    setPlayerReturnView(view);
-    if (playerId !== viewedPlayerId) setPlayerStatus("loading");
-    setViewedPlayerId(playerId);
-    setView("player");
-  };
-
-  const handleNavigate = (section) => {
-    setView(section === "players" ? "leaderboard" : "standings");
-  };
+  const handleNavigate = (section) => navigate(section === "players" ? "/leaderboard" : "/");
 
   const topNavSection =
-    view === "leaderboard" || (view === "player" && playerReturnView === "leaderboard")
+    location.pathname === "/leaderboard" || location.state?.from === "leaderboard"
       ? "players"
       : "standings";
 
@@ -885,11 +997,6 @@ export default function NHLDashboard() {
   const selectedRow = useMemo(
     () => standings.find((r) => r.team_abbrev === selectedTeam),
     [standings, selectedTeam]
-  );
-
-  const rosterTeamRow = useMemo(
-    () => standings.find((r) => r.team_abbrev === rosterTeamAbbrev),
-    [standings, rosterTeamAbbrev]
   );
 
   return (
@@ -1395,83 +1502,38 @@ export default function NHLDashboard() {
         </div>
       )}
 
-      {status === "ready" && view === "standings" && (
-        <>
-          <DivisionTabs
-            divisions={divisions}
-            active={activeDivision}
-            onSelect={setActiveDivision}
-            disabled={isSearching}
-          />
-          <StandingsTable
-            rows={visibleRows}
-            selectedTeam={selectedTeam}
-            onSelectTeam={setSelectedTeam}
-            playoffOddsByTeam={playoffOddsByTeam}
-          />
-          {playoffOddsStatus === "error" && (
-            <div className="status-line status-error">
-              Playoff odds unavailable — the PO% column may be incomplete.
-            </div>
-          )}
-          {history.length > 0 && (
-            <div className="detail-grid">
-              <TeamCard team={selectedRow} onViewRoster={handleViewRoster} />
-              <TrendChart
-                mode={trendMode}
-                onModeChange={setTrendMode}
+      {status === "ready" && (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <StandingsPage
+                divisions={divisions}
+                activeDivision={activeDivision}
+                onSelectDivision={setActiveDivision}
+                isSearching={isSearching}
+                visibleRows={visibleRows}
+                selectedTeam={selectedTeam}
+                onSelectTeam={setSelectedTeam}
+                playoffOddsByTeam={playoffOddsByTeam}
+                playoffOddsStatus={playoffOddsStatus}
+                selectedRow={selectedRow}
                 history={history}
                 seasonHistory={seasonHistory}
-                teamAbbrev={selectedTeam}
+                trendMode={trendMode}
+                onTrendModeChange={setTrendMode}
+                onViewRoster={handleViewRoster}
               />
-            </div>
-          )}
-        </>
-      )}
-
-      {status === "ready" && view === "roster" && (
-        <>
-          {rosterStatus === "loading" && <div className="status-line">Loading roster…</div>}
-          {rosterStatus === "error" && (
-            <div className="status-line status-error">Couldn't load the roster.</div>
-          )}
-          {rosterStatus === "ready" && (
-            <RosterPanel
-              team={rosterTeamRow}
-              roster={roster}
-              onSelectPlayer={handleSelectPlayer}
-              onBack={() => setView("standings")}
-            />
-          )}
-        </>
-      )}
-
-      {status === "ready" && view === "player" && (
-        <>
-          {playerStatus === "loading" && <div className="status-line">Loading player…</div>}
-          {playerStatus === "error" && (
-            <div className="status-line status-error">Couldn't load player details.</div>
-          )}
-          {playerStatus === "ready" && (
-            <PlayerPanel
-              player={playerDetail}
-              onBack={() => setView(playerReturnView)}
-              backLabel={playerReturnView === "leaderboard" ? "Back to Leaderboard" : "Back to Roster"}
-            />
-          )}
-        </>
-      )}
-
-      {status === "ready" && view === "leaderboard" && (
-        <>
-          {leadersStatus === "loading" && <div className="status-line">Loading players…</div>}
-          {leadersStatus === "error" && (
-            <div className="status-line status-error">Couldn't load player stats.</div>
-          )}
-          {leadersStatus === "ready" && (
-            <LeaderboardPanel players={leaders} onSelectPlayer={handleSelectPlayer} />
-          )}
-        </>
+            }
+          />
+          <Route
+            path="/teams/:teamAbbrev"
+            element={<RosterPage key={location.pathname} standings={standings} />}
+          />
+          <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       )}
     </div>
   );

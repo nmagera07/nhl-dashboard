@@ -24,9 +24,16 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+# Azure Container Apps already captures stdout/stderr, and the container's
+# filesystem is ephemeral, so skip the rotating file handler here -- just
+# reuse the same shared setup with file logging disabled.
+logger = setup_logging(__name__, log_to_file=False)
 
 app = FastAPI(
     title="NHL Stats Dashboard API",
@@ -47,7 +54,11 @@ app.add_middleware(
 
 
 def get_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+    except Exception:
+        logger.error("Failed to connect to the database", exc_info=True)
+        raise
 
 
 @app.get("/")
@@ -63,6 +74,9 @@ def list_teams():
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM teams ORDER BY team_name")
             return cur.fetchall()
+    except Exception:
+        logger.error("Failed to fetch teams", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -87,6 +101,9 @@ def playoff_odds():
                 """
             )
             return cur.fetchall()
+    except Exception:
+        logger.error("Failed to fetch playoff odds", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -119,6 +136,9 @@ def team_roster(team_abbrev: str):
                 (team_abbrev.upper(),),
             )
             return cur.fetchall()
+    except Exception:
+        logger.error(f"Failed to fetch roster for team '{team_abbrev}'", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -155,6 +175,9 @@ def player_leaders():
                 """
             )
             return cur.fetchall()
+    except Exception:
+        logger.error("Failed to fetch player leaders", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -190,6 +213,11 @@ def player_detail(player_id: int):
             )
             player["advanced_stats"] = cur.fetchall()
             return player
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error(f"Failed to fetch player detail for id '{player_id}'", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -210,6 +238,9 @@ def latest_standings():
                 """
             )
             return cur.fetchall()
+    except Exception:
+        logger.error("Failed to fetch latest standings", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -237,6 +268,9 @@ def team_season_history(team_abbrev: str):
                 (team_abbrev.upper(),),
             )
             return cur.fetchall()
+    except Exception:
+        logger.error(f"Failed to fetch season history for team '{team_abbrev}'", exc_info=True)
+        raise
     finally:
         conn.close()
 
@@ -272,5 +306,10 @@ def team_history(team_abbrev: str, start: Optional[date] = None, end: Optional[d
             if not rows:
                 raise HTTPException(status_code=404, detail=f"No data found for team '{team_abbrev}'")
             return rows
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error(f"Failed to fetch standings history for team '{team_abbrev}'", exc_info=True)
+        raise
     finally:
         conn.close()

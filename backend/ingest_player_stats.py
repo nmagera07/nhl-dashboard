@@ -24,11 +24,15 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 ROSTER_URL = "https://api-web.nhle.com/v1/roster/{team}/current"
 PLAYER_LANDING_URL = "https://api-web.nhle.com/v1/player/{player_id}/landing"
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+logger = setup_logging("ingest_player_stats")
 
 # Be polite to a free public API with no documented rate limit.
 REQUEST_DELAY_SECONDS = 0.15
@@ -188,27 +192,37 @@ def main():
 
     total_players = 0
     total_with_stats = 0
+    teams_succeeded = 0
+    teams_failed = 0
     for team_abbrev in team_abbrevs:
-        roster = fetch_roster(team_abbrev)
-        time.sleep(REQUEST_DELAY_SECONDS)
-
-        landings = []
-        for player in roster:
-            landings.append((player, fetch_player_landing(player["id"])))
+        try:
+            roster = fetch_roster(team_abbrev)
             time.sleep(REQUEST_DELAY_SECONDS)
 
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cur:
-                for player in roster:
-                    upsert_player(cur, team_abbrev, player)
-                for player, landing in landings:
-                    if upsert_season_stats(cur, player["id"], landing):
-                        total_with_stats += 1
+            landings = []
+            for player in roster:
+                landings.append((player, fetch_player_landing(player["id"])))
+                time.sleep(REQUEST_DELAY_SECONDS)
 
-        total_players += len(roster)
-        print(f"{team_abbrev}: ingested {len(roster)} players")
+            with psycopg2.connect(DATABASE_URL) as conn:
+                with conn.cursor() as cur:
+                    for player in roster:
+                        upsert_player(cur, team_abbrev, player)
+                    for player, landing in landings:
+                        if upsert_season_stats(cur, player["id"], landing):
+                            total_with_stats += 1
 
-    print(f"Done. {total_players} players total, {total_with_stats} with season stats.")
+            total_players += len(roster)
+            logger.info(f"{team_abbrev}: ingested {len(roster)} players")
+        except Exception as e:
+            teams_failed += 1
+            logger.warning(f"{team_abbrev}: failed to ingest roster/stats: {e}")
+            continue
+
+        teams_succeeded += 1
+
+    logger.info(f"Done. {total_players} players total, {total_with_stats} with season stats.")
+    logger.info(f"Teams: {teams_succeeded} succeeded, {teams_failed} failed.")
 
 
 if __name__ == "__main__":

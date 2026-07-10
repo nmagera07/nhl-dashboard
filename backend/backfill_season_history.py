@@ -24,11 +24,15 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 STANDINGS_SEASON_URL = "https://api-web.nhle.com/v1/standings-season"
 STANDINGS_BY_DATE_URL = "https://api-web.nhle.com/v1/standings/{date}"
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+logger = setup_logging("backfill_season_history")
 
 # clinchIndicator on the final day of a season: 'p' = Presidents' Trophy,
 # 'z'/'y'/'x' = clinched a playoff spot (division/division-runner-up/wildcard),
@@ -120,7 +124,7 @@ def main():
                     teams = fetch_final_standings(standings_end)
                     for team in teams:
                         upsert_season_row(cur, season_id, team)
-                    print(f"Backfilled {len(teams)} teams for season {season_id} (as of {standings_end})")
+                    logger.info(f"Backfilled {len(teams)} teams for season {season_id} (as of {standings_end})")
     finally:
         conn.close()
 

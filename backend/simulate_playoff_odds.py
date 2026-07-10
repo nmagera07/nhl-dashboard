@@ -58,9 +58,13 @@ import psycopg2.extras
 import requests
 from dotenv import load_dotenv
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+logger = setup_logging("simulate_playoff_odds")
 STANDINGS_URL = "https://api-web.nhle.com/v1/standings/{date}"
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
@@ -204,10 +208,10 @@ def main():
         args.season = current_season_id(as_of_parsed)
 
     standings = fetch_standings_as_of(args.as_of)
-    print(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
+    logger.info(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
 
     schedule = build_schedule(list(standings.keys()), args.season, args.as_of)
-    print(f"{len(schedule)} remaining games to simulate across {args.trials} trials")
+    logger.info(f"{len(schedule)} remaining games to simulate across {args.trials} trials")
 
     odds = simulate(standings, schedule, args.trials)
 
@@ -215,7 +219,7 @@ def main():
         save_odds(odds, args.season, args.as_of, args.trials)
 
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
-        print(f"{team}: {pct * 100:.1f}%")
+        logger.info(f"{team}: {pct * 100:.1f}%")
 
 
 if __name__ == "__main__":

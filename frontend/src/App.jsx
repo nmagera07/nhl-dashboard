@@ -744,12 +744,15 @@ export default function NHLDashboard() {
   const [view, setView] = useState("standings"); // standings | roster | player | leaderboard
   const [rosterTeamAbbrev, setRosterTeamAbbrev] = useState(null);
   const [roster, setRoster] = useState([]);
+  const [rosterStatus, setRosterStatus] = useState("idle"); // idle | loading | ready | error
   const [viewedPlayerId, setViewedPlayerId] = useState(null);
   const [playerDetail, setPlayerDetail] = useState(null);
+  const [playerStatus, setPlayerStatus] = useState("idle"); // idle | loading | ready | error
   const [playerReturnView, setPlayerReturnView] = useState("roster");
   const [leaders, setLeaders] = useState([]);
   const [leadersStatus, setLeadersStatus] = useState("idle"); // idle | loading | ready | error
   const [playoffOdds, setPlayoffOdds] = useState([]);
+  const [playoffOddsStatus, setPlayoffOddsStatus] = useState("loading"); // loading | ready | error
 
   useEffect(() => {
     fetch(`${API_BASE}/standings/latest`)
@@ -764,8 +767,11 @@ export default function NHLDashboard() {
 
     fetch(`${API_BASE}/playoff-odds`)
       .then((res) => res.json())
-      .then((data) => setPlayoffOdds(Array.isArray(data) ? data : []))
-      .catch(() => setPlayoffOdds([]));
+      .then((data) => {
+        setPlayoffOdds(Array.isArray(data) ? data : []);
+        setPlayoffOddsStatus("ready");
+      })
+      .catch(() => setPlayoffOddsStatus("error"));
   }, []);
 
   useEffect(() => {
@@ -784,16 +790,22 @@ export default function NHLDashboard() {
     if (!rosterTeamAbbrev) return;
     fetch(`${API_BASE}/teams/${rosterTeamAbbrev}/roster`)
       .then((res) => res.json())
-      .then((data) => setRoster(Array.isArray(data) ? data : []))
-      .catch(() => setRoster([]));
+      .then((data) => {
+        setRoster(Array.isArray(data) ? data : []);
+        setRosterStatus("ready");
+      })
+      .catch(() => setRosterStatus("error"));
   }, [rosterTeamAbbrev]);
 
   useEffect(() => {
     if (!viewedPlayerId) return;
     fetch(`${API_BASE}/players/${viewedPlayerId}`)
       .then((res) => res.json())
-      .then((data) => setPlayerDetail(data))
-      .catch(() => setPlayerDetail(null));
+      .then((data) => {
+        setPlayerDetail(data);
+        setPlayerStatus("ready");
+      })
+      .catch(() => setPlayerStatus("error"));
   }, [viewedPlayerId]);
 
   const leadersFetchStarted = useRef(false);
@@ -817,12 +829,14 @@ export default function NHLDashboard() {
   }, [view, leadersStatus]);
 
   const handleViewRoster = (teamAbbrev) => {
+    if (teamAbbrev !== rosterTeamAbbrev) setRosterStatus("loading");
     setRosterTeamAbbrev(teamAbbrev);
     setView("roster");
   };
 
   const handleSelectPlayer = (playerId) => {
     setPlayerReturnView(view);
+    if (playerId !== viewedPlayerId) setPlayerStatus("loading");
     setViewedPlayerId(playerId);
     setView("player");
   };
@@ -1395,6 +1409,11 @@ export default function NHLDashboard() {
             onSelectTeam={setSelectedTeam}
             playoffOddsByTeam={playoffOddsByTeam}
           />
+          {playoffOddsStatus === "error" && (
+            <div className="status-line status-error">
+              Playoff odds unavailable — the PO% column may be incomplete.
+            </div>
+          )}
           {history.length > 0 && (
             <div className="detail-grid">
               <TeamCard team={selectedRow} onViewRoster={handleViewRoster} />
@@ -1411,20 +1430,36 @@ export default function NHLDashboard() {
       )}
 
       {status === "ready" && view === "roster" && (
-        <RosterPanel
-          team={rosterTeamRow}
-          roster={roster}
-          onSelectPlayer={handleSelectPlayer}
-          onBack={() => setView("standings")}
-        />
+        <>
+          {rosterStatus === "loading" && <div className="status-line">Loading roster…</div>}
+          {rosterStatus === "error" && (
+            <div className="status-line status-error">Couldn't load the roster.</div>
+          )}
+          {rosterStatus === "ready" && (
+            <RosterPanel
+              team={rosterTeamRow}
+              roster={roster}
+              onSelectPlayer={handleSelectPlayer}
+              onBack={() => setView("standings")}
+            />
+          )}
+        </>
       )}
 
       {status === "ready" && view === "player" && (
-        <PlayerPanel
-          player={playerDetail}
-          onBack={() => setView(playerReturnView)}
-          backLabel={playerReturnView === "leaderboard" ? "Back to Leaderboard" : "Back to Roster"}
-        />
+        <>
+          {playerStatus === "loading" && <div className="status-line">Loading player…</div>}
+          {playerStatus === "error" && (
+            <div className="status-line status-error">Couldn't load player details.</div>
+          )}
+          {playerStatus === "ready" && (
+            <PlayerPanel
+              player={playerDetail}
+              onBack={() => setView(playerReturnView)}
+              backLabel={playerReturnView === "leaderboard" ? "Back to Leaderboard" : "Back to Roster"}
+            />
+          )}
+        </>
       )}
 
       {status === "ready" && view === "leaderboard" && (

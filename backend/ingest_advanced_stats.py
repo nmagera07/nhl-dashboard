@@ -44,6 +44,8 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
@@ -51,6 +53,8 @@ PLAY_BY_PLAY_URL = "https://api-web.nhle.com/v1/gamecenter/{game_id}/play-by-pla
 SHIFT_CHART_URL = "https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId={game_id}"
 DATABASE_URL = os.environ["DATABASE_URL"]
 DEFAULT_SEASON = 20252026
+
+logger = setup_logging("ingest_advanced_stats")
 
 SHOT_ATTEMPT_TYPES = {"missed-shot", "shot-on-goal", "goal", "blocked-shot"}
 EVEN_STRENGTH_5V5 = "1551"
@@ -207,7 +211,7 @@ def main():
         time.sleep(REQUEST_DELAY_SECONDS)
 
     game_ids = sorted(game_ids)
-    print(f"Processing {len(game_ids)} games across {len(team_abbrevs)} team(s)...")
+    logger.info(f"Processing {len(game_ids)} games across {len(team_abbrevs)} team(s)...")
 
     valid_player_ids = fetch_valid_player_ids()
 
@@ -216,14 +220,14 @@ def main():
         try:
             process_game(game_id, totals)
         except Exception as e:
-            print(f"  game {game_id} failed: {e}")
+            logger.warning(f"  game {game_id} failed: {e}")
             continue
 
         if i % CHECKPOINT_EVERY == 0 or i == len(game_ids):
             save_totals(totals, args.season, valid_player_ids)
-            print(f"[{i}/{len(game_ids)}] checkpoint saved -- {len(totals)} players so far")
+            logger.info(f"[{i}/{len(game_ids)}] checkpoint saved -- {len(totals)} players so far")
 
-    print(f"Done. {len(totals)} players, {len(game_ids)} games processed.")
+    logger.info(f"Done. {len(totals)} players, {len(game_ids)} games processed.")
 
 
 if __name__ == "__main__":

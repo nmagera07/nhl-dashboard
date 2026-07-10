@@ -18,10 +18,14 @@ import psycopg2
 from datetime import date
 from dotenv import load_dotenv
 
+from logging_config import setup_logging
+
 load_dotenv()
 
 NHL_STANDINGS_URL = "https://api-web.nhle.com/v1/standings/now"
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+logger = setup_logging("ingest_standings")
 
 
 def fetch_standings():
@@ -118,14 +122,25 @@ def main():
     teams = data["standings"]
     today = date.today()
 
+    succeeded = 0
+    failed = 0
+
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn:
             with conn.cursor() as cur:
                 for team in teams:
-                    upsert_team(cur, team)
-                    insert_snapshot(cur, today, team)
-        print(f"Ingested {len(teams)} team standings for {today}")
+                    try:
+                        upsert_team(cur, team)
+                        insert_snapshot(cur, today, team)
+                    except Exception as e:
+                        failed += 1
+                        logger.warning(
+                            f"{team.get('teamAbbrev', {}).get('default', '?')}: failed to ingest standings: {e}"
+                        )
+                        continue
+                    succeeded += 1
+        logger.info(f"Ingested {succeeded} team standings for {today} ({failed} failed)")
     finally:
         conn.close()
 

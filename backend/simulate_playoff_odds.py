@@ -34,8 +34,17 @@ Environment variables expected (put these in a .env file):
     DATABASE_URL=postgresql://user:password@host:port/dbname
 
 Usage:
-    python simulate_playoff_odds.py --season 20252026 --as-of 2026-02-01
+    python simulate_playoff_odds.py --as-of 2026-02-01  # backtest a past date
     python simulate_playoff_odds.py  # live: today's date, current season
+
+--season defaults to whichever season --as-of falls in, so it rarely needs
+to be passed explicitly -- see current_season_id().
+
+Scheduled via Windows Task Scheduler ("NHL Playoff Odds Simulation", daily
+6:10am, mirroring the existing "NHL Standings Ingestion" task). It's a
+no-op during the off-season (the NHL API returns no standings for a date
+outside any season's window), and needs no changes to keep working once
+the next season starts.
 """
 
 import argparse
@@ -59,7 +68,19 @@ HOME_ICE_BUMP = 0.02   # added to the home team's effective point pctg
 OT_PROBABILITY = 0.23  # league-average share of games going to OT/SO
 WIN_PROB_SCALE = 2.0   # logistic steepness
 DEFAULT_TRIALS = 10000
-DEFAULT_SEASON = 20252026
+
+
+def current_season_id(today=None):
+    """
+    NHL seasons start in Oct and end the following spring, so derive the
+    season id from today's date rather than hardcoding it -- otherwise a
+    scheduled run in a future season would keep pulling the wrong season's
+    schedule. Jul-Dec -> season starts this year; Jan-Jun -> it started
+    last year.
+    """
+    today = today or date.today()
+    start_year = today.year if today.month >= 7 else today.year - 1
+    return int(f"{start_year}{start_year + 1}")
 
 
 def win_probability(home_pctg, away_pctg):
@@ -172,11 +193,15 @@ def save_odds(odds, season_id, as_of_date, trials):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--season", type=int, default=DEFAULT_SEASON)
+    parser.add_argument("--season", type=int, default=None, help="Defaults to the season --as-of falls in")
     parser.add_argument("--as-of", type=str, default=str(date.today()))
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
     parser.add_argument("--no-save", action="store_true", help="Print results without writing to the DB")
     args = parser.parse_args()
+
+    if args.season is None:
+        as_of_parsed = date.fromisoformat(args.as_of)
+        args.season = current_season_id(as_of_parsed)
 
     standings = fetch_standings_as_of(args.as_of)
     print(f"Loaded standings for {len(standings)} teams as of {args.as_of}")

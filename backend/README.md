@@ -21,9 +21,9 @@ slow or unreachable upstream.
    ```
    pip install -r requirements.txt
    ```
-4. Create a `.env` file:
+4. Copy `.env.example` to `.env` and fill in your real database URL:
    ```
-   DATABASE_URL=postgresql://user:password@host:port/dbname
+   cp .env.example .env
    ```
 5. Run whichever ingestion scripts you need (see below), then start the API:
    ```

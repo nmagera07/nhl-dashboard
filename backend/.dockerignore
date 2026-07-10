@@ -4,19 +4,16 @@
 .env.*
 !.env.example
 
-# --- Python (backend) ---
+# --- Git ---
+.git
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
 venv/
 env/
-
-# --- Node / Vite (frontend) ---
-node_modules/
-frontend/dist/
-frontend/.vite/
-npm-debug.log*
 
 # --- OS / editor cruft ---
 .DS_Store

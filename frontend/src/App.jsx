@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo, useRef } from "react";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
@@ -796,9 +796,11 @@ export default function NHLDashboard() {
       .catch(() => setPlayerDetail(null));
   }, [viewedPlayerId]);
 
+  const leadersFetchStarted = useRef(false);
+
   useEffect(() => {
-    if (view !== "leaderboard" || leadersStatus !== "idle") return;
-    setLeadersStatus("loading");
+    if (view !== "leaderboard" || leadersFetchStarted.current) return;
+    leadersFetchStarted.current = true;
     fetch(`${API_BASE}/players/leaders`)
       .then((res) => res.json())
       .then((data) => {
@@ -806,6 +808,12 @@ export default function NHLDashboard() {
         setLeadersStatus("ready");
       })
       .catch(() => setLeadersStatus("error"));
+  }, [view]);
+
+  useEffect(() => {
+    if (view === "leaderboard" && leadersFetchStarted.current && leadersStatus === "idle") {
+      setLeadersStatus("loading");
+    }
   }, [view, leadersStatus]);
 
   const handleViewRoster = (teamAbbrev) => {

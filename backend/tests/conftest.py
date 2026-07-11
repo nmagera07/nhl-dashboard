@@ -8,15 +8,19 @@ fetchall() -- so patching get_connection() to return a fake connection
 backed by canned, per-query responses covers every endpoint without ever
 opening a socket. See backend/README.md for the full reasoning.
 
-Every module under test (api.py, simulate_playoff_odds.py,
-ingest_advanced_stats.py) reads os.environ["DATABASE_URL"] at import time
-(even though most of it is never used at test time), so a dummy value is
+Every module under test reads an env var at import time (even though
+none of it is ever used at test time, since get_connection() is always
+patched below) -- simulate_playoff_odds.py and ingest_advanced_stats.py
+read DATABASE_URL, api.py reads API_DATABASE_URL (its own read-only
+credential, separate from the ingestion scripts' DATABASE_URL -- see
+backend/README.md's "Database credentials" section). Dummy values are
 seeded here before those modules get imported by any test file.
 """
 
 import os
 
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
+os.environ.setdefault("API_DATABASE_URL", "postgresql://test_readonly:test@localhost:5432/test_db")
 
 import pytest
 from fastapi.testclient import TestClient

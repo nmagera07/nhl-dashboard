@@ -43,7 +43,19 @@ from response_models import (
 
 load_dotenv()
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# Deliberately separate from DATABASE_URL (used by the ingestion scripts,
+# which need write access): the API only ever reads, so it connects with
+# a least-privilege read-only Postgres role (nhl_api_readonly) instead.
+# Fail loudly at startup rather than falling back to DATABASE_URL -- a
+# silent fallback here would quietly hand the API owner-level credentials
+# again, defeating the whole point of the split.
+API_DATABASE_URL = os.environ.get("API_DATABASE_URL")
+if not API_DATABASE_URL:
+    raise RuntimeError(
+        "API_DATABASE_URL is not set. api.py connects with a read-only DB role, "
+        "separate from the owner-level DATABASE_URL used by the ingestion scripts -- "
+        "set API_DATABASE_URL in your .env (see .env.example)."
+    )
 
 # Azure Container Apps already captures stdout/stderr, and the container's
 # filesystem is ephemeral, so skip the rotating file handler here -- just
@@ -95,7 +107,7 @@ app.add_middleware(
 
 def get_connection():
     try:
-        return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        return psycopg2.connect(API_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     except Exception:
         logger.error("Failed to connect to the database", exc_info=True)
         raise

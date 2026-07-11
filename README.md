@@ -56,9 +56,9 @@ Azure Static      Azure Container
 - **Frontend** — React + Vite, deployed to Azure Static Web Apps via
   GitHub Actions on every push to `main`.
 - **Backend** — FastAPI, containerized, deployed to Azure Container Apps
-  via Azure Pipelines (builds the image, pushes to Azure Container
-  Registry, updates the running app) on every push to `main` that
-  touches `backend/`.
+  via Azure Pipelines on every push to `main` that touches `backend/`.
+  A test stage runs the pytest suite first; the build/push/deploy stage
+  only runs if it passes.
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
   process, scheduled via Windows Task Scheduler. The API only ever reads
@@ -88,7 +88,8 @@ See [`backend/README.md`](backend/README.md) and
 
 ## Known limitations
 
-- No automated test suite yet.
+- Backend has a pytest suite (`backend/tests/`), gated in CI before
+  deploy. Frontend has no automated tests yet.
 - The NHL's legacy shift-chart endpoint (used for advanced stats) is
   missing data for roughly a third of games league-wide — a gap in the
   NHL's own data, not something fixable on this end. The player card

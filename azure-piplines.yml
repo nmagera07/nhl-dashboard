@@ -1,10 +1,11 @@
 # Azure Pipelines - Backend CI/CD
 #
 # Triggers on any push to main that touches the backend/ folder.
-# Builds the Docker image locally on the pipeline agent (not via ACR Tasks,
-# since ACR Tasks cloud builds are blocked on free-trial subscriptions),
-# pushes it to Azure Container Registry, then tells the running Container
-# App to pull and use the new image.
+# Test stage runs the pytest suite; Deploy only runs if Test succeeds.
+# Deploy builds the Docker image locally on the pipeline agent (not via ACR
+# Tasks, since ACR Tasks cloud builds are blocked on free-trial
+# subscriptions), pushes it to Azure Container Registry, then tells the
+# running Container App to pull and use the new image.
 
 trigger:
   branches:
@@ -27,29 +28,56 @@ variables:
   # deploy is traceable back to the exact pipeline run that produced it.
   imageTag: "$(Build.BuildId)"
 
-steps:
-  - task: AzureCLI@2
-    displayName: "Build image, push to ACR, update Container App"
-    inputs:
-      azureSubscription: "azure-subscription-connection" # matches the service connection name you created
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
-        set -e
+stages:
+  - stage: Test
+    displayName: "Run backend tests"
+    jobs:
+      - job: Pytest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+          - script: |
+              set -e
+              python -m pip install --upgrade pip
+              pip install -r requirements-dev.txt
+            workingDirectory: backend
+            displayName: "Install dependencies"
+          - script: |
+              set -e
+              python -m pytest
+            workingDirectory: backend
+            displayName: "Run pytest"
 
-        echo "Logging in to ACR..."
-        az acr login --name $(acrName)
+  - stage: Deploy
+    displayName: "Build, push, and deploy"
+    dependsOn: Test
+    condition: succeeded()
+    jobs:
+      - job: BuildAndDeploy
+        steps:
+          - task: AzureCLI@2
+            displayName: "Build image, push to ACR, update Container App"
+            inputs:
+              azureSubscription: "azure-subscription-connection" # matches the service connection name you created
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -e
 
-        echo "Building image..."
-        docker build -t $(acrLoginServer)/$(imageName):$(imageTag) ./backend
+                echo "Logging in to ACR..."
+                az acr login --name $(acrName)
 
-        echo "Pushing image..."
-        docker push $(acrLoginServer)/$(imageName):$(imageTag)
+                echo "Building image..."
+                docker build -t $(acrLoginServer)/$(imageName):$(imageTag) ./backend
 
-        echo "Updating Container App to use new image..."
-        az containerapp update \
-          --name $(containerAppName) \
-          --resource-group $(resourceGroup) \
-          --image $(acrLoginServer)/$(imageName):$(imageTag)
+                echo "Pushing image..."
+                docker push $(acrLoginServer)/$(imageName):$(imageTag)
 
-        echo "Deploy complete: $(acrLoginServer)/$(imageName):$(imageTag)"
+                echo "Updating Container App to use new image..."
+                az containerapp update \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrLoginServer)/$(imageName):$(imageTag)
+
+                echo "Deploy complete: $(acrLoginServer)/$(imageName):$(imageTag)"

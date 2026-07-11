@@ -10,7 +10,7 @@ class TestRoot:
         assert response.json() == {
             "status": "ok",
             "message": "NHL Stats Dashboard API is running",
-            "version": "ci-cd-test-v1",
+            "version": "0.1.0",
         }
         assert db_router.calls == []
 

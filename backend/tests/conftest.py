@@ -113,6 +113,21 @@ def db_router():
     return DBRouter()
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """
+    slowapi's default in-memory storage is a module-level singleton on
+    api.limiter, and TestClient requests all share the same fake client
+    address -- so without a reset, call counts would silently accumulate
+    across every test in the session and could eventually trip a 429 on
+    an otherwise-unrelated test. Reset before each test so every test
+    starts with a clean rate-limit window regardless of run order.
+    """
+    import api
+
+    api.limiter.reset()
+
+
 @pytest.fixture
 def client(monkeypatch, db_router):
     """

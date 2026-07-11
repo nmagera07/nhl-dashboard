@@ -1,6 +1,7 @@
-requests
-psycopg2-binary
-python-dotenv
-fastapi
-uvicorn[standard]
-gunicorn
+requests==2.32.5
+psycopg2-binary==2.9.12
+python-dotenv==1.2.1
+fastapi==0.139.0
+uvicorn[standard]==0.50.2
+gunicorn==26.0.0
+slowapi==0.1.10

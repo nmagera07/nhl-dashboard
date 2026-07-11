@@ -5,7 +5,7 @@ A thin FastAPI service that reads from the standings_snapshots table
 and serves it up as JSON, ready for a frontend to consume.
 
 Setup:
-    pip install fastapi uvicorn[standard] psycopg2-binary python-dotenv --break-system-packages
+    pip install -r requirements.txt
 
 Run locally:
     uvicorn api:app --reload
@@ -21,8 +21,12 @@ from typing import List, Optional
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from logging_config import setup_logging
 from response_models import (
@@ -52,6 +56,31 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Coarse per-IP abuse/scraping guard. 60/minute is generous for normal
+# frontend usage (a page load fires a handful of requests, well under
+# this in any burst) while still bounding a naive scraper hammering the
+# API. The two join-heavy endpoints (player_leaders, playoff_odds) get a
+# tighter override below via @limiter.limit(...) -- retune either string
+# here if real usage patterns call for it.
+DEFAULT_RATE_LIMIT = "60/minute"
+EXPENSIVE_RATE_LIMIT = "20/minute"
+
+# key_style="endpoint" (rather than slowapi's default "url") scopes each
+# limit bucket to the route *handler*, not the literal request path -- so
+# e.g. /standings/PIT and /standings/BOS share one bucket per client
+# instead of each path parameter value getting its own fresh allowance,
+# which would otherwise let someone bypass the limit just by cycling
+# through team abbreviations or player ids.
+limiter = Limiter(key_func=get_remote_address, default_limits=[DEFAULT_RATE_LIMIT], key_style="endpoint")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# Added before CORSMiddleware so CORS ends up as the outermost layer
+# (Starlette wraps middleware in reverse registration order) -- otherwise
+# a 429 response would be missing Access-Control-Allow-Origin, and the
+# browser would surface it to the frontend as an opaque CORS/network
+# failure instead of a readable rate-limit response.
+app.add_middleware(SlowAPIMiddleware)
+
 # Only the deployed frontend (and local dev) can call this API.
 app.add_middleware(
     CORSMiddleware,
@@ -60,7 +89,7 @@ app.add_middleware(
         "http://localhost:5173",  # local Vite dev server
     ],
     allow_methods=["GET"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Accept"],
 )
 
 
@@ -74,7 +103,7 @@ def get_connection():
 
 @app.get("/", response_model=RootResponse)
 def root():
-    return {"status": "ok", "message": "NHL Stats Dashboard API is running", "version": "ci-cd-test-v1"}
+    return {"status": "ok", "message": "NHL Stats Dashboard API is running", "version": "0.1.0"}
 
 
 @app.get("/teams", response_model=List[Team])
@@ -93,7 +122,8 @@ def list_teams():
 
 
 @app.get("/playoff-odds", response_model=List[PlayoffOdds])
-def playoff_odds():
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def playoff_odds(request: Request):
     """
     Monte Carlo playoff-odds simulation results for every team, as of the
     most recently computed snapshot. See simulate_playoff_odds.py.
@@ -120,7 +150,7 @@ def playoff_odds():
 
 
 @app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])
-def team_roster(team_abbrev: str):
+def team_roster(team_abbrev: str = Path(..., max_length=3)):
     """
     Current roster for one team, with each player's latest season stats.
 
@@ -167,7 +197,8 @@ def team_roster(team_abbrev: str):
 
 
 @app.get("/players/leaders", response_model=List[PlayerLeader])
-def player_leaders():
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def player_leaders(request: Request):
     """
     Every rostered player with their latest season stats, for the league
     leaderboard. Must be registered before /players/{player_id} so this
@@ -273,7 +304,7 @@ def latest_standings():
 
 
 @app.get("/standings/{team_abbrev}/seasons", response_model=List[SeasonFinalStanding])
-def team_season_history(team_abbrev: str):
+def team_season_history(team_abbrev: str = Path(..., max_length=3)):
     """
     Final standings for one team across past completed seasons, e.g.
     /standings/PIT/seasons. Ordered oldest to newest.
@@ -307,7 +338,9 @@ def team_season_history(team_abbrev: str):
 
 
 @app.get("/standings/{team_abbrev}", response_model=List[StandingsHistoryRow])
-def team_history(team_abbrev: str, start: Optional[date] = None, end: Optional[date] = None):
+def team_history(
+    team_abbrev: str = Path(..., max_length=3), start: Optional[date] = None, end: Optional[date] = None
+):
     """
     Full snapshot history for one team, e.g. /standings/PIT
     Optionally filter with ?start=2026-01-01&end=2026-04-01

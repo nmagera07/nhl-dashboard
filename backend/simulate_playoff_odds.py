@@ -128,11 +128,22 @@ def build_schedule(team_abbrevs, season_id, as_of_date):
 
 
 def determine_playoff_teams(trial_standings, divisions, conferences):
-    """trial_standings: {team_abbrev: {'points', 'wins'}}. Returns a set of 16 abbrevs."""
+    """
+    trial_standings: {team_abbrev: {'points', 'wins'}}. Returns a set of 16 abbrevs.
+
+    Raises ValueError if any division has zero teams -- there's no team to
+    look up that division's conference from in that case, and a division
+    with no teams at all is a sign `divisions` was built wrong upstream
+    (e.g. a bad divisionName from the standings API), not a legitimate
+    "no playoff teams from this division" outcome.
+    """
     playoff_teams = set()
     conference_leftovers = defaultdict(list)
 
-    for division_teams in divisions.values():
+    for division_name, division_teams in divisions.items():
+        if not division_teams:
+            raise ValueError(f"Division '{division_name}' has no teams -- can't determine its conference")
+
         ranked = sorted(
             division_teams, key=lambda a: (-trial_standings[a]["points"], -trial_standings[a]["wins"])
         )

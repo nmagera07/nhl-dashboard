@@ -16,7 +16,7 @@ generates this automatically from the code below).
 
 import os
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 import psycopg2
 import psycopg2.extras
@@ -25,6 +25,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from logging_config import setup_logging
+from response_models import (
+    RootResponse,
+    Team,
+    PlayoffOdds,
+    RosterPlayer,
+    PlayerLeader,
+    PlayerDetail,
+    StandingsLatestRow,
+    StandingsHistoryRow,
+    SeasonFinalStanding,
+)
 
 load_dotenv()
 
@@ -61,12 +72,12 @@ def get_connection():
         raise
 
 
-@app.get("/")
+@app.get("/", response_model=RootResponse)
 def root():
     return {"status": "ok", "message": "NHL Stats Dashboard API is running", "version": "ci-cd-test-v1"}
 
 
-@app.get("/teams")
+@app.get("/teams", response_model=List[Team])
 def list_teams():
     """List all teams we have data for."""
     conn = get_connection()
@@ -81,7 +92,7 @@ def list_teams():
         conn.close()
 
 
-@app.get("/playoff-odds")
+@app.get("/playoff-odds", response_model=List[PlayoffOdds])
 def playoff_odds():
     """
     Monte Carlo playoff-odds simulation results for every team, as of the
@@ -108,12 +119,22 @@ def playoff_odds():
         conn.close()
 
 
-@app.get("/teams/{team_abbrev}/roster")
+@app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])
 def team_roster(team_abbrev: str):
-    """Current roster for one team, with each player's latest season stats."""
+    """
+    Current roster for one team, with each player's latest season stats.
+
+    404s if team_abbrev isn't a real team. Returns an empty 200 list (not
+    a 404) for a real team that simply has no roster rows loaded yet.
+    """
+    abbrev = team_abbrev.upper()
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+
             cur.execute(
                 """
                 SELECT p.*, s.season_id, s.games_played, s.goals, s.assists, s.points,
@@ -133,9 +154,11 @@ def team_roster(team_abbrev: str):
                 WHERE p.team_abbrev = %s
                 ORDER BY COALESCE(s.points, 0) DESC, COALESCE(s.wins, 0) DESC
                 """,
-                (team_abbrev.upper(),),
+                (abbrev,),
             )
             return cur.fetchall()
+    except HTTPException:
+        raise
     except Exception:
         logger.error(f"Failed to fetch roster for team '{team_abbrev}'", exc_info=True)
         raise
@@ -143,7 +166,7 @@ def team_roster(team_abbrev: str):
         conn.close()
 
 
-@app.get("/players/leaders")
+@app.get("/players/leaders", response_model=List[PlayerLeader])
 def player_leaders():
     """
     Every rostered player with their latest season stats, for the league
@@ -182,9 +205,13 @@ def player_leaders():
         conn.close()
 
 
-@app.get("/players/{player_id}")
+@app.get("/players/{player_id}", response_model=PlayerDetail)
 def player_detail(player_id: int):
-    """Bio plus season-by-season stats for one player."""
+    """
+    Bio plus season-by-season stats for one player.
+
+    404s (not an empty body) when player_id doesn't exist.
+    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -222,7 +249,7 @@ def player_detail(player_id: int):
         conn.close()
 
 
-@app.get("/standings/latest")
+@app.get("/standings/latest", response_model=List[StandingsLatestRow])
 def latest_standings():
     """Most recent day's standings for every team, ranked by league position."""
     conn = get_connection()
@@ -245,7 +272,7 @@ def latest_standings():
         conn.close()
 
 
-@app.get("/standings/{team_abbrev}/seasons")
+@app.get("/standings/{team_abbrev}/seasons", response_model=List[SeasonFinalStanding])
 def team_season_history(team_abbrev: str):
     """
     Final standings for one team across past completed seasons, e.g.
@@ -254,6 +281,10 @@ def team_season_history(team_abbrev: str):
     Note: relocated/renamed franchises (e.g. Arizona Coyotes -> Utah) are
     tracked under their historical abbreviation, so this only covers the
     seasons played under the given team_abbrev.
+
+    Returns an empty 200 list (not a 404) for an unknown/dataless
+    team_abbrev -- see SeasonFinalStanding's docstring for the cross-endpoint
+    404-vs-empty-list inconsistency.
     """
     conn = get_connection()
     try:
@@ -275,22 +306,31 @@ def team_season_history(team_abbrev: str):
         conn.close()
 
 
-@app.get("/standings/{team_abbrev}")
+@app.get("/standings/{team_abbrev}", response_model=List[StandingsHistoryRow])
 def team_history(team_abbrev: str, start: Optional[date] = None, end: Optional[date] = None):
     """
     Full snapshot history for one team, e.g. /standings/PIT
     Optionally filter with ?start=2026-01-01&end=2026-04-01
+
+    404s if team_abbrev isn't a real team. Returns an empty 200 list (not
+    a 404) for a real team that simply has no snapshot rows yet (or none
+    in the given start/end range).
     """
+    abbrev = team_abbrev.upper()
     conn = get_connection()
     try:
         with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+
             query = """
                 SELECT s.*, t.team_name
                 FROM standings_snapshots s
                 JOIN teams t ON t.team_abbrev = s.team_abbrev
                 WHERE s.team_abbrev = %s
             """
-            params = [team_abbrev.upper()]
+            params = [abbrev]
 
             if start:
                 query += " AND s.snapshot_date >= %s"
@@ -302,10 +342,7 @@ def team_history(team_abbrev: str, start: Optional[date] = None, end: Optional[d
             query += " ORDER BY s.snapshot_date ASC"
 
             cur.execute(query, params)
-            rows = cur.fetchall()
-            if not rows:
-                raise HTTPException(status_code=404, detail=f"No data found for team '{team_abbrev}'")
-            return rows
+            return cur.fetchall()
     except HTTPException:
         raise
     except Exception:

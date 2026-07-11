@@ -1,0 +1,142 @@
+from datetime import date, datetime
+from typing import List, Optional
+
+from pydantic import BaseModel
+
+
+class PlayerBio(BaseModel):
+    """Columns straight off the `players` table -- current roster only."""
+
+    player_id: int
+    team_abbrev: str
+    first_name: str
+    last_name: str
+    position_code: str
+    sweater_number: Optional[int] = None
+    shoots_catches: Optional[str] = None
+    height_in_inches: Optional[int] = None
+    weight_in_pounds: Optional[int] = None
+    birth_date: Optional[date] = None
+    birth_city: Optional[str] = None
+    birth_country: Optional[str] = None
+    headshot_url: Optional[str] = None
+    updated_at: datetime
+
+
+class LatestSeasonStatsFields(BaseModel):
+    """
+    The single latest player_season_stats row, flattened onto the player's
+    own row by a `LEFT JOIN LATERAL ... LIMIT 1`. Every field here is
+    Optional for two independent reasons:
+      - the LEFT JOIN means a player with no season_stats row at all yields
+        NULL for every one of these columns (season_id included).
+      - skater and goalie stats share one table (see schema.sql), so a
+        skater's row has wins/losses/goals_against_avg/etc as NULL, and a
+        goalie's row has goals/assists/points/etc as NULL.
+    """
+
+    season_id: Optional[int] = None
+    games_played: Optional[int] = None
+    # skater stats
+    goals: Optional[int] = None
+    assists: Optional[int] = None
+    points: Optional[int] = None
+    plus_minus: Optional[int] = None
+    pim: Optional[int] = None
+    shots: Optional[int] = None
+    shooting_pctg: Optional[float] = None
+    power_play_goals: Optional[int] = None
+    power_play_points: Optional[int] = None
+    shorthanded_goals: Optional[int] = None
+    shorthanded_points: Optional[int] = None
+    game_winning_goals: Optional[int] = None
+    ot_goals: Optional[int] = None
+    # goalie stats
+    wins: Optional[int] = None
+    losses: Optional[int] = None
+    ot_losses: Optional[int] = None
+    goals_against_avg: Optional[float] = None
+    save_pctg: Optional[float] = None
+    shutouts: Optional[int] = None
+
+
+class RosterPlayer(PlayerBio, LatestSeasonStatsFields):
+    """One player in GET /teams/{team_abbrev}/roster."""
+
+
+class PlayerLeader(PlayerBio, LatestSeasonStatsFields):
+    """
+    One player in GET /players/leaders -- same shape as RosterPlayer plus
+    the team fields joined in since this endpoint isn't scoped to one team.
+    """
+
+    team_name: str
+    team_logo_url: Optional[str] = None
+
+
+class PlayerSeasonStat(BaseModel):
+    """One row of `player_season_stats`, as nested under GET /players/{player_id}."""
+
+    id: int
+    player_id: int
+    season_id: int
+    games_played: Optional[int] = None
+    goals: Optional[int] = None
+    assists: Optional[int] = None
+    points: Optional[int] = None
+    plus_minus: Optional[int] = None
+    pim: Optional[int] = None
+    shots: Optional[int] = None
+    shooting_pctg: Optional[float] = None
+    power_play_goals: Optional[int] = None
+    power_play_points: Optional[int] = None
+    shorthanded_goals: Optional[int] = None
+    shorthanded_points: Optional[int] = None
+    game_winning_goals: Optional[int] = None
+    ot_goals: Optional[int] = None
+    wins: Optional[int] = None
+    losses: Optional[int] = None
+    ot_losses: Optional[int] = None
+    goals_against_avg: Optional[float] = None
+    save_pctg: Optional[float] = None
+    shutouts: Optional[int] = None
+    updated_at: datetime
+
+
+class PlayerAdvancedStat(BaseModel):
+    """
+    One row of `player_advanced_stats`, as nested under GET /players/{player_id}.
+    corsi/fenwick counts default to 0 at the DB level (NOT NULL DEFAULT 0),
+    but the *_pct columns stay NULL when for+against is 0/0.
+    """
+
+    id: int
+    player_id: int
+    season_id: int
+    corsi_for: int
+    corsi_against: int
+    corsi_for_pct: Optional[float] = None
+    fenwick_for: int
+    fenwick_against: int
+    fenwick_for_pct: Optional[float] = None
+    games_processed: int
+    updated_at: datetime
+
+
+class PlayerDetail(PlayerBio):
+    """
+    GET /players/{player_id}. 404s (not an empty body) when the player_id
+    doesn't exist -- see the endpoint's explicit HTTPException.
+
+    season_stats and advanced_stats are genuinely nested lists (unlike the
+    flattened single-row join used by RosterPlayer/PlayerLeader) because the
+    endpoint runs two separate follow-up queries and assigns their full
+    fetchall() results onto the player dict -- a player can have multiple
+    season rows (one per season_id) and 0 rows for either list is valid
+    (e.g. a rookie with no advanced_stats computed yet), not an error.
+    """
+
+    team_name: str
+    team_logo_url: Optional[str] = None
+    season_stats: List[PlayerSeasonStat]
+    advanced_stats: List[PlayerAdvancedStat]

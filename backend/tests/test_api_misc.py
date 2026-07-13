@@ -1,9 +1,10 @@
-"""GET / and GET /teams and GET /playoff-odds."""
+"""GET /, GET /health, GET /teams, and GET /playoff-odds."""
 
 
 class TestRoot:
     def test_root_ok(self, client, db_router):
-        # No DB call should happen for the health-check route.
+        # GET / is a static payload -- no DB call. GET /health is the one
+        # that actually exercises the database (see TestHealth below).
         response = client.get("/")
 
         assert response.status_code == 200
@@ -13,6 +14,36 @@ class TestRoot:
             "version": "0.1.0",
         }
         assert db_router.calls == []
+
+
+class TestHealth:
+    def test_healthy_when_the_database_responds(self, client, db_router):
+        db_router.when("select 1", [])
+
+        response = client.get("/health")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok", "database": "connected"}
+
+    def test_returns_503_when_the_database_is_unreachable(self, client, db_router):
+        def unreachable(params):
+            raise Exception("connection refused")
+
+        db_router.when("select 1", unreachable)
+
+        response = client.get("/health")
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Database unreachable"
+
+    def test_exempt_from_the_default_rate_limit(self, client, db_router):
+        # Monitors/probes can poll far more often than 60/minute -- confirm
+        # /health doesn't trip the same limit that /teams would.
+        db_router.when("select 1", [])
+
+        statuses = [client.get("/health").status_code for _ in range(70)]
+
+        assert all(s == 200 for s in statuses)
 
 
 class TestListTeams:

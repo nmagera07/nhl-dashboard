@@ -20,6 +20,7 @@ from typing import List, Optional
 
 import psycopg2
 import psycopg2.extras
+import sentry_sdk
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,7 @@ from slowapi.util import get_remote_address
 from logging_config import setup_logging
 from response_models import (
     RootResponse,
+    HealthResponse,
     Team,
     PlayoffOdds,
     RosterPlayer,
@@ -55,6 +57,22 @@ if not API_DATABASE_URL:
         "API_DATABASE_URL is not set. api.py connects with a read-only DB role, "
         "separate from the owner-level DATABASE_URL used by the ingestion scripts -- "
         "set API_DATABASE_URL in your .env (see .env.example)."
+    )
+
+# Error tracking (Sentry) is optional, unlike API_DATABASE_URL above --
+# a missing SENTRY_DSN just means errors aren't reported anywhere, not a
+# broken deployment, so this degrades quietly instead of raising. Must
+# run before the FastAPI app is constructed (Sentry's FastAPI/Starlette
+# integration auto-enables at init time since both packages are
+# installed -- see sentry_sdk.integrations._AUTO_ENABLING_INTEGRATIONS).
+# Only 5xx responses are reported by default; expected 4xx responses
+# (404s, 422 validation errors, 429 rate limits) are not treated as errors.
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "development"),
+        traces_sample_rate=0.1,
     )
 
 # Azure Container Apps already captures stdout/stderr, and the container's
@@ -116,6 +134,35 @@ def get_connection():
 @app.get("/", response_model=RootResponse)
 def root():
     return {"status": "ok", "message": "NHL Stats Dashboard API is running", "version": "0.1.0"}
+
+
+@app.get("/health", response_model=HealthResponse)
+@limiter.exempt
+def health():
+    """
+    Actually exercises the database connection (unlike GET /), for Azure
+    Container Apps' liveness/readiness probes and any external uptime
+    monitor -- both of which may poll far more often than the 60/minute
+    default rate limit, hence the exemption.
+
+    Note: get_connection() itself is inside the try block here, unlike
+    every other endpoint in this file -- elsewhere a connection failure
+    is allowed to bubble up as a plain 500, but the entire point of this
+    endpoint is to turn "can't connect" into a clean, deliberate 503
+    rather than a generic error.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+    except Exception:
+        logger.error("Health check failed: database unreachable", exc_info=True)
+        raise HTTPException(status_code=503, detail="Database unreachable")
+    finally:
+        if conn:
+            conn.close()
+    return {"status": "ok", "database": "connected"}
 
 
 @app.get("/teams", response_model=List[Team])

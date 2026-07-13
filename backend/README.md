@@ -106,7 +106,7 @@ Why mocking instead of a test database:
   that can open a real connection, so there's no possibility of a test
   accidentally reading or writing the live Neon database — not "we're
   careful," but structurally impossible.
-- **Fast and deterministic.** All 48 tests run in well under a second, no
+- **Fast and deterministic.** All 61 tests run in well under a second, no
   network calls, no flakiness from shared state or connection limits.
 - **The queries themselves were already verified against real data.**
   The response-model work in this project involved fetching real rows
@@ -145,6 +145,7 @@ the top-level README for why.
 
 | Endpoint | Returns |
 |---|---|
+| `GET /health` | Actually exercises the database (`SELECT 1` via the read-only role) — 200 if reachable, 503 if not. Exempt from rate limiting, for Azure Container Apps' probes / an uptime monitor. `GET /` is a static "process is up" payload and doesn't check the database at all. |
 | `GET /teams` | All 32 teams |
 | `GET /standings/latest` | Most recent day's standings, all teams |
 | `GET /standings/{team}` | Full daily-snapshot history for one team (`?start=&end=` optional) |
@@ -165,6 +166,22 @@ the top-level README for why.
 - `playoff_odds` — Monte Carlo simulation results, one row per team per as-of-date
 
 Full column definitions and comments are in `schema.sql`.
+
+## Error tracking
+
+Optional, via [Sentry](https://sentry.io). Set `SENTRY_DSN` in `.env` (a
+free Sentry project's DSN) and `api.py` reports unhandled errors there;
+leave it unset and the app just runs without error reporting — this is
+an operational nice-to-have, not a required credential like
+`API_DATABASE_URL`, so a missing DSN never blocks startup.
+
+Only 5xx responses are reported (Sentry's Starlette/FastAPI integration
+default) — expected 4xx responses (a bogus team abbreviation's 404, a
+too-long path param's 422, a rate-limited request's 429) are normal
+application flow, not errors, and don't get reported. Set
+`SENTRY_ENVIRONMENT=production` in the Container App's real environment
+variables so production issues aren't mixed in with local-dev noise
+(defaults to `"development"` if unset).
 
 ## Deployment
 

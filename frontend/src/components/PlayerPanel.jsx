@@ -1,11 +1,80 @@
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
 
+function CareerStatTiles({ stats, isGoalie }) {
+  return (
+    <div className="stat-tiles">
+      {isGoalie ? (
+        <>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.wins}-{stats.losses}-{stats.ot_losses}</span>
+            <span className="stat-tile-label">RECORD</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">
+              {stats.goals_against_avg != null ? Number(stats.goals_against_avg).toFixed(2) : "—"}
+            </span>
+            <span className="stat-tile-label">GAA</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">
+              {stats.save_pctg != null ? Number(stats.save_pctg).toFixed(3) : "—"}
+            </span>
+            <span className="stat-tile-label">SV%</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.shutouts ?? "—"}</span>
+            <span className="stat-tile-label">SO</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.games_played ?? "—"}</span>
+            <span className="stat-tile-label">GP</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.points ?? "—"}</span>
+            <span className="stat-tile-label">POINTS</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.goals ?? "—"}</span>
+            <span className="stat-tile-label">GOALS</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.assists ?? "—"}</span>
+            <span className="stat-tile-label">ASSISTS</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.plus_minus ?? "—"}</span>
+            <span className="stat-tile-label">+/-</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.shots ?? "—"}</span>
+            <span className="stat-tile-label">SHOTS</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.pim ?? "—"}</span>
+            <span className="stat-tile-label">PIM</span>
+          </div>
+          <div className="stat-tile">
+            <span className="stat-tile-value">{stats.games_played ?? "—"}</span>
+            <span className="stat-tile-label">GP</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PlayerPanel({ player, onBack, backLabel }) {
   if (!player) return null;
 
   const isGoalie = player.position_code === "G";
   const seasonStats = player.season_stats?.[0];
   const advancedStats = player.advanced_stats?.[0];
+  const careerRegularSeason = player.career_totals?.regular_season ?? null;
+  const careerPlayoffs = player.career_totals?.playoffs ?? null;
+  const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
   const heightLabel = player.height_in_inches
     ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
     : "—";
@@ -145,6 +214,24 @@ function PlayerPanel({ player, onBack, backLabel }) {
               this season &mdash; computed from official NHL play-by-play and shift data (the NHL's own shift-chart
               data isn't complete for every game).
             </div>
+          )}
+        </div>
+      )}
+
+      {hasCareerTotals && (
+        <div className="advanced-stats-panel">
+          <div className="trend-eyebrow advanced-stats-header">CAREER TOTALS</div>
+          {careerRegularSeason && (
+            <>
+              <div className="career-totals-subheader">Regular Season</div>
+              <CareerStatTiles stats={careerRegularSeason} isGoalie={isGoalie} />
+            </>
+          )}
+          {careerPlayoffs && (
+            <>
+              <div className="career-totals-subheader">Playoffs</div>
+              <CareerStatTiles stats={careerPlayoffs} isGoalie={isGoalie} />
+            </>
           )}
         </div>
       )}

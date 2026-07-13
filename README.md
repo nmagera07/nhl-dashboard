@@ -89,7 +89,10 @@ See [`backend/README.md`](backend/README.md) and
 ## Known limitations
 
 - Backend has a pytest suite (`backend/tests/`), gated in CI before
-  deploy. Frontend has no automated tests yet.
+  deploy. Frontend has a Vitest + React Testing Library suite
+  (`frontend/src/**/*.test.jsx`) too, but it isn't wired into the
+  Static Web Apps deploy workflow as a gate yet — see
+  [`frontend/README.md`](frontend/README.md) for how to run it locally.
 - The NHL's legacy shift-chart endpoint (used for advanced stats) is
   missing data for roughly a third of games league-wide — a gap in the
   NHL's own data, not something fixable on this end. The player card

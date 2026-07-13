@@ -417,6 +417,91 @@ def player_career_totals_goalie_row():
 
 
 @pytest.fixture
+def player_season_history_skater_row():
+    return {
+        "id": 1301,
+        "player_id": 8477492,
+        "season_id": 20242025,
+        "season_type": "regular_season",
+        "games_played": 71,
+        "goals": 44,
+        "assists": 65,
+        "points": 109,
+        "plus_minus": 25,
+        "pim": 30,
+        "shots": 297,
+        "shooting_pctg": 0.1481,
+        "power_play_goals": 10,
+        "power_play_points": 26,
+        "shorthanded_goals": 0,
+        "shorthanded_points": 0,
+        "game_winning_goals": 6,
+        "ot_goals": 1,
+        "wins": None,
+        "losses": None,
+        "ot_losses": None,
+        "goals_against_avg": None,
+        "save_pctg": None,
+        "shutouts": None,
+        "updated_at": "2026-07-08T23:56:05.982947",
+    }
+
+
+@pytest.fixture
+def player_season_history_skater_playoffs_row(player_season_history_skater_row):
+    return dict(
+        player_season_history_skater_row,
+        id=1302,
+        season_type="playoffs",
+        games_played=10,
+        goals=6,
+        assists=9,
+        points=15,
+        plus_minus=4,
+        pim=4,
+        shots=38,
+        shooting_pctg=0.1579,
+        power_play_goals=2,
+        power_play_points=5,
+        shorthanded_goals=0,
+        shorthanded_points=0,
+        game_winning_goals=1,
+        ot_goals=0,
+    )
+
+
+@pytest.fixture
+def player_season_history_goalie_row():
+    return {
+        "id": 2044,
+        "player_id": 8475809,
+        "season_id": 20212022,
+        "season_type": "regular_season",
+        "games_played": 24,
+        "goals": None,
+        "assists": None,
+        "points": None,
+        "plus_minus": None,
+        "pim": None,
+        "shots": None,
+        "shooting_pctg": None,
+        "power_play_goals": None,
+        "power_play_points": None,
+        "shorthanded_goals": None,
+        "shorthanded_points": None,
+        "game_winning_goals": None,
+        "ot_goals": None,
+        "wins": 11,
+        "losses": 9,
+        "ot_losses": 2,
+        "goals_against_avg": 2.9016,
+        "save_pctg": 0.9012,
+        "shutouts": 1,
+        "updated_at": "2026-07-08T23:56:05.982947",
+    }
+
+
+@pytest.fixture
 def standings_row():
     return {
         "id": 135,

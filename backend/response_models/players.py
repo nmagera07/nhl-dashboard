@@ -174,6 +174,41 @@ class CareerTotals(BaseModel):
     playoffs: Optional[CareerTotalsStats] = None
 
 
+class SeasonHistoryEntry(BaseModel):
+    """
+    One (season, season_type) row from player_season_history -- one
+    season's regular-season or playoffs line, filtered to the NHL only.
+    Same skater/goalie nullability split as CareerTotalsStats. A
+    mid-season trade's multiple real per-team entries are already
+    combined into this single row by ingest_player_stats.py's
+    upsert_season_history() -- counting stats summed, shooting_pctg and
+    goalie rate stats recomputed from underlying counts, not averaged.
+    """
+
+    season_id: int
+    season_type: str
+    games_played: Optional[int] = None
+    goals: Optional[int] = None
+    assists: Optional[int] = None
+    points: Optional[int] = None
+    plus_minus: Optional[int] = None
+    pim: Optional[int] = None
+    shots: Optional[int] = None
+    shooting_pctg: Optional[float] = None
+    power_play_goals: Optional[int] = None
+    power_play_points: Optional[int] = None
+    shorthanded_goals: Optional[int] = None
+    shorthanded_points: Optional[int] = None
+    game_winning_goals: Optional[int] = None
+    ot_goals: Optional[int] = None
+    wins: Optional[int] = None
+    losses: Optional[int] = None
+    ot_losses: Optional[int] = None
+    goals_against_avg: Optional[float] = None
+    save_pctg: Optional[float] = None
+    shutouts: Optional[int] = None
+
+
 class PlayerDetail(PlayerBio):
     """
     GET /players/{player_id}. 404s (not an empty body) when the player_id
@@ -189,6 +224,13 @@ class PlayerDetail(PlayerBio):
     career_totals is always present as an object -- even a player with zero
     player_career_totals rows gets {"regular_season": None, "playoffs": None}
     rather than the field being omitted, see CareerTotals.
+
+    season_history is a third, separately-nested list -- one row per
+    player_season_history row (regular season and playoffs kept as
+    separate entries, most recent season first) -- covering every NHL
+    season the player has ever played, not just the current one like
+    season_stats. 0 rows is valid (ingestion hasn't backfilled this
+    player's history yet), same as season_stats/advanced_stats.
     """
 
     team_name: str
@@ -196,3 +238,4 @@ class PlayerDetail(PlayerBio):
     season_stats: List[PlayerSeasonStat]
     advanced_stats: List[PlayerAdvancedStat]
     career_totals: CareerTotals
+    season_history: List[SeasonHistoryEntry]

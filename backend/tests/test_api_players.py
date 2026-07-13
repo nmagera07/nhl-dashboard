@@ -30,6 +30,7 @@ class TestPlayerDetail:
         db_router.when("from player_season_stats where player_id", [player_season_stat_row])
         db_router.when("from player_advanced_stats where player_id", [player_advanced_stat_row])
         db_router.when("from player_career_totals where player_id", [])
+        db_router.when("from player_season_history where player_id", [])
 
         response = client.get("/players/8477492")
 
@@ -49,6 +50,7 @@ class TestPlayerDetail:
         db_router.when("from player_season_stats where player_id", [])
         db_router.when("from player_advanced_stats where player_id", [])
         db_router.when("from player_career_totals where player_id", [])
+        db_router.when("from player_season_history where player_id", [])
 
         response = client.get("/players/8477492")
 
@@ -68,6 +70,7 @@ class TestPlayerDetail:
         assert not any("player_season_stats" in q.lower() for q, _ in db_router.calls)
         assert not any("player_advanced_stats" in q.lower() for q, _ in db_router.calls)
         assert not any("player_career_totals" in q.lower() for q, _ in db_router.calls)
+        assert not any("player_season_history" in q.lower() for q, _ in db_router.calls)
 
     def test_career_totals_happy_path_skater(
         self,
@@ -85,6 +88,7 @@ class TestPlayerDetail:
             "from player_career_totals where player_id",
             [player_career_totals_skater_row, player_career_totals_skater_playoffs_row],
         )
+        db_router.when("from player_season_history where player_id", [])
 
         response = client.get("/players/8477492")
 
@@ -105,6 +109,7 @@ class TestPlayerDetail:
         db_router.when(
             "from player_career_totals where player_id", [player_career_totals_goalie_row]
         )
+        db_router.when("from player_season_history where player_id", [])
 
         response = client.get("/players/8477492")
 
@@ -126,11 +131,78 @@ class TestPlayerDetail:
         db_router.when("from player_season_stats where player_id", [])
         db_router.when("from player_advanced_stats where player_id", [])
         db_router.when("from player_career_totals where player_id", [])
+        db_router.when("from player_season_history where player_id", [])
 
         response = client.get("/players/8477492")
 
         assert response.status_code == 200
         assert response.json()["career_totals"] == {"regular_season": None, "playoffs": None}
+
+    def test_season_history_happy_path_skater(
+        self,
+        client,
+        db_router,
+        player_bio_row,
+        player_season_history_skater_row,
+        player_season_history_skater_playoffs_row,
+    ):
+        # A skater with both a regular-season and a playoffs row for the
+        # same season -- two separate entries, not merged together.
+        db_router.when("where p.player_id = %s", player_bio_row)
+        db_router.when("from player_season_stats where player_id", [])
+        db_router.when("from player_advanced_stats where player_id", [])
+        db_router.when("from player_career_totals where player_id", [])
+        db_router.when(
+            "from player_season_history where player_id",
+            [player_season_history_skater_row, player_season_history_skater_playoffs_row],
+        )
+
+        response = client.get("/players/8477492")
+
+        assert response.status_code == 200
+        season_history = response.json()["season_history"]
+        assert len(season_history) == 2
+        assert season_history[0]["season_id"] == 20242025
+        assert season_history[0]["season_type"] == "regular_season"
+        assert season_history[0]["points"] == 109
+        assert season_history[1]["season_type"] == "playoffs"
+        assert season_history[1]["points"] == 15
+
+    def test_season_history_happy_path_goalie(
+        self, client, db_router, player_bio_row, player_season_history_goalie_row
+    ):
+        db_router.when("where p.player_id = %s", player_bio_row)
+        db_router.when("from player_season_stats where player_id", [])
+        db_router.when("from player_advanced_stats where player_id", [])
+        db_router.when("from player_career_totals where player_id", [])
+        db_router.when(
+            "from player_season_history where player_id", [player_season_history_goalie_row]
+        )
+
+        response = client.get("/players/8477492")
+
+        assert response.status_code == 200
+        season_history = response.json()["season_history"]
+        assert len(season_history) == 1
+        assert season_history[0]["wins"] == 11
+        assert season_history[0]["goals_against_avg"] == 2.9016
+        assert season_history[0]["save_pctg"] == 0.9012
+
+    def test_player_with_no_season_history_rows_returns_empty_list(
+        self, client, db_router, player_bio_row
+    ):
+        # Ingestion hasn't backfilled this player's history yet -- an
+        # empty list, not an error.
+        db_router.when("where p.player_id = %s", player_bio_row)
+        db_router.when("from player_season_stats where player_id", [])
+        db_router.when("from player_advanced_stats where player_id", [])
+        db_router.when("from player_career_totals where player_id", [])
+        db_router.when("from player_season_history where player_id", [])
+
+        response = client.get("/players/8477492")
+
+        assert response.status_code == 200
+        assert response.json()["season_history"] == []
 
     def test_non_integer_player_id_is_rejected_before_touching_the_db(self, client, db_router):
         # player_id: int in the route signature -- FastAPI's own request

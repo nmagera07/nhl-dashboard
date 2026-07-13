@@ -8,12 +8,13 @@ already season totals in one API call, so a weekly run is plenty during the
 season (and none needed in the off-season).
 
 Also extracts each player's career totals (regular season + playoffs
-aggregates) into player_career_totals. This lives here rather than in its
+aggregates) into player_career_totals, and their full season-by-season
+history into player_season_history. This lives here rather than in its
 own script because the NHL API's player landing page -- already fetched
-per player for featuredStats -- has careerTotals as a sibling top-level
-key in that same response. Parsing more of a response already sitting in
-memory costs nothing; a separate script would mean a second, redundant
-HTTP round trip per player for data we already have.
+per player for featuredStats -- has careerTotals and seasonTotals as
+sibling top-level keys in that same response. Parsing more of a response
+already sitting in memory costs nothing; a separate script would mean a
+second, redundant HTTP round trip per player for data we already have.
 
 Setup:
     pip install requests psycopg2-binary python-dotenv
@@ -269,6 +270,157 @@ def upsert_career_totals(cur, player_id, landing):
     return upserted_any
 
 
+def _parse_time_on_ice_to_seconds(time_on_ice):
+    if not time_on_ice:
+        return 0
+    minutes, seconds = time_on_ice.split(":")
+    return int(minutes) * 60 + int(seconds)
+
+
+def _combine_season_entries(entries):
+    """
+    Combine multiple raw seasonTotals entries for the same (season,
+    gameTypeId) -- i.e. a mid-season trade, where the player has one
+    entry per team -- into the single row stored in player_season_history.
+    Counting stats are summed (None treated as 0 so a partial None from a
+    skater-only or goalie-only entry doesn't poison the sum). shooting_pctg,
+    save_pctg, and goals_against_avg are NOT averaged across entries --
+    they're recomputed from the summed underlying counts, since averaging
+    per-stint percentages would misweight a short stint against a long one.
+    """
+    counting_int_keys = (
+        "gamesPlayed",
+        "goals",
+        "assists",
+        "points",
+        "plusMinus",
+        "pim",
+        "shots",
+        "powerPlayGoals",
+        "powerPlayPoints",
+        "shorthandedGoals",
+        "shorthandedPoints",
+        "gameWinningGoals",
+        "otGoals",
+        "wins",
+        "losses",
+        "otLosses",
+        "shutouts",
+    )
+    combined = {key: sum(e.get(key) or 0 for e in entries) for key in counting_int_keys}
+
+    total_shots = combined["shots"]
+    combined["shootingPctg"] = (combined["goals"] / total_shots) if total_shots > 0 else None
+
+    total_goals_against = sum(e.get("goalsAgainst") or 0 for e in entries)
+    total_shots_against = sum(e.get("shotsAgainst") or 0 for e in entries)
+    total_seconds = sum(_parse_time_on_ice_to_seconds(e.get("timeOnIce")) for e in entries)
+
+    combined["savePctg"] = (
+        (total_shots_against - total_goals_against) / total_shots_against
+        if total_shots_against > 0
+        else None
+    )
+    combined["goalsAgainstAvg"] = (
+        total_goals_against * 3600 / total_seconds if total_seconds > 0 else None
+    )
+
+    return combined
+
+
+def upsert_season_history(cur, player_id, landing):
+    entries = [e for e in landing.get("seasonTotals", []) if e.get("leagueAbbrev") == "NHL"]
+    if not entries:
+        return False
+
+    groups = {}
+    for entry in entries:
+        game_type_id = entry.get("gameTypeId")
+        if game_type_id == 2:
+            season_type = "regular_season"
+        elif game_type_id == 3:
+            season_type = "playoffs"
+        else:
+            continue
+
+        key = (entry.get("season"), season_type)
+        groups.setdefault(key, []).append(entry)
+
+    upserted_any = False
+    for (season_id, season_type), group in groups.items():
+        combined = group[0] if len(group) == 1 else _combine_season_entries(group)
+
+        cur.execute(
+            """
+            INSERT INTO player_season_history (
+                player_id, season_id, season_type, games_played,
+                goals, assists, points, plus_minus, pim, shots, shooting_pctg,
+                power_play_goals, power_play_points, shorthanded_goals,
+                shorthanded_points, game_winning_goals, ot_goals,
+                wins, losses, ot_losses, goals_against_avg, save_pctg, shutouts,
+                updated_at
+            ) VALUES (
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                NOW()
+            )
+            ON CONFLICT (player_id, season_id, season_type) DO UPDATE SET
+                games_played = EXCLUDED.games_played,
+                goals = EXCLUDED.goals,
+                assists = EXCLUDED.assists,
+                points = EXCLUDED.points,
+                plus_minus = EXCLUDED.plus_minus,
+                pim = EXCLUDED.pim,
+                shots = EXCLUDED.shots,
+                shooting_pctg = EXCLUDED.shooting_pctg,
+                power_play_goals = EXCLUDED.power_play_goals,
+                power_play_points = EXCLUDED.power_play_points,
+                shorthanded_goals = EXCLUDED.shorthanded_goals,
+                shorthanded_points = EXCLUDED.shorthanded_points,
+                game_winning_goals = EXCLUDED.game_winning_goals,
+                ot_goals = EXCLUDED.ot_goals,
+                wins = EXCLUDED.wins,
+                losses = EXCLUDED.losses,
+                ot_losses = EXCLUDED.ot_losses,
+                goals_against_avg = EXCLUDED.goals_against_avg,
+                save_pctg = EXCLUDED.save_pctg,
+                shutouts = EXCLUDED.shutouts,
+                updated_at = NOW()
+            """,
+            (
+                player_id,
+                season_id,
+                season_type,
+                combined.get("gamesPlayed"),
+                combined.get("goals"),
+                combined.get("assists"),
+                combined.get("points"),
+                combined.get("plusMinus"),
+                combined.get("pim"),
+                combined.get("shots"),
+                combined.get("shootingPctg"),
+                combined.get("powerPlayGoals"),
+                combined.get("powerPlayPoints"),
+                combined.get("shorthandedGoals"),
+                combined.get("shorthandedPoints"),
+                combined.get("gameWinningGoals"),
+                combined.get("otGoals"),
+                combined.get("wins"),
+                combined.get("losses"),
+                combined.get("otLosses"),
+                combined.get("goalsAgainstAvg"),
+                combined.get("savePctg"),
+                combined.get("shutouts"),
+            ),
+        )
+        upserted_any = True
+
+    return upserted_any
+
+
 def main():
     # Neon's serverless Postgres will drop an idle connection, and a full
     # run takes several minutes of mostly-HTTP time -- so open a fresh
@@ -282,6 +434,7 @@ def main():
     total_players = 0
     total_with_stats = 0
     total_with_career_totals = 0
+    total_with_season_history = 0
     teams_succeeded = 0
     teams_failed = 0
     for team_abbrev in team_abbrevs:
@@ -303,6 +456,8 @@ def main():
                             total_with_stats += 1
                         if upsert_career_totals(cur, player["id"], landing):
                             total_with_career_totals += 1
+                        if upsert_season_history(cur, player["id"], landing):
+                            total_with_season_history += 1
 
             total_players += len(roster)
             logger.info(f"{team_abbrev}: ingested {len(roster)} players")
@@ -315,7 +470,8 @@ def main():
 
     logger.info(
         f"Done. {total_players} players total, {total_with_stats} with season stats, "
-        f"{total_with_career_totals} with career totals."
+        f"{total_with_career_totals} with career totals, "
+        f"{total_with_season_history} with season history."
     )
     logger.info(f"Teams: {teams_succeeded} succeeded, {teams_failed} failed.")
 

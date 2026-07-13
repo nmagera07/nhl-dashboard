@@ -340,6 +340,12 @@ def player_detail(player_id: int):
                 "regular_season": by_season_type.get("regular_season"),
                 "playoffs": by_season_type.get("playoffs"),
             }
+
+            cur.execute(
+                "SELECT * FROM player_season_history WHERE player_id = %s ORDER BY season_id DESC, season_type DESC",
+                (player_id,),
+            )
+            player["season_history"] = cur.fetchall()
             return player
     except HTTPException:
         raise

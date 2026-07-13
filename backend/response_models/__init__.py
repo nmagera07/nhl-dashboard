@@ -9,6 +9,7 @@ from .players import (
     PlayerAdvancedStat,
     CareerTotalsStats,
     CareerTotals,
+    SeasonHistoryEntry,
 )
 from .standings import StandingsLatestRow, StandingsHistoryRow, SeasonFinalStanding
 
@@ -24,6 +25,7 @@ __all__ = [
     "PlayerAdvancedStat",
     "CareerTotalsStats",
     "CareerTotals",
+    "SeasonHistoryEntry",
     "StandingsLatestRow",
     "StandingsHistoryRow",
     "SeasonFinalStanding",

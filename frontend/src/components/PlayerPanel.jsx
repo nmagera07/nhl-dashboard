@@ -1,4 +1,37 @@
+import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
+
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
+
+const SEASON_HISTORY_SKATER_COLUMNS = [
+  { key: "points", label: "PTS" },
+  { key: "goals", label: "G" },
+  { key: "assists", label: "A" },
+  { key: "plus_minus", label: "+/-" },
+  { key: "pim", label: "PIM" },
+  { key: "shots", label: "SHOTS" },
+  { key: "games_played", label: "GP" },
+];
+
+const SEASON_HISTORY_GOALIE_COLUMNS = [
+  { key: "wins", label: "W" },
+  { key: "losses", label: "L" },
+  { key: "ot_losses", label: "OTL" },
+  { key: "goals_against_avg", label: "GAA" },
+  { key: "save_pctg", label: "SV%" },
+  { key: "shutouts", label: "SO" },
+  { key: "games_played", label: "GP" },
+];
+
+function formatStatValue(key, value) {
+  if (value == null) return "—";
+  if (key === "goals_against_avg") return Number(value).toFixed(2);
+  if (key === "save_pctg") return Number(value).toFixed(3);
+  return value;
+}
+
+function seasonTypeLabel(seasonType) {
+  return seasonType === "playoffs" ? "Playoffs" : "Regular";
+}
 
 function CareerStatTiles({ stats, isGoalie }) {
   return (
@@ -75,6 +108,8 @@ function PlayerPanel({ player, onBack, backLabel }) {
   const careerRegularSeason = player.career_totals?.regular_season ?? null;
   const careerPlayoffs = player.career_totals?.playoffs ?? null;
   const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
+  const seasonHistory = player.season_history ?? [];
+  const seasonHistoryColumns = isGoalie ? SEASON_HISTORY_GOALIE_COLUMNS : SEASON_HISTORY_SKATER_COLUMNS;
   const heightLabel = player.height_in_inches
     ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
     : "—";
@@ -233,6 +268,36 @@ function PlayerPanel({ player, onBack, backLabel }) {
               <CareerStatTiles stats={careerPlayoffs} isGoalie={isGoalie} />
             </>
           )}
+        </div>
+      )}
+
+      {seasonHistory.length > 0 && (
+        <div className="advanced-stats-panel">
+          <div className="trend-eyebrow advanced-stats-header">SEASON BY SEASON</div>
+          <div className="table-card">
+            <table className="standings-table">
+              <thead>
+                <tr>
+                  <th>SEASON</th>
+                  <th>TYPE</th>
+                  {seasonHistoryColumns.map((col) => (
+                    <th key={col.key}>{col.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {seasonHistory.map((entry) => (
+                  <tr key={`${entry.season_id}-${entry.season_type}`}>
+                    <td>{formatSeasonLabel(entry.season_id)}</td>
+                    <td>{seasonTypeLabel(entry.season_type)}</td>
+                    {seasonHistoryColumns.map((col) => (
+                      <td key={col.key}>{formatStatValue(col.key, entry[col.key])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

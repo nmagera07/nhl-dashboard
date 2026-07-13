@@ -1,11 +1,7 @@
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
-
-function formatSeasonLabel(seasonId) {
-  const str = String(seasonId);
-  return `${str.slice(2, 4)}-${str.slice(6, 8)}`;
-}
+import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 
 function YearlyDot({ cx, cy, payload }) {
   const fill = payload?.madePlayoffs ? "#3b82f6" : "#4b5563";

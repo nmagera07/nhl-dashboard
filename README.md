@@ -79,7 +79,7 @@ Azure Static      Azure Container
 
 React 19 · Vite · Recharts · FastAPI · psycopg2 · Postgres (Neon) ·
 Docker · Azure Container Apps · Azure Static Web Apps · Azure Container
-Registry · GitHub Actions · Azure Pipelines
+Registry · GitHub Actions · Azure Pipelines · Sentry (error tracking)
 
 ## Local development
 
@@ -88,11 +88,16 @@ See [`backend/README.md`](backend/README.md) and
 
 ## Known limitations
 
-- Backend has a pytest suite (`backend/tests/`), gated in CI before
-  deploy. Frontend has a Vitest + React Testing Library suite
-  (`frontend/src/**/*.test.jsx`) too, but it isn't wired into the
-  Static Web Apps deploy workflow as a gate yet — see
-  [`frontend/README.md`](frontend/README.md) for how to run it locally.
+- Both backend (pytest, `backend/tests/`) and frontend (Vitest + React
+  Testing Library, `frontend/src/**/*.test.jsx`) have test suites, each
+  gating its own deploy pipeline — a failing test blocks the deploy on
+  either side. See [`backend/README.md`](backend/README.md) and
+  [`frontend/README.md`](frontend/README.md) for how to run them locally.
+- No monitoring/alerting beyond error tracking (Sentry, optional —
+  `SENTRY_DSN`/`VITE_SENTRY_DSN`) and `GET /health` (which Azure Container
+  Apps can use as a liveness/readiness probe, though that's not wired up
+  yet — see `backend/README.md`). Nothing currently pages anyone if the
+  ingestion scripts silently stop running, for instance.
 - The NHL's legacy shift-chart endpoint (used for advanced stats) is
   missing data for roughly a third of games league-wide — a gap in the
   NHL's own data, not something fixable on this end. The player card

@@ -1,4 +1,12 @@
 name: Azure Static Web Apps CI/CD
+#
+# test_job runs the Vitest suite; build_and_deploy_job only runs if it
+# succeeds. Azure/static-web-apps-deploy@v1 does its own build+deploy in
+# one step, so unlike the backend's Azure Pipeline (which has full
+# control to insert a separate test stage before the build), gating here
+# means a preceding job plus `needs: test_job` -- and since a custom `if`
+# on a job REPLACES the implicit "needs must have succeeded" check rather
+# than adding to it, that condition includes an explicit success() too.
 
 on:
   push:
@@ -10,8 +18,26 @@ on:
       - main
 
 jobs:
-  build_and_deploy_job:
+  test_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    name: Run frontend tests
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  build_and_deploy_job:
+    needs: test_job
+    if: success() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed'))
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:

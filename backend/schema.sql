@@ -142,6 +142,49 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
 CREATE INDEX IF NOT EXISTS idx_player_season_player
     ON player_season_stats (player_id, season_id);
 
+-- One row per player per "season type" (regular season / playoffs),
+-- refreshed each ingestion run (overwritten, not a daily snapshot --
+-- same reasoning as player_season_stats). From the NHL API's player
+-- landing page's careerTotals section, which is a single running
+-- aggregate with no season_id dimension -- season_type plays that role
+-- instead. A player with no playoff games at all (e.g. a rookie, or a
+-- team that's never made the playoffs during their career) simply has
+-- no 'playoffs' row here -- see ingest_player_stats.py. Skater and
+-- goalie stats share this table, same as player_season_stats; whichever
+-- set doesn't apply to a player's position stays NULL.
+CREATE TABLE IF NOT EXISTS player_career_totals (
+    id                      SERIAL PRIMARY KEY,
+    player_id               INTEGER NOT NULL REFERENCES players(player_id),
+    season_type             VARCHAR(14) NOT NULL CHECK (season_type IN ('regular_season', 'playoffs')),
+    games_played            INTEGER,
+    -- skater stats
+    goals                   INTEGER,
+    assists                 INTEGER,
+    points                  INTEGER,
+    plus_minus              INTEGER,
+    pim                     INTEGER,
+    shots                   INTEGER,
+    shooting_pctg           NUMERIC(6,4),
+    power_play_goals        INTEGER,
+    power_play_points       INTEGER,
+    shorthanded_goals       INTEGER,
+    shorthanded_points      INTEGER,
+    game_winning_goals      INTEGER,
+    ot_goals                INTEGER,
+    -- goalie stats
+    wins                    INTEGER,
+    losses                  INTEGER,
+    ot_losses               INTEGER,
+    goals_against_avg       NUMERIC(6,4),
+    save_pctg               NUMERIC(6,4),
+    shutouts                INTEGER,
+    updated_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (player_id, season_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_career_totals_player
+    ON player_career_totals (player_id);
+
 -- Corsi/Fenwick (5-on-5 shot-attempt possession stats), computed ourselves
 -- from the NHL API's official play-by-play + shift-chart endpoints rather
 -- than scraped from MoneyPuck/Natural Stat Trick, both of which block

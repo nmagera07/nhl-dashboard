@@ -7,6 +7,14 @@ standings ingestion, this doesn't need to run every day -- player stats are
 already season totals in one API call, so a weekly run is plenty during the
 season (and none needed in the off-season).
 
+Also extracts each player's career totals (regular season + playoffs
+aggregates) into player_career_totals. This lives here rather than in its
+own script because the NHL API's player landing page -- already fetched
+per player for featuredStats -- has careerTotals as a sibling top-level
+key in that same response. Parsing more of a response already sitting in
+memory costs nothing; a separate script would mean a second, redundant
+HTTP round trip per player for data we already have.
+
 Setup:
     pip install requests psycopg2-binary python-dotenv
 
@@ -180,6 +188,87 @@ def upsert_season_stats(cur, player_id, landing):
     return True
 
 
+def upsert_career_totals(cur, player_id, landing):
+    career = landing.get("careerTotals")
+    if not career:
+        return False
+
+    upserted_any = False
+    for season_type, nhl_key in (("regular_season", "regularSeason"), ("playoffs", "playoffs")):
+        totals = career.get(nhl_key)
+        if not totals:
+            continue
+
+        cur.execute(
+            """
+            INSERT INTO player_career_totals (
+                player_id, season_type, games_played,
+                goals, assists, points, plus_minus, pim, shots, shooting_pctg,
+                power_play_goals, power_play_points, shorthanded_goals,
+                shorthanded_points, game_winning_goals, ot_goals,
+                wins, losses, ot_losses, goals_against_avg, save_pctg, shutouts,
+                updated_at
+            ) VALUES (
+                %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                NOW()
+            )
+            ON CONFLICT (player_id, season_type) DO UPDATE SET
+                games_played = EXCLUDED.games_played,
+                goals = EXCLUDED.goals,
+                assists = EXCLUDED.assists,
+                points = EXCLUDED.points,
+                plus_minus = EXCLUDED.plus_minus,
+                pim = EXCLUDED.pim,
+                shots = EXCLUDED.shots,
+                shooting_pctg = EXCLUDED.shooting_pctg,
+                power_play_goals = EXCLUDED.power_play_goals,
+                power_play_points = EXCLUDED.power_play_points,
+                shorthanded_goals = EXCLUDED.shorthanded_goals,
+                shorthanded_points = EXCLUDED.shorthanded_points,
+                game_winning_goals = EXCLUDED.game_winning_goals,
+                ot_goals = EXCLUDED.ot_goals,
+                wins = EXCLUDED.wins,
+                losses = EXCLUDED.losses,
+                ot_losses = EXCLUDED.ot_losses,
+                goals_against_avg = EXCLUDED.goals_against_avg,
+                save_pctg = EXCLUDED.save_pctg,
+                shutouts = EXCLUDED.shutouts,
+                updated_at = NOW()
+            """,
+            (
+                player_id,
+                season_type,
+                totals.get("gamesPlayed"),
+                totals.get("goals"),
+                totals.get("assists"),
+                totals.get("points"),
+                totals.get("plusMinus"),
+                totals.get("pim"),
+                totals.get("shots"),
+                totals.get("shootingPctg"),
+                totals.get("powerPlayGoals"),
+                totals.get("powerPlayPoints"),
+                totals.get("shorthandedGoals"),
+                totals.get("shorthandedPoints"),
+                totals.get("gameWinningGoals"),
+                totals.get("otGoals"),
+                totals.get("wins"),
+                totals.get("losses"),
+                totals.get("otLosses"),
+                totals.get("goalsAgainstAvg"),
+                totals.get("savePctg"),
+                totals.get("shutouts"),
+            ),
+        )
+        upserted_any = True
+
+    return upserted_any
+
+
 def main():
     # Neon's serverless Postgres will drop an idle connection, and a full
     # run takes several minutes of mostly-HTTP time -- so open a fresh
@@ -192,6 +281,7 @@ def main():
 
     total_players = 0
     total_with_stats = 0
+    total_with_career_totals = 0
     teams_succeeded = 0
     teams_failed = 0
     for team_abbrev in team_abbrevs:
@@ -211,6 +301,8 @@ def main():
                     for player, landing in landings:
                         if upsert_season_stats(cur, player["id"], landing):
                             total_with_stats += 1
+                        if upsert_career_totals(cur, player["id"], landing):
+                            total_with_career_totals += 1
 
             total_players += len(roster)
             logger.info(f"{team_abbrev}: ingested {len(roster)} players")
@@ -221,7 +313,10 @@ def main():
 
         teams_succeeded += 1
 
-    logger.info(f"Done. {total_players} players total, {total_with_stats} with season stats.")
+    logger.info(
+        f"Done. {total_players} players total, {total_with_stats} with season stats, "
+        f"{total_with_career_totals} with career totals."
+    )
     logger.info(f"Teams: {teams_succeeded} succeeded, {teams_failed} failed.")
 
 

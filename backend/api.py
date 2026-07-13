@@ -329,6 +329,17 @@ def player_detail(player_id: int):
                 (player_id,),
             )
             player["advanced_stats"] = cur.fetchall()
+
+            cur.execute(
+                "SELECT * FROM player_career_totals WHERE player_id = %s",
+                (player_id,),
+            )
+            career_rows = cur.fetchall()
+            by_season_type = {row["season_type"]: row for row in career_rows}
+            player["career_totals"] = {
+                "regular_season": by_season_type.get("regular_season"),
+                "playoffs": by_season_type.get("playoffs"),
+            }
             return player
     except HTTPException:
         raise

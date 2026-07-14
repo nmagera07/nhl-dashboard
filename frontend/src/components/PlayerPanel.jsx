@@ -4,13 +4,13 @@ import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
 
 const SEASON_HISTORY_SKATER_COLUMNS = [
-  { key: "points", label: "PTS" },
+  { key: "games_played", label: "GP" },
   { key: "goals", label: "G" },
   { key: "assists", label: "A" },
+  { key: "points", label: "PTS" },
   { key: "plus_minus", label: "+/-" },
-  { key: "pim", label: "PIM" },
   { key: "shots", label: "SHOTS" },
-  { key: "games_played", label: "GP" },
+  { key: "pim", label: "PIM" },
 ];
 
 const SEASON_HISTORY_GOALIE_COLUMNS = [

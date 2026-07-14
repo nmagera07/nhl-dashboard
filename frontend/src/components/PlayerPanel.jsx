@@ -30,9 +30,6 @@ function formatStatValue(key, value) {
   return value;
 }
 
-function seasonTypeLabel(seasonType) {
-  return seasonType === "playoffs" ? "Playoffs" : "Regular";
-}
 
 function CareerStatTiles({ stats, isGoalie }) {
   return (
@@ -102,6 +99,7 @@ function CareerStatTiles({ stats, isGoalie }) {
 
 function PlayerPanel({ player, onBack, backLabel }) {
   const [showAllSeasons, setShowAllSeasons] = useState(false);
+  const [seasonHistoryTab, setSeasonHistoryTab] = useState("regular_season");
 
   if (!player) return null;
 
@@ -113,7 +111,12 @@ function PlayerPanel({ player, onBack, backLabel }) {
   const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
   const seasonHistory = player.season_history ?? [];
   const seasonHistoryColumns = isGoalie ? SEASON_HISTORY_GOALIE_COLUMNS : SEASON_HISTORY_SKATER_COLUMNS;
-  const visibleSeasonHistory = showAllSeasons ? seasonHistory : seasonHistory.slice(0, 5);
+  const regularSeasonHistory = seasonHistory.filter((e) => e.season_type === "regular_season");
+  const playoffsHistory = seasonHistory.filter((e) => e.season_type === "playoffs");
+  const hasPlayoffHistory = playoffsHistory.length > 0;
+  const activeSeasonHistory =
+    seasonHistoryTab === "playoffs" && hasPlayoffHistory ? playoffsHistory : regularSeasonHistory;
+  const visibleSeasonHistory = showAllSeasons ? activeSeasonHistory : activeSeasonHistory.slice(0, 5);
   const heightLabel = player.height_in_inches
     ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
     : "—";
@@ -280,13 +283,36 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
       {seasonHistory.length > 0 && (
         <div className="advanced-stats-panel">
-          <div className="trend-eyebrow advanced-stats-header">SEASON BY SEASON</div>
+          <div className="trend-header">
+            <div className="trend-eyebrow advanced-stats-header">SEASON BY SEASON</div>
+            {hasPlayoffHistory && (
+              <div className="trend-toggle">
+                <button
+                  className={seasonHistoryTab === "regular_season" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
+                  onClick={() => {
+                    setSeasonHistoryTab("regular_season");
+                    setShowAllSeasons(false);
+                  }}
+                >
+                  Regular Season
+                </button>
+                <button
+                  className={seasonHistoryTab === "playoffs" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
+                  onClick={() => {
+                    setSeasonHistoryTab("playoffs");
+                    setShowAllSeasons(false);
+                  }}
+                >
+                  Playoffs
+                </button>
+              </div>
+            )}
+          </div>
           <div className="table-card">
             <table className="standings-table">
               <thead>
                 <tr>
                   <th>SEASON</th>
-                  <th>TYPE</th>
                   {seasonHistoryColumns.map((col) => (
                     <th key={col.key}>{col.label}</th>
                   ))}
@@ -296,7 +322,6 @@ function PlayerPanel({ player, onBack, backLabel }) {
                 {visibleSeasonHistory.map((entry) => (
                   <tr key={`${entry.season_id}-${entry.season_type}`}>
                     <td>{formatSeasonLabel(entry.season_id)}</td>
-                    <td>{seasonTypeLabel(entry.season_type)}</td>
                     {seasonHistoryColumns.map((col) => (
                       <td key={col.key}>{formatStatValue(col.key, entry[col.key])}</td>
                     ))}
@@ -305,9 +330,9 @@ function PlayerPanel({ player, onBack, backLabel }) {
               </tbody>
             </table>
           </div>
-          {seasonHistory.length > 5 && (
+          {activeSeasonHistory.length > 5 && (
             <button className="roster-link" onClick={() => setShowAllSeasons((prev) => !prev)}>
-              {showAllSeasons ? "Show less" : `Show all ${seasonHistory.length} seasons`}
+              {showAllSeasons ? "Show less" : `Show all ${activeSeasonHistory.length} seasons`}
             </button>
           )}
         </div>

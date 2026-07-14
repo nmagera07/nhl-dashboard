@@ -28,7 +28,7 @@ class TestPlayerDetail:
     ):
         db_router.when("where p.player_id = %s", player_bio_row)
         db_router.when("from player_season_stats where player_id", [player_season_stat_row])
-        db_router.when("from player_advanced_stats where player_id", [player_advanced_stat_row])
+        db_router.when("from player_advanced_stats where player_id", player_advanced_stat_row)
         db_router.when("from player_career_totals where player_id", [])
         db_router.when("from player_season_history where player_id", [])
 
@@ -38,7 +38,8 @@ class TestPlayerDetail:
         body = response.json()
         assert body["first_name"] == "Nathan"
         assert body["season_stats"] == [player_season_stat_row]
-        assert body["advanced_stats"] == [player_advanced_stat_row]
+        assert body["advanced_stats"]["corsi_for_pct"] == 0.574
+        assert body["advanced_stats"]["pdo"] == 101.4
 
     def test_player_with_no_season_or_advanced_stats_returns_empty_nested_lists(
         self, client, db_router, player_bio_row
@@ -57,7 +58,7 @@ class TestPlayerDetail:
         assert response.status_code == 200
         body = response.json()
         assert body["season_stats"] == []
-        assert body["advanced_stats"] == []
+        assert body["advanced_stats"] is None
 
     def test_unknown_player_id_404s(self, client, db_router):
         db_router.when("where p.player_id = %s", None)

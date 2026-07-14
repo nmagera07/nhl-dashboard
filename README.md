@@ -1,9 +1,9 @@
 # NHL Stats Dashboard
 
 A full-stack NHL analytics dashboard: live standings, team rosters, a
-league-wide player leaderboard, and two stats you won't find prebuilt
-anywhere else — 5-on-5 Corsi/Fenwick computed from raw play-by-play data,
-and a Monte Carlo playoff-odds simulation.
+league-wide player leaderboard, 5-on-5 advanced stats (Corsi/Fenwick/xG%/PDO)
+sourced from MoneyPuck, and a from-scratch Monte Carlo playoff-odds
+simulation you won't find as a prebuilt feed anywhere else.
 
 **Live:** https://ashy-sky-01e4eba1e.7.azurestaticapps.net
 
@@ -15,23 +15,30 @@ and a Monte Carlo playoff-odds simulation.
 - **Team drill-down** — click a team for a snapshot card (record,
   home/road split, division/conference/league rank), then its full
   roster split into forwards, defensemen, and goalies.
-- **Player drill-down** — click a player for bio, season stats, and
-  5-on-5 Corsi/Fenwick (see below).
+- **Player drill-down** — click a player for bio, season stats, career
+  totals, season-by-season history, and 5-on-5 advanced stats (see below).
 - **League leaderboard** — every rostered player, sortable by any stat,
   searchable, skaters and goalies split out.
+- **Standings, sortable by advanced stat** — click CF%/xG%/PDO in the
+  standings table to re-sort the league by that column, backed by a real
+  `?sort_by=` query param on the API, not client-side-only sorting.
 - **Playoff odds** — a from-scratch Monte Carlo simulation, not a
   third-party feed.
 
 ## Why some of this is harder than it looks
 
-**Advanced stats (Corsi/Fenwick).** The usual sources for this data
-(MoneyPuck, Natural Stat Trick) both block automated access — MoneyPuck's
-Cloudflare check demands a paid license for scraping, and Natural Stat
-Trick's `robots.txt` explicitly disallows AI-agent user agents. Instead
-of working around that, this computes the same stat directly from the
-NHL's own public API: for every 5-on-5 shot attempt, it cross-references
-the event's timestamp against every player's on-ice shift intervals for
-that period to figure out who was actually on the ice. See
+**Advanced stats (Corsi/Fenwick/xG%/PDO).** MoneyPuck's own site and
+directory listings sit behind a Cloudflare bot-check demanding a paid data
+license for scraping — but the individual CSV files under
+`moneypuck.com/moneypuck/playerData/seasonSummary/{season}/regular/*.csv`
+are not behind that check, confirmed by fetching them directly. This pulls
+team- and skater-level 5-on-5 stats from those CSVs directly; PDO isn't a
+column MoneyPuck publishes, so it's derived from the underlying
+goals/shots columns. (An earlier version of this recomputed Corsi/Fenwick
+from scratch out of the NHL API's own play-by-play + shift-chart data,
+based on the mistaken assumption that MoneyPuck blocked all automated
+access rather than just its website UI — replaced once the CSV endpoints
+turned out to be open.) See
 [`backend/ingest_advanced_stats.py`](backend/ingest_advanced_stats.py).
 
 **Playoff odds.** A real Monte Carlo simulation, not a lookup: for each
@@ -72,7 +79,7 @@ Azure Static      Azure Container
 | `ingest_standings.py` | Daily standings snapshot, all 32 teams | Daily |
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation | Daily |
 | `ingest_player_stats.py` | Full roster + season stats, all 32 teams | Manual, ~weekly in-season |
-| `ingest_advanced_stats.py` | Corsi/Fenwick from play-by-play + shift data | Manual, ~weekly in-season |
+| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team + skater, from MoneyPuck | Manual, ~weekly in-season |
 | `backfill_season_history.py` | Last 5 completed seasons' final standings | One-time |
 
 ## Tech stack
@@ -98,10 +105,6 @@ See [`backend/README.md`](backend/README.md) and
   Apps can use as a liveness/readiness probe, though that's not wired up
   yet — see `backend/README.md`). Nothing currently pages anyone if the
   ingestion scripts silently stop running, for instance.
-- The NHL's legacy shift-chart endpoint (used for advanced stats) is
-  missing data for roughly a third of games league-wide — a gap in the
-  NHL's own data, not something fixable on this end. The player card
-  surfaces this transparently rather than hiding it.
 - Ingestion scripts run manually or via a local Windows Task Scheduler,
   not a cloud-native scheduler — fine for a personal project, would move
   to something like Azure Functions on a timer trigger for anything

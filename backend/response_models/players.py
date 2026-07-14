@@ -105,22 +105,26 @@ class PlayerSeasonStat(BaseModel):
 
 class PlayerAdvancedStat(BaseModel):
     """
-    One row of `player_advanced_stats`, as nested under GET /players/{player_id}.
-    corsi/fenwick counts default to 0 at the DB level (NOT NULL DEFAULT 0),
-    but the *_pct columns stay NULL when for+against is 0/0.
+    The current season's row of `player_advanced_stats`, as nested under
+    GET /players/{player_id} -- sourced from MoneyPuck's public seasonSummary
+    CSVs (see ingest_advanced_stats.py), 5-on-5 situation only. Skaters only;
+    goalies never have a row here (on-ice possession shares aren't a
+    meaningful goalie stat). Every field is Optional because a rookie or a
+    player MoneyPuck hasn't published a row for yet still has a valid 200
+    response -- see PlayerDetail's advanced_stats field for the
+    None-if-missing pattern this follows (same shape as career_totals).
     """
 
-    id: int
-    player_id: int
     season_id: int
-    corsi_for: int
-    corsi_against: int
+    games_played: Optional[int] = None
+    icetime_seconds: Optional[int] = None
     corsi_for_pct: Optional[float] = None
-    fenwick_for: int
-    fenwick_against: int
     fenwick_for_pct: Optional[float] = None
-    games_processed: int
-    updated_at: datetime
+    xgoals_for_pct: Optional[float] = None
+    xgoals_for: Optional[float] = None
+    xgoals_against: Optional[float] = None
+    individual_xgoals: Optional[float] = None
+    pdo: Optional[float] = None
 
 
 class CareerTotalsStats(BaseModel):
@@ -214,12 +218,18 @@ class PlayerDetail(PlayerBio):
     GET /players/{player_id}. 404s (not an empty body) when the player_id
     doesn't exist -- see the endpoint's explicit HTTPException.
 
-    season_stats and advanced_stats are genuinely nested lists (unlike the
-    flattened single-row join used by RosterPlayer/PlayerLeader) because the
-    endpoint runs two separate follow-up queries and assigns their full
-    fetchall() results onto the player dict -- a player can have multiple
-    season rows (one per season_id) and 0 rows for either list is valid
-    (e.g. a rookie with no advanced_stats computed yet), not an error.
+    season_stats is a genuinely nested list (unlike the flattened
+    single-row join used by RosterPlayer/PlayerLeader) because the endpoint
+    runs a separate follow-up query and assigns its full fetchall() result
+    onto the player dict -- a player can have multiple season rows (one per
+    season_id) and 0 rows is valid (e.g. a rookie), not an error.
+
+    advanced_stats is None (not an empty list) when MoneyPuck has no row
+    for this player/season yet -- goalies always get None, since
+    player_advanced_stats is skater-only -- following the same
+    None-if-missing shape as career_totals below, rather than
+    season_stats' possibly-empty-list shape, since this is always at most
+    one row (the current season only, not a history).
 
     career_totals is always present as an object -- even a player with zero
     player_career_totals rows gets {"regular_season": None, "playoffs": None}
@@ -230,12 +240,12 @@ class PlayerDetail(PlayerBio):
     separate entries, most recent season first) -- covering every NHL
     season the player has ever played, not just the current one like
     season_stats. 0 rows is valid (ingestion hasn't backfilled this
-    player's history yet), same as season_stats/advanced_stats.
+    player's history yet), same as season_stats.
     """
 
     team_name: str
     team_logo_url: Optional[str] = None
     season_stats: List[PlayerSeasonStat]
-    advanced_stats: List[PlayerAdvancedStat]
+    advanced_stats: Optional[PlayerAdvancedStat] = None
     career_totals: CareerTotals
     season_history: List[SeasonHistoryEntry]

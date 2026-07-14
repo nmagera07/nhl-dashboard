@@ -233,23 +233,62 @@ CREATE TABLE IF NOT EXISTS player_season_history (
 CREATE INDEX IF NOT EXISTS idx_player_season_history_player
     ON player_season_history (player_id, season_id);
 
--- Corsi/Fenwick (5-on-5 shot-attempt possession stats), computed ourselves
--- from the NHL API's official play-by-play + shift-chart endpoints rather
--- than scraped from MoneyPuck/Natural Stat Trick, both of which block
--- automated access. See ingest_advanced_stats.py for the on-ice-detection
--- algorithm. Recomputed from scratch each run (not incremental), so this
--- is always the full-season total as of the last ingestion.
+-- Advanced possession/shot-quality stats sourced from MoneyPuck's public
+-- seasonSummary CSVs (see ingest_advanced_stats.py). MoneyPuck's own site
+-- and directory listings sit behind a Cloudflare bot-check demanding a paid
+-- data license, but the individual CSV files under
+-- moneypuck.com/moneypuck/playerData/seasonSummary/{season}/regular/*.csv
+-- are not gated -- confirmed by fetching them directly. All rows here are
+-- the "5on5" situation slice (MoneyPuck's CSVs include multiple situations
+-- per team/player -- all, 5on5, 4on5, 5on4, other); 5-on-5 is the standard
+-- reference frame the industry quotes CF%/FF%/xG% in, since special-teams
+-- shot attempts otherwise swamp the signal. Recomputed from scratch each
+-- ingestion run (not incremental), so this is always MoneyPuck's latest
+-- published snapshot for the season.
+CREATE TABLE IF NOT EXISTS team_advanced_stats (
+    id                      SERIAL PRIMARY KEY,
+    team_abbrev             VARCHAR(3) NOT NULL REFERENCES teams(team_abbrev),
+    season_id               INTEGER NOT NULL,
+    games_played            INTEGER,
+    corsi_for_pct           NUMERIC(6,4),
+    fenwick_for_pct         NUMERIC(6,4),
+    xgoals_for_pct          NUMERIC(6,4),
+    xgoals_for              NUMERIC(8,3),
+    xgoals_against          NUMERIC(8,3),
+    goals_for               INTEGER,
+    goals_against           INTEGER,
+    shots_on_goal_for       INTEGER,
+    shots_on_goal_against   INTEGER,
+    pdo                     NUMERIC(6,2),
+    updated_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, team_abbrev)
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_advanced_team
+    ON team_advanced_stats (team_abbrev, season_id);
+
+-- Same MoneyPuck source, one row per skater per season (goalies aren't
+-- included -- on-ice possession shares aren't a meaningful goalie stat the
+-- way they are for skaters, matching how the old Corsi/Fenwick
+-- implementation also skater-only). individual_xgoals ("ixG") is the
+-- player's own shot quality, independent of who else is on the ice --
+-- useful alongside goals to see who's over/underperforming their chances.
+-- pdo here is the player's on-ice shooting% + on-ice save% while they're
+-- on the ice (not the team's), a common shorthand for "how sustainable is
+-- this player's on-ice results."
 CREATE TABLE IF NOT EXISTS player_advanced_stats (
     id                      SERIAL PRIMARY KEY,
     player_id               INTEGER NOT NULL REFERENCES players(player_id),
     season_id               INTEGER NOT NULL,
-    corsi_for               INTEGER NOT NULL DEFAULT 0,
-    corsi_against            INTEGER NOT NULL DEFAULT 0,
+    games_played            INTEGER,
+    icetime_seconds         INTEGER,
     corsi_for_pct           NUMERIC(6,4),
-    fenwick_for             INTEGER NOT NULL DEFAULT 0,
-    fenwick_against         INTEGER NOT NULL DEFAULT 0,
     fenwick_for_pct         NUMERIC(6,4),
-    games_processed         INTEGER NOT NULL DEFAULT 0,
+    xgoals_for_pct          NUMERIC(6,4),
+    xgoals_for              NUMERIC(8,3),
+    xgoals_against          NUMERIC(8,3),
+    individual_xgoals       NUMERIC(8,3),
+    pdo                     NUMERIC(6,2),
     updated_at              TIMESTAMP DEFAULT NOW(),
     UNIQUE (season_id, player_id)
 );

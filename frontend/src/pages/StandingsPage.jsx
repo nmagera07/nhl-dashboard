@@ -19,6 +19,9 @@ function StandingsPage({
   trendMode,
   onTrendModeChange,
   onViewRoster,
+  sortBy,
+  sortDir,
+  onSort,
 }) {
   return (
     <>
@@ -33,6 +36,9 @@ function StandingsPage({
         selectedTeam={selectedTeam}
         onSelectTeam={onSelectTeam}
         playoffOddsByTeam={playoffOddsByTeam}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSort={onSort}
       />
       {playoffOddsStatus === "error" && (
         <div className="status-line status-error">

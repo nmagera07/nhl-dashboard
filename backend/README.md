@@ -80,7 +80,7 @@ pytest -k playoff_teams                # tests matching a keyword
 tests/
   conftest.py                    # fake DB layer + shared fixtures (see below)
   test_simulate_playoff_odds.py  # pure-function tests: win_probability, determine_playoff_teams
-  test_ingest_advanced_stats.py  # pure-function tests: time_to_seconds
+  test_ingest_advanced_stats.py  # pure-function tests: MoneyPuck CSV row parsing, PDO calc
   test_api_misc.py               # GET /, GET /teams, GET /playoff-odds
   test_api_roster.py             # GET /teams/{team}/roster
   test_api_players.py            # GET /players/leaders, GET /players/{id}
@@ -106,7 +106,7 @@ Why mocking instead of a test database:
   that can open a real connection, so there's no possibility of a test
   accidentally reading or writing the live Neon database — not "we're
   careful," but structurally impossible.
-- **Fast and deterministic.** All 61 tests run in well under a second, no
+- **Fast and deterministic.** All 96 tests run in well under a second, no
   network calls, no flakiness from shared state or connection limits.
 - **The queries themselves were already verified against real data.**
   The response-model work in this project involved fetching real rows
@@ -133,7 +133,7 @@ upserts, nothing duplicates.
 |---|---|---|
 | `ingest_standings.py` | Current standings, all 32 teams → one snapshot row per team per day | Daily |
 | `ingest_player_stats.py` | Current roster + season-to-date stats, all 32 teams | Weekly in-season (season totals don't need daily polling) |
-| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick, computed from play-by-play + shift-chart data across every completed game | Weekly in-season |
+| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team- and skater-level, from MoneyPuck's public seasonSummary CSVs | Weekly in-season |
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
 | `backfill_season_history.py --years N` | Final standings for the last N completed seasons | One-time, or to extend the range |
 
@@ -147,13 +147,13 @@ the top-level README for why.
 |---|---|
 | `GET /health` | Actually exercises the database (`SELECT 1` via the read-only role) — 200 if reachable, 503 if not. Exempt from rate limiting, for Azure Container Apps' probes / an uptime monitor. `GET /` is a static "process is up" payload and doesn't check the database at all. |
 | `GET /teams` | All 32 teams |
-| `GET /standings/latest` | Most recent day's standings, all teams |
+| `GET /standings/latest` | Most recent day's standings, all teams, joined with this season's 5-on-5 team advanced stats (corsi/fenwick/xG%/PDO). `?sort_by=<field>&sort_dir=asc\|desc` overrides the default league_sequence ordering — see `STANDINGS_SORT_FIELDS` in `api.py` for the allowed field names (400 on an unrecognized one) |
 | `GET /standings/{team}` | Full daily-snapshot history for one team (`?start=&end=` optional) |
 | `GET /standings/{team}/seasons` | Final standings for that team's last 5 completed seasons |
 | `GET /playoff-odds` | Latest Monte Carlo playoff-odds simulation, all teams |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |
 | `GET /players/leaders` | Every rostered player + season stats (league leaderboard) |
-| `GET /players/{id}` | Bio + season-by-season stats + advanced stats for one player |
+| `GET /players/{id}` | Bio + season-by-season stats + career totals + this season's advanced stats (skaters only; `null` for goalies and for any player MoneyPuck hasn't covered yet) for one player |
 
 ## Schema
 
@@ -162,7 +162,8 @@ the top-level README for why.
 - `season_final_standings` — one row per team per completed season (last 5 years)
 - `players` — current roster snapshot, all 32 teams
 - `player_season_stats` — one row per player per season, refreshed each ingestion run
-- `player_advanced_stats` — computed Corsi/Fenwick, one row per player per season
+- `team_advanced_stats` — 5-on-5 corsi/fenwick/xG%/PDO from MoneyPuck, one row per team per season
+- `player_advanced_stats` — same MoneyPuck source, one row per skater per season (goalies excluded)
 - `playoff_odds` — Monte Carlo simulation results, one row per team per as-of-date
 
 Full column definitions and comments are in `schema.sql`.

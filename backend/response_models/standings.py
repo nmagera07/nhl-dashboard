@@ -39,7 +39,15 @@ class StandingsSnapshotFields(BaseModel):
 class StandingsLatestRow(StandingsSnapshotFields):
     """
     One team in GET /standings/latest -- the most recent snapshot_date for
-    every team, joined with team metadata.
+    every team, joined with team metadata plus this season's 5-on-5
+    advanced stats from team_advanced_stats (see ingest_advanced_stats.py).
+
+    The advanced-stat fields are None (not omitted, not zero) for a team
+    MoneyPuck ingestion hasn't covered yet -- same None-if-missing
+    convention used throughout this API (career_totals, advanced_stats on
+    PlayerDetail). ?sort_by= accepts any of corsi_for_pct, fenwick_for_pct,
+    xgoals_for_pct, xgoals_for, xgoals_against, pdo in addition to the
+    existing standings columns -- see the whitelist in api.py.
     """
 
     team_name: str
@@ -47,6 +55,12 @@ class StandingsLatestRow(StandingsSnapshotFields):
     division: Optional[str] = None
     conference: Optional[str] = None
     logo_url: Optional[str] = None
+    corsi_for_pct: Optional[float] = None
+    fenwick_for_pct: Optional[float] = None
+    xgoals_for_pct: Optional[float] = None
+    xgoals_for: Optional[float] = None
+    xgoals_against: Optional[float] = None
+    pdo: Optional[float] = None
 
 
 class StandingsHistoryRow(StandingsSnapshotFields):

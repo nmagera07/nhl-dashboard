@@ -30,6 +30,14 @@ function formatStatValue(key, value) {
   return value;
 }
 
+function formatPct(value) {
+  return value != null ? `${(Number(value) * 100).toFixed(1)}%` : "—";
+}
+
+function formatDecimal(value, digits = 2) {
+  return value != null ? Number(value).toFixed(digits) : "—";
+}
+
 
 function CareerStatTiles({ stats, isGoalie }) {
   return (
@@ -105,7 +113,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
   const isGoalie = player.position_code === "G";
   const seasonStats = player.season_stats?.[0];
-  const advancedStats = player.advanced_stats?.[0];
+  const advancedStats = player.advanced_stats;
   const careerRegularSeason = player.career_totals?.regular_season ?? null;
   const careerPlayoffs = player.career_totals?.playoffs ?? null;
   const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
@@ -233,33 +241,36 @@ function PlayerPanel({ player, onBack, backLabel }) {
           <div className="trend-eyebrow advanced-stats-header">ADVANCED (5-ON-5)</div>
           <div className="stat-tiles">
             <div className="stat-tile">
-              <span className="stat-tile-value">
-                {advancedStats.corsi_for_pct != null ? `${(Number(advancedStats.corsi_for_pct) * 100).toFixed(1)}%` : "—"}
-              </span>
+              <span className="stat-tile-value">{formatPct(advancedStats.corsi_for_pct)}</span>
               <span className="stat-tile-label">CORSI FOR %</span>
             </div>
             <div className="stat-tile">
-              <span className="stat-tile-value">{advancedStats.corsi_for}-{advancedStats.corsi_against}</span>
-              <span className="stat-tile-label">CF - CA</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">
-                {advancedStats.fenwick_for_pct != null ? `${(Number(advancedStats.fenwick_for_pct) * 100).toFixed(1)}%` : "—"}
-              </span>
+              <span className="stat-tile-value">{formatPct(advancedStats.fenwick_for_pct)}</span>
               <span className="stat-tile-label">FENWICK FOR %</span>
             </div>
             <div className="stat-tile">
-              <span className="stat-tile-value">{advancedStats.fenwick_for}-{advancedStats.fenwick_against}</span>
-              <span className="stat-tile-label">FF - FA</span>
+              <span className="stat-tile-value">{formatPct(advancedStats.xgoals_for_pct)}</span>
+              <span className="stat-tile-label">xG FOR %</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">
+                {formatDecimal(advancedStats.xgoals_for)}-{formatDecimal(advancedStats.xgoals_against)}
+              </span>
+              <span className="stat-tile-label">xGF - xGA</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">{formatDecimal(advancedStats.individual_xgoals)}</span>
+              <span className="stat-tile-label">IND. xG</span>
+            </div>
+            <div className="stat-tile">
+              <span className="stat-tile-value">{formatDecimal(advancedStats.pdo, 1)}</span>
+              <span className="stat-tile-label">PDO</span>
             </div>
           </div>
-          {seasonStats && advancedStats.games_processed < seasonStats.games_played && (
-            <div className="advanced-stats-caveat">
-              Based on shift data from {advancedStats.games_processed} of {seasonStats.games_played} games played
-              this season &mdash; computed from official NHL play-by-play and shift data (the NHL's own shift-chart
-              data isn't complete for every game).
-            </div>
-          )}
+          <div className="advanced-stats-caveat">
+            5-on-5 stats from MoneyPuck.com for the {formatSeasonLabel(advancedStats.season_id)} season
+            {advancedStats.games_played != null ? ` (${advancedStats.games_played} games played)` : ""}.
+          </div>
         </div>
       )}
 

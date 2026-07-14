@@ -35,6 +35,85 @@ class TestLatestStandings:
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_advanced_stats_fields_included_when_present(self, client, db_router, standings_row):
+        row = dict(standings_row, corsi_for_pct=0.53, fenwick_for_pct=0.545,
+                   xgoals_for_pct=0.512, xgoals_for=181.35, xgoals_against=174.06, pdo=101.19)
+        db_router.when("where s.snapshot_date =", [row])
+
+        response = client.get("/standings/latest")
+
+        assert response.status_code == 200
+        body = response.json()[0]
+        assert body["corsi_for_pct"] == 0.53
+        assert body["pdo"] == 101.19
+
+    def test_advanced_stats_fields_are_null_when_team_has_no_row(self, client, db_router, standings_row):
+        # team_advanced_stats is a LEFT JOIN -- a team MoneyPuck ingestion
+        # hasn't covered yet still returns 200 with these fields None,
+        # not omitted and not a broken join.
+        db_router.when("where s.snapshot_date =", [standings_row])
+
+        response = client.get("/standings/latest")
+
+        assert response.status_code == 200
+        body = response.json()[0]
+        assert body["corsi_for_pct"] is None
+        assert body["pdo"] is None
+
+
+class TestLatestStandingsSort:
+    def test_default_order_is_league_sequence(self, client, db_router, standings_row):
+        seen_queries = []
+
+        def capture(params):
+            return [standings_row]
+
+        db_router.when("where s.snapshot_date =", capture)
+
+        client.get("/standings/latest")
+
+        query, _ = db_router.calls[-1]
+        assert "order by s.league_sequence asc" in query.lower()
+
+    def test_sort_by_valid_advanced_stat_field_orders_by_that_column(self, client, db_router, standings_row):
+        db_router.when("where s.snapshot_date =", [standings_row])
+
+        response = client.get("/standings/latest?sort_by=corsi_for_pct")
+
+        assert response.status_code == 200
+        query, _ = db_router.calls[-1]
+        assert "order by ta.corsi_for_pct desc nulls last" in query.lower()
+
+    def test_sort_by_existing_standings_column_orders_by_that_column(self, client, db_router, standings_row):
+        db_router.when("where s.snapshot_date =", [standings_row])
+
+        response = client.get("/standings/latest?sort_by=goal_differential&sort_dir=asc")
+
+        assert response.status_code == 200
+        query, _ = db_router.calls[-1]
+        assert "order by s.goal_differential asc nulls last" in query.lower()
+
+    def test_sort_by_pdo_descending_is_the_default_direction(self, client, db_router, standings_row):
+        db_router.when("where s.snapshot_date =", [standings_row])
+
+        client.get("/standings/latest?sort_by=pdo")
+
+        query, _ = db_router.calls[-1]
+        assert "order by ta.pdo desc nulls last" in query.lower()
+
+    def test_invalid_sort_by_is_rejected_before_touching_the_db(self, client, db_router):
+        response = client.get("/standings/latest?sort_by=not_a_real_column")
+
+        assert response.status_code == 400
+        assert "not_a_real_column" in response.json()["detail"]
+        assert db_router.calls == []
+
+    def test_invalid_sort_dir_is_rejected_before_touching_the_db(self, client, db_router):
+        response = client.get("/standings/latest?sort_by=points&sort_dir=sideways")
+
+        assert response.status_code == 400
+        assert db_router.calls == []
+
 
 class TestTeamHistory:
     def test_happy_path_real_team_with_data(self, client, db_router, standings_row):

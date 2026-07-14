@@ -10,7 +10,7 @@ const player = {
   position_code: "C",
   team_abbrev: "COL",
   season_stats: [],
-  advanced_stats: [],
+  advanced_stats: null,
 };
 
 function renderAt(path, { state } = {}) {

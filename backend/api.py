@@ -325,10 +325,10 @@ def player_detail(player_id: int):
             player["season_stats"] = cur.fetchall()
 
             cur.execute(
-                "SELECT * FROM player_advanced_stats WHERE player_id = %s ORDER BY season_id DESC",
+                "SELECT * FROM player_advanced_stats WHERE player_id = %s ORDER BY season_id DESC LIMIT 1",
                 (player_id,),
             )
-            player["advanced_stats"] = cur.fetchall()
+            player["advanced_stats"] = cur.fetchone()
 
             cur.execute(
                 "SELECT * FROM player_career_totals WHERE player_id = %s",
@@ -356,22 +356,74 @@ def player_detail(player_id: int):
         conn.close()
 
 
+# Maps a ?sort_by= value to a safe SQL column expression -- never
+# interpolate the raw query param into ORDER BY directly, since it comes
+# straight from the client. Covers the original standings columns plus
+# the team_advanced_stats fields joined in below; "ta." columns are NULL
+# for any team MoneyPuck ingestion hasn't covered yet, so every sort uses
+# NULLS LAST to keep those teams at the bottom regardless of direction
+# rather than jumbling them in wherever NULL happens to sort by default.
+STANDINGS_SORT_FIELDS = {
+    "points": "s.points",
+    "wins": "s.wins",
+    "losses": "s.losses",
+    "goal_differential": "s.goal_differential",
+    "point_pctg": "s.point_pctg",
+    "corsi_for_pct": "ta.corsi_for_pct",
+    "fenwick_for_pct": "ta.fenwick_for_pct",
+    "xgoals_for_pct": "ta.xgoals_for_pct",
+    "xgoals_for": "ta.xgoals_for",
+    "xgoals_against": "ta.xgoals_against",
+    "pdo": "ta.pdo",
+}
+
+
 @app.get("/standings/latest", response_model=List[StandingsLatestRow])
-def latest_standings():
-    """Most recent day's standings for every team, ranked by league position."""
+def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
+    """
+    Most recent day's standings for every team, joined with this season's
+    5-on-5 advanced stats (corsi/fenwick/xG%/PDO -- see
+    ingest_advanced_stats.py), ranked by league position by default.
+
+    ?sort_by=<field>&sort_dir=asc|desc overrides the default ordering --
+    see STANDINGS_SORT_FIELDS for the allowed field names. A 400 is raised
+    for an unrecognized sort_by or sort_dir rather than silently falling
+    back to the default, since a typo'd field name silently doing nothing
+    would be a confusing way to fail.
+    """
+    if sort_by is not None and sort_by not in STANDINGS_SORT_FIELDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort_by '{sort_by}'. Must be one of: {', '.join(sorted(STANDINGS_SORT_FIELDS))}",
+        )
+    if sort_dir not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail="Invalid sort_dir. Must be 'asc' or 'desc'.")
+
+    order_clause = (
+        f"{STANDINGS_SORT_FIELDS[sort_by]} {sort_dir.upper()} NULLS LAST"
+        if sort_by
+        else "s.league_sequence ASC"
+    )
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url
+                f"""
+                SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url,
+                       ta.corsi_for_pct, ta.fenwick_for_pct, ta.xgoals_for_pct,
+                       ta.xgoals_for, ta.xgoals_against, ta.pdo
                 FROM standings_snapshots s
                 JOIN teams t ON t.team_abbrev = s.team_abbrev
+                LEFT JOIN team_advanced_stats ta
+                    ON ta.team_abbrev = s.team_abbrev AND ta.season_id = s.season_id
                 WHERE s.snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)
-                ORDER BY s.league_sequence ASC
+                ORDER BY {order_clause}
                 """
             )
             return cur.fetchall()
+    except HTTPException:
+        raise
     except Exception:
         logger.error("Failed to fetch latest standings", exc_info=True)
         raise

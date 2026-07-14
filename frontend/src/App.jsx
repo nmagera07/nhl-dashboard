@@ -16,17 +16,36 @@ export default function NHLDashboard() {
   const [selectedTeam, setSelectedTeam] = useState("PIT");
   const [activeDivision, setActiveDivision] = useState(null);
   const [search, setSearch] = useState("");
+  const [standingsSortBy, setStandingsSortBy] = useState(null);
+  const [standingsSortDir, setStandingsSortDir] = useState("desc");
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { data: standings, status } = useFetchWithStatus(`${API_BASE}/standings/latest`, {
+  const standingsUrl = standingsSortBy
+    ? `${API_BASE}/standings/latest?sort_by=${standingsSortBy}&sort_dir=${standingsSortDir}`
+    : `${API_BASE}/standings/latest`;
+
+  const { data: standings, status } = useFetchWithStatus(standingsUrl, {
     initialData: [],
     onSuccess: (data) => {
+      // Only seed the default division tab on first load -- re-fetches
+      // triggered by clicking a sortable column reorder the same teams,
+      // they don't mean "switch the user's selected division tab."
+      if (activeDivision != null) return;
       const firstDivision = data.find((d) => d.division)?.division;
       if (firstDivision) setActiveDivision(firstDivision);
     },
   });
+
+  const handleStandingsSort = (key) => {
+    if (key === standingsSortBy) {
+      setStandingsSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setStandingsSortBy(key);
+      setStandingsSortDir("desc");
+    }
+  };
 
   const { data: playoffOdds, status: playoffOddsStatus } = useFetchWithStatus(
     `${API_BASE}/playoff-odds`,
@@ -128,6 +147,9 @@ export default function NHLDashboard() {
                 trendMode={trendMode}
                 onTrendModeChange={setTrendMode}
                 onViewRoster={handleViewRoster}
+                sortBy={standingsSortBy}
+                sortDir={standingsSortDir}
+                onSort={handleStandingsSort}
               />
             }
           />

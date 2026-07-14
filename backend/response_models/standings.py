@@ -46,8 +46,9 @@ class StandingsLatestRow(StandingsSnapshotFields):
     MoneyPuck ingestion hasn't covered yet -- same None-if-missing
     convention used throughout this API (career_totals, advanced_stats on
     PlayerDetail). ?sort_by= accepts any of corsi_for_pct, fenwick_for_pct,
-    xgoals_for_pct, xgoals_for, xgoals_against, pdo in addition to the
-    existing standings columns -- see the whitelist in api.py.
+    xgoals_for_pct, xgoals_for, xgoals_against, shots_on_goal_for,
+    shots_on_goal_against, pdo in addition to the existing standings
+    columns -- see the whitelist in api.py.
     """
 
     team_name: str
@@ -60,6 +61,8 @@ class StandingsLatestRow(StandingsSnapshotFields):
     xgoals_for_pct: Optional[float] = None
     xgoals_for: Optional[float] = None
     xgoals_against: Optional[float] = None
+    shots_on_goal_for: Optional[int] = None
+    shots_on_goal_against: Optional[int] = None
     pdo: Optional[float] = None
 
 

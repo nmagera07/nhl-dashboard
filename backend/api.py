@@ -374,6 +374,8 @@ STANDINGS_SORT_FIELDS = {
     "xgoals_for_pct": "ta.xgoals_for_pct",
     "xgoals_for": "ta.xgoals_for",
     "xgoals_against": "ta.xgoals_against",
+    "shots_on_goal_for": "ta.shots_on_goal_for",
+    "shots_on_goal_against": "ta.shots_on_goal_against",
     "pdo": "ta.pdo",
 }
 
@@ -382,8 +384,9 @@ STANDINGS_SORT_FIELDS = {
 def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
     """
     Most recent day's standings for every team, joined with this season's
-    5-on-5 advanced stats (corsi/fenwick/xG%/PDO -- see
-    ingest_advanced_stats.py), ranked by league position by default.
+    5-on-5 advanced stats (corsi/fenwick/xG%, xG/shots for and against,
+    PDO -- see ingest_advanced_stats.py), ranked by league position by
+    default.
 
     ?sort_by=<field>&sort_dir=asc|desc overrides the default ordering --
     see STANDINGS_SORT_FIELDS for the allowed field names. A 400 is raised
@@ -412,7 +415,8 @@ def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
                 f"""
                 SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url,
                        ta.corsi_for_pct, ta.fenwick_for_pct, ta.xgoals_for_pct,
-                       ta.xgoals_for, ta.xgoals_against, ta.pdo
+                       ta.xgoals_for, ta.xgoals_against,
+                       ta.shots_on_goal_for, ta.shots_on_goal_against, ta.pdo
                 FROM standings_snapshots s
                 JOIN teams t ON t.team_abbrev = s.team_abbrev
                 LEFT JOIN team_advanced_stats ta

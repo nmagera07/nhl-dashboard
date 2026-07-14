@@ -15,15 +15,20 @@ function PlayoffOddsCell({ pct }) {
 }
 
 const ADVANCED_SORT_COLUMNS = [
-  { key: "corsi_for_pct", label: "CF%" },
   { key: "xgoals_for_pct", label: "xG%" },
+  { key: "xgoals_for", label: "xGF" },
+  { key: "xgoals_against", label: "xGA" },
+  { key: "shots_on_goal_for", label: "SF" },
+  { key: "shots_on_goal_against", label: "SA" },
   { key: "pdo", label: "PDO" },
 ];
 
 function formatAdvancedValue(key, value) {
   if (value == null) return "—";
   if (key === "pdo") return Number(value).toFixed(1);
-  return `${(Number(value) * 100).toFixed(1)}%`;
+  if (key === "xgoals_for_pct") return `${(Number(value) * 100).toFixed(1)}%`;
+  if (key === "xgoals_for" || key === "xgoals_against") return Number(value).toFixed(1);
+  return value; // shots_on_goal_for/against are plain integer counts
 }
 
 function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort }) {

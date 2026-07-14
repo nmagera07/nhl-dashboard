@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
@@ -100,6 +101,8 @@ function CareerStatTiles({ stats, isGoalie }) {
 }
 
 function PlayerPanel({ player, onBack, backLabel }) {
+  const [showAllSeasons, setShowAllSeasons] = useState(false);
+
   if (!player) return null;
 
   const isGoalie = player.position_code === "G";
@@ -110,6 +113,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
   const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
   const seasonHistory = player.season_history ?? [];
   const seasonHistoryColumns = isGoalie ? SEASON_HISTORY_GOALIE_COLUMNS : SEASON_HISTORY_SKATER_COLUMNS;
+  const visibleSeasonHistory = showAllSeasons ? seasonHistory : seasonHistory.slice(0, 5);
   const heightLabel = player.height_in_inches
     ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
     : "—";
@@ -155,7 +159,9 @@ function PlayerPanel({ player, onBack, backLabel }) {
       </div>
 
       {seasonStats && (
-        <div className="stat-tiles">
+        <div className="advanced-stats-panel">
+          <div className="trend-eyebrow advanced-stats-header">THIS SEASON</div>
+          <div className="stat-tiles">
           {isGoalie ? (
             <>
               <div className="stat-tile">
@@ -215,6 +221,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
               </div>
             </>
           )}
+          </div>
         </div>
       )}
 
@@ -286,7 +293,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
                 </tr>
               </thead>
               <tbody>
-                {seasonHistory.map((entry) => (
+                {visibleSeasonHistory.map((entry) => (
                   <tr key={`${entry.season_id}-${entry.season_type}`}>
                     <td>{formatSeasonLabel(entry.season_id)}</td>
                     <td>{seasonTypeLabel(entry.season_type)}</td>
@@ -298,6 +305,11 @@ function PlayerPanel({ player, onBack, backLabel }) {
               </tbody>
             </table>
           </div>
+          {seasonHistory.length > 5 && (
+            <button className="roster-link" onClick={() => setShowAllSeasons((prev) => !prev)}>
+              {showAllSeasons ? "Show less" : `Show all ${seasonHistory.length} seasons`}
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -27,6 +27,7 @@ variables:
   # Each run gets a unique tag from the built-in build ID, so every
   # deploy is traceable back to the exact pipeline run that produced it.
   imageTag: "$(Build.BuildId)"
+  healthCheckUrl: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health"
 
 stages:
   - stage: Test
@@ -81,3 +82,77 @@ stages:
                   --image $(acrLoginServer)/$(imageName):$(imageTag)
 
                 echo "Deploy complete: $(acrLoginServer)/$(imageName):$(imageTag)"
+
+          - task: AzureCLI@2
+            displayName: "Verify the deploy actually came up healthy"
+            inputs:
+              azureSubscription: "azure-subscription-connection"
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -e
+
+                # Motivated by a real incident: a typo'd env var name
+                # (API_DATABASE_URL vs APP_DATABASE_URL) crash-looped
+                # every deploy for days while `az containerapp update`
+                # kept returning success and the pipeline kept reporting
+                # green -- that command only means the update request was
+                # accepted, never that the app inside actually started.
+                #
+                # Checking the public health endpoint alone isn't enough
+                # either -- confirmed empirically while building this: in
+                # single-revision mode, Container Apps performs a rolling
+                # update and keeps the OLD healthy revision serving the
+                # public URL while a NEW, crash-looping revision sits
+                # underneath in CrashLoopBackOff. curl-ing the public URL
+                # right after a bad deploy can come back 200 purely
+                # because the previous good revision hasn't been torn
+                # down yet, silently masking the exact failure this step
+                # exists to catch. So this checks the newly created
+                # revision's own state directly (immune to that masking)
+                # *and* the public endpoint (the actual end-user signal).
+
+                echo "Waiting 25s for the new revision to spin up..."
+                sleep 25
+
+                NEW_REVISION=$(az containerapp show \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query "properties.latestRevisionName" -o tsv)
+                echo "New revision: $NEW_REVISION"
+
+                healthy=0
+                for i in $(seq 1 12); do
+                  revisionHealth=$(az containerapp revision show \
+                    --name $(containerAppName) \
+                    --resource-group $(resourceGroup) \
+                    --revision "$NEW_REVISION" \
+                    --query "properties.healthState" -o tsv 2>/dev/null || echo "Unknown")
+                  revisionRunning=$(az containerapp revision show \
+                    --name $(containerAppName) \
+                    --resource-group $(resourceGroup) \
+                    --revision "$NEW_REVISION" \
+                    --query "properties.runningState" -o tsv 2>/dev/null || echo "Unknown")
+
+                  httpStatus=$(curl -s -o /tmp/health_body.txt -w "%{http_code}" --max-time 10 "$(healthCheckUrl)" || echo "000")
+                  body=$(cat /tmp/health_body.txt 2>/dev/null || echo "")
+
+                  echo "attempt $i/12: revision health=$revisionHealth running=$revisionRunning | endpoint HTTP $httpStatus body=$body"
+
+                  if [ "$revisionHealth" = "Healthy" ] && [ "$revisionRunning" = "Running" ] \
+                     && [ "$httpStatus" = "200" ] \
+                     && echo "$body" | grep -q '"status":"ok"' \
+                     && echo "$body" | grep -q '"database":"connected"'; then
+                    healthy=1
+                    break
+                  fi
+
+                  sleep 5
+                done
+
+                if [ "$healthy" != "1" ]; then
+                  echo "##vso[task.logissue type=error]Deploy did not come up healthy -- new revision '$NEW_REVISION' failed its health check (revision state and/or GET /health) within 60s. Failing the pipeline rather than reporting a broken deploy as green."
+                  exit 1
+                fi
+
+                echo "New revision is healthy and GET /health confirms the live app is serving correctly."

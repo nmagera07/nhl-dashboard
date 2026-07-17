@@ -24,3 +24,21 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# --- Terraform ---
+# State files can contain sensitive data (resource IDs, sometimes
+# secrets) and provider binaries under .terraform/ are large (100MB+)
+# and machine-specific -- neither belongs in git.
+Terraform/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

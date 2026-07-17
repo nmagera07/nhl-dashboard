@@ -95,20 +95,28 @@ See [`backend/README.md`](backend/README.md) and
 
 ## Known limitations
 
-- Both backend (pytest, `backend/tests/`) and frontend (Vitest + React
-  Testing Library, `frontend/src/**/*.test.jsx`) have test suites, each
-  gating its own deploy pipeline — a failing test blocks the deploy on
-  either side. See [`backend/README.md`](backend/README.md) and
-  [`frontend/README.md`](frontend/README.md) for how to run them locally.
-- No monitoring/alerting beyond error tracking (Sentry, optional —
-  `SENTRY_DSN`/`VITE_SENTRY_DSN`) and `GET /health` (which Azure Container
-  Apps can use as a liveness/readiness probe, though that's not wired up
-  yet — see `backend/README.md`). Nothing currently pages anyone if the
-  ingestion scripts silently stop running, for instance.
-- Ingestion scripts run manually or via a local Windows Task Scheduler,
-  not a cloud-native scheduler — fine for a personal project, would move
-  to something like Azure Functions on a timer trigger for anything
-  beyond that.
+- Both backend (pytest, `backend/tests/`) and frontend (Vitest + ESLint,
+  `frontend/src/**/*.test.jsx`) gate their deploy pipelines — a failing
+  test or a lint error blocks the deploy on either side. The backend
+  pipeline also verifies the deploy itself: after `az containerapp update`
+  reports success, a follow-up step polls the new revision's own health
+  state *and* `GET /health` for up to 60s and fails the pipeline if the
+  app didn't actually come up healthy — added after a typo'd env var name
+  once crash-looped every deploy for days while the pipeline kept
+  reporting green. See [`backend/README.md`](backend/README.md) and
+  [`frontend/README.md`](frontend/README.md) for how to run these locally.
+- Monitoring: Sentry (error tracking, optional —
+  `SENTRY_DSN`/`VITE_SENTRY_DSN`) plus an Azure Monitor alert that emails
+  on any container crash (scans `ContainerAppConsoleLogs` for a Python
+  traceback). Nothing currently pages anyone if the ingestion scripts
+  silently stop running, though — that gap is still open.
+- Ingestion still runs via a local Windows Task Scheduler, not a
+  cloud-native scheduler — fine for a personal project, would move to
+  something like Azure Functions on a timer trigger for anything beyond
+  that. It does run regardless of whether the machine is logged in, and
+  catches up on a missed run once the machine's back (`LogonType:
+  Password` + `StartWhenAvailable`), but it still won't wake the machine
+  from sleep and can't run at all while it's off.
 
 ## Data source
 

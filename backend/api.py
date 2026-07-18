@@ -14,8 +14,10 @@ Then visit http://127.0.0.1:8000/docs for interactive API docs (FastAPI
 generates this automatically from the code below).
 """
 
+import asyncio
 import os
-from datetime import date
+from contextlib import asynccontextmanager
+from datetime import date, datetime, timezone
 from typing import List, Optional
 
 import psycopg2
@@ -80,10 +82,87 @@ if SENTRY_DSN:
 # reuse the same shared setup with file logging disabled.
 logger = setup_logging(__name__, log_to_file=False)
 
+# Ingestion (ingest_standings.py) runs on a schedule outside this process
+# (a local Windows Task Scheduler job, not something api.py ever calls --
+# see the architecture note in the top-level README) -- so there's no
+# in-process signal if it silently stops running. This periodic check is
+# the one exception to "api.py only reads on request": once an hour it
+# reads MAX(created_at) off standings_snapshots and logs an ERROR line if
+# it's older than INGESTION_STALE_THRESHOLD_HOURS, the same
+# scanned-for-a-traceback mechanism already used for
+# nhl-api-startup-crash (see backend/README.md) picks the line up from
+# Container Apps' console logs and fires the same email alert.
+INGESTION_STALE_THRESHOLD_HOURS = float(os.environ.get("INGESTION_STALE_THRESHOLD_HOURS", "30"))
+INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS = 60 * 60
+
+
+def as_utc(dt):
+    """
+    created_at is TIMESTAMP (no time zone) -- psycopg2 hands back a naive
+    datetime for it, which NOW() on this server stores in UTC. Attach
+    that explicitly so it's comparable to a timezone-aware "now"
+    (subtracting naive from aware raises TypeError -- caught the hard
+    way against real data). A None input (no rows at all) passes through
+    unchanged; an already-aware datetime is left alone too.
+    """
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def compute_staleness(last_updated, now, threshold_hours):
+    """
+    Pure staleness calculation, kept separate from the DB/logging side
+    effects below so it's trivially unit-testable. last_updated=None
+    (no rows at all yet) counts as stale with hours_old=None.
+    """
+    if last_updated is None:
+        return True, None
+    hours_old = (now - last_updated).total_seconds() / 3600
+    return hours_old > threshold_hours, hours_old
+
+
+async def check_ingestion_freshness_loop():
+    while True:
+        try:
+            conn = get_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT MAX(created_at) AS last_updated FROM standings_snapshots")
+                    last_updated = as_utc(cur.fetchone()["last_updated"])
+            finally:
+                conn.close()
+
+            is_stale, hours_old = compute_staleness(
+                last_updated, datetime.now(timezone.utc), INGESTION_STALE_THRESHOLD_HOURS
+            )
+            if is_stale:
+                age_desc = "no rows at all" if hours_old is None else f"{hours_old:.1f}h ago"
+                logger.error(
+                    f"STALE_INGESTION: standings_snapshots last updated {age_desc} "
+                    f"(threshold {INGESTION_STALE_THRESHOLD_HOURS}h) -- "
+                    f"ingest_standings.py may not be running"
+                )
+            else:
+                logger.info(f"Ingestion freshness check OK -- last standings update {hours_old:.1f}h ago")
+        except Exception:
+            logger.error("Ingestion freshness check itself failed", exc_info=True)
+
+        await asyncio.sleep(INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(check_ingestion_freshness_loop())
+    yield
+    task.cancel()
+
+
 app = FastAPI(
     title="NHL Stats Dashboard API",
     description="Serves NHL standings data collected from the NHL public API.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Coarse per-IP abuse/scraping guard. 60/minute is generous for normal

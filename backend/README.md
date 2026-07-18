@@ -184,6 +184,27 @@ application flow, not errors, and don't get reported. Set
 variables so production issues aren't mixed in with local-dev noise
 (defaults to `"development"` if unset).
 
+## Alerting
+
+Two Azure Monitor scheduled query alerts watch `ContainerAppConsoleLogs_CL`
+(the Container App's console logs, ingested into the
+`workspace-nhldashboardrg78I6` Log Analytics workspace) and both email
+through the same `nhl-api-crash-alert` action group:
+
+| Alert | Fires when | Usually means |
+|---|---|---|
+| `nhl-api-startup-crash` | An unhandled Python traceback is printed | The container is crash-looping (e.g. a missing/misnamed env var) and silently serving a stale revision |
+| `nhl-ingestion-stale` | A `STALE_INGESTION` line is logged | `ingest_standings.py`'s scheduled task has stopped running |
+
+The second one is produced by an hourly background check inside `api.py`
+(`check_ingestion_freshness_loop`, started via the app's `lifespan`) —
+the one exception to "api.py only reads on request," since ingestion
+runs outside this process entirely (a local Windows Task Scheduler job,
+not something api.py calls) and there'd otherwise be no signal at all if
+it silently stopped. It reads `MAX(created_at)` off `standings_snapshots`
+and logs an ERROR line if that's older than
+`INGESTION_STALE_THRESHOLD_HOURS` (default 30 — see `.env.example`).
+
 ## Deployment
 
 Dockerized, deployed to Azure Container Apps. `../azure-piplines.yml`

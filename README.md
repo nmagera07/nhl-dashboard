@@ -106,10 +106,12 @@ See [`backend/README.md`](backend/README.md) and
   reporting green. See [`backend/README.md`](backend/README.md) and
   [`frontend/README.md`](frontend/README.md) for how to run these locally.
 - Monitoring: Sentry (error tracking, optional —
-  `SENTRY_DSN`/`VITE_SENTRY_DSN`) plus an Azure Monitor alert that emails
-  on any container crash (scans `ContainerAppConsoleLogs` for a Python
-  traceback). Nothing currently pages anyone if the ingestion scripts
-  silently stop running, though — that gap is still open.
+  `SENTRY_DSN`/`VITE_SENTRY_DSN`) plus two Azure Monitor alerts, both
+  emailing the same address — one on any container crash (scans
+  `ContainerAppConsoleLogs` for a Python traceback), one on ingestion
+  going stale (an hourly background check in `api.py` logs an error if
+  `standings_snapshots` hasn't been updated in 30h, meaning
+  `ingest_standings.py`'s scheduled task has likely stopped running).
 - Ingestion still runs via a local Windows Task Scheduler, not a
   cloud-native scheduler — fine for a personal project, would move to
   something like Azure Functions on a timer trigger for anything beyond

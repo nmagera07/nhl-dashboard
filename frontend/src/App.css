@@ -13,6 +13,77 @@
   padding: 0 0 32px 0;
   overflow-x: hidden;
 }
+.intelligence {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10;
+}
+.intelligence-toggle {
+  border: 1px solid #60a5fa;
+  border-radius: 999px;
+  background: #172554;
+  color: #dbeafe;
+  padding: 11px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.intelligence-panel {
+  width: min(380px, calc(100vw - 32px));
+  margin-bottom: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #12141a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+.intelligence-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.intelligence-heading span,
+.intelligence-answer small {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.intelligence textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #0a0b0f;
+  color: var(--text);
+  font: inherit;
+}
+.intelligence form button {
+  margin-top: 8px;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+.intelligence form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.intelligence-error {
+  color: #fca5a5;
+  font-size: 13px;
+}
+.intelligence-answer {
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.intelligence-answer p {
+  white-space: pre-wrap;
+}
 .topnav {
   display: flex;
   align-items: center;

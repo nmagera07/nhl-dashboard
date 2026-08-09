@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import "./App.css";
 import { API_BASE, DIVISION_ORDER } from "./config.js";
+import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import TopNav from "./components/TopNav.jsx";
 import StandingsPage from "./pages/StandingsPage.jsx";
@@ -73,6 +74,16 @@ export default function NHLDashboard() {
       ? "players"
       : "standings";
 
+  const intelligenceContext = useMemo(() => {
+    const player = location.pathname.match(/^\/players\/(\d+)/);
+    if (player) return { page: "player", player_id: Number(player[1]) };
+
+    const team = location.pathname.match(/^\/teams\/([A-Za-z]{2,3})/);
+    if (team) return { page: "team", team_abbrev: team[1].toUpperCase() };
+
+    return { page: "standings" };
+  }, [location.pathname]);
+
   const divisions = useMemo(() => {
     const set = new Set(standings.map((r) => r.division).filter(Boolean));
     return Array.from(set).sort(
@@ -118,6 +129,7 @@ export default function NHLDashboard() {
         search={search}
         onSearchChange={setSearch}
       />
+      <IntelligencePanel context={intelligenceContext} />
 
       {status === "loading" && <div className="status-line">Loading standings…</div>}
       {status === "error" && (

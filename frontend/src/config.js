@@ -11,3 +11,9 @@ export const INTELLIGENCE_BASE = (
 ).replace(/\/+$/, "");
 
 export const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific"];
+
+// Development-only fixture: set VITE_NHL_GAME_PREVIEW_ID to a known NHL
+// gamecenter ID when testing during the offseason. It is never shown in a
+// production build unless explicitly enabled.
+export const GAME_PREVIEW_ID = import.meta.env.VITE_NHL_GAME_PREVIEW_ID || "2023020001";
+export const SHOW_GAME_PREVIEW = import.meta.env.DEV && import.meta.env.VITE_NHL_GAME_PREVIEW !== "false";

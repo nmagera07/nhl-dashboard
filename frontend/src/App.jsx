@@ -83,6 +83,9 @@ export default function NHLDashboard() {
     const team = location.pathname.match(/^\/teams\/([A-Za-z]{2,3})/);
     if (team) return { page: "team", team_abbrev: team[1].toUpperCase() };
 
+    const game = location.pathname.match(/^\/games\/(\d+)/);
+    if (game) return { page: "game", game_id: Number(game[1]) };
+
     return { page: "standings" };
   }, [location.pathname]);
 

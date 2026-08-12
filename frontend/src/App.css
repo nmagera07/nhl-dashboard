@@ -115,6 +115,7 @@
 .scoreboard-games { display: flex; gap: 10px; overflow-x: auto; }
 .scoreboard-game { min-width: 142px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; background: #0a0b0f; color: var(--text); text-align: left; cursor: pointer; }
 .scoreboard-game:hover { border-color: var(--accent); }
+.scoreboard-preview { border-style: dashed; border-color: #6366f1; }
 .scoreboard-status { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 10px; text-transform: uppercase; }
 .scoreboard-team { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.6; }
 .scoreboard-empty { color: var(--text-dim); font-size: 13px; }

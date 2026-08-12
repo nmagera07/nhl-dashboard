@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE } from "../config.js";
+import { API_BASE, GAME_PREVIEW_ID, SHOW_GAME_PREVIEW } from "../config.js";
 
 function teamLabel(team) {
   return team?.abbrev || team?.placeName?.default || team?.name?.default || "—";
@@ -50,6 +50,13 @@ export default function Scoreboard() {
             <span className="scoreboard-team"><span>{teamLabel(game.homeTeam)}</span><strong>{game.homeTeam?.score ?? "—"}</strong></span>
           </button>
         ))}
+        {SHOW_GAME_PREVIEW && (
+          <button className="scoreboard-game scoreboard-preview" type="button" onClick={() => navigate(`/games/${GAME_PREVIEW_ID}`)}>
+            <span className="scoreboard-status">Preview</span>
+            <span className="scoreboard-team"><span>Historical game</span><strong>›</strong></span>
+            <span className="scoreboard-team"><span>Open box score</span><strong>↗</strong></span>
+          </button>
+        )}
       </div>
     </section>
   );

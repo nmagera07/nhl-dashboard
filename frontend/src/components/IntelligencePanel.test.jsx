@@ -8,12 +8,18 @@ describe("IntelligencePanel", () => {
   });
 
   it("sends the current page context and displays a grounded answer", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('data: {"type":"delta","text":"Chicago\\'s recent "}\n\n'));
+        controller.enqueue(encoder.encode('data: {"type":"delta","text":"record trails the division leaders."}\n\n'));
+        controller.enqueue(encoder.encode('data: {"type":"done","evidence":[{"label":"Team standings","endpoint":"/standings/CHI"}]}\n\n'));
+        controller.close();
+      },
+    });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({
-        answer: "Chicago's recent record trails the division leaders.",
-        evidence: [{ label: "Team standings", endpoint: "/standings/CHI" }],
-      }),
+      body: stream,
     });
 
     render(<IntelligencePanel context={{ page: "team", team_abbrev: "CHI" }} />);
@@ -27,7 +33,7 @@ describe("IntelligencePanel", () => {
     expect(await screen.findByText(/recent record trails/i)).toBeInTheDocument();
     expect(screen.getByText(/evidence: team standings/i)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://nhl-intelligence-kaxll7b4fq-uk.a.run.app/chat",
+      "https://nhl-intelligence-kaxll7b4fq-uk.a.run.app/chat/stream",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({

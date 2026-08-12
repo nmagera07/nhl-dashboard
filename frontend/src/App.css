@@ -500,6 +500,8 @@
   margin-bottom: 8px;
 }
 .roster-section { margin-bottom: 20px; }
+.roster-section .standings-table { min-width: 620px; }
+.roster-section .col-team { min-width: 190px; }
 .player-thumb {
   width: 28px;
   height: 28px;
@@ -510,7 +512,14 @@
   background: var(--bg);
   vertical-align: middle;
 }
-.player-name-cell { vertical-align: middle; }
+.player-name-cell {
+  display: inline-block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
 .player-header {
   display: flex;
   align-items: center;
@@ -628,6 +637,9 @@
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }
   .standings-table th, .standings-table td { padding: 8px 8px; }
+  .roster-section .standings-table { min-width: 620px; }
+  .roster-section .col-team { min-width: 190px; }
+  .roster-section .player-name-cell { max-width: 145px; }
   .stat-tile { flex-basis: calc(50% - 6px); }
   .team-card, .trend-panel { padding: 14px; }
   .player-bio { padding: 12px 14px; }

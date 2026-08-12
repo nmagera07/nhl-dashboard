@@ -23,7 +23,7 @@ function SkaterTable({ label, players, onSelectPlayer }) {
                 <td className="col-rank">{p.sweater_number ?? "—"}</td>
                 <td className="col-team">
                   {p.headshot_url && <img className="player-thumb" src={p.headshot_url} alt="" />}
-                  <span className="player-name-cell">{p.first_name} {p.last_name}</span>
+                  <span className="player-name-cell" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
                 </td>
                 <td>{p.games_played ?? "—"}</td>
                 <td>{p.goals ?? "—"}</td>
@@ -66,7 +66,7 @@ function GoalieTable({ players, onSelectPlayer }) {
                 <td className="col-rank">{p.sweater_number ?? "—"}</td>
                 <td className="col-team">
                   {p.headshot_url && <img className="player-thumb" src={p.headshot_url} alt="" />}
-                  <span className="player-name-cell">{p.first_name} {p.last_name}</span>
+                  <span className="player-name-cell" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
                 </td>
                 <td>{p.games_played ?? "—"}</td>
                 <td>{p.wins ?? "—"}</td>

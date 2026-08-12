@@ -141,7 +141,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
                 <td className="col-team">
                   {p.team_logo_url && <img className="leaderboard-team-logo" src={p.team_logo_url} alt="" />}
                   <span className="team-abbrev">{p.team_abbrev}</span>
-                  <span className="team-name">{p.first_name} {p.last_name}</span>
+                  <span className="team-name" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
                 </td>
                 {columns.map((col) => (
                   <td key={col.key} className={col.key === sortKey ? "col-pts" : ""}>

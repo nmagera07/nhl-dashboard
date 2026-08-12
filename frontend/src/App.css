@@ -589,6 +589,16 @@
 .leaderboard-search { width: 220px; }
 .leaderboard-group-tabs { display: flex; gap: 8px; }
 .leaderboard-table-card { margin: 0 var(--gutter); }
+.leaderboard-table-card .standings-table { min-width: 760px; }
+.leaderboard-table-card .col-team { min-width: 230px; white-space: nowrap; }
+.leaderboard-table-card .team-name {
+  display: inline-block;
+  max-width: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { color: var(--text); }
 .sortable-col-active { color: var(--accent); }
@@ -634,6 +644,9 @@
     gap: 10px;
   }
   .leaderboard-search { width: 100%; }
+  .leaderboard-table-card .standings-table { min-width: 760px; }
+  .leaderboard-table-card .col-team { min-width: 230px; }
+  .leaderboard-table-card .team-name { max-width: 145px; }
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }
   .standings-table th, .standings-table td { padding: 8px 8px; }

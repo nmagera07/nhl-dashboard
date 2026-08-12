@@ -44,7 +44,7 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
-from nhl_games import NHLGamesUnavailable, game_boxscore, today_games
+from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, today_games
 
 load_dotenv()
 
@@ -250,6 +250,15 @@ def games_today():
     """Live, scheduled, and completed NHL games for today."""
     try:
         return {"games": today_games()}
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/games/date/{game_date}")
+def games_by_date(game_date: date):
+    """NHL games for a specific calendar date, useful for historical lookup."""
+    try:
+        return {"games": games_on_date(game_date)}
     except NHLGamesUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -1,5 +1,6 @@
 """Read-only client for live NHL scores and gamecenter box scores."""
 
+from datetime import date
 from typing import Any
 
 import requests
@@ -27,6 +28,11 @@ def _get(path: str) -> dict[str, Any]:
 def today_games() -> list[dict[str, Any]]:
     """Return the NHL's score feed for the current day."""
     return _get("/score/now").get("games", [])
+
+
+def games_on_date(game_date: date) -> list[dict[str, Any]]:
+    """Return scheduled, live, and final games for a calendar date."""
+    return _get(f"/schedule/{game_date.isoformat()}").get("games", [])
 
 
 def game_boxscore(game_id: int) -> dict[str, Any]:

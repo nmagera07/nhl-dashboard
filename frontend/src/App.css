@@ -30,12 +30,17 @@
 }
 .intelligence-panel {
   width: min(380px, calc(100vw - 32px));
+  max-height: min(640px, calc(100dvh - 100px));
+  box-sizing: border-box;
   margin-bottom: 10px;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #12141a;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .intelligence-heading {
   display: grid;
@@ -51,6 +56,7 @@
   box-sizing: border-box;
   width: 100%;
   min-height: 84px;
+  max-height: 150px;
   resize: vertical;
   padding: 10px;
   border: 1px solid var(--border);
@@ -78,6 +84,11 @@
   font-size: 13px;
 }
 .intelligence-answer {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  padding-right: 8px;
   margin-top: 14px;
   line-height: 1.5;
 }
@@ -613,4 +624,31 @@
   .player-bio { padding: 12px 14px; }
   .player-headshot { width: 56px; height: 56px; }
   .player-name { font-size: 18px; }
+  .intelligence {
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .intelligence-toggle {
+    align-self: flex-end;
+  }
+  .intelligence-panel {
+    width: 100%;
+    max-height: min(70dvh, 520px);
+    margin-bottom: 8px;
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .intelligence-heading { margin-bottom: 8px; }
+  .intelligence textarea {
+    min-height: 60px;
+    max-height: 96px;
+  }
+  .intelligence-answer {
+    margin-top: 10px;
+    font-size: 13px;
+  }
 }

@@ -127,6 +127,14 @@
 .boxscore-card h2 { margin-top: 0; }
 .scoring-period { padding: 10px 0; border-top: 1px solid var(--border); }
 .scoring-period p { margin: 5px 0 0; color: var(--text-dim); }
+.game-stats-table { display: grid; gap: 0; }
+.game-stats-row { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); text-align: center; }
+.game-stats-row span:first-child { text-align: right; }
+.game-stats-row span:last-child { text-align: left; }
+.game-stats-header { color: var(--text-dim); font-size: 12px; border-top: 0; }
+.player-stats-list { display: grid; gap: 8px; }
+.player-stat-row { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.player-stat-row span { color: var(--text-dim); }
 .brand {
   display: flex;
   align-items: center;

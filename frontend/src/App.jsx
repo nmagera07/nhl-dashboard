@@ -9,6 +9,8 @@ import StandingsPage from "./pages/StandingsPage.jsx";
 import RosterPage from "./pages/RosterPage.jsx";
 import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
+import GamePage from "./pages/GamePage.jsx";
+import Scoreboard from "./components/Scoreboard.jsx";
 
 export default function NHLDashboard() {
   const [history, setHistory] = useState([]);
@@ -129,6 +131,7 @@ export default function NHLDashboard() {
         search={search}
         onSearchChange={setSearch}
       />
+      <Scoreboard />
       <IntelligencePanel context={intelligenceContext} />
 
       {status === "loading" && <div className="status-line">Loading standings…</div>}
@@ -171,6 +174,7 @@ export default function NHLDashboard() {
           />
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/games/:gameId" element={<GamePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}

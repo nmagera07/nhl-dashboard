@@ -44,6 +44,7 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
+from nhl_games import NHLGamesUnavailable, game_boxscore, today_games
 
 load_dotenv()
 
@@ -242,6 +243,24 @@ def health():
         if conn:
             conn.close()
     return {"status": "ok", "database": "connected"}
+
+
+@app.get("/games/today")
+def games_today():
+    """Live, scheduled, and completed NHL games for today."""
+    try:
+        return {"games": today_games()}
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/games/{game_id}/boxscore")
+def game_box_score(game_id: int = Path(..., gt=0)):
+    """Detailed NHL gamecenter box score for a selected game."""
+    try:
+        return game_boxscore(game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/teams", response_model=List[Team])

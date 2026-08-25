@@ -24,6 +24,7 @@ variables:
   imageName: "nhl-dashboard-api"
   resourceGroup: "nhl-dashboard-rg"
   containerAppName: "nhl-dashboard-api"
+  ingestionJobName: "nhl-standings-ingest"
   # Each run gets a unique tag from the built-in build ID, so every
   # deploy is traceable back to the exact pipeline run that produced it.
   imageTag: "$(Build.BuildId)"
@@ -78,6 +79,12 @@ stages:
                 echo "Updating Container App to use new image..."
                 az containerapp update \
                   --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrLoginServer)/$(imageName):$(imageTag)
+
+                echo "Updating ingestion job to use new image..."
+                az containerapp job update \
+                  --name $(ingestionJobName) \
                   --resource-group $(resourceGroup) \
                   --image $(acrLoginServer)/$(imageName):$(imageTag)
 

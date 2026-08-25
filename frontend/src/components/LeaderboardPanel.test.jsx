@@ -53,7 +53,7 @@ describe("LeaderboardPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "GOALIES" }));
 
-    expect(screen.getByText(/fleury/i)).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText(/fleury/i)).toBeInTheDocument();
     expect(screen.queryByText(/crosby/i)).not.toBeInTheDocument();
     // Switching group also resets the sort column to that group's default.
     expect(screen.getByText(/W\s*▼/)).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe("LeaderboardPanel", () => {
     // Case-sensitive here: a case-insensitive match would also hit the
     // status line below ("1 result for 'mcdavid'"), which echoes the
     // lowercase search term back.
-    expect(screen.getByText(/McDavid/)).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText(/McDavid/)).toBeInTheDocument();
     expect(screen.queryByText(/crosby/i)).not.toBeInTheDocument();
     expect(screen.getByText(/1 result for "mcdavid"/i)).toBeInTheDocument();
   });
@@ -99,7 +99,7 @@ describe("LeaderboardPanel", () => {
 
     await userEvent.type(screen.getByPlaceholderText("Find a player..."), "zzz-nobody");
 
-    expect(screen.getByText("No players match your search.")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("No players match your search.")).toBeInTheDocument();
   });
 
   it("formats GAA to 2 decimals and SV% to 3, and renders a missing stat as an em dash", async () => {
@@ -116,16 +116,17 @@ describe("LeaderboardPanel", () => {
     render(<LeaderboardPanel players={[partial]} onSelectPlayer={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "GOALIES" }));
 
-    expect(screen.getByText("2.50")).toBeInTheDocument();
-    expect(screen.getByText("0.912")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("2.50")).toBeInTheDocument();
+    expect(table.getByText("0.912")).toBeInTheDocument();
+    expect(table.getByText("—")).toBeInTheDocument();
   });
 
   it("clicking a player row calls onSelectPlayer with that player's id", async () => {
     const onSelectPlayer = vi.fn();
     render(<LeaderboardPanel players={skaters} onSelectPlayer={onSelectPlayer} />);
 
-    await userEvent.click(screen.getByText(/crosby/i));
+    await userEvent.click(screen.getByRole("button", { name: /open sidney crosby profile/i }));
 
     expect(onSelectPlayer).toHaveBeenCalledWith(1);
   });

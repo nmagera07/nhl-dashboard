@@ -80,6 +80,10 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   }, [filtered, sortKey, sortDir]);
 
   const displayed = isSearching ? sorted : sorted.slice(0, LEADERBOARD_PAGE_SIZE);
+  const mobileColumns = group === "goalies"
+    ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts"]
+    : ["games_played", "goals", "assists", "points", "plus_minus"];
+  const mobileLabels = { games_played: "GP", goals: "G", assists: "A", points: "PTS", plus_minus: "+/-", wins: "W", goals_against_avg: "GAA", save_pctg: "SV%", shutouts: "SO" };
 
   return (
     <div className="leaderboard-panel">
@@ -152,6 +156,31 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="leaderboard-mobile-list" aria-label={`${group} player cards`}>
+        {displayed.length === 0 && <div className="leaderboard-mobile-empty">No players match your search.</div>}
+        {displayed.map((p, i) => (
+          <button
+            className="leaderboard-player-card"
+            key={p.player_id}
+            type="button"
+            aria-label={`Open ${p.first_name} ${p.last_name} profile`}
+            onClick={() => onSelectPlayer(p.player_id)}
+          >
+            <span className="leaderboard-player-card-header">
+              <span className="leaderboard-player-rank">{i + 1}</span>
+              {p.team_logo_url && <img className="leaderboard-team-logo" src={p.team_logo_url} alt="" />}
+              <span className="leaderboard-player-identity">
+                <strong>{p.first_name} {p.last_name}</strong>
+                <small>{p.team_abbrev} · {p.position_code}</small>
+              </span>
+              <span className="leaderboard-player-points">{formatStatValue(group === "goalies" ? "wins" : "points", p[group === "goalies" ? "wins" : "points"])}<small>{group === "goalies" ? "W" : "PTS"}</small></span>
+            </span>
+            <span className="leaderboard-player-card-stats">
+              {mobileColumns.map((key) => <span key={key}><strong>{formatStatValue(key, p[key])}</strong><small>{mobileLabels[key]}</small></span>)}
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );

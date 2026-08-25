@@ -104,14 +104,14 @@ describe("StandingsTable", () => {
   it("shows a no-results row spanning every column when rows is empty", () => {
     render(<StandingsTable rows={[]} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
-    expect(screen.getByText("No teams match your search.")).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("No teams match your search.")).toBeInTheDocument();
   });
 
   it("clicking a team row calls onSelectTeam with that team's abbreviation", async () => {
     const onSelectTeam = vi.fn();
     render(<StandingsTable rows={rows} onSelectTeam={onSelectTeam} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
-    await userEvent.click(screen.getByText("Colorado Avalanche"));
+    await userEvent.click(screen.getByRole("button", { name: /open colorado avalanche team page/i }));
 
     expect(onSelectTeam).toHaveBeenCalledWith("COL");
   });

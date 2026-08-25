@@ -129,6 +129,7 @@
 .game-scoreline > span:last-child { text-align: left; }
 .game-scoreline strong { color: var(--accent); }
 .game-score-separator { color: var(--text-dim); }
+.standings-mobile-list { display: none; }
 .game-hero p, .muted { color: var(--text-dim); }
 .boxscore-card h2 { margin-top: 0; }
 .scoring-period { padding: 10px 0; border-top: 1px solid var(--border); }
@@ -652,6 +653,20 @@
   .leaderboard-table-card .standings-table { min-width: 760px; }
   .leaderboard-table-card .col-team { min-width: 230px; }
   .leaderboard-table-card .team-name { max-width: 145px; }
+  .standings-table-card { display: none; }
+  .standings-mobile-list { display: grid; gap: 10px; margin: 0 var(--gutter); }
+  .standings-team-card { display: grid; gap: 12px; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); text-align: left; cursor: pointer; }
+  .standings-team-card:active, .standings-team-card-selected { border-color: var(--accent); }
+  .standings-team-card-header { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .standings-team-rank { width: 20px; color: var(--text-dim); font-size: 12px; }
+  .standings-team-identity { display: grid; gap: 3px; min-width: 0; flex: 1; }
+  .standings-team-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .standings-team-identity small, .standings-team-points small, .standings-team-card-stats small { color: var(--text-dim); font-size: 10px; }
+  .standings-team-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; }
+  .standings-team-card-stats { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .standings-team-card-stats span { display: grid; gap: 2px; justify-items: center; min-width: 0; }
+  .standings-team-card-stats strong { font-size: 12px; white-space: nowrap; }
+  .standings-mobile-empty { padding: 24px 14px; color: var(--text-dim); text-align: center; }
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }
   .standings-table th, .standings-table td { padding: 8px 8px; }

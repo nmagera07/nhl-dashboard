@@ -39,7 +39,8 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam, s
   const displayRows = sortBy ? rows : [...rows].sort((a, b) => a.division_sequence - b.division_sequence);
 
   return (
-    <div className="table-card">
+    <>
+    <div className="table-card standings-table-card">
       <table className="standings-table">
         <thead>
           <tr>
@@ -109,6 +110,35 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam, s
         </tbody>
       </table>
     </div>
+    <div className="standings-mobile-list" aria-label="Team standings cards">
+      {displayRows.length === 0 && <div className="standings-mobile-empty">No teams match your search.</div>}
+      {displayRows.map((row) => {
+        const playoffPct = playoffOddsByTeam?.[row.team_abbrev];
+        return (
+          <button
+            className={`standings-team-card${row.team_abbrev === selectedTeam ? " standings-team-card-selected" : ""}`}
+            key={row.team_abbrev}
+            type="button"
+            aria-label={`Open ${row.team_name} team page`}
+            onClick={() => onSelectTeam(row.team_abbrev)}
+          >
+            <span className="standings-team-card-header">
+              <span className="standings-team-rank">{row.division_sequence}</span>
+              <span className="standings-team-identity"><strong>{row.team_name}</strong><small>{row.team_abbrev}</small></span>
+              <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
+            </span>
+            <span className="standings-team-card-stats">
+              <span><strong>{row.wins}-{row.losses}-{row.ot_losses}</strong><small>REC</small></span>
+              <span><strong>{row.goal_differential > 0 ? "+" : ""}{row.goal_differential}</strong><small>DIFF</small></span>
+              <span><strong>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</strong><small>L10</small></span>
+              <span><strong>{row.streak_code ? `${row.streak_code}${row.streak_count}` : "—"}</strong><small>STRK</small></span>
+              <span><strong>{playoffPct == null ? "—" : `${(Number(playoffPct) * 100).toFixed(0)}%`}</strong><small>PO%</small></span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+    </>
   );
 }
 

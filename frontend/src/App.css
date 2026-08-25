@@ -599,6 +599,7 @@
   white-space: nowrap;
   vertical-align: middle;
 }
+.leaderboard-mobile-list { display: none; }
 .sortable-col { cursor: pointer; user-select: none; }
 .sortable-col:hover { color: var(--text); }
 .sortable-col-active { color: var(--accent); }
@@ -647,6 +648,31 @@
   .leaderboard-table-card .standings-table { min-width: 760px; }
   .leaderboard-table-card .col-team { min-width: 230px; }
   .leaderboard-table-card .team-name { max-width: 145px; }
+  .leaderboard-table-card { display: none; }
+  .leaderboard-mobile-list { display: grid; gap: 10px; margin: 0 var(--gutter); }
+  .leaderboard-player-card {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .leaderboard-player-card:active { border-color: var(--accent); }
+  .leaderboard-player-card-header { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .leaderboard-player-rank { width: 20px; color: var(--text-dim); font-size: 12px; }
+  .leaderboard-player-identity { display: grid; gap: 3px; min-width: 0; flex: 1; }
+  .leaderboard-player-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .leaderboard-player-identity small, .leaderboard-player-points small, .leaderboard-player-card-stats small { color: var(--text-dim); font-size: 10px; }
+  .leaderboard-player-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; font-weight: 700; }
+  .leaderboard-player-card-stats { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .leaderboard-player-card-stats span { display: grid; gap: 2px; justify-items: center; }
+  .leaderboard-player-card-stats strong { font-size: 13px; }
+  .leaderboard-mobile-empty { padding: 24px 14px; color: var(--text-dim); text-align: center; }
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }
   .standings-table th, .standings-table td { padding: 8px 8px; }

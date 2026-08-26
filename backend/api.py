@@ -84,7 +84,7 @@ if SENTRY_DSN:
 logger = setup_logging(__name__, log_to_file=False)
 
 # Ingestion (ingest_standings.py) runs on a schedule outside this process
-# (a local Windows Task Scheduler job, not something api.py ever calls --
+# (an Azure Container Apps Job `nhl-standings-ingest`, not something api.py ever calls --
 # see the architecture note in the top-level README) -- so there's no
 # in-process signal if it silently stops running. This periodic check is
 # the one exception to "api.py only reads on request": once an hour it

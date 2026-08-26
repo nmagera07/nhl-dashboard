@@ -137,8 +137,7 @@ upserts, nothing duplicates.
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
 | `backfill_season_history.py --years N` | Final standings for the last N completed seasons | One-time, or to extend the range |
 
-Scheduled via Windows Task Scheduler (`ingest_standings.py` at 6:00am,
-`simulate_playoff_odds.py` at 6:10am). The others are run manually — see
+Scheduled via an Azure Container Apps Job (`nhl-standings-ingest`, daily, early morning) — see `azure-piplines.yml` `ingestionJobName`. The other ingestion scripts are run manually — see
 the top-level README for why.
 
 ## API endpoints
@@ -194,12 +193,12 @@ through the same `nhl-api-crash-alert` action group:
 | Alert | Fires when | Usually means |
 |---|---|---|
 | `nhl-api-startup-crash` | An unhandled Python traceback is printed | The container is crash-looping (e.g. a missing/misnamed env var) and silently serving a stale revision |
-| `nhl-ingestion-stale` | A `STALE_INGESTION` line is logged | `ingest_standings.py`'s scheduled task has stopped running |
+| `nhl-ingestion-stale` | A `STALE_INGESTION` line is logged | the `nhl-standings-ingest` Container Apps Job has stopped running / is failing |
 
 The second one is produced by an hourly background check inside `api.py`
 (`check_ingestion_freshness_loop`, started via the app's `lifespan`) —
 the one exception to "api.py only reads on request," since ingestion
-runs outside this process entirely (a local Windows Task Scheduler job,
+runs outside this process entirely (an Azure Container Apps Job (`nhl-standings-ingest`),
 not something api.py calls) and there'd otherwise be no signal at all if
 it silently stopped. It reads `MAX(created_at)` off `standings_snapshots`
 and logs an ERROR line if that's older than

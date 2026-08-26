@@ -1,8 +1,8 @@
 """
 Shared logging setup for the NHL Stats Dashboard backend.
 
-Used by both the 5 standalone ingestion scripts (run via Windows Task
-Scheduler, some daily at 6:00am/6:10am with no other captured output) and
+Used by both the 5 standalone ingestion scripts (run via an Azure Container Apps Job
+`nhl-standings-ingest` for the daily jobs, or manually for the weekly/one-off scripts) and
 api.py (runs inside an Azure Container App, where stdout/stderr is already
 captured by Azure's own logging).
 

@@ -68,7 +68,7 @@ Azure Static      Azure Container
   only runs if it passes.
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
-  process, scheduled via Windows Task Scheduler. The API only ever reads
+  process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`). The API only ever reads
   from Postgres; it never calls the NHL API directly, so a slow or
   unreachable upstream never affects the live site.
 
@@ -111,14 +111,8 @@ See [`backend/README.md`](backend/README.md) and
   `ContainerAppConsoleLogs` for a Python traceback), one on ingestion
   going stale (an hourly background check in `api.py` logs an error if
   `standings_snapshots` hasn't been updated in 30h, meaning
-  `ingest_standings.py`'s scheduled task has likely stopped running).
-- Ingestion still runs via a local Windows Task Scheduler, not a
-  cloud-native scheduler — fine for a personal project, would move to
-  something like Azure Functions on a timer trigger for anything beyond
-  that. It does run regardless of whether the machine is logged in, and
-  catches up on a missed run once the machine's back (`LogonType:
-  Password` + `StartWhenAvailable`), but it still won't wake the machine
-  from sleep and can't run at all while it's off.
+  the `nhl-standings-ingest` Container Apps Job has likely stopped running or is failing).
+- Ingestion now runs via an Azure Container Apps Job (`nhl-standings-ingest`) on a daily schedule, with its image kept in sync on each deploy via `azure-piplines.yml` — no longer a local Windows Task Scheduler job. The staleness check and deploy pipeline still guard it the same way.
 
 ## Data source
 

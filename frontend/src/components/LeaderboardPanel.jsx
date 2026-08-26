@@ -30,11 +30,22 @@ function formatStatValue(key, value) {
   return value;
 }
 
+function getVisiblePages(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = [1];
+  if (current > 3) pages.push("…");
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) pages.push(p);
+  if (current < total - 2) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
 function LeaderboardPanel({ players, onSelectPlayer }) {
   const [group, setGroup] = useState("skaters"); // skaters | goalies
   const [sortKey, setSortKey] = useState("points");
   const [sortDir, setSortDir] = useState("desc");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const columns = group === "goalies" ? GOALIE_COLUMNS : SKATER_COLUMNS;
 
@@ -42,6 +53,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
     setGroup(nextGroup);
     setSortKey(nextGroup === "goalies" ? "wins" : "points");
     setSortDir("desc");
+    setPage(1);
   };
 
   const handleSort = (key) => {
@@ -51,6 +63,12 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
       setSortKey(key);
       setSortDir(LOWER_IS_BETTER.has(key) ? "asc" : "desc");
     }
+    setPage(1);
+  };
+
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
   };
 
   const isSearching = search.trim().length > 0;
@@ -79,7 +97,13 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
     return withRank;
   }, [filtered, sortKey, sortDir]);
 
-  const displayed = isSearching ? sorted : sorted.slice(0, LEADERBOARD_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / LEADERBOARD_PAGE_SIZE));
+  const effectivePage = Math.min(page, totalPages);
+  const startIdx = (effectivePage - 1) * LEADERBOARD_PAGE_SIZE;
+  const paged = sorted.slice(startIdx, startIdx + LEADERBOARD_PAGE_SIZE);
+
+  const rangeStart = sorted.length === 0 ? 0 : startIdx + 1;
+  const rangeEnd = Math.min(startIdx + LEADERBOARD_PAGE_SIZE, sorted.length);
 
   return (
     <div className="leaderboard-panel">
@@ -102,14 +126,16 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
           className="search-input leaderboard-search"
           placeholder="Find a player..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
       </div>
 
       <div className="status-line">
         {isSearching
-          ? `${sorted.length} result${sorted.length === 1 ? "" : "s"} for "${search.trim()}"`
-          : `Showing top ${Math.min(LEADERBOARD_PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+          ? `${sorted.length} result${sorted.length === 1 ? "" : "s"} for "${search.trim()}"${totalPages > 1 ? ` — page ${effectivePage} of ${totalPages}` : ""}`
+          : totalPages > 1
+            ? `Showing ${rangeStart}–${rangeEnd} of ${sorted.length} — page ${effectivePage} of ${totalPages}`
+            : `Showing top ${Math.min(LEADERBOARD_PAGE_SIZE, sorted.length)} of ${sorted.length}`}
       </div>
 
       <div className="table-card leaderboard-table-card">
@@ -130,14 +156,14 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
             </tr>
           </thead>
           <tbody>
-            {displayed.length === 0 && (
+            {paged.length === 0 && (
               <tr>
                 <td colSpan={2 + columns.length} className="no-results">No players match your search.</td>
               </tr>
             )}
-            {displayed.map((p, i) => (
+            {paged.map((p, i) => (
               <tr key={p.player_id} onClick={() => onSelectPlayer(p.player_id)}>
-                <td className="col-rank">{i + 1}</td>
+                <td className="col-rank">{startIdx + i + 1}</td>
                 <td className="col-team">
                   {p.team_logo_url && <img className="leaderboard-team-logo" src={p.team_logo_url} alt="" />}
                   <span className="team-abbrev">{p.team_abbrev}</span>
@@ -153,6 +179,44 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <nav className="pagination" aria-label="Leaderboard pagination">
+          <button
+            className="pagination-btn"
+            disabled={effectivePage === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            aria-label="Previous page"
+          >
+            ‹ Prev
+          </button>
+          <div className="pagination-pages">
+            {getVisiblePages(effectivePage, totalPages).map((p, idx) =>
+              p === "…" ? (
+                <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>
+              ) : (
+                <button
+                  key={p}
+                  className={p === effectivePage ? "pagination-btn pagination-btn-active" : "pagination-btn"}
+                  onClick={() => setPage(p)}
+                  aria-label={`Page ${p}`}
+                  aria-current={p === effectivePage ? "page" : undefined}
+                >
+                  {p}
+                </button>
+              )
+            )}
+          </div>
+          <button
+            className="pagination-btn"
+            disabled={effectivePage === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            aria-label="Next page"
+          >
+            Next ›
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

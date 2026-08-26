@@ -1,7 +1,9 @@
+import { lazy, Suspense } from "react";
 import DivisionTabs from "../components/DivisionTabs.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 import TeamCard from "../components/TeamCard.jsx";
-import TrendChart from "../components/TrendChart.jsx";
+
+const TrendChart = lazy(() => import("../components/TrendChart.jsx"));
 
 function StandingsPage({
   divisions,
@@ -48,13 +50,15 @@ function StandingsPage({
       {history.length > 0 && (
         <div className="detail-grid">
           <TeamCard team={selectedRow} onViewRoster={onViewRoster} />
-          <TrendChart
-            mode={trendMode}
-            onModeChange={onTrendModeChange}
-            history={history}
-            seasonHistory={seasonHistory}
-            teamAbbrev={selectedTeam}
-          />
+          <Suspense fallback={<div className="trend-panel" style={{ minHeight: 260, display: "grid", placeItems: "center", color: "var(--text-dim)" }}>Loading chart…</div>}>
+            <TrendChart
+              mode={trendMode}
+              onModeChange={onTrendModeChange}
+              history={history}
+              seasonHistory={seasonHistory}
+              teamAbbrev={selectedTeam}
+            />
+          </Suspense>
         </div>
       )}
     </>

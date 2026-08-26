@@ -686,3 +686,45 @@
     font-size: 13px;
   }
 }
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px var(--gutter) 0 var(--gutter);
+  flex-wrap: wrap;
+}
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pagination-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 36px;
+}
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pagination-btn-active {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent);
+}
+.pagination-ellipsis {
+  color: var(--text-dim);
+  padding: 0 4px;
+  user-select: none;
+}

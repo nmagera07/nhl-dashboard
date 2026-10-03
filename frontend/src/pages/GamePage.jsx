@@ -36,7 +36,13 @@ export default function GamePage() {
       <Link className="back-link" to="/">← Back to dashboard</Link>
       <div className="game-hero">
         <span>{game.gameState === "FINAL" ? "FINAL" : game.gameState}</span>
-        <h1>{label(away)} <strong>{away?.score ?? "—"}</strong> — <strong>{home?.score ?? "—"}</strong> {label(home)}</h1>
+        <h1 className="game-scoreline">
+          <span>{label(away)}</span>
+          <strong>{away?.score ?? "—"}</strong>
+          <span className="game-score-separator">—</span>
+          <strong>{home?.score ?? "—"}</strong>
+          <span>{label(home)}</span>
+        </h1>
         <p>{game.gameDate}</p>
       </div>
       <section className="boxscore-card">

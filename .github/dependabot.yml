@@ -1,11 +1,24 @@
 version: 2
+# Updates target dev (not main, which auto-deploys) and are grouped into
+# one weekly PR per ecosystem. Test on dev, then ship with the next
+# dev -> main PR.
 updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
+    groups:
+      frontend-deps:
+        patterns:
+          - "*"
 
   - package-ecosystem: "pip"
     directory: "/backend"
+    target-branch: "dev"
     schedule:
       interval: "weekly"
+    groups:
+      backend-deps:
+        patterns:
+          - "*"

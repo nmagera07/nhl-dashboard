@@ -236,6 +236,13 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </div>
       )}
 
+      {!seasonStats && (
+        <div className="advanced-stats-panel">
+          <div className="trend-eyebrow advanced-stats-header">THIS SEASON</div>
+          <p className="muted">No current-season stats are available yet.</p>
+        </div>
+      )}
+
       {!isGoalie && advancedStats && (
         <div className="advanced-stats-panel">
           <div className="trend-eyebrow advanced-stats-header">ADVANCED (5-ON-5)</div>

@@ -93,7 +93,7 @@ logger = setup_logging(__name__, log_to_file=False)
 # scanned-for-a-traceback mechanism already used for
 # nhl-api-startup-crash (see backend/README.md) picks the line up from
 # Container Apps' console logs and fires the same email alert.
-INGESTION_STALE_THRESHOLD_HOURS = float(os.environ.get("INGESTION_STALE_THRESHOLD_HOURS", "30"))
+INGESTION_STALE_THRESHOLD_HOURS = float(os.environ.get("INGESTION_STALE_THRESHOLD_HOURS") or "30")
 INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS = 60 * 60
 
 
@@ -344,6 +344,7 @@ def team_roster(team_abbrev: str = Path(..., max_length=3)):
                 LEFT JOIN LATERAL (
                     SELECT * FROM player_season_stats pss
                     WHERE pss.player_id = p.player_id
+                      AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
                     ORDER BY pss.season_id DESC
                     LIMIT 1
                 ) s ON true
@@ -388,6 +389,7 @@ def player_leaders(request: Request):
                 LEFT JOIN LATERAL (
                     SELECT * FROM player_season_stats pss
                     WHERE pss.player_id = p.player_id
+                      AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
                     ORDER BY pss.season_id DESC
                     LIMIT 1
                 ) s ON true
@@ -426,13 +428,24 @@ def player_detail(player_id: int):
                 raise HTTPException(status_code=404, detail=f"No player found with id '{player_id}'")
 
             cur.execute(
-                "SELECT * FROM player_season_stats WHERE player_id = %s ORDER BY season_id DESC",
+                """
+                SELECT * FROM player_season_stats
+                WHERE player_id = %s
+                  AND season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                ORDER BY season_id DESC
+                """,
                 (player_id,),
             )
             player["season_stats"] = cur.fetchall()
 
             cur.execute(
-                "SELECT * FROM player_advanced_stats WHERE player_id = %s ORDER BY season_id DESC LIMIT 1",
+                """
+                SELECT * FROM player_advanced_stats
+                WHERE player_id = %s
+                  AND season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                ORDER BY season_id DESC
+                LIMIT 1
+                """,
                 (player_id,),
             )
             player["advanced_stats"] = cur.fetchone()

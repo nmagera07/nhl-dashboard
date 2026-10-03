@@ -1,7 +1,10 @@
-// Points at the live FastAPI backend deployed on Azure Container Apps.
-// For local development against `uvicorn api:app --reload`, swap this
-// back to "http://127.0.0.1:8000".
-export const API_BASE = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
+// Defaults to the live FastAPI backend deployed on Azure Container Apps.
+// For local development against `uvicorn api:app --reload`, set
+// VITE_API_BASE=http://127.0.0.1:8000 in frontend/.env.local.
+export const API_BASE = (
+  import.meta.env.VITE_API_BASE ||
+  "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io"
+).replace(/\/+$/, "");
 
 // The AI service owns the model key and prompt logic. Keeping the URL overridable
 // lets preview environments point at a different Cloud Run service when needed.

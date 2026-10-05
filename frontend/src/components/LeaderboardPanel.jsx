@@ -105,6 +105,15 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   const rangeStart = sorted.length === 0 ? 0 : startIdx + 1;
   const rangeEnd = Math.min(startIdx + LEADERBOARD_PAGE_SIZE, sorted.length);
 
+  // Mobile cards show the headline stat up top and five supporting stats below.
+  const headlineKey = group === "goalies" ? "wins" : "points";
+  const mobileColumns = columns.filter((col) =>
+    (group === "goalies"
+      ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts"]
+      : ["games_played", "goals", "assists", "points", "plus_minus"]
+    ).includes(col.key)
+  );
+
   return (
     <div className="leaderboard-panel">
       <div className="leaderboard-controls">
@@ -178,6 +187,37 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="leaderboard-mobile-list" aria-label={`${group} player cards`}>
+        {paged.length === 0 && <div className="leaderboard-mobile-empty">No players match your search.</div>}
+        {paged.map((p, i) => (
+          <button
+            className="leaderboard-player-card"
+            key={p.player_id}
+            type="button"
+            aria-label={`Open ${p.first_name} ${p.last_name} profile`}
+            onClick={() => onSelectPlayer(p.player_id)}
+          >
+            <span className="leaderboard-player-card-header">
+              <span className="leaderboard-player-rank">{startIdx + i + 1}</span>
+              {p.team_logo_url && <img className="leaderboard-team-logo" src={p.team_logo_url} alt="" />}
+              <span className="leaderboard-player-identity">
+                <strong>{p.first_name} {p.last_name}</strong>
+                <small>{p.team_abbrev} · {p.position_code}</small>
+              </span>
+              <span className="leaderboard-player-points">
+                {formatStatValue(headlineKey, p[headlineKey])}
+                <small>{group === "goalies" ? "W" : "PTS"}</small>
+              </span>
+            </span>
+            <span className="leaderboard-player-card-stats">
+              {mobileColumns.map((col) => (
+                <span key={col.key}><strong>{formatStatValue(col.key, p[col.key])}</strong><small>{col.label}</small></span>
+              ))}
+            </span>
+          </button>
+        ))}
       </div>
 
       {totalPages > 1 && (

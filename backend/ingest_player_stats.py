@@ -73,11 +73,11 @@ def upsert_player(cur, team_abbrev, player):
         INSERT INTO players (
             player_id, team_abbrev, first_name, last_name, position_code,
             sweater_number, shoots_catches, height_in_inches, weight_in_pounds,
-            birth_date, birth_city, birth_country, headshot_url, updated_at
+            birth_date, birth_city, birth_country, headshot_url, on_roster, updated_at
         ) VALUES (
             %s, %s, %s, %s, %s,
             %s, %s, %s, %s,
-            %s, %s, %s, %s, NOW()
+            %s, %s, %s, %s, true, NOW()
         )
         ON CONFLICT (player_id) DO UPDATE SET
             team_abbrev = EXCLUDED.team_abbrev,
@@ -92,6 +92,7 @@ def upsert_player(cur, team_abbrev, player):
             birth_city = EXCLUDED.birth_city,
             birth_country = EXCLUDED.birth_country,
             headshot_url = EXCLUDED.headshot_url,
+            on_roster = true,
             updated_at = NOW()
         """,
         (
@@ -110,6 +111,34 @@ def upsert_player(cur, team_abbrev, player):
             player.get("headshot"),
         ),
     )
+
+
+def mark_off_roster(cur, team_abbrev, roster_player_ids):
+    """
+    Flag this team's players who aren't on its current roster (cut, sent
+    down, released) as off-roster. Rows are kept for player pages and
+    season stats; only the roster endpoint filters on on_roster.
+
+    A traded player is safe in either team order: once the new team's
+    upsert has moved him, he no longer matches the old team_abbrev here.
+
+    An empty roster is treated as a bad API response rather than a team
+    with zero players, so nobody is flagged.
+    """
+    roster_player_ids = list(roster_player_ids)
+    if not roster_player_ids:
+        return 0
+    cur.execute(
+        """
+        UPDATE players
+        SET on_roster = false, updated_at = NOW()
+        WHERE team_abbrev = %s
+          AND on_roster
+          AND NOT (player_id = ANY(%s))
+        """,
+        (team_abbrev, roster_player_ids),
+    )
+    return cur.rowcount
 
 
 def upsert_season_stats(cur, player_id, landing):
@@ -432,6 +461,7 @@ def main():
             team_abbrevs = fetch_team_abbrevs(cur)
 
     total_players = 0
+    total_removed = 0
     total_with_stats = 0
     total_with_career_totals = 0
     total_with_season_history = 0
@@ -451,6 +481,8 @@ def main():
                 with conn.cursor() as cur:
                     for player in roster:
                         upsert_player(cur, team_abbrev, player)
+                    removed = mark_off_roster(cur, team_abbrev, [p["id"] for p in roster])
+                    total_removed += removed
                     for player, landing in landings:
                         if upsert_season_stats(cur, player["id"], landing):
                             total_with_stats += 1
@@ -460,7 +492,7 @@ def main():
                             total_with_season_history += 1
 
             total_players += len(roster)
-            logger.info(f"{team_abbrev}: ingested {len(roster)} players")
+            logger.info(f"{team_abbrev}: ingested {len(roster)} players, {removed} marked off-roster")
         except Exception as e:
             teams_failed += 1
             logger.warning(f"{team_abbrev}: failed to ingest roster/stats: {e}")
@@ -471,7 +503,8 @@ def main():
     logger.info(
         f"Done. {total_players} players total, {total_with_stats} with season stats, "
         f"{total_with_career_totals} with career totals, "
-        f"{total_with_season_history} with season history."
+        f"{total_with_season_history} with season history, "
+        f"{total_removed} marked off-roster."
     )
     logger.info(f"Teams: {teams_succeeded} succeeded, {teams_failed} failed.")
 

@@ -81,9 +81,11 @@ CREATE INDEX IF NOT EXISTS idx_season_final_team
 
 -- Current roster only -- one row per player currently on one of the 32
 -- team rosters (~750 players), from https://api-web.nhle.com/v1/roster/{team}/current.
--- Re-running the ingestion just upserts, so released/traded players fall
--- out naturally next time their old team's roster is re-pulled... except
--- we never delete rows for players no longer listed, see ingest script note.
+-- Re-running the ingestion upserts every player on a team's current
+-- roster. Rows are never deleted (player pages, career totals, and the
+-- leaderboard still need cut/released players); instead on_roster is set
+-- false for anyone missing from their team's latest roster pull, and the
+-- roster endpoint filters on it.
 CREATE TABLE IF NOT EXISTS players (
     player_id           INTEGER PRIMARY KEY,        -- NHL API player id
     team_abbrev         VARCHAR(3) NOT NULL REFERENCES teams(team_abbrev),
@@ -98,8 +100,12 @@ CREATE TABLE IF NOT EXISTS players (
     birth_city          TEXT,
     birth_country       TEXT,
     headshot_url        TEXT,
+    on_roster           BOOLEAN NOT NULL DEFAULT true,
     updated_at          TIMESTAMP DEFAULT NOW()
 );
+
+-- Added after the table first shipped; a no-op on fresh installs.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS on_roster BOOLEAN NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS idx_players_team
     ON players (team_abbrev);

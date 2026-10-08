@@ -38,3 +38,32 @@ export function relativeDayLabel(iso, today = todayISO()) {
 export function longDateLabel(iso) {
   return fromISO(iso).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
+
+// --- Months ("YYYY-MM") for the calendar picker ---
+
+export function monthOf(iso) {
+  return iso.slice(0, 7);
+}
+
+export function shiftMonth(ym, months) {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + months, 1);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+export function monthLabel(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString([], { month: "long", year: "numeric" });
+}
+
+// Calendar grid for a month, Sunday-first: leading nulls for the days
+// before the 1st, then each date as "YYYY-MM-DD".
+export function monthGrid(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const leading = new Date(y, m - 1, 1).getDay();
+  const count = new Date(y, m, 0).getDate();
+  return [
+    ...Array(leading).fill(null),
+    ...Array.from({ length: count }, (_, i) => `${ym}-${pad(i + 1)}`),
+  ];
+}

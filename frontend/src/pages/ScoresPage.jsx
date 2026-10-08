@@ -1,4 +1,6 @@
+import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
 
@@ -10,9 +12,12 @@ function ScoresPage() {
   const param = searchParams.get("date");
   const date = isValidISODate(param) ? param : today;
   const isToday = date === today;
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const closeCalendar = useCallback(() => setCalendarOpen(false), []);
 
   const goTo = (next) => {
     setSearchParams(next === today ? {} : { date: next });
+    setCalendarOpen(false);
   };
 
   return (
@@ -21,15 +26,22 @@ function ScoresPage() {
         <h1>Scores</h1>
         <div className="date-bar" role="group" aria-label="Choose a day">
           <button type="button" className="date-bar-step" onClick={() => goTo(shiftDate(date, -1))} aria-label="Previous day">‹</button>
-          <label className="date-bar-picker">
-            <span className="date-bar-label">{relativeDayLabel(date, today)}</span>
-            <input
-              type="date"
-              value={date}
-              aria-label="Pick a date"
-              onChange={(e) => isValidISODate(e.target.value) && goTo(e.target.value)}
-            />
-          </label>
+          <div className="date-bar-picker-wrap">
+            <button
+              type="button"
+              className="date-bar-picker"
+              aria-haspopup="dialog"
+              aria-expanded={calendarOpen}
+              aria-label={`${relativeDayLabel(date, today)}, open calendar`}
+              onClick={() => setCalendarOpen((open) => !open)}
+            >
+              {relativeDayLabel(date, today)}
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+            </button>
+            {calendarOpen && (
+              <GameCalendar value={date} today={today} onSelect={goTo} onClose={closeCalendar} />
+            )}
+          </div>
           <button type="button" className="date-bar-step" onClick={() => goTo(shiftDate(date, 1))} aria-label="Next day">›</button>
           {!isToday && (
             <button type="button" className="date-bar-today" onClick={() => goTo(today)}>Today</button>

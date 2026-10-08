@@ -1,7 +1,10 @@
 """Read-only client for live NHL scores and gamecenter box scores."""
 
+import calendar
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import requests
@@ -76,3 +79,64 @@ def game_boxscore(game_id: int) -> dict[str, Any]:
         "shotsByPeriod": right_rail_data.get("shotsByPeriod") or [],
         "teamGameStats": right_rail_data.get("teamGameStats") or [],
     }
+
+
+# Month calendars change rarely (a postponement at most), so they're cached
+# in-process: past months for a day, the current/future ones for an hour.
+_CALENDAR_CACHE: dict[tuple[int, int], tuple[float, dict[str, Any]]] = {}
+_CALENDAR_LOCK = threading.Lock()
+_PAST_MONTH_TTL = 24 * 3600
+_CURRENT_MONTH_TTL = 3600
+
+
+def _week_starts(year: int, month: int) -> list[date]:
+    """Dates 7 days apart covering the whole month (/schedule returns a week)."""
+    first = date(year, month, 1)
+    last = date(year, month, calendar.monthrange(year, month)[1])
+    starts, d = [], first
+    while d <= last:
+        starts.append(d)
+        d += timedelta(days=7)
+    return starts
+
+
+def month_calendar(year: int, month: int, today: date | None = None) -> dict[str, Any]:
+    """
+    Season bounds plus the number of games on each day of one month, for the
+    Scores page calendar. Season = regular season start through playoff end;
+    days outside it, or with no games, are left out of "days".
+    """
+    today = today or date.today()
+    key = (year, month)
+    with _CALENDAR_LOCK:
+        cached = _CALENDAR_CACHE.get(key)
+        if cached and cached[0] > time.time():
+            return cached[1]
+
+    starts = _week_starts(year, month)
+    with ThreadPoolExecutor(max_workers=len(starts)) as pool:
+        weeks = list(pool.map(lambda d: _get(f"/schedule/{d.isoformat()}"), starts))
+
+    first = weeks[0]
+    season_start = first.get("regularSeasonStartDate")
+    season_end = first.get("playoffEndDate") or first.get("regularSeasonEndDate")
+    prefix = f"{year:04d}-{month:02d}-"
+    days: dict[str, int] = {}
+    for week in weeks:
+        for day in week.get("gameWeek", []):
+            d, count = day.get("date", ""), day.get("numberOfGames") or 0
+            in_season = bool(season_start and season_end and season_start <= d <= season_end)
+            if d.startswith(prefix) and count > 0 and in_season:
+                days[d] = count
+
+    result = {
+        "season_start": season_start,
+        "season_end": season_end,
+        "days": [{"date": d, "games": n} for d, n in sorted(days.items())],
+    }
+    is_past = (year, month) < (today.year, today.month)
+    ttl = _PAST_MONTH_TTL if is_past else _CURRENT_MONTH_TTL
+    with _CALENDAR_LOCK:
+        _CALENDAR_CACHE[key] = (time.time() + ttl, result)
+    return result
+

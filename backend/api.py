@@ -44,7 +44,7 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
-from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, today_games
+from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, today_games
 
 load_dotenv()
 
@@ -264,6 +264,20 @@ def games_by_date(game_date: date):
     """NHL games for a specific calendar date, useful for historical lookup."""
     try:
         return {"games": games_on_date(game_date)}
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/games/calendar/{year_month}")
+def games_calendar(year_month: str = Path(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$")):
+    """
+    Season bounds and per-day game counts for one month (YYYY-MM), for the
+    Scores page's date picker: only days with games in the current season
+    are selectable.
+    """
+    year, month = (int(part) for part in year_month.split("-"))
+    try:
+        return month_calendar(year, month)
     except NHLGamesUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

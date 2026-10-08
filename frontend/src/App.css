@@ -9,7 +9,6 @@
   background: var(--bg);
   color: var(--text);
   font-family: 'Inter', system-ui, sans-serif;
-  min-height: 100%;
   /* Installed as a full-screen app (black-translucent status bar), the page
      runs under the iPhone notch/status bar and home indicator -- the
      safe-area insets keep content clear of them. They're 0 in a browser. */
@@ -18,7 +17,10 @@
     env(safe-area-inset-right, 0px)
     calc(32px + env(safe-area-inset-bottom, 0px))
     env(safe-area-inset-left, 0px);
-  overflow-x: hidden;
+  /* clip, not hidden: hidden also makes this a vertical clipping box, which
+     cut off popups (the date calendar) at the end of short pages. */
+  overflow-x: clip;
+  min-height: 100dvh;
 }
 .intelligence {
   position: fixed;
@@ -144,25 +146,66 @@
 .date-bar-step { width: 34px; font-size: 18px; line-height: 1; }
 .date-bar-today { padding: 0 12px; color: var(--accent); font-size: 13px; font-weight: 600; }
 .date-bar-step:hover, .date-bar-today:hover { border-color: var(--accent); }
-/* The label is what you see; the native date input sits on top of it,
-   invisible, so tapping the label opens the phone's/browser's date picker. */
+.date-bar-picker-wrap { position: relative; }
 .date-bar-picker {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 112px;
+  gap: 6px;
+  min-width: 120px;
   height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
+  color: var(--text);
+  font: inherit;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
-.date-bar-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-.date-bar-picker:focus-within { border-color: var(--accent); }
+.date-bar-picker:hover, .date-bar-picker[aria-expanded="true"] { border-color: var(--accent); }
+.date-bar-picker svg { width: 12px; height: 12px; fill: none; stroke: var(--text-dim); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.game-calendar {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 300px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+.game-calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.game-calendar-header strong { font-size: 14px; }
+.game-calendar-header button { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--text); font-size: 16px; cursor: pointer; }
+.game-calendar-header button:disabled { opacity: 0.3; cursor: default; }
+.game-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.game-calendar-weekday { padding: 4px 0; color: var(--text-dim); font-size: 11px; text-align: center; }
+.game-calendar-day {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.game-calendar-day small { color: var(--accent); font-size: 9px; font-weight: 700; line-height: 1; }
+.game-calendar-day:hover:not(:disabled) { background: rgba(59, 130, 246, 0.12); }
+.game-calendar-day:disabled { color: #3a4150; font-weight: 400; cursor: default; }
+.game-calendar-day.is-today { border-color: var(--border); }
+.game-calendar-day.is-selected { background: var(--accent); color: #fff; }
+.game-calendar-day.is-selected small { color: #dbeafe; }
+.game-calendar-note { margin: 8px 0 0; color: var(--text-dim); font-size: 11px; text-align: center; }
 .scoreboard-games {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -611,6 +654,7 @@
   .nav-tabs { display: none; }
   .search-input { flex: 1; width: auto; min-width: 0; }
   .scoreboard-games { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .game-calendar { left: -46px; right: auto; width: min(300px, calc(100vw - 24px)); }
   .scoreboard-game { padding: 10px 12px; }
   .game-card-tv { display: none; }
   .game-card-record { display: none; }

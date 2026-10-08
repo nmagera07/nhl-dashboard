@@ -137,7 +137,7 @@ upserts, nothing duplicates.
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
 | `backfill_season_history.py --years N` | Final standings for the last N completed seasons | One-time, or to extend the range |
 
-Scheduled via an Azure Container Apps Job (`nhl-standings-ingest`, daily, early morning) — see `azure-piplines.yml` `ingestionJobName`. The other ingestion scripts are run manually — see
+Scheduled via an Azure Container Apps Job (`nhl-standings-ingest`, daily at 06:00 UTC, entry point `run_daily_ingest.py`). The other ingestion scripts are run manually — see
 the top-level README for why.
 
 ## API endpoints
@@ -206,9 +206,13 @@ and logs an ERROR line if that's older than
 
 ## Deployment
 
-Dockerized, deployed to Azure Container Apps. `../azure-piplines.yml`
-builds the image on every push to `main` that touches `backend/`, pushes
-it to Azure Container Registry, and updates the running Container App.
+Dockerized, deployed to Azure Container Apps by
+`../.github/workflows/backend-deploy.yml` on every push to `main` that
+touches `backend/`: tests, then `az acr build` (image tagged with the
+commit SHA, also baked in as `GIT_SHA` and reported by `GET /health`),
+then the API and ingestion job are updated and the new revision is
+verified. Azure auth is OIDC via a federated credential — no stored
+password.
 
 ## Notes
 

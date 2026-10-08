@@ -1,8 +1,8 @@
 name: Backend Tests
 #
 # Runs the pytest suite on PRs into main and dev (and pushes to dev) so
-# backend changes are tested before merge. azure-piplines.yml runs the
-# same suite, but only after a push to main. "Run backend tests" is a required status check
+# backend changes are tested before merge. backend-deploy.yml runs the
+# same suite again before deploying. "Run backend tests" is a required status check
 # in main's branch protection, so keep the job name in sync with it.
 # Tests mock the DB layer (see backend/tests/conftest.py), so no
 # Postgres service or secrets are needed.

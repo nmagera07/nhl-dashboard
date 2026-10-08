@@ -16,7 +16,12 @@ class HealthResponse(BaseModel):
     connection (a SELECT 1 on the read-only role) rather than just
     confirming the process is up. Meant for Azure Container Apps'
     liveness/readiness probes and any external uptime monitor.
+
+    commit is the git SHA the running image was built from ("unknown"
+    for local runs), so deploys and the drift check can confirm
+    production is running the code on main.
     """
 
     status: str
     database: str
+    commit: str

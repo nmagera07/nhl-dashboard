@@ -349,6 +349,7 @@ def team_roster(team_abbrev: str = Path(..., max_length=3)):
                     LIMIT 1
                 ) s ON true
                 WHERE p.team_abbrev = %s
+                  AND p.on_roster
                 ORDER BY COALESCE(s.points, 0) DESC, COALESCE(s.wins, 0) DESC
                 """,
                 (abbrev,),

@@ -23,6 +23,17 @@ class TestTeamRoster:
         assert body[1]["goals"] is None
         assert body[1]["wins"] == 31
 
+    def test_only_players_still_on_the_roster_are_returned(self, client, db_router, roster_skater_row):
+        # Cut/sent-down/released players keep their old team_abbrev (rows
+        # are never deleted), so the roster query must filter on on_roster.
+        db_router.when("select 1 from teams where team_abbrev", {"?column?": 1})
+        db_router.when("where p.team_abbrev = %s", [roster_skater_row])
+
+        client.get("/teams/COL/roster")
+
+        roster_query = next(q for q, _ in db_router.calls if "where p.team_abbrev" in q.lower())
+        assert "and p.on_roster" in " ".join(roster_query.split()).lower()
+
     def test_real_team_with_no_roster_rows_returns_200_empty_list(self, client, db_router):
         # Real team (passes the teams existence check), but the roster
         # query itself comes back empty -- e.g. a new team before its

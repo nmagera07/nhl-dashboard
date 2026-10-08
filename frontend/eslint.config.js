@@ -19,6 +19,14 @@ export default defineConfig([
     },
   },
   {
+    // The entry point renders the app but exports nothing, so Fast
+    // Refresh's "only export components" rule doesn't apply to it.
+    files: ['src/main.jsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     files: ['**/*.test.{js,jsx}'],
     languageOptions: {
       globals: globals.vitest,

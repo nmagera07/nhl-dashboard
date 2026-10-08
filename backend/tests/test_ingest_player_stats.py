@@ -19,6 +19,8 @@ import pytest
 from ingest_player_stats import (
     _combine_season_entries,
     _parse_time_on_ice_to_seconds,
+    mark_off_roster,
+    upsert_player,
     upsert_season_history,
 )
 
@@ -367,3 +369,71 @@ class TestUpsertSeasonHistory:
         assert params[22] == 1  # shutouts summed
         assert params[20] == pytest.approx(65 * 3600 / 90000)  # goals_against_avg
         assert params[21] == pytest.approx((650 - 65) / 650)  # save_pctg
+
+
+# ---------------------------------------------------------------------------
+# Roster membership: upsert_player / mark_off_roster
+# ---------------------------------------------------------------------------
+
+
+class _RowcountCursor(_RecordingCursor):
+    """Recording cursor that also reports a canned rowcount for UPDATEs."""
+
+    def __init__(self, rowcount=0):
+        super().__init__()
+        self.rowcount = rowcount
+
+
+def _roster_player(player_id=8477492):
+    return {
+        "id": player_id,
+        "firstName": {"default": "Nathan"},
+        "lastName": {"default": "MacKinnon"},
+        "positionCode": "C",
+    }
+
+
+class TestUpsertPlayer:
+    def test_marks_player_on_roster_on_insert_and_update(self):
+        # A player cut earlier (on_roster = false) who comes back -- or is
+        # traded onto a new team -- must flip back to true on the update path.
+        cur = _RecordingCursor()
+        upsert_player(cur, "COL", _roster_player())
+
+        query, _ = cur.calls[0]
+        assert "on_roster, updated_at" in query
+        assert "true, now()" in query
+        assert "on_roster = true" in query
+
+
+class TestMarkOffRoster:
+    def test_flags_only_this_teams_players_missing_from_the_roster(self):
+        cur = _RowcountCursor(rowcount=27)
+
+        removed = mark_off_roster(cur, "TOR", [1, 2, 3])
+
+        assert removed == 27
+        query, params = cur.calls[0]
+        assert query.startswith("update players set on_roster = false")
+        assert "where team_abbrev = %s" in query
+        assert "not (player_id = any(%s))" in query
+        assert params == ("TOR", [1, 2, 3])
+
+    def test_empty_roster_is_treated_as_bad_data_and_flags_nobody(self):
+        # An empty API response must not wipe a whole team off its roster.
+        cur = _RowcountCursor(rowcount=50)
+
+        assert mark_off_roster(cur, "TOR", []) == 0
+        assert cur.calls == []
+
+    def test_accepts_any_iterable_of_ids(self):
+        cur = _RowcountCursor()
+        mark_off_roster(cur, "TOR", (pid for pid in [7, 8]))
+
+        _, params = cur.calls[0]
+        assert params == ("TOR", [7, 8])
+
+    def test_empty_generator_also_flags_nobody(self):
+        cur = _RowcountCursor()
+        assert mark_off_roster(cur, "TOR", (pid for pid in [])) == 0
+        assert cur.calls == []

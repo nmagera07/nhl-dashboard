@@ -1,9 +1,6 @@
-import { lazy, Suspense } from "react";
 import DivisionTabs from "../components/DivisionTabs.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 import TeamCard from "../components/TeamCard.jsx";
-
-const TrendChart = lazy(() => import("../components/TrendChart.jsx"));
 
 function StandingsPage({
   divisions,
@@ -16,10 +13,6 @@ function StandingsPage({
   playoffOddsByTeam,
   playoffOddsStatus,
   selectedRow,
-  history,
-  seasonHistory,
-  trendMode,
-  onTrendModeChange,
   onViewRoster,
   sortBy,
   sortDir,
@@ -47,18 +40,9 @@ function StandingsPage({
           Playoff odds unavailable — the PO% column may be incomplete.
         </div>
       )}
-      {history.length > 0 && (
+      {selectedRow && (
         <div className="detail-grid">
           <TeamCard team={selectedRow} onViewRoster={onViewRoster} />
-          <Suspense fallback={<div className="trend-panel" style={{ minHeight: 260, display: "grid", placeItems: "center", color: "var(--text-dim)" }}>Loading chart…</div>}>
-            <TrendChart
-              mode={trendMode}
-              onModeChange={onTrendModeChange}
-              history={history}
-              seasonHistory={seasonHistory}
-              teamAbbrev={selectedTeam}
-            />
-          </Suspense>
         </div>
       )}
     </>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
@@ -308,6 +308,9 @@ function PlayerStats({ playerStats, away, home }) {
 
 export default function GamePage() {
   const { gameId } = useParams();
+  const location = useLocation();
+  // Back to the scoreboard day this game was opened from (defaults to today).
+  const backTo = location.state?.from || "/";
   const [game, setGame] = useState(null);
   const [error, setError] = useState("");
 
@@ -352,7 +355,7 @@ export default function GamePage() {
 
   return (
     <main className="game-page">
-      <Link className="back-link" to="/">← Scores</Link>
+      <Link className="back-link" to={backTo}>← Scores</Link>
 
       <div className="game-hero">
         <span className={`game-status${isLive ? " game-status-live" : ""}`}>

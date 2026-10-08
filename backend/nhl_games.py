@@ -32,8 +32,14 @@ def today_games() -> list[dict[str, Any]]:
 
 
 def games_on_date(game_date: date) -> list[dict[str, Any]]:
-    """Return scheduled, live, and final games for a calendar date."""
-    return _get(f"/schedule/{game_date.isoformat()}").get("games", [])
+    """
+    Return scheduled, live, and final games for a calendar date, in the same
+    shape as today_games() (scores, outcomes, logos, records), so the
+    scoreboard renders any day the same way. Uses /score/{date}; the
+    /schedule/{date} feed nests games under gameWeek, so reading "games"
+    from it always came back empty.
+    """
+    return _get(f"/score/{game_date.isoformat()}").get("games", [])
 
 
 def _get_optional(path: str) -> dict[str, Any]:

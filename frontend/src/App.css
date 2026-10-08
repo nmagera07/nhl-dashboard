@@ -129,6 +129,40 @@
 .page-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 16px; }
 .page-header h1 { margin: 0; font-size: 24px; }
 .page-subtitle { color: var(--text-dim); font-size: 13px; }
+.scores-header { justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.scores-date { margin: 0 0 16px; }
+.date-bar { display: flex; align-items: center; gap: 6px; }
+.date-bar-step, .date-bar-today {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.date-bar-step { width: 34px; font-size: 18px; line-height: 1; }
+.date-bar-today { padding: 0 12px; color: var(--accent); font-size: 13px; font-weight: 600; }
+.date-bar-step:hover, .date-bar-today:hover { border-color: var(--accent); }
+/* The label is what you see; the native date input sits on top of it,
+   invisible, so tapping the label opens the phone's/browser's date picker. */
+.date-bar-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.date-bar-picker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.date-bar-picker:focus-within { border-color: var(--accent); }
 .scoreboard-games {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -147,7 +181,6 @@
   cursor: pointer;
 }
 .scoreboard-game:hover { border-color: var(--accent); }
-.scoreboard-preview { border-style: dashed; border-color: #6366f1; }
 .game-card-live { border-color: rgba(239, 68, 68, 0.45); }
 .game-card-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 .game-card-live .game-card-status { color: #ef4444; }

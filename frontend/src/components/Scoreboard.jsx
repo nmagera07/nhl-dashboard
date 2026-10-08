@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { API_BASE, GAME_PREVIEW_ID, SHOW_GAME_PREVIEW } from "../config.js";
+import { useLocation, useNavigate } from "react-router-dom";
+import { API_BASE } from "../config.js";
 import { phase, sortGames, statusLabel } from "./gameStatus.js";
 import { darkLogo } from "../utils/darkLogo.js";
 
@@ -47,14 +47,18 @@ function GameCard({ game, onOpen }) {
   );
 }
 
-export default function Scoreboard() {
+// date: "YYYY-MM-DD" for another day, or null for today (which also
+// refreshes every minute; other days don't change often enough to poll).
+export default function Scoreboard({ date = null }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [games, setGames] = useState([]);
   const [status, setStatus] = useState("loading");
+  const url = date ? `${API_BASE}/games/date/${date}` : `${API_BASE}/games/today`;
 
   useEffect(() => {
     let active = true;
-    const load = () => fetch(`${API_BASE}/games/today`)
+    const load = () => fetch(url)
       .then((response) => {
         if (!response.ok) throw new Error("scoreboard unavailable");
         return response.json();
@@ -66,25 +70,24 @@ export default function Scoreboard() {
       })
       .catch(() => active && setStatus("error"));
     load();
-    const timer = window.setInterval(load, 60_000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, []);
+    const timer = date ? null : window.setInterval(load, 60_000);
+    return () => { active = false; if (timer) window.clearInterval(timer); };
+  }, [url, date]);
+
+  // Remember which day we came from, so the box score's back link returns there.
+  const openGame = (id) => navigate(`/games/${id}`, { state: { from: `${location.pathname}${location.search}` } });
 
   return (
     <section className="scoreboard" aria-label="Today's NHL scoreboard">
       {status === "loading" && <p className="scoreboard-empty">Loading games…</p>}
       {status === "error" && <p className="scoreboard-empty status-error">Scores are unavailable right now.</p>}
-      {status === "ready" && games.length === 0 && <p className="scoreboard-empty">No games scheduled today.</p>}
+      {status === "ready" && games.length === 0 && (
+        <p className="scoreboard-empty">{date ? "No games on this day." : "No games scheduled today."}</p>
+      )}
       <div className="scoreboard-games">
         {sortGames(games).map((game) => (
-          <GameCard key={game.id} game={game} onOpen={() => navigate(`/games/${game.id}`)} />
+          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)} />
         ))}
-        {SHOW_GAME_PREVIEW && (
-          <button className="scoreboard-game scoreboard-preview" type="button" onClick={() => navigate(`/games/${GAME_PREVIEW_ID}`)}>
-            <span className="game-card-status">Dev preview</span>
-            <span className="game-card-team"><span className="game-card-abbrev">Historical game</span><strong className="game-card-score">↗</strong></span>
-          </button>
-        )}
       </div>
     </section>
   );

@@ -6,7 +6,9 @@ _get is faked, so no network calls are made.
 import pytest
 
 import nhl_games
-from nhl_games import NHLGamesUnavailable, game_boxscore
+from datetime import date
+
+from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date
 
 BOXSCORE = {"id": 2026020044, "gameState": "OFF", "awayTeam": {"abbrev": "NSH"}, "homeTeam": {"abbrev": "TOR"}}
 LANDING = {"summary": {"scoring": [{"goals": []}], "threeStars": []}}
@@ -67,3 +69,26 @@ class TestGameBoxscore:
 
         with pytest.raises(NHLGamesUnavailable):
             game_boxscore(2026020044)
+
+
+class TestGamesOnDate:
+    def test_reads_the_score_feed_for_that_date(self, monkeypatch):
+        # Regression: /schedule/{date} nests games under gameWeek, so reading
+        # "games" from it always returned an empty list.
+        calls = []
+
+        def fake_get(path):
+            calls.append(path)
+            return {"games": [{"id": 2026020044, "gameState": "OFF"}], "gameWeek": []}
+
+        monkeypatch.setattr(nhl_games, "_get", fake_get)
+
+        games = games_on_date(date(2026, 10, 6))
+
+        assert calls == ["/score/2026-10-06"]
+        assert games == [{"id": 2026020044, "gameState": "OFF"}]
+
+    def test_a_day_with_no_games_returns_an_empty_list(self, monkeypatch):
+        monkeypatch.setattr(nhl_games, "_get", lambda path: {"gameWeek": []})
+
+        assert games_on_date(date(2026, 7, 1)) == []

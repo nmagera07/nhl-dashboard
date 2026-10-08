@@ -162,6 +162,16 @@ API never even used it, since it connects with a separate read-only credential.
 - **Secrets vs. env vars:** plain env vars are visible to anyone with read access
   to the resource. Credentials belong in the platform's secret store.
 - After a credential has been exposed, **rotate it** too. Removing it isn't enough.
+- **Rotation is where mistakes happen.** On the first try, the job's secret got
+  the `< >` placeholder brackets from a command template, and my local `.env`
+  ended up with the owner URL pasted into both `DATABASE_URL` and
+  `API_DATABASE_URL`. What helped:
+  - Commands that **read the value from a file** (`dotenv_values(".env")`)
+    instead of having me paste it, so I never retype a password.
+  - **Verify right after a change** (a test job run, a `SELECT current_user`
+    per connection string) instead of finding out at the next scheduled run.
+  - The heartbeat monitor emailed about the failed run on its own, which is
+    exactly what it's for.
 
 ---
 

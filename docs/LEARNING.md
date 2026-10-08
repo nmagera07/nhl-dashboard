@@ -43,6 +43,23 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-08 — A frozen standings day, and my first hotfix
+
+**What happened:** Standings were missing a game for 6 teams. A manual test run
+of the daily job at 8:56pm ET wrote that day's snapshot mid-games, and the
+script used `ON CONFLICT DO NOTHING`, so the scheduled 2am run's final numbers
+were silently skipped. The first run of the day won.
+
+**What I learned:**
+- For "one row per day" data, decide **which write should win**. Here it's the
+  latest (`DO UPDATE`), so an early or partial run can't freeze the day.
+- **Hotfix workflow:** the fix was urgent, but `dev` had an unfinished redesign
+  on it. So: branch from `main`, cherry-pick just the fix, PR, merge, deploy,
+  then merge `main` back into `dev` so the branches don't drift.
+- Manual "test" runs against production data aren't free. That one caused the bug.
+
+---
+
 ## 2026-10-08 — Heartbeat monitoring for the daily job
 
 **What happened:** Swapped the Azure "ingestion is stale" alert for a

@@ -4,20 +4,27 @@ A running list of ideas for future work. Not commitments, just a parking lot.
 Add to this as new ideas come up; check items off or move them to "In Progress"
 when you actually start building them.
 
+Last updated: 2026-10-08
+
 ---
 
 ## In Progress
-- (nothing yet)
+- **Site redesign** — current layout feels clunky. Ideas: "favorite team"
+  pinned card, cleaner navigation, a better mobile feel now that it's an app.
+- **Installable phone app (PWA)** — built and waiting on `dev`; ships with the
+  redesign. Manifest, app icon, service worker, iPhone notch handling.
+  Install: Safari → Share → Add to Home Screen (iPhone), or Chrome → Install
+  app (Android).
 
 ---
 
 ## Up Next
-- **"My Team" drill-down view** — click a team → team detail panel (full stats,
-  roster) → click a player → player detail (stats, trend chart over season)
-  - New tables needed: `players`, `player_stats_snapshots` (same daily-snapshot
-    pattern as `standings_snapshots`)
-  - New endpoints: `GET /teams/{team_abbrev}/roster`, `GET /players/{player_id}`
-  - New ingestion: pull from NHL API's roster + player stats endpoints
+- **Playoff odds cleanup** — `simulate_playoff_odds.py` is still manual and the
+  PO% column shows last season's final odds. Clean it up, then add it to
+  `run_daily_ingest.py` (right after standings, since it reads them).
+- **Advanced stats cleanup** — `ingest_advanced_stats.py` (MoneyPuck) is still
+  manual, so xG%/xGF/xGA/SF/SA/PDO are blank this season. Clean it up and add it
+  to the daily job (numbers get meaningful a couple of weeks into the season).
 
 ---
 
@@ -25,12 +32,15 @@ when you actually start building them.
 
 ### Fan-focused
 - Pinned "my team" view — Penguins front and center, rest of league secondary
+  (today the dashboard just defaults to PIT selected)
 - Rivalry tracker — head-to-head record vs a specific team over the season
-- Playoff odds / "would we make it if the season ended today" widget
+- Push notifications for goals and final scores ("Goal! PIT 2–1, Crosby (5)").
+  Works for installed PWAs on Android and iPhone (iOS 16.4+). Needs: a
+  permission prompt + saved subscriptions, a backend that watches live games
+  (server-side polling + cache), and Web Push sending. Replaces the old
+  "email/text alert when the Penguins win" idea.
 
 ### Data-nerd
-- Player-level stats (goals, assists, +/-, TOI) — ties into the drill-down view above
-- Advanced stats overlay (Corsi, xG) from MoneyPuck's public CSVs
 - Auto-flag teams on a 5+ game win/lose streak as a callout, not just a table column
 - Contract details on the player page (cap hit, term, expiry, NMC/NTC). No free
   official source: the NHL API has no contract data, and CapFriendly was bought
@@ -43,31 +53,55 @@ when you actually start building them.
     international careers, but not a cap source
   - Avoid scraping: it breaks ToS and fails silently when sites change
   - Fits the existing pattern: new table + ingestion script + weekly schedule
+- Historical season-over-season comparison views (team level; player
+  season-by-season already exists)
 
 ### Fun / gimmicky
 - Give teams a "type" based on playstyle (high-scoring = fire, defensive = steel, etc.)
 - Subjective "power rankings" tab layered over the objective stats
 
 ### Infra / portfolio-flex
-- Email/text alert when the Penguins win (Azure Function, event-driven)
-- `/health` endpoint on the API
-- Redis caching layer in front of the API to reduce repeated Postgres hits
-- Terraform for infra provisioning (per original roadmap)
-- Historical season-over-season comparison views
-
-### Design
-- Redesign layout with Claude's design help — sidebar for trend chart instead of
-  below-the-fold, team logos, "favorite team" pinned card
+- Short server-side cache on the live game endpoints (`/games/today`,
+  `/games/{id}/boxscore`), so 500 viewers cost the NHL API the same as 1. An
+  in-process TTL cache is enough at this scale; Redis only if the API ever
+  runs more than one replica.
+- Turn on Sentry in production (already wired into the code; just needs
+  `SENTRY_DSN` as a Container App secret). Then drop the last Azure alert and
+  take the Azure bill from ~$0.97/month to $0.
+- Terraform for infra provisioning (per original roadmap) — would also have
+  prevented the leftover-resource surprises (second registry, extra workspace)
+- App store version via Capacitor (wraps the PWA). Apple $99/yr, Google $25
+  one-time, plus app review. Only if store presence is worth it.
 
 ---
 
 ## Done
 - ~~Backend: NHL API ingestion → Postgres (Neon)~~
-- ~~Daily scheduled ingestion (Windows Task Scheduler)~~
 - ~~FastAPI backend serving standings data~~
-- ~~React frontend: standings table + trend chart~~
+- ~~React frontend: standings table~~ (trend chart later removed, Oct 2026)
 - ~~Dockerized backend~~
 - ~~Deployed backend to Azure Container Apps~~
 - ~~Deployed frontend to Azure Static Web Apps~~
-- ~~CI/CD: GitHub Actions (frontend), Azure DevOps Pipelines (backend)~~
 - ~~GitHub Codespaces + Codespaces secrets for working from any machine~~
+- ~~"My Team" drill-down: team roster page → player page (season stats,
+  season-by-season, career totals, 5-on-5 advanced)~~
+- ~~Player-level stats + leaderboard (pagination, mobile cards)~~
+- ~~Advanced stats from MoneyPuck (team + skater; still run manually)~~
+- ~~Playoff odds (Monte Carlo) + PO% column (still run manually)~~
+- ~~`/health` endpoint (checks the DB, reports the deployed commit)~~
+- ~~Live scoreboard + full game box score (linescore, scoring summary, three
+  stars, team stats, per-team player tables; refreshes every 30s while live)~~
+- ~~Rosters drop cut/released players (`on_roster` flag)~~
+- ~~Daily ingestion as an Azure Container Apps Job (`run_daily_ingest.py`:
+  standings + rosters), replacing Windows Task Scheduler on the old PC~~
+- ~~`dev` → `main` workflow: branch protection, required frontend and backend
+  test checks, grouped Dependabot updates targeting `dev`~~
+- ~~CI/CD: GitHub Actions for both frontend and backend. Backend deploys via
+  OIDC (no stored password), images on GitHub Container Registry, post-deploy
+  commit verification. Replaced Azure DevOps Pipelines (which silently stopped
+  in July 2026) and Azure Container Registry.~~
+- ~~Monitoring: deploy drift check (daily), healthchecks.io heartbeat on the
+  daily job, Azure crash alert~~
+- ~~Security: API holds only the read-only DB role; leaked owner password rotated~~
+- ~~Azure bill cut from ~$11.44/month to ~$0.97/month~~
+- ~~Learning log with resume bullets (`docs/LEARNING.md`)~~

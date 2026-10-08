@@ -78,10 +78,13 @@ Azure Static      Azure Container
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
   process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`).
-  Standings, rosters, stats, and odds are served from Postgres, so a slow
-  NHL API doesn't affect those pages. Live scores, box scores, and the
-  game calendar are fetched from the NHL API on request (the calendar is
-  cached).
+  Standings, rosters, stats, and odds are served from Postgres, so the
+  NHL API is never in the path for those pages. Live scores, box scores,
+  and the game calendar come from the NHL API through a short-lived cache
+  (`backend/nhl_games.py`): seconds for live games, an hour for finished
+  ones; concurrent requests share one upstream fetch; and if the NHL API is
+  down, the last good copy (up to 6 hours old) is served instead of an
+  error.
 
 ## Data pipeline
 

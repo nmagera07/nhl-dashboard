@@ -134,11 +134,31 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
-.scoreboard-game { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); text-align: left; cursor: pointer; }
+.scoreboard-game {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .scoreboard-game:hover { border-color: var(--accent); }
 .scoreboard-preview { border-style: dashed; border-color: #6366f1; }
-.scoreboard-status { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 10px; text-transform: uppercase; }
-.scoreboard-team { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.6; }
+.game-card-live { border-color: rgba(239, 68, 68, 0.45); }
+.game-card-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.game-card-live .game-card-status { color: #ef4444; }
+.game-card-tv { margin-left: auto; overflow: hidden; font-weight: 500; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
+.game-card-team { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 15px; }
+.game-card-logo { width: 26px; height: 26px; flex: 0 0 26px; object-fit: contain; }
+.game-card-abbrev { font-weight: 700; }
+.game-card-record { color: var(--text-dim); font-size: 12px; }
+.game-card-score { margin-left: auto; font-size: 18px; font-variant-numeric: tabular-nums; }
+.game-card-team.is-loser { color: var(--text-dim); }
+.game-card-team.is-loser .game-card-logo { opacity: 0.6; }
 .scoreboard-empty { margin: 0 0 12px; color: var(--text-dim); font-size: 13px; }
 .game-page { max-width: 860px; margin: 0 auto; padding: 0 var(--gutter); }
 .back-link { color: #93c5fd; font-size: 13px; }
@@ -558,6 +578,9 @@
   .nav-tabs { display: none; }
   .search-input { flex: 1; width: auto; min-width: 0; }
   .scoreboard-games { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .scoreboard-game { padding: 10px 12px; }
+  .game-card-tv { display: none; }
+  .game-card-record { display: none; }
   .tabbar {
     position: fixed;
     right: 0;

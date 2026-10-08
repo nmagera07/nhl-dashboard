@@ -1,3 +1,5 @@
+import { darkLogo } from "../utils/darkLogo.js";
+
 // Header of the team page: identity, playoff status, and the season at a
 // glance. Replaces the old TeamCard that sat under the standings table.
 
@@ -28,7 +30,7 @@ function TeamSummary({ team }) {
   return (
     <section className="team-summary" aria-label={`${team.team_name} season summary`}>
       <div className="team-summary-identity">
-        {team.logo_url && <img className="team-summary-logo" src={team.logo_url} alt="" />}
+        {team.logo_url && <img className="team-summary-logo" src={darkLogo(team.logo_url)} alt="" />}
         <div className="team-summary-title">
           <h1>{team.team_name}</h1>
           <p>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
+import { darkLogo } from "../utils/darkLogo.js";
 
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defense", G: "Goalie" };
 
@@ -163,7 +164,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
             <p className="player-hero-sub">
               {player.team_abbrev && (
                 <Link className="player-team-link" to={`/teams/${player.team_abbrev}`}>
-                  {player.team_logo_url && <img className="player-team-logo" src={player.team_logo_url} alt="" />}
+                  {player.team_logo_url && <img className="player-team-logo" src={darkLogo(player.team_logo_url)} alt="" />}
                   {player.team_abbrev}
                 </Link>
               )}

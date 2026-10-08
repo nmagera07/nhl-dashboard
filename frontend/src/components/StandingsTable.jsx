@@ -1,3 +1,5 @@
+import { darkLogo } from "../utils/darkLogo.js";
+
 function StreakBadge({ code, count }) {
   if (!code) return <span className="streak streak-none">—</span>;
   const cls = code === "W" ? "streak streak-w" : code === "L" ? "streak streak-l" : "streak streak-ot";
@@ -35,7 +37,7 @@ function TeamCell({ row }) {
   return (
     <td className="col-team">
       <span className="team-cell">
-        {row.logo_url ? <img className="team-cell-logo" src={row.logo_url} alt="" /> : <span className="team-cell-logo" />}
+        {row.logo_url ? <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" /> : <span className="team-cell-logo" />}
         <span className="team-abbrev">{row.team_abbrev}</span>
         <span className="team-name">{row.team_name}</span>
       </span>
@@ -146,7 +148,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
         >
           <span className="standings-team-card-header">
             <span className="standings-team-rank">{row.division_sequence}</span>
-            {row.logo_url && <img className="standings-team-logo" src={row.logo_url} alt="" />}
+            {row.logo_url && <img className="standings-team-logo" src={darkLogo(row.logo_url)} alt="" />}
             <span className="standings-team-identity"><strong>{row.team_name}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
             <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
           </span>

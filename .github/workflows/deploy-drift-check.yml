@@ -8,7 +8,7 @@ name: Deploy Drift Check
 #
 # Production reports its commit at GET /health. It's up to date if the
 # newest commit on main that touched backend/ is that commit or one of
-# its ancestors. Recent commits get a grace period so a deploy that's
+# its ancestors, or if its backend/ code is identical to main's. Recent commits get a grace period so a deploy that's
 # still in progress isn't flagged.
 
 on:
@@ -42,9 +42,13 @@ jobs:
           deployed=$(curl -s --max-time 15 "$HEALTH_URL" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit', 'unknown'))" || echo "unreachable")
           echo "Production reports: $deployed"
 
+          # Up to date if production's backend/ matches main's, compared by
+          # content. (Commit ancestry alone trips on cherry-picked hotfixes:
+          # the same change can land on main as a different commit.)
           if [ "$deployed" != "unknown" ] && [ "$deployed" != "unreachable" ] \
              && git cat-file -e "${deployed}^{commit}" 2>/dev/null \
-             && git merge-base --is-ancestor "$latest" "$deployed"; then
+             && { git merge-base --is-ancestor "$latest" "$deployed" \
+                  || git diff --quiet "$deployed" origin/main -- backend; }; then
             echo "Production is up to date."
             exit 0
           fi

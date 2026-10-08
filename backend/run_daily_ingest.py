@@ -15,14 +15,24 @@ A failure in one script doesn't stop the next, since a standings outage
 shouldn't also leave rosters stale. The process exits non-zero if any
 script failed, so the job execution shows as Failed and the job's retry
 kicks in (re-running is safe, everything is upserts).
+
+Heartbeat: if HEALTHCHECK_URL is set (a healthchecks.io ping URL), the
+run pings /start when it begins, the bare URL on success, and /fail on
+failure. healthchecks.io emails if a run fails, takes too long, or never
+happens at all -- the last one is the case log-based alerts can't see.
 """
 
+import os
 import subprocess
 import sys
+
+import requests
 
 from logging_config import setup_logging
 
 logger = setup_logging("run_daily_ingest")
+
+HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
 
 SCRIPTS = [
     "ingest_standings.py",
@@ -43,12 +53,26 @@ def run_all(scripts=SCRIPTS, runner=subprocess.run):
     return failed
 
 
+def ping(suffix="", body=None, post=None):
+    """Best-effort heartbeat. Never lets a monitoring hiccup fail the run."""
+    if not HEALTHCHECK_URL:
+        return
+    try:
+        (post or requests.post)(f"{HEALTHCHECK_URL}{suffix}", data=body, timeout=10)
+    except requests.RequestException as e:
+        logger.warning(f"Healthcheck ping{suffix or ''} failed: {e}")
+
+
 def main():
+    ping("/start")
     failed = run_all()
     if failed:
-        logger.error(f"Daily ingest finished with failures: {', '.join(failed)}")
+        message = f"Daily ingest finished with failures: {', '.join(failed)}"
+        logger.error(message)
+        ping("/fail", body=message)
         sys.exit(1)
     logger.info("Daily ingest finished successfully")
+    ping()
 
 
 if __name__ == "__main__":

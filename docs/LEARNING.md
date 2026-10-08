@@ -34,12 +34,79 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   environment variable on the API, enforcing least privilege (the API only
   holds a read-only credential, stored as a secret).
 
+**Data and modeling**
+- Rebuilt a Monte Carlo playoff-odds model (regressed team ratings, game
+  model calibrated on ~4,000 real games, official tiebreakers) and validated
+  it by backtesting against 3 past seasons: 15% lower Brier score overall,
+  29% lower in early season.
+
 **Data and backend**
 - Fixed a data-integrity bug where cut and released players stayed on team
   rosters indefinitely (~580 stale records), using a soft-delete flag that
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-08 — Playoff odds v2: making a model better, and proving it
+
+**What happened:** The playoff odds were overconfident early in the season.
+After a few games, teams showed 0% or 99%. The model rated teams by their
+current point %, and four games is mostly luck. I rebuilt it with an AI
+pair-programmer. My part was spotting that the numbers looked wrong,
+deciding what "better" meant, and insisting we *measure* it before shipping.
+
+**The concepts, in plain English:**
+- **Monte Carlo simulation:** instead of a formula for playoff chances, play
+  the rest of the season 10,000 times with weighted dice and count how often
+  each team gets in.
+- **Regression to the mean:** a coin that lands heads 4 times in a row isn't
+  a magic coin. Early on, the model leans on last season and lets this
+  season take over as games pile up (blended as "45 pseudo-games").
+- **Uncertainty:** we don't *know* how good a team is in October, so each
+  simulated season varies every team's strength a little. That's what keeps
+  October odds humble instead of 0% / 99%.
+- **Calibration:** instead of guessing things like home-ice advantage, we
+  measured them from ~4,000 real games: home teams win 54.5% of the time
+  between equal teams, 22% of games go to OT, and 32% of those go to a
+  shootout.
+- **Backtesting:** pretend it's November 1st of a past season, run the model,
+  and check it against who actually made the playoffs. Repeat across dates
+  and seasons to get a score.
+- **Brier score:** "how far off were the probabilities." Lower is better, and
+  saying 50% for everyone scores 0.25. The old model scored **0.252** on
+  Nov 1, worse than not trying. The new one scored **0.178**.
+
+**Results:** overall Brier 0.152 → 0.129 (15% better); early November 29% better.
+
+**The 30-second interview version:**
+> "My dashboard shows playoff odds by simulating the rest of the season
+> 10,000 times. Early in the season they were wildly overconfident, because
+> a 4-0 team looked like a lock. I rebuilt the model to blend this season's
+> results with last season's, so it starts cautious and gets more confident
+> as games pile up. To prove it was better, I backtested both versions
+> against three past seasons: 15% more accurate overall, and 29% more
+> accurate in early November, when the old model was worse than guessing 50/50."
+
+**Follow-up questions to expect:**
+- *"Why not use an existing model?"* Building it taught me how they work, and
+  I made it measurable so I can keep improving it instead of guessing.
+- *"How do you know it's not overfit?"* The game-level numbers were fit on
+  the same seasons I tested on, so the absolute score is a bit optimistic.
+  The fair comparison is old vs. new under the same conditions, and that gap
+  was big. (Admitting a model's limits unprompted is a good look.)
+- *"What would you do next?"* Add shot-quality data (expected goals), and
+  re-run the calibration script each offseason.
+
+**For front-end interviews,** lead with the product side, not the math:
+noticing that 0%/100% in October looked wrong to a user, showing "<1%"
+instead of a misleading "0%", hiding stale odds instead of showing last
+season's, and measuring before shipping.
+
+**Be honest about AI help.** Don't claim I derived the math. The real skills
+were judgment (this looks wrong), framing (what does "better" mean?), and
+verification (prove it with a backtest).
 
 ---
 

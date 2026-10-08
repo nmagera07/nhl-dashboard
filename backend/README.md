@@ -219,5 +219,6 @@ password.
 
 - `season_id` format is `20252026` for the 2025-26 season.
 - `streak_code` is `'W'`, `'L'`, or `'OT'`; pair with `streak_count`.
-- `standings_snapshots` is unique per `(snapshot_date, team_abbrev)`, so
-  re-running the ingestion the same day just no-ops on conflict.
+- `standings_snapshots` is unique per `(snapshot_date, team_abbrev)`.
+  Re-running the ingestion the same day overwrites that day's rows, so the
+  latest run wins (an early or mid-game run can't freeze the day).

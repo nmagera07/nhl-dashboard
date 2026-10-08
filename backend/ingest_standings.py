@@ -63,7 +63,13 @@ def upsert_team(cur, team):
 
 
 def insert_snapshot(cur, snapshot_date, team):
-    """Insert today's standings row for one team."""
+    """
+    Write today's standings row for one team. The latest run of the day
+    wins: a re-run overwrites the row (and refreshes created_at, which the
+    API's staleness check reads). With DO NOTHING, an early or mid-game run
+    froze the whole day and the scheduled 06:00 UTC run's final numbers
+    were silently dropped.
+    """
     cur.execute(
         """
         INSERT INTO standings_snapshots (
@@ -85,7 +91,31 @@ def insert_snapshot(cur, snapshot_date, team):
             %s, %s, %s,
             %s
         )
-        ON CONFLICT (snapshot_date, team_abbrev) DO NOTHING
+        ON CONFLICT (snapshot_date, team_abbrev) DO UPDATE SET
+            season_id = EXCLUDED.season_id,
+            games_played = EXCLUDED.games_played,
+            wins = EXCLUDED.wins,
+            losses = EXCLUDED.losses,
+            ot_losses = EXCLUDED.ot_losses,
+            points = EXCLUDED.points,
+            point_pctg = EXCLUDED.point_pctg,
+            goal_for = EXCLUDED.goal_for,
+            goal_against = EXCLUDED.goal_against,
+            goal_differential = EXCLUDED.goal_differential,
+            home_wins = EXCLUDED.home_wins,
+            home_losses = EXCLUDED.home_losses,
+            road_wins = EXCLUDED.road_wins,
+            road_losses = EXCLUDED.road_losses,
+            l10_wins = EXCLUDED.l10_wins,
+            l10_losses = EXCLUDED.l10_losses,
+            l10_ot_losses = EXCLUDED.l10_ot_losses,
+            streak_code = EXCLUDED.streak_code,
+            streak_count = EXCLUDED.streak_count,
+            division_sequence = EXCLUDED.division_sequence,
+            conference_sequence = EXCLUDED.conference_sequence,
+            league_sequence = EXCLUDED.league_sequence,
+            wildcard_sequence = EXCLUDED.wildcard_sequence,
+            created_at = NOW()
         """,
         (
             snapshot_date,

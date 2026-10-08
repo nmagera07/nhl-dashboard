@@ -13,7 +13,7 @@ describe("IntelligencePanel", () => {
         const encoder = new TextEncoder();
         controller.enqueue(encoder.encode(`data: {"type":"delta","text":"Chicago's recent "}\n\n`));
         controller.enqueue(encoder.encode('data: {"type":"delta","text":"record trails the division leaders."}\n\n'));
-        controller.enqueue(encoder.encode('data: {"type":"done","evidence":[{"label":"Team standings","endpoint":"/standings/CHI"}]}\n\n'));
+        controller.enqueue(encoder.encode('data: {"type":"done","evidence":[{"label":"Team standings","endpoint":"/standings/CHI"}],"model":"Groq"}\n\n'));
         controller.close();
       },
     });
@@ -32,6 +32,7 @@ describe("IntelligencePanel", () => {
 
     expect(await screen.findByText(/recent record trails/i)).toBeInTheDocument();
     expect(screen.getByText(/evidence: team standings/i)).toBeInTheDocument();
+    expect(screen.getByText("Answered by Groq")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "https://nhl-intelligence-kaxll7b4fq-uk.a.run.app/chat/stream",
       expect.objectContaining({

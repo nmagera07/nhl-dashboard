@@ -33,6 +33,7 @@ export default function IntelligencePanel({ context }) {
       let buffer = "";
       let answer = "";
       let evidence = [];
+      let model = null;
       const consume = (chunk) => {
         buffer += decoder.decode(chunk, { stream: true });
         const events = buffer.split("\n\n");
@@ -46,7 +47,8 @@ export default function IntelligencePanel({ context }) {
             setResult({ answer, evidence });
           } else if (payload.type === "done") {
             evidence = payload.evidence || [];
-            setResult({ answer, evidence });
+            model = payload.model || null;
+            setResult({ answer, evidence, model });
           } else if (payload.type === "error") {
             throw new Error(payload.message);
           }
@@ -107,6 +109,7 @@ export default function IntelligencePanel({ context }) {
                   Evidence: {result.evidence.map((item) => item.label).join(" · ")}
                 </small>
               )}
+              {result.model && <small className="intelligence-model">Answered by {result.model}</small>}
             </div>
           )}
         </div>

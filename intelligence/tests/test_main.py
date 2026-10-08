@@ -1,44 +1,34 @@
 import httpx
 import pytest
 from fastapi import HTTPException
-from openai import OpenAIError
-
 from app.config import Settings
 from app.dashboard import DashboardClient
-from app.main import ChatContext, ChatRequest, IntelligenceService
+from app.main import ALL_BUSY, ChatContext, ChatRequest, IntelligenceService
+from app.providers import Provider, ProviderChain
+from tests.fakes import fake_factory, rate_limited
 
 
-class FakeResponses:
-    async def create(self, **kwargs):
-        assert kwargs["model"] == "test-model"
-        assert "Player One" in kwargs["input"]
-        return type("Response", (), {"output_text": "Player One is producing efficiently."})()
+def settings():
+    return Settings("https://dashboard.test", ["http://localhost:5173"], providers=[Provider("groq", "Groq", None, "k", "test-model")])
 
 
-class FakeOpenAI:
-    responses = FakeResponses()
-
-
-class FailingResponses:
-    async def create(self, **kwargs):
-        raise OpenAIError("provider failed")
-
-
-class FailingOpenAI:
-    responses = FailingResponses()
+def chain(behavior, calls=None):
+    return ProviderChain(settings().providers, client_factory=fake_factory({"groq": behavior}, calls if calls is not None else []))
 
 
 @pytest.mark.asyncio
 async def test_player_answer_uses_dashboard_context():
+    calls = []
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One", "position_code": "C", "season_stats": [{"season_id": 20262027, "points": 50}]}))
     async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:
-        service = IntelligenceService(
-            Settings("https://dashboard.test", "test-key", "test-model", ["http://localhost:5173"]),
-            dashboard=DashboardClient("https://dashboard.test", client), openai_client=FakeOpenAI(),
-        )
+        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain("Player One is producing efficiently.", calls))
         result = await service.answer(ChatRequest(message="How is he doing?", context=ChatContext(page="player", player_id=7)))
     assert result.answer == "Player One is producing efficiently."
     assert result.evidence[0].endpoint == "/players/7"
+    assert result.model == "Groq"
+    _, kwargs = calls[0]
+    assert kwargs["model"] == "test-model"
+    assert "Player One" in kwargs["messages"][1]["content"]
 
 
 def test_player_context_requires_player_id():
@@ -52,21 +42,34 @@ def test_game_context_requires_game_id():
 
 
 @pytest.mark.asyncio
-async def test_openai_failure_becomes_safe_service_error():
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"name": "Player One"}))
+async def test_all_providers_failing_becomes_a_friendly_503():
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One"}))
     async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:
-        service = IntelligenceService(
-            Settings("https://dashboard.test", "test-key", "test-model", ["http://localhost:5173"]),
-            dashboard=DashboardClient("https://dashboard.test", client),
-            openai_client=FailingOpenAI(),
-        )
+        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain(rate_limited()))
         with pytest.raises(HTTPException) as error:
-            await service.answer(
-                ChatRequest(message="How is he doing?", context=ChatContext(page="player", player_id=7))
-            )
+            await service.answer(ChatRequest(message="How is he doing?", context=ChatContext(page="player", player_id=7)))
 
     assert error.value.status_code == 503
-    assert error.value.detail == "NHL Intelligence's AI provider is temporarily unavailable."
+    assert error.value.detail == ALL_BUSY
+
+
+@pytest.mark.asyncio
+async def test_no_providers_configured_is_a_503():
+    service = IntelligenceService(Settings("https://dashboard.test", []), dashboard=DashboardClient("https://dashboard.test"))
+    with pytest.raises(HTTPException) as error:
+        await service.answer(ChatRequest(message="Hi", context=ChatContext(page="standings")))
+    assert error.value.detail == "NHL Intelligence is not configured yet."
+
+
+@pytest.mark.asyncio
+async def test_stream_reports_which_provider_answered():
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One"}))
+    async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:
+        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain(["Fine ", "season."]))
+        events = [e async for e in service.answer_stream(ChatRequest(message="?", context=ChatContext(page="player", player_id=7)))]
+
+    assert '"text": "Fine "' in events[0]
+    assert '"type": "done"' in events[-1] and '"model": "Groq"' in events[-1]
 
 
 @pytest.mark.asyncio

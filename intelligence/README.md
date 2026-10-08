@@ -22,9 +22,24 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8001
 ```
 
-Set `OPENAI_API_KEY` in `.env`. It is used only by this service and must never be sent to the browser.
+Configure AI providers in `.env` (see `.env.example`). The service tries
+them in order (`AI_PROVIDERS`, default `gemini,groq,cloudflare,ollama`) and
+falls back to the next on a rate limit, outage, or bad key, so it runs on
+free tiers. Use keys with no payment method attached. For local development,
+Ollama on your own GPU works with no limits:
+
+```bash
+ollama pull qwen2.5:7b && ollama serve   # then OLLAMA_BASE_URL=http://localhost:11434/v1
+```
+
+Keys are used only by this service and must never be sent to the browser.
+Answers report which provider responded (`model` in the response).
 
 ## Deploy to Google Cloud Run
+
+> Being replaced: this service is moving to Azure Container Apps next to the
+> dashboard API, deployed by GitHub Actions. The Terraform below still
+> describes the current (OpenAI-based) Cloud Run deployment.
 
 Deployment uses a container image plus Terraform. Terraform owns the Google
 APIs, Artifact Registry repository, runtime service account, Secret Manager

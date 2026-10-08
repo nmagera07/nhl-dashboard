@@ -37,16 +37,46 @@ class TestRunAll:
         assert len(calls) == 2
 
 
+@pytest.fixture
+def pings(monkeypatch):
+    """Records heartbeat pings instead of sending them."""
+    sent = []
+    monkeypatch.setattr(run_daily_ingest, "HEALTHCHECK_URL", "https://hc-ping.com/abc")
+    monkeypatch.setattr(run_daily_ingest.requests, "post", lambda url, data=None, timeout=None: sent.append(url))
+    return sent
+
+
 class TestMain:
-    def test_exits_non_zero_when_any_script_fails(self, monkeypatch):
+    def test_exits_non_zero_when_any_script_fails(self, monkeypatch, pings):
         monkeypatch.setattr(run_daily_ingest, "run_all", lambda: ["ingest_player_stats.py"])
 
         with pytest.raises(SystemExit) as exc:
             run_daily_ingest.main()
 
         assert exc.value.code == 1
+        assert pings == ["https://hc-ping.com/abc/start", "https://hc-ping.com/abc/fail"]
 
-    def test_returns_normally_when_everything_succeeds(self, monkeypatch):
+    def test_pings_start_then_success(self, monkeypatch, pings):
         monkeypatch.setattr(run_daily_ingest, "run_all", lambda: [])
 
         run_daily_ingest.main()
+
+        assert pings == ["https://hc-ping.com/abc/start", "https://hc-ping.com/abc"]
+
+
+class TestPing:
+    def test_does_nothing_without_a_url(self, monkeypatch):
+        sent = []
+        monkeypatch.setattr(run_daily_ingest, "HEALTHCHECK_URL", "")
+
+        run_daily_ingest.ping(post=lambda *a, **k: sent.append(a))
+
+        assert sent == []
+
+    def test_a_failed_ping_never_breaks_the_run(self, monkeypatch):
+        monkeypatch.setattr(run_daily_ingest, "HEALTHCHECK_URL", "https://hc-ping.com/abc")
+
+        def down(*args, **kwargs):
+            raise run_daily_ingest.requests.ConnectionError("hc-ping.com unreachable")
+
+        run_daily_ingest.ping(post=down)  # no exception

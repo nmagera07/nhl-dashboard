@@ -10,13 +10,20 @@
   color: var(--text);
   font-family: 'Inter', system-ui, sans-serif;
   min-height: 100%;
-  padding: 0 0 32px 0;
+  /* Installed as a full-screen app (black-translucent status bar), the page
+     runs under the iPhone notch/status bar and home indicator -- the
+     safe-area insets keep content clear of them. They're 0 in a browser. */
+  padding:
+    env(safe-area-inset-top, 0px)
+    env(safe-area-inset-right, 0px)
+    calc(32px + env(safe-area-inset-bottom, 0px))
+    env(safe-area-inset-left, 0px);
   overflow-x: hidden;
 }
 .intelligence {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  right: max(24px, env(safe-area-inset-right, 0px));
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
   z-index: 10;
 }
 .intelligence-toggle {

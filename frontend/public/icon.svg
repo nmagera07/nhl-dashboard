@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed background so the same art works as a maskable icon;
+       the glyph stays inside the central ~60% safe zone. -->
+  <rect width="512" height="512" fill="#0a0b0f"/>
+  <!-- Rising stat bars -->
+  <rect x="150" y="270" width="52" height="96" rx="10" fill="#3b82f6" opacity="0.55"/>
+  <rect x="230" y="210" width="52" height="156" rx="10" fill="#3b82f6" opacity="0.8"/>
+  <rect x="310" y="146" width="52" height="220" rx="10" fill="#3b82f6"/>
+  <!-- Puck: a short dark cylinder with a lit top edge -->
+  <path d="M146 368 v22 a110 26 0 0 0 220 0 v-22 z" fill="#05060a"/>
+  <ellipse cx="256" cy="390" rx="110" ry="26" fill="none" stroke="#2b3240" stroke-width="2"/>
+  <ellipse cx="256" cy="368" rx="110" ry="26" fill="#252a35" stroke="#5b6475" stroke-width="3"/>
+</svg>

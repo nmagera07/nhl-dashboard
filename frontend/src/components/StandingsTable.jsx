@@ -1,3 +1,5 @@
+import { darkLogo } from "../utils/darkLogo.js";
+
 function StreakBadge({ code, count }) {
   if (!code) return <span className="streak streak-none">—</span>;
   const cls = code === "W" ? "streak streak-w" : code === "L" ? "streak streak-l" : "streak streak-ot";
@@ -31,80 +33,104 @@ function formatAdvancedValue(key, value) {
   return value; // shots_on_goal_for/against are plain integer counts
 }
 
-function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort }) {
+function TeamCell({ row }) {
+  return (
+    <td className="col-team">
+      <span className="team-cell">
+        {row.logo_url ? <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" /> : <span className="team-cell-logo" />}
+        <span className="team-abbrev">{row.team_abbrev}</span>
+        <span className="team-name">{row.team_name}</span>
+      </span>
+    </td>
+  );
+}
+
+function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard" }) {
   // Rows arrive already ordered by the API when a column sort is active
   // (?sort_by=... on GET /standings/latest) -- only fall back to the
   // default division-rank ordering when no custom sort is in effect.
   // Copy before sorting so this never mutates the rows prop in place.
   const displayRows = sortBy ? rows : [...rows].sort((a, b) => a.division_sequence - b.division_sequence);
+  const advanced = view === "advanced";
+  // rank + team + the view's stat columns
+  const columnCount = 2 + (advanced ? 3 + ADVANCED_SORT_COLUMNS.length : 11);
 
   return (
     <>
     <div className="table-card standings-table-card">
-      <table className="standings-table">
+      <table className={advanced ? "standings-table standings-table-advanced" : "standings-table"}>
         <thead>
           <tr>
             <th className="col-rank"></th>
             <th className="col-team">TEAM</th>
             <th>GP</th>
-            <th>W</th>
-            <th>L</th>
-            <th>OT</th>
-            <th className="col-pts">PTS</th>
-            <th>GF</th>
-            <th>GA</th>
-            <th>DIFF</th>
-            <th>L10</th>
-            <th>STRK</th>
-            <th className="col-po">PO%</th>
-            {ADVANCED_SORT_COLUMNS.map((col) => (
-              <th
-                key={col.key}
-                className={col.key === sortBy ? "sortable-col sortable-col-active" : "sortable-col"}
-                onClick={() => onSort(col.key)}
-              >
-                {col.label}{col.key === sortBy ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
-              </th>
-            ))}
+            {advanced ? (
+              <>
+                <th className="col-pts">PTS</th>
+                <th className="col-po">PO%</th>
+                {ADVANCED_SORT_COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={col.key === sortBy ? "sortable-col sortable-col-active" : "sortable-col"}
+                    onClick={() => onSort(col.key)}
+                  >
+                    {col.label}{col.key === sortBy ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  </th>
+                ))}
+              </>
+            ) : (
+              <>
+                <th>W</th>
+                <th>L</th>
+                <th>OT</th>
+                <th className="col-pts">PTS</th>
+                <th>GF</th>
+                <th>GA</th>
+                <th>DIFF</th>
+                <th>L10</th>
+                <th>STRK</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
           {displayRows.length === 0 && (
             <tr>
-              <td colSpan={12 + ADVANCED_SORT_COLUMNS.length} className="no-results">
+              <td colSpan={columnCount} className="no-results">
                 No teams match your search.
               </td>
             </tr>
           )}
           {displayRows.map((row) => (
-            <tr
-              key={row.team_abbrev}
-              className={row.team_abbrev === selectedTeam ? "row-selected" : ""}
-              onClick={() => onSelectTeam(row.team_abbrev)}
-            >
+            <tr key={row.team_abbrev} onClick={() => onSelectTeam(row.team_abbrev)}>
               <td className="col-rank">{row.division_sequence}</td>
-              <td className="col-team">
-                <span className="team-abbrev">{row.team_abbrev}</span>
-                <span className="team-name">{row.team_name}</span>
-              </td>
+              <TeamCell row={row} />
               <td>{row.games_played}</td>
-              <td>{row.wins}</td>
-              <td>{row.losses}</td>
-              <td>{row.ot_losses}</td>
-              <td className="col-pts">{row.points}</td>
-              <td>{row.goal_for}</td>
-              <td>{row.goal_against}</td>
-              <td className={row.goal_differential >= 0 ? "diff-pos" : "diff-neg"}>
-                {row.goal_differential > 0 ? "+" : ""}{row.goal_differential}
-              </td>
-              <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
-              <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
-              <PlayoffOddsCell pct={playoffOddsByTeam?.[row.team_abbrev]} />
-              {ADVANCED_SORT_COLUMNS.map((col) => (
-                <td key={col.key} className={col.key === sortBy ? "col-pts" : ""}>
-                  {formatAdvancedValue(col.key, row[col.key])}
-                </td>
-              ))}
+              {advanced ? (
+                <>
+                  <td className="col-pts">{row.points}</td>
+                  <PlayoffOddsCell pct={playoffOddsByTeam?.[row.team_abbrev]} />
+                  {ADVANCED_SORT_COLUMNS.map((col) => (
+                    <td key={col.key} className={col.key === sortBy ? "col-pts" : ""}>
+                      {formatAdvancedValue(col.key, row[col.key])}
+                    </td>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <td>{row.wins}</td>
+                  <td>{row.losses}</td>
+                  <td>{row.ot_losses}</td>
+                  <td className="col-pts">{row.points}</td>
+                  <td>{row.goal_for}</td>
+                  <td>{row.goal_against}</td>
+                  <td className={row.goal_differential >= 0 ? "diff-pos" : "diff-neg"}>
+                    {row.goal_differential > 0 ? "+" : ""}{row.goal_differential}
+                  </td>
+                  <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
+                  <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>
@@ -112,31 +138,28 @@ function StandingsTable({ rows, selectedTeam, onSelectTeam, playoffOddsByTeam, s
     </div>
     <div className="standings-mobile-list" aria-label="Team standings cards">
       {displayRows.length === 0 && <div className="standings-mobile-empty">No teams match your search.</div>}
-      {displayRows.map((row) => {
-        const playoffPct = playoffOddsByTeam?.[row.team_abbrev];
-        return (
-          <button
-            className={`standings-team-card${row.team_abbrev === selectedTeam ? " standings-team-card-selected" : ""}`}
-            key={row.team_abbrev}
-            type="button"
-            aria-label={`Open ${row.team_name} team page`}
-            onClick={() => onSelectTeam(row.team_abbrev)}
-          >
-            <span className="standings-team-card-header">
-              <span className="standings-team-rank">{row.division_sequence}</span>
-              <span className="standings-team-identity"><strong>{row.team_name}</strong><small>{row.team_abbrev}</small></span>
-              <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
-            </span>
-            <span className="standings-team-card-stats">
-              <span><strong>{row.wins}-{row.losses}-{row.ot_losses}</strong><small>REC</small></span>
-              <span><strong>{row.goal_differential > 0 ? "+" : ""}{row.goal_differential}</strong><small>DIFF</small></span>
-              <span><strong>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</strong><small>L10</small></span>
-              <span><strong>{row.streak_code ? `${row.streak_code}${row.streak_count}` : "—"}</strong><small>STRK</small></span>
-              <span><strong>{playoffPct == null ? "—" : `${(Number(playoffPct) * 100).toFixed(0)}%`}</strong><small>PO%</small></span>
-            </span>
-          </button>
-        );
-      })}
+      {displayRows.map((row) => (
+        <button
+          className="standings-team-card"
+          key={row.team_abbrev}
+          type="button"
+          aria-label={`Open ${row.team_name} team page`}
+          onClick={() => onSelectTeam(row.team_abbrev)}
+        >
+          <span className="standings-team-card-header">
+            <span className="standings-team-rank">{row.division_sequence}</span>
+            {row.logo_url && <img className="standings-team-logo" src={darkLogo(row.logo_url)} alt="" />}
+            <span className="standings-team-identity"><strong>{row.team_name}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
+            <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
+          </span>
+          <span className="standings-team-card-stats">
+            <span><strong>{row.goal_for}-{row.goal_against}</strong><small>GF-GA</small></span>
+            <span><strong>{row.goal_differential > 0 ? "+" : ""}{row.goal_differential}</strong><small>DIFF</small></span>
+            <span><strong>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</strong><small>L10</small></span>
+            <span><strong>{row.streak_code ? `${row.streak_code}${row.streak_count}` : "—"}</strong><small>STRK</small></span>
+          </span>
+        </button>
+      ))}
     </div>
     </>
   );

@@ -17,10 +17,10 @@ function PlayerPage() {
   // roster, which is always a sensible destination and doesn't depend on
   // browser history existing at all.
   const cameFromLeaderboard = location.state?.from === "leaderboard";
-  const backLabel = cameFromLeaderboard ? "Back to Leaderboard" : "Back to Roster";
+  const backLabel = cameFromLeaderboard ? "Back to Players" : "Back to Roster";
   const handleBack = () => {
-    if (cameFromLeaderboard) navigate("/leaderboard");
-    else navigate(playerDetail?.team_abbrev ? `/teams/${playerDetail.team_abbrev}` : "/");
+    if (cameFromLeaderboard) navigate("/players");
+    else navigate(playerDetail?.team_abbrev ? `/teams/${playerDetail.team_abbrev}` : "/players");
   };
 
   return (

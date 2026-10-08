@@ -22,7 +22,7 @@ function renderAt(path, { state } = {}) {
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/players/:playerId" element={<PlayerPage />} />
-        <Route path="/leaderboard" element={<div>Leaderboard page</div>} />
+        <Route path="/players" element={<div>Leaderboard page</div>} />
         <Route path="/teams/:teamAbbrev" element={<div>Roster page</div>} />
         <Route path="/" element={<div>Standings page</div>} />
       </Routes>
@@ -63,13 +63,13 @@ describe("PlayerPage", () => {
     expect(screen.getByText("Roster page")).toBeInTheDocument();
   });
 
-  it("navigating in from the leaderboard shows 'Back to Leaderboard' and returns there", async () => {
+  it("navigating in from the leaderboard shows 'Back to Players' and returns there", async () => {
     renderAt("/players/8477492", { state: { from: "leaderboard" } });
     await waitFor(() => screen.getByText(/mackinnon/i));
 
-    expect(screen.getByRole("button", { name: /back to leaderboard/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /back to players/i })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /back to leaderboard/i }));
+    await userEvent.click(screen.getByRole("button", { name: /back to players/i }));
 
     expect(screen.getByText("Leaderboard page")).toBeInTheDocument();
   });

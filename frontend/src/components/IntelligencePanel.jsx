@@ -72,9 +72,13 @@ export default function IntelligencePanel({ context }) {
         type="button"
         aria-expanded={open}
         aria-controls="nhl-intelligence-panel"
+        aria-label="Ask NHL Intelligence"
         onClick={() => setOpen((value) => !value)}
       >
-        ✦ Ask NHL Intelligence
+        <span aria-hidden="true">✦ </span>
+        {/* Full label on desktop; just "Ask" on phones so it covers less content. */}
+        <span className="intelligence-toggle-full" aria-hidden="true">Ask NHL Intelligence</span>
+        <span className="intelligence-toggle-short" aria-hidden="true">Ask</span>
       </button>
       {open && (
         <div className="intelligence-panel" id="nhl-intelligence-panel">

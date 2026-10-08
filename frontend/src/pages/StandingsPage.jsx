@@ -1,6 +1,10 @@
 import DivisionTabs from "../components/DivisionTabs.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
-import TeamCard from "../components/TeamCard.jsx";
+
+const VIEWS = [
+  { key: "standard", label: "Standard" },
+  { key: "advanced", label: "Advanced" },
+];
 
 function StandingsPage({
   divisions,
@@ -8,44 +12,57 @@ function StandingsPage({
   onSelectDivision,
   isSearching,
   visibleRows,
-  selectedTeam,
   onSelectTeam,
   playoffOddsByTeam,
   playoffOddsStatus,
-  selectedRow,
-  onViewRoster,
+  view,
+  onViewChange,
   sortBy,
   sortDir,
   onSort,
 }) {
   return (
-    <>
-      <DivisionTabs
-        divisions={divisions}
-        active={activeDivision}
-        onSelect={onSelectDivision}
-        disabled={isSearching}
-      />
+    <main>
+      <div className="page-header page">
+        <h1>Standings</h1>
+      </div>
+      <div className="standings-controls">
+        <DivisionTabs
+          divisions={divisions}
+          active={activeDivision}
+          onSelect={onSelectDivision}
+          disabled={isSearching}
+        />
+        {/* Desktop only: phones show the standard stats as cards. */}
+        <div className="view-toggle" role="group" aria-label="Stats view">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              className={v.key === view ? "view-toggle-btn view-toggle-btn-active" : "view-toggle-btn"}
+              aria-pressed={v.key === view}
+              onClick={() => onViewChange(v.key)}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <StandingsTable
         rows={visibleRows}
-        selectedTeam={selectedTeam}
         onSelectTeam={onSelectTeam}
         playoffOddsByTeam={playoffOddsByTeam}
+        view={view}
         sortBy={sortBy}
         sortDir={sortDir}
         onSort={onSort}
       />
-      {playoffOddsStatus === "error" && (
+      {view === "advanced" && playoffOddsStatus === "error" && (
         <div className="status-line status-error">
           Playoff odds unavailable — the PO% column may be incomplete.
         </div>
       )}
-      {selectedRow && (
-        <div className="detail-grid">
-          <TeamCard team={selectedRow} onViewRoster={onViewRoster} />
-        </div>
-      )}
-    </>
+    </main>
   );
 }
 

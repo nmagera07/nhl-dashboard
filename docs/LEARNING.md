@@ -83,6 +83,9 @@ deployed." A stale deploy looks healthy.
 - A deploy can't report that it never ran. That takes a separate check, so a
   daily GitHub Action compares production's commit to `main` and fails if
   they've drifted.
+- Root cause, as best I can tell: by October the Azure DevOps organization
+  and pipeline no longer existed under my account at all. The pipeline didn't
+  fail, it just vanished, which is the hardest kind of failure to notice.
 - Watch out for silent schedules: GitHub disables scheduled workflows in public
   repos after 60 days without activity.
 

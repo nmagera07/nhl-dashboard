@@ -79,14 +79,16 @@ Azure Static      Azure Container
 | Script | What it pulls | Schedule |
 |---|---|---|
 | `ingest_standings.py` | Daily standings snapshot, all 32 teams | Daily |
-| `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation | Manual (being cleaned up) |
+| `simulate_playoff_odds.py` | Monte Carlo playoff odds (v2: regressed goal-differential ratings, calibrated game model, NHL tiebreakers) | Daily |
 | `ingest_player_stats.py` | Full roster + season stats, all 32 teams; marks cut/released players off-roster | Daily |
 | `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team + skater, from MoneyPuck | Manual, ~weekly in-season |
 | `backfill_season_history.py` | Last 5 completed seasons' final standings | One-time |
 
-The daily scripts (standings, then player stats) run through
-`run_daily_ingest.py`, the entry point of the `nhl-standings-ingest`
-Container Apps Job (06:00 UTC).
+The daily scripts (standings, playoff odds, then player stats) run
+through `run_daily_ingest.py`, the entry point of the
+`nhl-standings-ingest` Container Apps Job (06:00 UTC).
+`calibrate_playoff_model.py` and `backtest_playoff_odds.py` are offline
+tools for tuning the playoff model (see their docstrings).
 
 ## Tech stack
 

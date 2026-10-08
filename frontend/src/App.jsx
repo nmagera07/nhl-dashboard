@@ -84,13 +84,17 @@ export default function NHLDashboard() {
     );
   }, [standings]);
 
+  // Only use odds from the same season as the standings: if the daily
+  // simulation hasn't run yet this season, the API's latest odds are last
+  // season's, and showing those would be wrong -- PO% shows "—" instead.
   const playoffOddsByTeam = useMemo(() => {
+    const currentSeason = standings[0]?.season_id;
     const map = {};
     playoffOdds.forEach((t) => {
-      map[t.team_abbrev] = t.playoff_pct;
+      if (t.season_id === currentSeason) map[t.team_abbrev] = t.playoff_pct;
     });
     return map;
-  }, [playoffOdds]);
+  }, [playoffOdds, standings]);
 
   const isSearching = search.trim().length > 0;
 

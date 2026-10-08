@@ -725,7 +725,7 @@
   .standings-team-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
   .standings-team-identity small, .standings-team-points small, .standings-team-card-stats small { color: var(--text-dim); font-size: 10px; }
   .standings-team-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; }
-  .standings-team-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .standings-team-card-stats { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
   .standings-controls .view-toggle { display: none; }
   .standings-controls .division-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
   .standings-controls .division-tab { padding: 7px 2px; font-size: 10px; letter-spacing: 0.02em; }

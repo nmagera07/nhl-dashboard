@@ -350,38 +350,6 @@
 .streak-l { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
 .streak-ot { background: rgba(234, 179, 8, 0.15); color: #eab308; }
 .streak-none { color: var(--text-dim); }
-.detail-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin: 24px var(--gutter) 0 var(--gutter);
-}
-.team-card {
-  flex: 0 1 260px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
-}
-.team-card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.team-logo {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-}
-.team-card-name {
-  font-weight: 700;
-  font-size: 15px;
-}
-.team-card-division {
-  font-size: 12px;
-  color: var(--text-dim);
-}
 .playoff-badge {
   display: inline-block;
   font-size: 10px;
@@ -389,65 +357,36 @@
   letter-spacing: 0.05em;
   padding: 4px 10px;
   border-radius: 12px;
-  margin-bottom: 14px;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .playoff-in { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
 .playoff-out { background: rgba(139, 147, 163, 0.15); color: var(--text-dim); }
-.team-card-record {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 16px;
+.team-summary {
+  margin: 0 var(--gutter) 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
 }
-.team-card-pts {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--accent);
-}
-.team-card-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.team-card-splits {
-  display: flex;
-  justify-content: space-between;
+.team-summary-identity { display: flex; align-items: center; gap: 16px; }
+.team-summary-logo { width: 64px; height: 64px; flex: 0 0 64px; object-fit: contain; }
+.team-summary-title { flex: 1; min-width: 0; }
+.team-summary-title h1 { margin: 0; font-size: 24px; line-height: 1.2; }
+.team-summary-title p { margin: 4px 0 0; color: var(--text-dim); font-size: 13px; }
+.team-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
-  padding-top: 14px;
-  margin-bottom: 14px;
 }
-.split {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.split-label {
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
-}
-.split-value {
-  font-size: 13px;
-  font-weight: 600;
-}
-.team-card-ranks {
-  display: flex;
-  justify-content: space-between;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
-}
-.rank-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.rank-value {
-  font-size: 13px;
-  font-weight: 600;
-}
-.rank-label {
-  font-size: 10px;
-  color: var(--text-dim);
-}
+.team-summary-stat dt { color: var(--text-dim); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.team-summary-stat dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-summary-stat dd.is-highlight { color: var(--accent); font-size: 20px; line-height: 1; }
+.team-summary-stat dd.is-pos { color: #22c55e; }
+.team-summary-stat dd.is-neg { color: #ef4444; }
 .trend-header {
   display: flex;
   align-items: baseline;
@@ -500,18 +439,6 @@
   padding: 0 var(--gutter);
 }
 .status-error { color: #ef4444; }
-.roster-link {
-  width: 100%;
-  margin-top: 14px;
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 8px 0;
-  border-radius: 6px;
-  cursor: pointer;
-}
 .back-link {
   background: none;
   border: none;
@@ -523,27 +450,19 @@
 }
 .back-link:hover { color: var(--text); }
 .roster-panel, .player-panel { padding-top: 4px; }
-.roster-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 var(--gutter);
-  margin-bottom: 20px;
-}
-.team-logo-lg { width: 48px; height: 48px; object-fit: contain; }
-.roster-team-name { font-weight: 700; font-size: 20px; }
-.roster-team-sub { font-size: 12px; color: var(--text-dim); }
 .roster-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
+  margin: 0 0 8px;
   padding: 0 var(--gutter);
-  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.roster-section { margin-bottom: 20px; }
-.roster-section .standings-table { min-width: 620px; }
-.roster-section .col-team { min-width: 190px; }
+.roster-section-count { margin-left: 4px; color: var(--text-dim); font-weight: 500; }
+.roster-section { margin-bottom: 24px; }
+/* The player column absorbs spare width so stats sit together on the right. */
+.roster-table .col-team { width: 40%; }
+.roster-player { display: inline-flex; align-items: center; }
 .player-thumb {
   width: 28px;
   height: 28px;
@@ -763,11 +682,23 @@
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }
   .standings-table th, .standings-table td { padding: 8px 8px; }
-  .roster-section .standings-table { min-width: 620px; }
-  .roster-section .col-team { min-width: 190px; }
-  .roster-section .player-name-cell { max-width: 145px; }
+  .roster-table .col-optional { display: none; }
+  .roster-table .col-team { width: auto; }
+  .roster-table th, .roster-table td { padding: 8px 5px; }
+  .roster-table .col-rank { width: 22px; }
+  .roster-section .player-name-cell { max-width: 118px; }
+  .roster-table .player-thumb { display: none; }
+  .roster-section .player-name-cell { max-width: 132px; }
   .stat-tile { flex-basis: calc(50% - 6px); }
-  .team-card { padding: 14px; }
+  .team-summary { padding: 14px; }
+  .team-summary-identity { flex-wrap: wrap; gap: 8px 12px; }
+  .team-summary-title { flex-basis: calc(100% - 60px); }
+  .team-summary-identity .playoff-badge { margin-left: 60px; }
+  .team-summary-logo { width: 48px; height: 48px; flex-basis: 48px; }
+  .team-summary-title h1 { font-size: 20px; }
+  .team-summary-title p { font-size: 12px; }
+  .team-summary-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; }
+  .team-summary-stat dd { font-size: 14px; }
   .player-bio { padding: 12px 14px; }
   .player-headshot { width: 56px; height: 56px; }
   .player-name { font-size: 18px; }

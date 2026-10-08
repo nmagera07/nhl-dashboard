@@ -1,10 +1,34 @@
+import TeamSummary from "./TeamSummary.jsx";
+
+// Columns marked col-optional hide on phones so the table fits without
+// sideways scrolling; the essentials stay.
+
+function PlayerCell({ p }) {
+  return (
+    <td className="col-team">
+      <span className="roster-player">
+        {p.headshot_url ? <img className="player-thumb" src={p.headshot_url} alt="" /> : <span className="player-thumb" />}
+        <span className="player-name-cell" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
+      </span>
+    </td>
+  );
+}
+
+function SectionLabel({ label, count }) {
+  return (
+    <h2 className="roster-section-label">
+      {label} <span className="roster-section-count">{count}</span>
+    </h2>
+  );
+}
+
 function SkaterTable({ label, players, onSelectPlayer }) {
   if (players.length === 0) return null;
   return (
     <>
-      <div className="roster-section-label">{label}</div>
+      <SectionLabel label={label} count={players.length} />
       <div className="table-card roster-section">
-        <table className="standings-table">
+        <table className="standings-table roster-table" aria-label={label}>
           <thead>
             <tr>
               <th className="col-rank">#</th>
@@ -14,23 +38,22 @@ function SkaterTable({ label, players, onSelectPlayer }) {
               <th>A</th>
               <th className="col-pts">PTS</th>
               <th>+/-</th>
-              <th>PIM</th>
+              <th className="col-optional">SOG</th>
+              <th className="col-optional">PIM</th>
             </tr>
           </thead>
           <tbody>
             {players.map((p) => (
               <tr key={p.player_id} onClick={() => onSelectPlayer(p.player_id)}>
                 <td className="col-rank">{p.sweater_number ?? "—"}</td>
-                <td className="col-team">
-                  {p.headshot_url && <img className="player-thumb" src={p.headshot_url} alt="" />}
-                  <span className="player-name-cell" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
-                </td>
+                <PlayerCell p={p} />
                 <td>{p.games_played ?? "—"}</td>
                 <td>{p.goals ?? "—"}</td>
                 <td>{p.assists ?? "—"}</td>
                 <td className="col-pts">{p.points ?? "—"}</td>
-                <td>{p.plus_minus ?? "—"}</td>
-                <td>{p.pim ?? "—"}</td>
+                <td>{p.plus_minus == null ? "—" : `${p.plus_minus > 0 ? "+" : ""}${p.plus_minus}`}</td>
+                <td className="col-optional">{p.shots ?? "—"}</td>
+                <td className="col-optional">{p.pim ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -44,9 +67,9 @@ function GoalieTable({ players, onSelectPlayer }) {
   if (players.length === 0) return null;
   return (
     <>
-      <div className="roster-section-label">Goalies</div>
+      <SectionLabel label="Goalies" count={players.length} />
       <div className="table-card roster-section">
-        <table className="standings-table">
+        <table className="standings-table roster-table" aria-label="Goalies">
           <thead>
             <tr>
               <th className="col-rank">#</th>
@@ -54,27 +77,24 @@ function GoalieTable({ players, onSelectPlayer }) {
               <th>GP</th>
               <th>W</th>
               <th>L</th>
-              <th>OTL</th>
+              <th className="col-optional">OTL</th>
               <th>GAA</th>
-              <th>SV%</th>
-              <th>SO</th>
+              <th className="col-pts">SV%</th>
+              <th className="col-optional">SO</th>
             </tr>
           </thead>
           <tbody>
             {players.map((p) => (
               <tr key={p.player_id} onClick={() => onSelectPlayer(p.player_id)}>
                 <td className="col-rank">{p.sweater_number ?? "—"}</td>
-                <td className="col-team">
-                  {p.headshot_url && <img className="player-thumb" src={p.headshot_url} alt="" />}
-                  <span className="player-name-cell" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
-                </td>
+                <PlayerCell p={p} />
                 <td>{p.games_played ?? "—"}</td>
                 <td>{p.wins ?? "—"}</td>
                 <td>{p.losses ?? "—"}</td>
-                <td>{p.ot_losses ?? "—"}</td>
+                <td className="col-optional">{p.ot_losses ?? "—"}</td>
                 <td>{p.goals_against_avg != null ? Number(p.goals_against_avg).toFixed(2) : "—"}</td>
-                <td>{p.save_pctg != null ? Number(p.save_pctg).toFixed(3) : "—"}</td>
-                <td>{p.shutouts ?? "—"}</td>
+                <td className="col-pts">{p.save_pctg != null ? Number(p.save_pctg).toFixed(3).replace(/^0/, "") : "—"}</td>
+                <td className="col-optional">{p.shutouts ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -90,23 +110,13 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
   const goalies = roster.filter((p) => p.position_code === "G");
 
   return (
-    <div className="roster-panel">
-      <button className="back-link" onClick={onBack}>&larr; Back to Standings</button>
-
-      {team && (
-        <div className="roster-header">
-          {team.logo_url && <img className="team-logo-lg" src={team.logo_url} alt="" />}
-          <div>
-            <div className="roster-team-name">{team.team_name}</div>
-            <div className="roster-team-sub">Roster</div>
-          </div>
-        </div>
-      )}
-
+    <main className="roster-panel">
+      <button className="back-link" onClick={onBack}>&larr; Standings</button>
+      <TeamSummary team={team} />
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
-      <SkaterTable label="Defensemen" players={defensemen} onSelectPlayer={onSelectPlayer} />
+      <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />
       <GoalieTable players={goalies} onSelectPlayer={onSelectPlayer} />
-    </div>
+    </main>
   );
 }
 

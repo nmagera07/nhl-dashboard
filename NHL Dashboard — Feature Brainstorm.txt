@@ -9,12 +9,12 @@ Last updated: 2026-10-08
 ---
 
 ## In Progress
-- **Site redesign** — current layout feels clunky. Ideas: "favorite team"
-  pinned card, cleaner navigation, a better mobile feel now that it's an app.
-- **Installable phone app (PWA)** — built and waiting on `dev`; ships with the
-  redesign. Manifest, app icon, service worker, iPhone notch handling.
-  Install: Safari → Share → Add to Home Screen (iPhone), or Chrome → Install
-  app (Android).
+- **Site redesign + installable phone app (PWA)** — built on `dev`, ready to
+  ship together. Scores / Standings / Players sections with a phone tab bar,
+  standings with logos + Advanced toggle, team page with season summary,
+  player page hero + compact tables, polished game cards, dark-theme logos.
+  PWA install: Safari → Share → Add to Home Screen (iPhone), or Chrome →
+  Install app (Android).
 
 ---
 
@@ -22,6 +22,10 @@ Last updated: 2026-10-08
 - **Playoff odds cleanup** — `simulate_playoff_odds.py` is still manual and the
   PO% column shows last season's final odds. Clean it up, then add it to
   `run_daily_ingest.py` (right after standings, since it reads them).
+- **Fix "Ask NHL Intelligence" on game pages** — the dashboard sends
+  `page: "game"`, but nhl-intelligence only accepts player | team |
+  standings, so the chat on game pages is likely rejected. Fix belongs in
+  the nhl-intelligence repo (accept "game", ideally with box score context).
 - **Advanced stats cleanup** — `ingest_advanced_stats.py` (MoneyPuck) is still
   manual, so xG%/xGF/xGA/SF/SA/PDO are blank this season. Clean it up and add it
   to the daily job (numbers get meaningful a couple of weeks into the season).

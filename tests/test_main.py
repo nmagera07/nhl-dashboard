@@ -30,7 +30,7 @@ class FailingOpenAI:
 
 @pytest.mark.asyncio
 async def test_player_answer_uses_dashboard_context():
-    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"name": "Player One", "points": 50}))
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One", "position_code": "C", "season_stats": [{"season_id": 20262027, "points": 50}]}))
     async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:
         service = IntelligenceService(
             Settings("https://dashboard.test", "test-key", "test-model", ["http://localhost:5173"]),
@@ -78,7 +78,7 @@ async def test_dashboard_retries_transient_timeout():
         attempts += 1
         if attempts == 1:
             raise httpx.ReadTimeout("slow upstream", request=request)
-        return httpx.Response(200, json={"name": "Player One"})
+        return httpx.Response(200, json={"first_name": "Player", "last_name": "One"})
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:

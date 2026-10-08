@@ -53,7 +53,7 @@ class ChatResponse(BaseModel):
 
 
 SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
-Use only the supplied dashboard data. Do not invent game events, injuries, line combinations, or facts absent from the context. This Phase 1 dashboard does not include game-level box scores or play-by-play. If asked what happened in a specific game, say that game-level data is not available yet and explain what season-level context you can provide. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
+Use only the supplied dashboard data. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
 
 
 class IntelligenceService:
@@ -72,8 +72,10 @@ class IntelligenceService:
         return await self.dashboard.league_context()
 
     def prompt_for(self, request: ChatRequest, context: ContextBundle) -> str:
-        facts = json.dumps(context.facts, default=str)
+        facts = json.dumps(context.facts, default=str, separators=(",", ":"))
         if len(facts) > self.settings.max_context_chars:
+            # Safety net only: the compact contexts are sized to fit well under this.
+            logger.warning("Context for %s is %d chars; truncating", request.context.page, len(facts))
             facts = facts[: self.settings.max_context_chars] + "\n[Dashboard context truncated to control usage.]"
         return (
             f"Question: {request.message}\n\nPage context: {request.context.model_dump_json()}"

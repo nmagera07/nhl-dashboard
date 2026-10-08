@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 
+from . import compact
+
 
 class DashboardUnavailable(Exception):
     """The dashboard could not provide the requested context."""
@@ -49,7 +51,7 @@ class DashboardClient:
     async def player_context(self, player_id: int) -> ContextBundle:
         player = await self._get(f"/players/{player_id}")
         return ContextBundle(
-            facts={"player": player},
+            facts={"player": compact.player_facts(player)},
             evidence=[{"label": "Player profile and season statistics", "endpoint": f"/players/{player_id}"}],
         )
 
@@ -61,12 +63,7 @@ class DashboardClient:
             self._get("/playoff-odds"),
         )
         return ContextBundle(
-            facts={
-                "team_abbrev": abbrev,
-                "standing": next((row for row in standings if row.get("team_abbrev") == abbrev), None),
-                "roster": roster,
-                "playoff_odds": next((row for row in playoff_odds if row.get("team_abbrev") == abbrev), None),
-            },
+            facts=compact.team_facts(abbrev, standings, roster, playoff_odds),
             evidence=[
                 {"label": "Current standings", "endpoint": "/standings/latest"},
                 {"label": "Current roster and season totals", "endpoint": f"/teams/{abbrev}/roster"},
@@ -81,11 +78,7 @@ class DashboardClient:
             self._get("/playoff-odds"),
         )
         return ContextBundle(
-            facts={
-                "standings": standings,
-                "player_leaders": player_leaders,
-                "playoff_odds": playoff_odds,
-            },
+            facts=compact.league_facts(standings, player_leaders, playoff_odds),
             evidence=[
                 {"label": "Current standings", "endpoint": "/standings/latest"},
                 {"label": "Player leaderboard", "endpoint": "/players/leaders"},
@@ -96,6 +89,6 @@ class DashboardClient:
     async def game_context(self, game_id: int) -> ContextBundle:
         game = await self._get(f"/games/{game_id}/boxscore")
         return ContextBundle(
-            facts={"game": game},
+            facts={"game": compact.game_facts(game)},
             evidence=[{"label": "NHL game box score", "endpoint": f"/games/{game_id}/boxscore"}],
         )

@@ -25,6 +25,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Consolidated daily data ingestion into a single scheduled Azure Container
   Apps Job with failure isolation between steps and automatic retry.
 
+- Replaced a log-based Azure alert with a heartbeat monitor (healthchecks.io)
+  that also detects a scheduled job that never runs, and cut the monthly
+  Azure bill from ~$11.44 to ~$0.97.
+
 **Security**
 - Removed a write-capable database credential that was exposed as a plain-text
   environment variable on the API, enforcing least privilege (the API only
@@ -36,6 +40,24 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-08 — Heartbeat monitoring for the daily job
+
+**What happened:** Swapped the Azure "ingestion is stale" alert for a
+healthchecks.io heartbeat. The job pings `/start` when it begins, the plain URL
+when it succeeds, and `/fail` when it fails.
+
+**What I learned:**
+- **Push vs. pull monitoring:** the old alert *looked* for a problem in the
+  logs. A heartbeat expects a check-in and alerts when one **doesn't arrive**,
+  so it catches the job never running at all. That's the same blind spot as
+  the deploy that never ran.
+- Monitoring calls should be **best-effort**: if healthchecks.io is down, the
+  job still finishes. A ping failure is logged, never raised.
+- Treat the ping URL as a secret (stored as a Container Apps secret), since
+  anyone holding it could send fake "all good" pings.
 
 ---
 
@@ -61,6 +83,16 @@ deployed." A stale deploy looks healthy.
 - A deploy can't report that it never ran. That takes a separate check, so a
   daily GitHub Action compares production's commit to `main` and fails if
   they've drifted.
+- **Root cause:** the pipeline still existed (under an Azure DevOps org that
+  the Azure Portal doesn't show; it's listed at aex.dev.azure.com/me), but its
+  last run was July 18. It never *failed*. GitHub stopped notifying it of new
+  commits. It wasn't using the Azure Pipelines GitHub App (no checks ever
+  appeared on commits), and by October the repo had zero webhooks, so the
+  push webhook or the OAuth connection behind it was most likely removed or
+  expired. No runs means no failures, which means no alerts.
+- Azure DevOps and the Azure Portal are effectively separate products
+  (DevOps grew out of VSTS/TFS). DevOps orgs aren't Azure resources and don't
+  show up in a subscription, which is part of why this was easy to forget.
 - Watch out for silent schedules: GitHub disables scheduled workflows in public
   repos after 60 days without activity.
 
@@ -130,6 +162,16 @@ API never even used it, since it connects with a separate read-only credential.
 - **Secrets vs. env vars:** plain env vars are visible to anyone with read access
   to the resource. Credentials belong in the platform's secret store.
 - After a credential has been exposed, **rotate it** too. Removing it isn't enough.
+- **Rotation is where mistakes happen.** On the first try, the job's secret got
+  the `< >` placeholder brackets from a command template, and my local `.env`
+  ended up with the owner URL pasted into both `DATABASE_URL` and
+  `API_DATABASE_URL`. What helped:
+  - Commands that **read the value from a file** (`dotenv_values(".env")`)
+    instead of having me paste it, so I never retype a password.
+  - **Verify right after a change** (a test job run, a `SELECT current_user`
+    per connection string) instead of finding out at the next scheduled run.
+  - The heartbeat monitor emailed about the failed run on its own, which is
+    exactly what it's for.
 
 ---
 

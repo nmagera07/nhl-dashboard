@@ -75,6 +75,8 @@ if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         environment=os.environ.get("SENTRY_ENVIRONMENT", "development"),
+        # Same commit GET /health reports, so each error is tied to a deploy.
+        release=os.environ.get("GIT_SHA") or None,
         traces_sample_rate=0.1,
     )
 

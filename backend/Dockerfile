@@ -2,6 +2,9 @@
 # Built and run by Azure Container Apps (via ACR cloud build - no local Docker needed)
 
 FROM python:3.12-slim
+# Links the GHCR package to the repo (shown on the package page, and lets
+# the repo's workflows manage it).
+LABEL org.opencontainers.image.source=https://github.com/nmagera07/nhl-dashboard
 
 WORKDIR /app
 

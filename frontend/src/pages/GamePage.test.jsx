@@ -183,6 +183,19 @@ describe("GamePage", () => {
     }
   });
 
+  it("links back to the scoreboard day the game was opened from", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(finalGame()) });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/games/2026020044", state: { from: "/?date=2026-10-06" } }]}>
+        <Routes>
+          <Route path="/games/:gameId" element={<GamePage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("link", { name: "← Scores" })).toHaveAttribute("href", "/?date=2026-10-06");
+  });
+
   it("shows the API's error message when the box score can't be loaded", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({ detail: "The NHL live game feed is temporarily unavailable." }) });
     render(

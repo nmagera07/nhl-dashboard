@@ -1,0 +1,38 @@
+name: Intelligence Tests
+#
+# Runs the NHL Intelligence (AI chat service) pytest suite on PRs into
+# main and dev, and on pushes to dev. The service lives in intelligence/
+# (moved here from atelier-ai-labs/nhl-intelligence in October 2026).
+# Runs on every PR, not just ones touching intelligence/, so it can be a
+# required check without blocking unrelated PRs. Tests fake the dashboard
+# API and the AI provider, so no keys or network are needed.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  push:
+    branches:
+      - dev
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    name: Run intelligence tests
+    defaults:
+      run:
+        working-directory: intelligence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"  # matches intelligence/Dockerfile
+          cache: pip
+          cache-dependency-path: intelligence/requirements*.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Run pytest
+        run: python -m pytest

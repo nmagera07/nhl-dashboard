@@ -83,9 +83,16 @@ deployed." A stale deploy looks healthy.
 - A deploy can't report that it never ran. That takes a separate check, so a
   daily GitHub Action compares production's commit to `main` and fails if
   they've drifted.
-- Root cause, as best I can tell: by October the Azure DevOps organization
-  and pipeline no longer existed under my account at all. The pipeline didn't
-  fail, it just vanished, which is the hardest kind of failure to notice.
+- **Root cause:** the pipeline still existed (under an Azure DevOps org that
+  the Azure Portal doesn't show; it's listed at aex.dev.azure.com/me), but its
+  last run was July 18. It never *failed*. GitHub stopped notifying it of new
+  commits. It wasn't using the Azure Pipelines GitHub App (no checks ever
+  appeared on commits), and by October the repo had zero webhooks, so the
+  push webhook or the OAuth connection behind it was most likely removed or
+  expired. No runs means no failures, which means no alerts.
+- Azure DevOps and the Azure Portal are effectively separate products
+  (DevOps grew out of VSTS/TFS). DevOps orgs aren't Azure resources and don't
+  show up in a subscription, which is part of why this was easy to forget.
 - Watch out for silent schedules: GitHub disables scheduled workflows in public
   repos after 60 days without activity.
 

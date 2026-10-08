@@ -65,8 +65,9 @@ Azure Static      Azure Container
 - **Backend** — FastAPI, containerized, deployed to Azure Container Apps
   via GitHub Actions (`.github/workflows/backend-deploy.yml`) on every
   push to `main` that touches `backend/`. Tests run first; the image is
-  built in Azure Container Registry, tagged with the commit SHA, and
-  rolled out to the API and the ingestion job.
+  built on the runner, pushed to GitHub Container Registry (public)
+  tagged with the commit SHA, and rolled out to the API and the
+  ingestion job.
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
   process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`). The API only ever reads
@@ -90,7 +91,7 @@ Container Apps Job (06:00 UTC).
 ## Tech stack
 
 React 19 · Vite · FastAPI · psycopg2 · Postgres (Neon) ·
-Docker · Azure Container Apps · Azure Static Web Apps · Azure Container
+Docker · Azure Container Apps · Azure Static Web Apps · GitHub Container
 Registry · GitHub Actions · Sentry (error tracking)
 
 ## Local development

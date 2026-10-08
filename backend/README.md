@@ -208,8 +208,9 @@ and logs an ERROR line if that's older than
 
 Dockerized, deployed to Azure Container Apps by
 `../.github/workflows/backend-deploy.yml` on every push to `main` that
-touches `backend/`: tests, then `az acr build` (image tagged with the
-commit SHA, also baked in as `GIT_SHA` and reported by `GET /health`),
+touches `backend/`: tests, then a Docker build pushed to
+`ghcr.io/nmagera07/nhl-dashboard-api` (public; tagged with the commit
+SHA, also baked in as `GIT_SHA` and reported by `GET /health`),
 then the API and ingestion job are updated and the new revision is
 verified. Azure auth is OIDC via a federated credential — no stored
 password.

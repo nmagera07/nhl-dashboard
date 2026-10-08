@@ -6,6 +6,12 @@ name: Backend Deploy
 # anyone noticing -- a failure here shows up as a red check on the commit
 # and a GitHub email instead.
 #
+# The image is built on the runner and pushed to GHCR (public, since the
+# repo is public and the image holds no secrets -- credentials are
+# Container App secrets). Azure pulls it anonymously, so there's no
+# registry credential to expire. This replaced Azure Container Registry,
+# which was ~$10 of the ~$11/month Azure bill.
+#
 # Azure auth is OIDC (no stored password): the federated credential on
 # the app registration trusts only this repo's "production" environment.
 # Requires repo secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID.
@@ -30,9 +36,7 @@ concurrency:
 
 env:
   RESOURCE_GROUP: nhl-dashboard-rg
-  ACR_NAME: nhldashboardacr
-  IMAGE: nhldashboardacr.azurecr.io/nhl-dashboard-api
-  GHCR_IMAGE: ghcr.io/nmagera07/nhl-dashboard-api
+  IMAGE: ghcr.io/nmagera07/nhl-dashboard-api
   CONTAINER_APP: nhl-dashboard-api
   INGESTION_JOB: nhl-standings-ingest
   HEALTH_URL: https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health
@@ -56,14 +60,11 @@ jobs:
           pip install -r requirements-dev.txt
       - run: python -m pytest
 
-  # Migration step 1 of 2 (ACR -> GHCR): publish every image to GHCR as
-  # well, without deploying from it yet. Once the package is public and
-  # Azure is confirmed able to pull it, deploys switch to GHCR and the
-  # Azure Container Registry (~$10/month) is deleted.
-  publish-ghcr:
+  # Tagged with the full commit SHA, which is also baked in for GET /health.
+  build:
     needs: test
     runs-on: ubuntu-latest
-    name: Publish image to GHCR
+    name: Build and push image
     permissions:
       contents: read
       packages: write
@@ -80,16 +81,16 @@ jobs:
           context: backend
           push: true
           tags: |
-            ${{ env.GHCR_IMAGE }}:${{ github.sha }}
-            ${{ env.GHCR_IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
           build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
-    name: Build and deploy
+    name: Deploy
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -99,16 +100,6 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      # Builds in ACR (no Docker on the runner). The image is tagged with
-      # the full commit SHA, which is also baked in for GET /health.
-      - name: Build and push image
-        run: |
-          az acr build \
-            --registry "$ACR_NAME" \
-            --image "nhl-dashboard-api:${GITHUB_SHA}" \
-            --build-arg "GIT_SHA=${GITHUB_SHA}" \
-            backend
 
       - name: Update API and ingestion job
         run: |

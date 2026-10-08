@@ -1,14 +1,17 @@
 """
 Phase 1 -- pure function tests for simulate_playoff_odds.py.
 
-win_probability() is pure arithmetic, no mocking needed.
+win_probability() and team_ratings() are pure arithmetic; simulate() takes
+a seeded random.Random so its results are reproducible.
 determine_playoff_teams() only touches its plain-dict/list arguments, so
 it's exercised directly with hand-built standings -- no DB, no network.
 """
 
+import random
+
 import pytest
 
-from simulate_playoff_odds import win_probability, determine_playoff_teams
+from simulate_playoff_odds import determine_playoff_teams, simulate, team_ratings, win_probability
 
 
 # ---------------------------------------------------------------------------
@@ -18,63 +21,108 @@ from simulate_playoff_odds import win_probability, determine_playoff_teams
 
 class TestWinProbability:
     def test_evenly_matched_teams_favor_home_ice(self):
-        # Equal point pctgs -- only the home-ice bump should separate them,
-        # so the home team is a slight favorite, not a 50/50 coin flip.
-        assert win_probability(0.5, 0.5) == pytest.approx(0.5230095872975623)
-        assert win_probability(0.5, 0.5) > 0.5
+        # Equal ratings: only home ice separates them. Calibrated from real
+        # games, the home team wins about 54.5%.
+        assert win_probability(0.0, 0.0) == pytest.approx(0.5448, abs=1e-3)
+
+    def test_only_the_rating_difference_matters(self):
+        assert win_probability(0.5, 0.5) == pytest.approx(win_probability(-0.3, -0.3))
 
     def test_strong_home_favorite(self):
-        assert win_probability(0.700, 0.300) == pytest.approx(0.8737104209450813)
+        # A +1.0 GD/game team hosting a -1.0 team.
+        assert win_probability(1.0, -1.0) == pytest.approx(0.823, abs=1e-3)
 
     def test_strong_away_favorite_despite_home_ice(self):
-        # Home ice alone (a flat +0.02) isn't enough to flip a lopsided
-        # matchup in the home team's favor.
-        assert win_probability(0.300, 0.700) == pytest.approx(0.14805165414742627)
-
-    def test_symmetric_inputs_always_land_on_the_same_value(self):
-        # The formula only depends on the *difference* between the two
-        # pctgs (plus the fixed home-ice bump), so any two equal inputs --
-        # including the boundary 0.0/0.0 -- should produce the identical
-        # probability as any other equal pair.
-        assert win_probability(0.0, 0.0) == pytest.approx(win_probability(0.5, 0.5))
-        assert win_probability(0.55, 0.55) == pytest.approx(win_probability(0.5, 0.5))
-
-    def test_boundary_extreme_point_pctgs(self):
-        # point_pctg is bounded to [0, 1] by construction (points / (games*2)),
-        # so a perfect team at home vs. a winless team away is the most
-        # lopsided real input this function will ever see.
-        assert win_probability(1.0, 0.0) == pytest.approx(0.9909623162617605)
-        assert win_probability(0.0, 1.0) == pytest.approx(0.010845859477081325)
+        assert win_probability(-1.0, 1.0) < 0.25
 
     def test_result_always_in_unit_interval(self):
-        # A logistic function should never escape [0, 1], even for inputs
-        # well outside the normal 0-1 point-pctg range (never produced by
-        # fetch_standings_as_of() in practice, but the function itself
-        # does no input validation).
-        for home, away in [(-5.0, 5.0), (5.0, -5.0), (100.0, 100.0)]:
-            p = win_probability(home, away)
-            assert 0.0 <= p <= 1.0
+        for home, away in [(-5.0, 5.0), (5.0, -5.0), (100.0, 100.0), (-2000.0, 2000.0)]:
+            assert 0.0 <= win_probability(home, away) <= 1.0
 
-    def test_extreme_favorite_saturates_to_exactly_1(self):
-        # Discovered edge case, confirmed empirically (not assumed): for a
-        # large enough point-pctg gap, 10**(-diff*scale) underflows to a
-        # value so small that 1 + that value rounds to exactly 1.0 at
-        # float64 precision -- so the result isn't just "very close to"
-        # 1, it IS exactly 1.0. This is a one-way asymmetry, not
-        # symmetric saturation: the mirror-image extreme underdog case
-        # (see below) stays a tiny nonzero float instead of flooring to
-        # 0.0, because float64 has vastly more precision near 0 than it
-        # does near 1 (a value 1e-20 away from 1.0 is indistinguishable
-        # from 1.0, but a value 1e-20 away from 0.0 is still representable
-        # just fine). Worth knowing since a caller computing the away
-        # team's odds as 1 - win_probability(...) would silently get
-        # exactly 0.0 here, not "extremely unlikely."
-        assert win_probability(5.0, -5.0) == 1.0
 
-    def test_extreme_underdog_stays_a_tiny_nonzero_float(self):
-        result = win_probability(-5.0, 5.0)
-        assert result != 0.0
-        assert result == pytest.approx(1.0964781961431828e-20)
+# ---------------------------------------------------------------------------
+# team_ratings
+# ---------------------------------------------------------------------------
+
+
+def _team(gp, gd, **extra):
+    return {"games_played": gp, "goal_differential": gd, **extra}
+
+
+class TestTeamRatings:
+    def test_a_hot_start_is_shrunk_toward_the_prior(self):
+        # 4-0 with +10 GD is +2.5/game raw; with a 30-game prior at 0.0
+        # it rates as +10/34 = +0.29.
+        mean, _ = team_ratings({"PIT": _team(4, 10)}, {}, prior_games=30)["PIT"]
+        assert mean == pytest.approx(10 / 34)
+
+    def test_the_prior_pulls_toward_last_seasons_strength(self):
+        mean, _ = team_ratings({"PIT": _team(0, 0)}, {"PIT": 0.4}, prior_games=30)["PIT"]
+        assert mean == pytest.approx(0.4)
+
+    def test_this_seasons_results_dominate_later_in_the_year(self):
+        mean, _ = team_ratings({"PIT": _team(70, 70)}, {"PIT": -0.5}, prior_games=30)["PIT"]
+        assert mean == pytest.approx((70 - 15) / 100)
+        assert mean > 0.5
+
+    def test_uncertainty_shrinks_as_games_are_played(self):
+        early = team_ratings({"A": _team(0, 0)}, {}, prior_games=30, talent_sd=0.35)["A"][1]
+        late = team_ratings({"A": _team(90, 0)}, {}, prior_games=30, talent_sd=0.35)["A"][1]
+        assert early == pytest.approx(0.35)
+        assert late == pytest.approx(0.35 * (30 / 120) ** 0.5)
+
+
+# ---------------------------------------------------------------------------
+# simulate
+# ---------------------------------------------------------------------------
+
+
+def _league():
+    """4 divisions of 5 teams, 2 per conference: 20 teams, 16 playoff spots."""
+    standings = {}
+    for div, conf in (("A", "East"), ("B", "East"), ("C", "West"), ("D", "West")):
+        for i in range(1, 6):
+            standings[f"{div}{i}"] = {
+                "points": 0, "wins": 0, "regulation_wins": 0, "row": 0,
+                "games_played": 0, "goal_differential": 0, "division": div, "conference": conf,
+            }
+    return standings
+
+
+class TestSimulate:
+    def test_a_team_that_has_clinched_always_makes_it(self):
+        standings = _league()
+        standings["A1"]["points"] = 500
+        ratings = {t: (0.0, 0.0) for t in standings}
+        schedule = [("A2", "A3"), ("B1", "B2")] * 5
+
+        odds = simulate(standings, schedule, 200, ratings, rng=random.Random(1))
+
+        assert odds["A1"] == 1.0
+        assert all(0.0 <= p <= 1.0 for p in odds.values())
+
+    def test_probabilities_sum_to_the_number_of_playoff_spots(self):
+        standings = _league()
+        ratings = {t: (0.0, 0.3) for t in standings}
+        schedule = [(h, a) for h in standings for a in standings if h != a]
+
+        odds = simulate(standings, schedule, 300, ratings, rng=random.Random(7))
+
+        # Exactly 16 teams make it in every simulated season (3 per division
+        # x 4 + 2 wild cards x 2 conferences), so the odds add up to 16.
+        assert sum(odds.values()) == pytest.approx(16)
+        assert all(p < 1.0 for p in odds.values())  # nobody's a lock
+
+    def test_a_much_stronger_team_makes_it_more_often(self):
+        standings = _league()
+        ratings = {t: (0.0, 0.1) for t in standings}
+        ratings["A4"] = (1.5, 0.1)
+        ratings["A1"] = (-1.5, 0.1)
+        schedule = [(h, a) for h in standings for a in standings if h != a]
+
+        odds = simulate(standings, schedule, 300, ratings, rng=random.Random(3))
+
+        assert odds["A4"] > odds["A1"]
 
 
 # ---------------------------------------------------------------------------

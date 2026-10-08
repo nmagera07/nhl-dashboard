@@ -2,17 +2,17 @@
 Entry point for the daily Azure Container Apps Job (nhl-standings-ingest).
 
 Runs each ingestion script in its own process, in order:
-  1. ingest_standings.py    -- standings snapshot (also sets the current
-                               season that player stats are scoped to)
-  2. ingest_player_stats.py -- rosters + season stats, including marking
-                               cut/released players off-roster
+  1. ingest_standings.py      -- standings snapshot (also sets the current
+                                 season that player stats are scoped to)
+  2. simulate_playoff_odds.py -- Monte Carlo playoff odds (v2) from today's
+                                 standings
+  3. ingest_player_stats.py   -- rosters + season stats, including marking
+                                 cut/released players off-roster
 
-simulate_playoff_odds.py and ingest_advanced_stats.py are still run by
-hand while they get cleaned up; add them here (playoff odds right after
-standings, since it reads them) once they're ready to run unattended.
+ingest_advanced_stats.py is still run by hand while it gets cleaned up.
 
-A failure in one script doesn't stop the next, since a standings outage
-shouldn't also leave rosters stale. The process exits non-zero if any
+A failure in one script doesn't stop the next, since e.g. a playoff-odds
+problem shouldn't also leave rosters stale. The process exits non-zero if any
 script failed, so the job execution shows as Failed and the job's retry
 kicks in (re-running is safe, everything is upserts).
 
@@ -36,6 +36,7 @@ HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
 
 SCRIPTS = [
     "ingest_standings.py",
+    "simulate_playoff_odds.py",
     "ingest_player_stats.py",
 ]
 

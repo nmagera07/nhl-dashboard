@@ -1,29 +1,32 @@
 # NHL Stats Dashboard
 
-A full-stack NHL analytics dashboard: live standings, team rosters, a
-league-wide player leaderboard, 5-on-5 advanced stats (Corsi/Fenwick/xG%/PDO)
-sourced from MoneyPuck, and a from-scratch Monte Carlo playoff-odds
-simulation you won't find as a prebuilt feed anywhere else.
+A full-stack NHL analytics app: live scores and box scores, standings with
+a from-scratch Monte Carlo playoff-odds model, team and player pages, a
+league leaderboard, 5-on-5 advanced stats from MoneyPuck, and an AI chat
+("NHL Intelligence") grounded in the app's own data. Installable on phones
+as a PWA.
 
 **Live:** https://ashy-sky-01e4eba1e.7.azurestaticapps.net
 
 ## What it does
 
-- **Standings** — live NHL standings by division, with a season trend
-  chart (daily points this season, or points across the last 5 seasons)
-  and a playoff-odds percentage built right into the table.
-- **Team drill-down** — click a team for a snapshot card (record,
-  home/road split, division/conference/league rank), then its full
-  roster split into forwards, defensemen, and goalies.
-- **Player drill-down** — click a player for bio, season stats, career
-  totals, season-by-season history, and 5-on-5 advanced stats (see below).
-- **League leaderboard** — every rostered player, sortable by any stat,
-  searchable, skaters and goalies split out.
-- **Standings, sortable by advanced stat** — click CF%/xG%/PDO in the
-  standings table to re-sort the league by that column, backed by a real
-  `?sort_by=` query param on the API, not client-side-only sorting.
-- **Playoff odds** — a from-scratch Monte Carlo simulation, not a
-  third-party feed.
+- **Scores** — today's games with live period/clock, finals, and start
+  times; browse any day of the season from a calendar that only offers game
+  days. Every game opens a full box score: linescore, scoring summary, three
+  stars, team stats, and per-team player stats.
+- **Standings** — by division, with logos, playoff odds, and an Advanced
+  view (xG%, shots, PDO) sortable server-side via `?sort_by=`.
+- **Team pages** — a season summary (record, splits, ranks, playoff status)
+  above the full roster.
+- **Player pages** — bio, this season, career totals, season-by-season
+  history, and 5-on-5 advanced stats.
+- **Leaderboard** — every rostered player, sortable and searchable.
+- **Playoff odds** — a Monte Carlo simulation with regressed team ratings,
+  a game model calibrated on ~4,000 real games, and official tiebreakers;
+  backtested against past seasons (see `docs/LEARNING.md`).
+- **NHL Intelligence** — ask questions on any page; answers come only from
+  the dashboard's own data for that page (`intelligence/`).
+- **Phone app** — installable PWA with a bottom tab bar.
 
 ## Why some of this is harder than it looks
 
@@ -68,11 +71,17 @@ Azure Static      Azure Container
   built on the runner, pushed to GitHub Container Registry (public)
   tagged with the commit SHA, and rolled out to the API and the
   ingestion job.
+- **NHL Intelligence** — a separate FastAPI service in `intelligence/` that
+  builds compact, page-specific summaries from the dashboard's public API
+  and asks an LLM to answer from them only. It never sees database
+  credentials. Currently on Google Cloud Run (moving alongside the API).
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
-  process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`). The API only ever reads
-  from Postgres; it never calls the NHL API directly, so a slow or
-  unreachable upstream never affects the live site.
+  process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`).
+  Standings, rosters, stats, and odds are served from Postgres, so a slow
+  NHL API doesn't affect those pages. Live scores, box scores, and the
+  game calendar are fetched from the NHL API on request (the calendar is
+  cached).
 
 ## Data pipeline
 
@@ -98,8 +107,9 @@ Registry · GitHub Actions · Sentry (error tracking)
 
 ## Local development
 
-See [`backend/README.md`](backend/README.md) and
-[`frontend/README.md`](frontend/README.md).
+See [`backend/README.md`](backend/README.md),
+[`frontend/README.md`](frontend/README.md), and
+[`intelligence/README.md`](intelligence/README.md).
 
 ## Known limitations
 

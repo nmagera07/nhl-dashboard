@@ -1,5 +1,9 @@
 # NHL Intelligence
 
+> Moved here from `atelier-ai-labs/nhl-intelligence` in October 2026; its
+> commit history came along via `git subtree`. Part of the NHL Dashboard
+> repo so API and chat changes ship together.
+
 A standalone, grounded conversational layer for the NHL Dashboard. It reads structured data from the dashboard public API, so it never receives dashboard database credentials.
 
 ## Phase 1

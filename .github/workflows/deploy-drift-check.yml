@@ -1,0 +1,59 @@
+name: Deploy Drift Check
+#
+# Daily safety net for the backend deploy: fails (and GitHub emails) if
+# production's API isn't running the latest backend code on main. Catches
+# the case a deploy workflow can't report on itself -- the deploy never
+# running at all, which is how production sat on July's code until
+# October 2026.
+#
+# Production reports its commit at GET /health. It's up to date if the
+# newest commit on main that touched backend/ is that commit or one of
+# its ancestors. Recent commits get a grace period so a deploy that's
+# still in progress isn't flagged.
+
+on:
+  schedule:
+    - cron: "0 14 * * *" # 10am Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HEALTH_URL: https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health
+  GRACE_HOURS: 3
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    name: Production is running main's backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Compare production's commit to main
+        run: |
+          latest=$(git log -1 --format=%H origin/main -- backend)
+          latest_time=$(git log -1 --format=%ct "$latest")
+          echo "Latest backend commit on main: $latest ($(git log -1 --format='%ci %s' "$latest"))"
+
+          deployed=$(curl -s --max-time 15 "$HEALTH_URL" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit', 'unknown'))" || echo "unreachable")
+          echo "Production reports: $deployed"
+
+          if [ "$deployed" != "unknown" ] && [ "$deployed" != "unreachable" ] \
+             && git cat-file -e "${deployed}^{commit}" 2>/dev/null \
+             && git merge-base --is-ancestor "$latest" "$deployed"; then
+            echo "Production is up to date."
+            exit 0
+          fi
+
+          age_hours=$(( ($(date +%s) - latest_time) / 3600 ))
+          if [ "$age_hours" -lt "$GRACE_HOURS" ]; then
+            echo "Production is behind, but $latest is only ${age_hours}h old -- giving the deploy time to finish."
+            exit 0
+          fi
+
+          echo "::error::Production is running '$deployed', but main's latest backend commit $latest is ${age_hours}h old and not deployed. Check the Backend Deploy workflow."
+          exit 1

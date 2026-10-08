@@ -9,6 +9,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+# Set by the deploy workflow (--build-arg GIT_SHA=...) and reported by
+# GET /health, so production's running commit is always checkable.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=$GIT_SHA
 
 # Run as a non-root user -- api.py never writes to the filesystem at
 # runtime (log_to_file=False, see logging_config.py), so this is a plain

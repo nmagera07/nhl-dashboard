@@ -93,6 +93,9 @@ logger = setup_logging(__name__, log_to_file=False)
 # scanned-for-a-traceback mechanism already used for
 # nhl-api-startup-crash (see backend/README.md) picks the line up from
 # Container Apps' console logs and fires the same email alert.
+# Baked into the image at build time (Dockerfile ARG), reported by /health.
+GIT_SHA = os.environ.get("GIT_SHA") or "unknown"
+
 INGESTION_STALE_THRESHOLD_HOURS = float(os.environ.get("INGESTION_STALE_THRESHOLD_HOURS") or "30")
 INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS = 60 * 60
 
@@ -242,7 +245,7 @@ def health():
     finally:
         if conn:
             conn.close()
-    return {"status": "ok", "database": "connected"}
+    return {"status": "ok", "database": "connected", "commit": GIT_SHA}
 
 
 @app.get("/games/today")

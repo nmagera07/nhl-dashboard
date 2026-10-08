@@ -63,9 +63,10 @@ Azure Static      Azure Container
 - **Frontend** — React + Vite, deployed to Azure Static Web Apps via
   GitHub Actions on every push to `main`.
 - **Backend** — FastAPI, containerized, deployed to Azure Container Apps
-  via Azure Pipelines on every push to `main` that touches `backend/`.
-  A test stage runs the pytest suite first; the build/push/deploy stage
-  only runs if it passes.
+  via GitHub Actions (`.github/workflows/backend-deploy.yml`) on every
+  push to `main` that touches `backend/`. Tests run first; the image is
+  built in Azure Container Registry, tagged with the commit SHA, and
+  rolled out to the API and the ingestion job.
 - **Database** — Postgres on Neon (serverless).
 - **Data ingestion** — standalone Python scripts, separate from the API
   process, scheduled via an Azure Container Apps Job (`nhl-standings-ingest`). The API only ever reads
@@ -88,9 +89,9 @@ Container Apps Job (06:00 UTC).
 
 ## Tech stack
 
-React 19 · Vite · Recharts · FastAPI · psycopg2 · Postgres (Neon) ·
+React 19 · Vite · FastAPI · psycopg2 · Postgres (Neon) ·
 Docker · Azure Container Apps · Azure Static Web Apps · Azure Container
-Registry · GitHub Actions · Azure Pipelines · Sentry (error tracking)
+Registry · GitHub Actions · Sentry (error tracking)
 
 ## Local development
 
@@ -100,14 +101,21 @@ See [`backend/README.md`](backend/README.md) and
 ## Known limitations
 
 - Both backend (pytest, `backend/tests/`) and frontend (Vitest + ESLint,
-  `frontend/src/**/*.test.jsx`) gate their deploy pipelines — a failing
+  `frontend/src/**/*.test.jsx`) gate their deploys — a failing
   test or a lint error blocks the deploy on either side. The backend
-  pipeline also verifies the deploy itself: after `az containerapp update`
-  reports success, a follow-up step polls the new revision's own health
-  state *and* `GET /health` for up to 60s and fails the pipeline if the
-  app didn't actually come up healthy — added after a typo'd env var name
-  once crash-looped every deploy for days while the pipeline kept
-  reporting green. See [`backend/README.md`](backend/README.md) and
+  deploy also verifies itself: after `az containerapp update` reports
+  success, it polls the new revision's own health state *and*
+  `GET /health` for up to 4 minutes, and fails unless production reports
+  the exact commit just deployed — added after a typo'd env var name
+  once crash-looped every deploy for days while the old pipeline kept
+  reporting green.
+- Deploy drift: `GET /health` reports the commit the running image was
+  built from, and a daily GitHub Action (`deploy-drift-check.yml`) fails
+  if production isn't running main's latest backend commit. Added after
+  the old Azure DevOps pipeline silently stopped triggering in July 2026
+  and production ran July's code until October. Note that GitHub disables
+  scheduled workflows in public repos after 60 days without activity —
+  re-enable it from the Actions tab if that happens. See [`backend/README.md`](backend/README.md) and
   [`frontend/README.md`](frontend/README.md) for how to run these locally.
 - Monitoring: Sentry (error tracking, optional —
   `SENTRY_DSN`/`VITE_SENTRY_DSN`) plus two Azure Monitor alerts, both
@@ -116,7 +124,7 @@ See [`backend/README.md`](backend/README.md) and
   going stale (an hourly background check in `api.py` logs an error if
   `standings_snapshots` hasn't been updated in 30h, meaning
   the `nhl-standings-ingest` Container Apps Job has likely stopped running or is failing).
-- Ingestion now runs via an Azure Container Apps Job (`nhl-standings-ingest`) on a daily schedule, with its image kept in sync on each deploy via `azure-piplines.yml` — no longer a local Windows Task Scheduler job. The staleness check and deploy pipeline still guard it the same way.
+- Ingestion runs via an Azure Container Apps Job (`nhl-standings-ingest`) on a daily schedule, with its image kept in sync on each backend deploy — no longer a local Windows Task Scheduler job.
 
 ## Data source
 

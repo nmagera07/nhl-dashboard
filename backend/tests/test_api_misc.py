@@ -23,7 +23,15 @@ class TestHealth:
         response = client.get("/health")
 
         assert response.status_code == 200
-        assert response.json() == {"status": "ok", "database": "connected"}
+        assert response.json() == {"status": "ok", "database": "connected", "commit": "unknown"}
+
+    def test_reports_the_commit_the_image_was_built_from(self, client, db_router, monkeypatch):
+        import api
+
+        monkeypatch.setattr(api, "GIT_SHA", "f2c2a18")
+        db_router.when("select 1", [])
+
+        assert client.get("/health").json()["commit"] == "f2c2a18"
 
     def test_returns_503_when_the_database_is_unreachable(self, client, db_router):
         def unreachable(params):

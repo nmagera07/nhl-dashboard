@@ -1,32 +1,42 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 
-const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defenseman", G: "Goalie" };
+const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defense", G: "Goalie" };
 
-const SEASON_HISTORY_SKATER_COLUMNS = [
+// One column set per player type, shared by the season strip, career
+// totals, and season-by-season tables so the numbers always line up.
+const SKATER_COLUMNS = [
   { key: "games_played", label: "GP" },
   { key: "goals", label: "G" },
   { key: "assists", label: "A" },
-  { key: "points", label: "PTS" },
+  { key: "points", label: "PTS", highlight: true },
   { key: "plus_minus", label: "+/-" },
-  { key: "shots", label: "SHOTS" },
-  { key: "pim", label: "PIM" },
+  { key: "shots", label: "SOG", optional: true },
+  { key: "pim", label: "PIM", optional: true },
 ];
 
-const SEASON_HISTORY_GOALIE_COLUMNS = [
+const GOALIE_COLUMNS = [
+  { key: "games_played", label: "GP" },
   { key: "wins", label: "W" },
   { key: "losses", label: "L" },
-  { key: "ot_losses", label: "OTL" },
+  { key: "ot_losses", label: "OTL", optional: true },
   { key: "goals_against_avg", label: "GAA" },
-  { key: "save_pctg", label: "SV%" },
-  { key: "shutouts", label: "SO" },
-  { key: "games_played", label: "GP" },
+  { key: "save_pctg", label: "SV%", highlight: true },
+  { key: "shutouts", label: "SO", optional: true },
 ];
 
-function formatStatValue(key, value) {
+// Table cells for a column: optional columns hide on phones (the season
+// strip at the top still shows every stat).
+function columnClass(col) {
+  return [col.highlight && "col-pts", col.optional && "col-optional"].filter(Boolean).join(" ") || undefined;
+}
+
+function formatStat(key, value) {
   if (value == null) return "—";
   if (key === "goals_against_avg") return Number(value).toFixed(2);
-  if (key === "save_pctg") return Number(value).toFixed(3);
+  if (key === "save_pctg") return Number(value).toFixed(3).replace(/^0/, "");
+  if (key === "plus_minus") return value > 0 ? `+${value}` : String(value);
   return value;
 }
 
@@ -38,69 +48,67 @@ function formatDecimal(value, digits = 2) {
   return value != null ? Number(value).toFixed(digits) : "—";
 }
 
+function ageOn(birthDate, today = new Date()) {
+  if (!birthDate) return null;
+  const born = new Date(`${birthDate}T00:00:00`);
+  const age = today.getFullYear() - born.getFullYear();
+  const hadBirthday =
+    today.getMonth() > born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() >= born.getDate());
+  return hadBirthday ? age : age - 1;
+}
 
-function CareerStatTiles({ stats, isGoalie }) {
+function heightLabel(inches) {
+  return inches ? `${Math.floor(inches / 12)}'${inches % 12}"` : null;
+}
+
+function StatStrip({ stats, columns, label }) {
   return (
-    <div className="stat-tiles">
-      {isGoalie ? (
-        <>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.wins}-{stats.losses}-{stats.ot_losses}</span>
-            <span className="stat-tile-label">RECORD</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">
-              {stats.goals_against_avg != null ? Number(stats.goals_against_avg).toFixed(2) : "—"}
-            </span>
-            <span className="stat-tile-label">GAA</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">
-              {stats.save_pctg != null ? Number(stats.save_pctg).toFixed(3) : "—"}
-            </span>
-            <span className="stat-tile-label">SV%</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.shutouts ?? "—"}</span>
-            <span className="stat-tile-label">SO</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.games_played ?? "—"}</span>
-            <span className="stat-tile-label">GP</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.points ?? "—"}</span>
-            <span className="stat-tile-label">POINTS</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.goals ?? "—"}</span>
-            <span className="stat-tile-label">GOALS</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.assists ?? "—"}</span>
-            <span className="stat-tile-label">ASSISTS</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.plus_minus ?? "—"}</span>
-            <span className="stat-tile-label">+/-</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.shots ?? "—"}</span>
-            <span className="stat-tile-label">SHOTS</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.pim ?? "—"}</span>
-            <span className="stat-tile-label">PIM</span>
-          </div>
-          <div className="stat-tile">
-            <span className="stat-tile-value">{stats.games_played ?? "—"}</span>
-            <span className="stat-tile-label">GP</span>
-          </div>
-        </>
-      )}
+    <dl className="stat-strip" aria-label={label}>
+      {columns.map((col) => (
+        <div key={col.key} className="stat-strip-item">
+          <dt>{col.label}</dt>
+          <dd className={col.highlight ? "is-highlight" : undefined}>{formatStat(col.key, stats[col.key])}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Section({ title, aside, children }) {
+  return (
+    <section className="player-section">
+      <div className="player-section-header">
+        <h2>{title}</h2>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function StatsTable({ rows, columns, firstColumn, label }) {
+  return (
+    <div className="table-card player-table-card">
+      <table className="standings-table player-stats-table" aria-label={label}>
+        <thead>
+          <tr>
+            <th className="col-team">{firstColumn}</th>
+            {columns.map((col) => (
+              <th key={col.key} className={columnClass(col)}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <td className="col-team">{row.label}</td>
+              {columns.map((col) => (
+                <td key={col.key} className={columnClass(col)}>{formatStat(col.key, row.stats[col.key])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -112,250 +120,141 @@ function PlayerPanel({ player, onBack, backLabel }) {
   if (!player) return null;
 
   const isGoalie = player.position_code === "G";
+  const columns = isGoalie ? GOALIE_COLUMNS : SKATER_COLUMNS;
   const seasonStats = player.season_stats?.[0];
   const advancedStats = player.advanced_stats;
-  const careerRegularSeason = player.career_totals?.regular_season ?? null;
-  const careerPlayoffs = player.career_totals?.playoffs ?? null;
-  const hasCareerTotals = careerRegularSeason != null || careerPlayoffs != null;
+
+  const careerRows = [
+    player.career_totals?.regular_season && { key: "rs", label: "Regular season", stats: player.career_totals.regular_season },
+    player.career_totals?.playoffs && { key: "po", label: "Playoffs", stats: player.career_totals.playoffs },
+  ].filter(Boolean);
+
   const seasonHistory = player.season_history ?? [];
-  const seasonHistoryColumns = isGoalie ? SEASON_HISTORY_GOALIE_COLUMNS : SEASON_HISTORY_SKATER_COLUMNS;
   const regularSeasonHistory = seasonHistory.filter((e) => e.season_type === "regular_season");
   const playoffsHistory = seasonHistory.filter((e) => e.season_type === "playoffs");
   const hasPlayoffHistory = playoffsHistory.length > 0;
   const activeSeasonHistory =
     seasonHistoryTab === "playoffs" && hasPlayoffHistory ? playoffsHistory : regularSeasonHistory;
   const visibleSeasonHistory = showAllSeasons ? activeSeasonHistory : activeSeasonHistory.slice(0, 5);
-  const heightLabel = player.height_in_inches
-    ? `${Math.floor(player.height_in_inches / 12)}'${player.height_in_inches % 12}"`
-    : "—";
+
+  const age = ageOn(player.birth_date);
+  const bio = [
+    player.shoots_catches && `${isGoalie ? "Catches" : "Shoots"} ${player.shoots_catches}`,
+    heightLabel(player.height_in_inches),
+    player.weight_in_pounds && `${player.weight_in_pounds} lbs`,
+    age != null && `Age ${age}`,
+    player.birth_city && `${player.birth_city}, ${player.birth_country}`,
+  ].filter(Boolean);
+
+  const switchSeasonTab = (tab) => {
+    setSeasonHistoryTab(tab);
+    setShowAllSeasons(false);
+  };
 
   return (
-    <div className="player-panel">
+    <main className="player-panel">
       <button className="back-link" onClick={onBack}>&larr; {backLabel}</button>
 
-      <div className="player-header">
-        {player.headshot_url && <img className="player-headshot" src={player.headshot_url} alt="" />}
-        <div>
-          <div className="player-name">{player.first_name} {player.last_name}</div>
-          <div className="player-sub">
-            {player.team_logo_url && <img className="player-team-logo" src={player.team_logo_url} alt="" />}
-            #{player.sweater_number ?? "—"} &middot; {POSITION_LABELS[player.position_code] ?? player.position_code}
+      <section className="player-hero" aria-label={`${player.first_name} ${player.last_name}`}>
+        <div className="player-hero-identity">
+          {player.headshot_url && <img className="player-headshot" src={player.headshot_url} alt="" />}
+          <div className="player-hero-title">
+            <h1>{player.first_name} {player.last_name}</h1>
+            <p className="player-hero-sub">
+              {player.team_abbrev && (
+                <Link className="player-team-link" to={`/teams/${player.team_abbrev}`}>
+                  {player.team_logo_url && <img className="player-team-logo" src={player.team_logo_url} alt="" />}
+                  {player.team_abbrev}
+                </Link>
+              )}
+              <span>#{player.sweater_number ?? "—"}</span>
+              <span>{POSITION_LABELS[player.position_code] ?? player.position_code}</span>
+            </p>
+            {bio.length > 0 && <p className="player-hero-bio">{bio.join(" · ")}</p>}
           </div>
         </div>
-      </div>
 
-      <div className="player-bio">
-        <div className="bio-item">
-          <span className="bio-label">SHOOTS/CATCHES</span>
-          <span className="bio-value">{player.shoots_catches ?? "—"}</span>
-        </div>
-        <div className="bio-item">
-          <span className="bio-label">HEIGHT</span>
-          <span className="bio-value">{heightLabel}</span>
-        </div>
-        <div className="bio-item">
-          <span className="bio-label">WEIGHT</span>
-          <span className="bio-value">{player.weight_in_pounds ? `${player.weight_in_pounds} lbs` : "—"}</span>
-        </div>
-        <div className="bio-item">
-          <span className="bio-label">BORN</span>
-          <span className="bio-value">{player.birth_date ?? "—"}</span>
-        </div>
-        <div className="bio-item">
-          <span className="bio-label">HOMETOWN</span>
-          <span className="bio-value">
-            {player.birth_city ? `${player.birth_city}, ${player.birth_country}` : "—"}
-          </span>
-        </div>
-      </div>
-
-      {seasonStats && (
-        <div className="advanced-stats-panel">
-          <div className="trend-eyebrow advanced-stats-header">THIS SEASON</div>
-          <div className="stat-tiles">
-          {isGoalie ? (
-            <>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.wins}-{seasonStats.losses}-{seasonStats.ot_losses}</span>
-                <span className="stat-tile-label">RECORD</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">
-                  {seasonStats.goals_against_avg != null ? Number(seasonStats.goals_against_avg).toFixed(2) : "—"}
-                </span>
-                <span className="stat-tile-label">GAA</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">
-                  {seasonStats.save_pctg != null ? Number(seasonStats.save_pctg).toFixed(3) : "—"}
-                </span>
-                <span className="stat-tile-label">SV%</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.shutouts ?? "—"}</span>
-                <span className="stat-tile-label">SO</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.games_played ?? "—"}</span>
-                <span className="stat-tile-label">GP</span>
-              </div>
-            </>
+        <div className="player-hero-season">
+          <div className="player-hero-season-label">
+            {seasonStats ? `${formatSeasonLabel(seasonStats.season_id)} season` : "This season"}
+          </div>
+          {seasonStats ? (
+            <StatStrip stats={seasonStats} columns={columns} label="This season" />
           ) : (
-            <>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.points ?? "—"}</span>
-                <span className="stat-tile-label">POINTS</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.goals ?? "—"}</span>
-                <span className="stat-tile-label">GOALS</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.assists ?? "—"}</span>
-                <span className="stat-tile-label">ASSISTS</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.plus_minus ?? "—"}</span>
-                <span className="stat-tile-label">+/-</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.shots ?? "—"}</span>
-                <span className="stat-tile-label">SHOTS</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.pim ?? "—"}</span>
-                <span className="stat-tile-label">PIM</span>
-              </div>
-              <div className="stat-tile">
-                <span className="stat-tile-value">{seasonStats.games_played ?? "—"}</span>
-                <span className="stat-tile-label">GP</span>
-              </div>
-            </>
+            <p className="muted">No current-season stats are available yet.</p>
           )}
-          </div>
         </div>
-      )}
-
-      {!seasonStats && (
-        <div className="advanced-stats-panel">
-          <div className="trend-eyebrow advanced-stats-header">THIS SEASON</div>
-          <p className="muted">No current-season stats are available yet.</p>
-        </div>
-      )}
+      </section>
 
       {!isGoalie && advancedStats && (
-        <div className="advanced-stats-panel">
-          <div className="trend-eyebrow advanced-stats-header">ADVANCED (5-ON-5)</div>
-          <div className="stat-tiles">
-            <div className="stat-tile">
-              <span className="stat-tile-value">{formatPct(advancedStats.corsi_for_pct)}</span>
-              <span className="stat-tile-label">CORSI FOR %</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">{formatPct(advancedStats.fenwick_for_pct)}</span>
-              <span className="stat-tile-label">FENWICK FOR %</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">{formatPct(advancedStats.xgoals_for_pct)}</span>
-              <span className="stat-tile-label">xG FOR %</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">
-                {formatDecimal(advancedStats.xgoals_for)}-{formatDecimal(advancedStats.xgoals_against)}
-              </span>
-              <span className="stat-tile-label">xGF - xGA</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">{formatDecimal(advancedStats.individual_xgoals)}</span>
-              <span className="stat-tile-label">IND. xG</span>
-            </div>
-            <div className="stat-tile">
-              <span className="stat-tile-value">{formatDecimal(advancedStats.pdo, 1)}</span>
-              <span className="stat-tile-label">PDO</span>
-            </div>
+        <Section title="Advanced (5-on-5)">
+          <div className="player-card">
+            <dl className="stat-strip">
+              {[
+                ["Corsi %", formatPct(advancedStats.corsi_for_pct)],
+                ["Fenwick %", formatPct(advancedStats.fenwick_for_pct)],
+                ["xG %", formatPct(advancedStats.xgoals_for_pct)],
+                ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`],
+                ["Ind. xG", formatDecimal(advancedStats.individual_xgoals)],
+                ["PDO", formatDecimal(advancedStats.pdo, 1)],
+              ].map(([label, value]) => (
+                <div key={label} className="stat-strip-item">
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="player-card-note">
+              MoneyPuck.com, {formatSeasonLabel(advancedStats.season_id)} season
+              {advancedStats.games_played != null ? ` (${advancedStats.games_played} GP)` : ""}.
+            </p>
           </div>
-          <div className="advanced-stats-caveat">
-            5-on-5 stats from MoneyPuck.com for the {formatSeasonLabel(advancedStats.season_id)} season
-            {advancedStats.games_played != null ? ` (${advancedStats.games_played} games played)` : ""}.
-          </div>
-        </div>
+        </Section>
       )}
 
-      {hasCareerTotals && (
-        <div className="advanced-stats-panel">
-          <div className="trend-eyebrow advanced-stats-header">CAREER TOTALS</div>
-          {careerRegularSeason && (
-            <>
-              <div className="career-totals-subheader">Regular Season</div>
-              <CareerStatTiles stats={careerRegularSeason} isGoalie={isGoalie} />
-            </>
-          )}
-          {careerPlayoffs && (
-            <>
-              <div className="career-totals-subheader">Playoffs</div>
-              <CareerStatTiles stats={careerPlayoffs} isGoalie={isGoalie} />
-            </>
-          )}
-        </div>
+      {careerRows.length > 0 && (
+        <Section title="Career">
+          <StatsTable rows={careerRows} columns={columns} firstColumn="" label="Career totals" />
+        </Section>
       )}
 
       {seasonHistory.length > 0 && (
-        <div className="advanced-stats-panel">
-          <div className="trend-header">
-            <div className="trend-eyebrow advanced-stats-header">SEASON BY SEASON</div>
-            {hasPlayoffHistory && (
-              <div className="trend-toggle">
+        <Section
+          title="Season by season"
+          aside={hasPlayoffHistory && (
+            <div className="view-toggle" role="group" aria-label="Season type">
+              {[["regular_season", "Regular season"], ["playoffs", "Playoffs"]].map(([key, label]) => (
                 <button
-                  className={seasonHistoryTab === "regular_season" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
-                  onClick={() => {
-                    setSeasonHistoryTab("regular_season");
-                    setShowAllSeasons(false);
-                  }}
+                  key={key}
+                  type="button"
+                  className={seasonHistoryTab === key ? "view-toggle-btn view-toggle-btn-active" : "view-toggle-btn"}
+                  aria-pressed={seasonHistoryTab === key}
+                  onClick={() => switchSeasonTab(key)}
                 >
-                  Regular Season
+                  {label}
                 </button>
-                <button
-                  className={seasonHistoryTab === "playoffs" ? "toggle-btn toggle-btn-active" : "toggle-btn"}
-                  onClick={() => {
-                    setSeasonHistoryTab("playoffs");
-                    setShowAllSeasons(false);
-                  }}
-                >
-                  Playoffs
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="table-card">
-            <table className="standings-table">
-              <thead>
-                <tr>
-                  <th>SEASON</th>
-                  {seasonHistoryColumns.map((col) => (
-                    <th key={col.key}>{col.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleSeasonHistory.map((entry) => (
-                  <tr key={`${entry.season_id}-${entry.season_type}`}>
-                    <td>{formatSeasonLabel(entry.season_id)}</td>
-                    {seasonHistoryColumns.map((col) => (
-                      <td key={col.key}>{formatStatValue(col.key, entry[col.key])}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </div>
+          )}
+        >
+          <StatsTable
+            rows={visibleSeasonHistory.map((entry) => ({
+              key: `${entry.season_id}-${entry.season_type}`,
+              label: formatSeasonLabel(entry.season_id),
+              stats: entry,
+            }))}
+            columns={columns}
+            firstColumn="SEASON"
+            label="Season by season"
+          />
           {activeSeasonHistory.length > 5 && (
-            <button className="roster-link" onClick={() => setShowAllSeasons((prev) => !prev)}>
+            <button type="button" className="show-more-btn" onClick={() => setShowAllSeasons((prev) => !prev)}>
               {showAllSeasons ? "Show less" : `Show all ${activeSeasonHistory.length} seasons`}
             </button>
           )}
-        </div>
+        </Section>
       )}
-    </div>
+    </main>
   );
 }
 

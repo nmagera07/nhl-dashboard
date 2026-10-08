@@ -14,7 +14,7 @@ import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 
 export default function NHLDashboard() {
-  const [selectedTeam, setSelectedTeam] = useState("PIT");
+  const [standingsView, setStandingsView] = useState("standard"); // standard | advanced
   const [activeDivision, setActiveDivision] = useState(null);
   const [search, setSearch] = useState("");
   const [standingsSortBy, setStandingsSortBy] = useState(null);
@@ -53,7 +53,14 @@ export default function NHLDashboard() {
     { initialData: [], transform: (data) => (Array.isArray(data) ? data : []) }
   );
 
-  const handleViewRoster = (teamAbbrev) => navigate(`/teams/${teamAbbrev}`);
+  const handleSelectTeam = (teamAbbrev) => navigate(`/teams/${teamAbbrev}`);
+
+  // Sorting is only offered on advanced columns, so leaving that view drops
+  // the sort -- otherwise teams would stay ordered by a hidden column.
+  const handleStandingsViewChange = (view) => {
+    setStandingsView(view);
+    if (view === "standard") setStandingsSortBy(null);
+  };
 
   const intelligenceContext = useMemo(() => {
     const player = location.pathname.match(/^\/players\/(\d+)/);
@@ -102,11 +109,6 @@ export default function NHLDashboard() {
     return rows;
   }, [standings, activeDivision, search, isSearching]);
 
-  const selectedRow = useMemo(
-    () => standings.find((r) => r.team_abbrev === selectedTeam),
-    [standings, selectedTeam]
-  );
-
   // Standings data is fetched once here and shared (the standings page and
   // team pages both use it), but only the standings page waits on it.
   const standingsGate =
@@ -131,12 +133,11 @@ export default function NHLDashboard() {
                 onSelectDivision={setActiveDivision}
                 isSearching={isSearching}
                 visibleRows={visibleRows}
-                selectedTeam={selectedTeam}
-                onSelectTeam={setSelectedTeam}
+                onSelectTeam={handleSelectTeam}
                 playoffOddsByTeam={playoffOddsByTeam}
                 playoffOddsStatus={playoffOddsStatus}
-                selectedRow={selectedRow}
-                onViewRoster={handleViewRoster}
+                view={standingsView}
+                onViewChange={handleStandingsViewChange}
                 sortBy={standingsSortBy}
                 sortDir={standingsSortDir}
                 onSort={handleStandingsSort}

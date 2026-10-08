@@ -69,7 +69,7 @@ describe("StandingsTable", () => {
 
   it("clicking an advanced-stat column header calls onSort with that column's key", async () => {
     const onSort = vi.fn();
-    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={onSort} />);
+    render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={onSort} />);
 
     await userEvent.click(screen.getByRole("columnheader", { name: /xGA/ }));
 
@@ -77,13 +77,13 @@ describe("StandingsTable", () => {
   });
 
   it("shows the active sort column's direction arrow", () => {
-    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy="pdo" sortDir="asc" onSort={vi.fn()} />);
+    render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy="pdo" sortDir="asc" onSort={vi.fn()} />);
 
     expect(screen.getByText(/PDO\s*▲/)).toBeInTheDocument();
   });
 
   it("formats xG% as a percentage, xGF/xGA to 1 decimal, SF/SA as plain integers, and PDO to 1 decimal", () => {
-    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+    render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
     expect(screen.getByText("57.0%")).toBeInTheDocument();
     expect(screen.getByText("181.4")).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("StandingsTable", () => {
 
   it("renders an em dash for teams with no advanced stats row yet", () => {
     const noAdvanced = [team({ team_abbrev: "SEA" })];
-    render(<StandingsTable rows={noAdvanced} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+    render(<StandingsTable view="advanced" rows={noAdvanced} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
     const rendered = dataRows();
     expect(within(rendered[0]).getAllByText("—").length).toBeGreaterThan(0);
@@ -118,6 +118,27 @@ describe("StandingsTable", () => {
 
   // Mobile cards render alongside the table (CSS picks which one shows),
   // so they get their own coverage.
+  it("the standard view shows the classic columns and hides advanced ones", () => {
+    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toEqual(["", "TEAM", "GP", "W", "L", "OT", "PTS", "GF", "GA", "DIFF", "L10", "STRK"]);
+  });
+
+  it("the advanced view adds playoff odds and the sortable advanced columns", () => {
+    render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+
+    const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    expect(headers).toEqual(["", "TEAM", "GP", "PTS", "PO%", "xG%", "xGF", "xGA", "SF", "SA", "PDO"]);
+  });
+
+  it("shows each team's logo next to its name", () => {
+    const withLogo = [team({ team_abbrev: "PIT", team_name: "Pittsburgh Penguins", logo_url: "https://example.com/pit.svg" })];
+    const { container } = render(<StandingsTable rows={withLogo} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+
+    expect(container.querySelector("table img.team-cell-logo")).toHaveAttribute("src", "https://example.com/pit.svg");
+  });
+
   describe("mobile cards", () => {
     const cardList = () => within(screen.getByLabelText("Team standings cards"));
 

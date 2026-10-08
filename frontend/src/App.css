@@ -26,6 +26,7 @@
   bottom: max(24px, env(safe-area-inset-bottom, 0px));
   z-index: 10;
 }
+.intelligence-toggle-short { display: none; }
 .intelligence-toggle {
   border: 1px solid #60a5fa;
   border-radius: 999px;
@@ -248,6 +249,23 @@
   padding: 0 var(--gutter);
   margin-bottom: 16px;
 }
+.standings-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 var(--gutter);
+  margin-bottom: 16px;
+}
+.standings-controls .division-tabs { padding: 0; margin: 0; flex-wrap: wrap; }
+.view-toggle { display: inline-flex; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.view-toggle-btn { padding: 5px 12px; border: 0; border-radius: 6px; background: none; color: var(--text-dim); font-size: 12px; font-weight: 600; cursor: pointer; }
+.view-toggle-btn:hover { color: var(--text); }
+.view-toggle-btn-active { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
+.team-cell { display: inline-flex; align-items: center; gap: 10px; line-height: 1.2; }
+.team-cell .team-abbrev { margin-right: 0; min-width: 34px; }
+.team-cell-logo { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
+.standings-team-logo { width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain; }
 .division-tab {
   background: var(--card);
   border: 1px solid var(--border);
@@ -732,7 +750,13 @@
   .standings-team-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
   .standings-team-identity small, .standings-team-points small, .standings-team-card-stats small { color: var(--text-dim); font-size: 10px; }
   .standings-team-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; }
-  .standings-team-card-stats { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .standings-team-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .view-toggle { display: none; }
+  .standings-controls .division-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
+  .standings-controls .division-tab { padding: 7px 2px; font-size: 10px; letter-spacing: 0.02em; }
+  .intelligence-toggle { padding: 10px 14px; }
+  .intelligence-toggle-full { display: none; }
+  .intelligence-toggle-short { display: inline; }
   .standings-team-card-stats span { display: grid; gap: 2px; justify-items: center; min-width: 0; }
   .standings-team-card-stats strong { font-size: 12px; white-space: nowrap; }
   .standings-mobile-empty { padding: 24px 14px; color: var(--text-dim); text-align: center; }

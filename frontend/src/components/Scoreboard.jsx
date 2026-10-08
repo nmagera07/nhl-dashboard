@@ -39,10 +39,10 @@ export default function Scoreboard() {
 
   return (
     <section className="scoreboard" aria-label="Today's NHL scoreboard">
-      <div className="scoreboard-header"><strong>Scoreboard</strong><span>{status === "error" ? "Unavailable" : "Today"}</span></div>
+      {status === "loading" && <p className="scoreboard-empty">Loading games…</p>}
+      {status === "error" && <p className="scoreboard-empty status-error">Scores are unavailable right now.</p>}
+      {status === "ready" && games.length === 0 && <p className="scoreboard-empty">No games scheduled today.</p>}
       <div className="scoreboard-games">
-        {status === "loading" && <span className="scoreboard-empty">Loading games…</span>}
-        {status === "ready" && games.length === 0 && <span className="scoreboard-empty">No games scheduled today.</span>}
         {games.map((game) => (
           <button className="scoreboard-game" key={game.id} type="button" onClick={() => navigate(`/games/${game.id}`)}>
             <span className="scoreboard-status">{gameLabel(game)}</span>

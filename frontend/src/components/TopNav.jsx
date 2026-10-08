@@ -1,38 +1,41 @@
-function TopNav({ section, onNavigate, search, onSearchChange }) {
+import { Link, useLocation } from "react-router-dom";
+import { SECTIONS, sectionFor } from "./navSections.js";
+
+function TopNav({ search, onSearchChange }) {
+  const { pathname } = useLocation();
+  const active = sectionFor(pathname);
+
   return (
-    <div className="topnav">
-      <div className="brand">
-        <span className="brand-dot" />
-        <span className="brand-name">NHL Standings</span>
-      </div>
-      <div className="nav-tabs">
-        <button
-          className={section === "standings" ? "nav-tab nav-tab-active" : "nav-tab"}
-          onClick={() => onNavigate("standings")}
-        >
-          Standings
-        </button>
-        <button
-          className={section === "players" ? "nav-tab nav-tab-active" : "nav-tab"}
-          onClick={() => onNavigate("players")}
-        >
-          Player Stats
-        </button>
-      </div>
-      <div className="nav-right">
-        {section === "standings" && (
+    <header className="topnav">
+      <div className="topnav-inner">
+        <Link className="brand" to="/" aria-label="NHL Dash home">
+          <img className="brand-icon" src="/icon.svg" alt="" />
+          <span className="brand-name">NHL Dash</span>
+        </Link>
+        {/* Desktop navigation; phones use the bottom TabBar instead. */}
+        <nav className="nav-tabs" aria-label="Sections">
+          {SECTIONS.map((section) => (
+            <Link
+              key={section.key}
+              to={section.to}
+              className={section.key === active ? "nav-tab nav-tab-active" : "nav-tab"}
+              aria-current={section.key === active ? "page" : undefined}
+            >
+              {section.label}
+            </Link>
+          ))}
+        </nav>
+        {pathname === "/standings" && (
           <input
             className="search-input"
             placeholder="Find a team..."
+            aria-label="Find a team"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
         )}
-        <span className="live-badge">
-          <span className="live-dot" /> LIVE
-        </span>
       </div>
-    </div>
+    </header>
   );
 }
 

@@ -5,12 +5,13 @@ import { API_BASE, DIVISION_ORDER } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import TopNav from "./components/TopNav.jsx";
+import TabBar from "./components/TabBar.jsx";
+import ScoresPage from "./pages/ScoresPage.jsx";
 import StandingsPage from "./pages/StandingsPage.jsx";
 import RosterPage from "./pages/RosterPage.jsx";
 import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
-import Scoreboard from "./components/Scoreboard.jsx";
 
 export default function NHLDashboard() {
   const [selectedTeam, setSelectedTeam] = useState("PIT");
@@ -54,13 +55,6 @@ export default function NHLDashboard() {
 
   const handleViewRoster = (teamAbbrev) => navigate(`/teams/${teamAbbrev}`);
 
-  const handleNavigate = (section) => navigate(section === "players" ? "/leaderboard" : "/");
-
-  const topNavSection =
-    location.pathname === "/leaderboard" || location.state?.from === "leaderboard"
-      ? "players"
-      : "standings";
-
   const intelligenceContext = useMemo(() => {
     const player = location.pathname.match(/^\/players\/(\d+)/);
     if (player) return { page: "player", player_id: Number(player[1]) };
@@ -71,6 +65,8 @@ export default function NHLDashboard() {
     const game = location.pathname.match(/^\/games\/(\d+)/);
     if (game) return { page: "game", game_id: Number(game[1]) };
 
+    // nhl-intelligence only accepts player | team | standings, so other
+    // pages (scores) use the general league context.
     return { page: "standings" };
   }, [location.pathname]);
 
@@ -111,29 +107,24 @@ export default function NHLDashboard() {
     [standings, selectedTeam]
   );
 
+  // Standings data is fetched once here and shared (the standings page and
+  // team pages both use it), but only the standings page waits on it.
+  const standingsGate =
+    status === "loading" ? <div className="status-line">Loading standings…</div>
+    : status === "error" ? <div className="status-line status-error">Couldn't reach the API at {API_BASE}.</div>
+    : null;
+
   return (
     <div className="dashboard">
-      <TopNav
-        section={topNavSection}
-        onNavigate={handleNavigate}
-        search={search}
-        onSearchChange={setSearch}
-      />
-      <Scoreboard />
+      <TopNav search={search} onSearchChange={setSearch} />
       <IntelligencePanel context={intelligenceContext} />
 
-      {status === "loading" && <div className="status-line">Loading standings…</div>}
-      {status === "error" && (
-        <div className="status-line status-error">
-          Couldn't reach the API at {API_BASE}.
-        </div>
-      )}
-
-      {status === "ready" && (
+      <div className="app-content">
         <Routes>
+          <Route path="/" element={<ScoresPage />} />
           <Route
-            path="/"
-            element={
+            path="/standings"
+            element={standingsGate || (
               <StandingsPage
                 divisions={divisions}
                 activeDivision={activeDivision}
@@ -150,18 +141,22 @@ export default function NHLDashboard() {
                 sortDir={standingsSortDir}
                 onSort={handleStandingsSort}
               />
-            }
+            )}
           />
           <Route
             path="/teams/:teamAbbrev"
             element={<RosterPage key={location.pathname} standings={standings} />}
           />
+          <Route path="/players" element={<LeaderboardPage />} />
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/games/:gameId" element={<GamePage />} />
+          {/* Old URL, kept so existing bookmarks and installs still work. */}
+          <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      )}
+      </div>
+
+      <TabBar />
     </div>
   );
 }

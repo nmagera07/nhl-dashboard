@@ -34,7 +34,7 @@ function RosterPage({ standings }) {
           team={team}
           roster={roster}
           onSelectPlayer={handleSelectPlayer}
-          onBack={() => navigate("/")}
+          onBack={() => navigate("/standings")}
         />
       )}
     </>

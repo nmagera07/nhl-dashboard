@@ -352,7 +352,7 @@ export default function GamePage() {
 
   return (
     <main className="game-page">
-      <Link className="back-link" to="/">← Back to dashboard</Link>
+      <Link className="back-link" to="/">← Scores</Link>
 
       <div className="game-hero">
         <span className={`game-status${isLive ? " game-status-live" : ""}`}>

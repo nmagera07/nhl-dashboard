@@ -25,6 +25,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Consolidated daily data ingestion into a single scheduled Azure Container
   Apps Job with failure isolation between steps and automatic retry.
 
+- Replaced a log-based Azure alert with a heartbeat monitor (healthchecks.io)
+  that also detects a scheduled job that never runs, and cut the monthly
+  Azure bill from ~$11.44 to ~$0.97.
+
 **Security**
 - Removed a write-capable database credential that was exposed as a plain-text
   environment variable on the API, enforcing least privilege (the API only
@@ -36,6 +40,24 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-08 — Heartbeat monitoring for the daily job
+
+**What happened:** Swapped the Azure "ingestion is stale" alert for a
+healthchecks.io heartbeat. The job pings `/start` when it begins, the plain URL
+when it succeeds, and `/fail` when it fails.
+
+**What I learned:**
+- **Push vs. pull monitoring:** the old alert *looked* for a problem in the
+  logs. A heartbeat expects a check-in and alerts when one **doesn't arrive**,
+  so it catches the job never running at all. That's the same blind spot as
+  the deploy that never ran.
+- Monitoring calls should be **best-effort**: if healthchecks.io is down, the
+  job still finishes. A ping failure is logged, never raised.
+- Treat the ping URL as a secret (stored as a Container Apps secret), since
+  anyone holding it could send fake "all good" pings.
 
 ---
 

@@ -119,12 +119,15 @@ See [`backend/README.md`](backend/README.md) and
   re-enable it from the Actions tab if that happens. See [`backend/README.md`](backend/README.md) and
   [`frontend/README.md`](frontend/README.md) for how to run these locally.
 - Monitoring: Sentry (error tracking, optional —
-  `SENTRY_DSN`/`VITE_SENTRY_DSN`) plus two Azure Monitor alerts, both
-  emailing the same address — one on any container crash (scans
-  `ContainerAppConsoleLogs` for a Python traceback), one on ingestion
-  going stale (an hourly background check in `api.py` logs an error if
-  `standings_snapshots` hasn't been updated in 30h, meaning
-  the `nhl-standings-ingest` Container Apps Job has likely stopped running or is failing).
+  `SENTRY_DSN`/`VITE_SENTRY_DSN`, not yet enabled in production), an
+  Azure Monitor alert on any API crash (`nhl-api-startup-crash`, scans
+  `ContainerAppConsoleLogs` for a Python traceback and emails via the
+  `nhl-api-crash-alert` action group), and a healthchecks.io heartbeat
+  on the daily ingestion job (`run_daily_ingest.py` pings start /
+  success / fail via `HEALTHCHECK_URL`; healthchecks.io emails if a run
+  fails, runs long, or never happens). The heartbeat replaced an Azure
+  log alert on the API's hourly `STALE_INGESTION` check, which still
+  logs but no longer pages anyone.
 - Ingestion runs via an Azure Container Apps Job (`nhl-standings-ingest`) on a daily schedule, with its image kept in sync on each backend deploy — no longer a local Windows Task Scheduler job.
 
 ## Data source

@@ -110,6 +110,11 @@ storing Docker images. Everything else fit in free tiers.
   deploying from the old one (expand), confirm Azure can pull from the new one,
   switch deploys (migrate), then delete the old registry (contract).
   Production never depended on something that hadn't been verified.
+- **Audit what you're actually running.** Cleaning up turned up a *second*,
+  empty registry left over from the initial setup (setup tools like
+  `az containerapp up` can create resources with random names). It had been
+  billing every month with zero images in it. Listing everything in the
+  resource group (`az resource list -g ...`) is worth doing now and then.
 
 ---
 

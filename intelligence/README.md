@@ -29,8 +29,16 @@ free tiers. Use keys with no payment method attached. For local development,
 Ollama on your own GPU works with no limits:
 
 ```bash
-ollama pull qwen2.5:7b && ollama serve   # then OLLAMA_BASE_URL=http://localhost:11434/v1
+ollama pull qwen2.5:7b
+OLLAMA_CONTEXT_LENGTH=8192 ollama serve   # then OLLAMA_BASE_URL=http://localhost:11434/v1
 ```
+
+Ollama's default context window is 4,096 tokens and it silently drops the
+*start* of longer prompts (including the instructions). The league context
+is ~3.4K tokens (measured), so the default works, but 8,192 leaves room.
+A 7B model is fine for development but inconsistent on multi-row questions
+("who leads the league?" was right in one run and wrong in the next); use
+the larger hosted models in production.
 
 Keys are used only by this service and must never be sent to the browser.
 Answers report which provider responded (`model` in the response).

@@ -10,9 +10,9 @@ events -- and drop logos, ids, timestamps, and empty fields.
 
 from typing import Any, Iterable
 
-TOP_POINTS = 15
-TOP_GOALS = 10
-TOP_GOALIES = 8
+TOP_POINTS = 10
+TOP_GOALS = 5
+TOP_GOALIES = 5
 RECENT_SEASONS = 5
 
 
@@ -39,6 +39,23 @@ def _name(p: dict[str, Any]) -> str:
 
 # --- standings --------------------------------------------------------------
 
+def playoff_spot(row: dict[str, Any]) -> str | None:
+    """
+    Where the team sits in the playoff picture, in words. Small models
+    struggle to combine division and wild-card ranks themselves (wild cards
+    are conference-wide), so the conclusion is computed here.
+    """
+    div_rank, wc_rank = row.get("division_sequence"), row.get("wildcard_sequence")
+    conference = (row.get("conference") or "").replace(" Conference", "")
+    if div_rank and div_rank <= 3:
+        return f"{row.get('division')} #{div_rank} (in)"
+    if wc_rank and wc_rank <= 2:
+        return f"{conference} wild card {wc_rank} (in)"
+    if wc_rank:
+        return f"Outside ({conference} wild-card race #{wc_rank})"
+    return None
+
+
 def standing_row(row: dict[str, Any], playoff_pct: float | None = None) -> dict[str, Any]:
     streak = f"{row['streak_code']}{row['streak_count']}" if row.get("streak_code") else None
     return _clean({
@@ -61,6 +78,7 @@ def standing_row(row: dict[str, Any], playoff_pct: float | None = None) -> dict[
         "conference_rank": row.get("conference_sequence"),
         "league_rank": row.get("league_sequence"),
         "wildcard_rank": row.get("wildcard_sequence") or None,  # 0 means "not in a wild-card race"
+        "playoff_spot": playoff_spot(row),
         "playoff_odds_pct": _pct(playoff_pct),
         "xgoals_for_pct": _pct(row.get("xgoals_for_pct")),
         "pdo": _num(row.get("pdo"), 1),
@@ -115,22 +133,62 @@ def _top(players: Iterable[dict], key: str, n: int, *tiebreak: str) -> list[dict
 def leaders(players: list[dict]) -> dict[str, list[dict]]:
     skaters = [p for p in players if p.get("position_code") != "G"]
     goalies = [p for p in players if p.get("position_code") == "G" and (p.get("games_played") or 0) > 0]
+
+    def brief(line):
+        return {k: v for k, v in line.items() if k in LEADER_FIELDS}
+
     return {
-        "points": [skater_line(p) for p in _top(skaters, "points", TOP_POINTS, "goals")],
-        "goals": [skater_line(p) for p in _top(skaters, "goals", TOP_GOALS, "points")],
-        "goalie_wins": [goalie_line(p) for p in _top(goalies, "wins", TOP_GOALIES, "save_pctg")],
+        "points": [brief(skater_line(p)) for p in _top(skaters, "points", TOP_POINTS, "goals")],
+        "goals": [brief(skater_line(p)) for p in _top(skaters, "goals", TOP_GOALS, "points")],
+        "goalie_wins": [brief(goalie_line(p)) for p in _top(goalies, "wins", TOP_GOALIES, "save_pctg")],
     }
 
 
 # --- contexts ---------------------------------------------------------------
 
+# League context has to cover 32 teams, so each row keeps only the most-asked
+# columns (team pages get the full row). Measured on real data this keeps a
+# league question around 3K tokens: inside a local model's default 4K window,
+# and light on free tiers that cap tokens per minute.
+LEAGUE_ROW_FIELDS = (
+    "team", "division", "gp", "record", "points", "goal_diff",
+    "last_10", "streak", "conference_rank", "playoff_spot", "playoff_odds_pct",
+)
+LEADER_FIELDS = ("name", "team", "pos", "gp", "g", "a", "pts", "record", "gaa", "save_pct")
+
+
+def playoff_picture(standings: list[dict]) -> dict[str, dict[str, list[str]]]:
+    """If the season ended today: each conference's division top-3s, wild
+    cards, and the next teams out, as plain lists the model can read off."""
+    picture: dict[str, dict[str, list[str]]] = {}
+    for conf in sorted({r.get("conference") for r in standings if r.get("conference")}):
+        rows = [r for r in standings if r.get("conference") == conf]
+        name = conf.replace(" Conference", "")
+        section: dict[str, list[str]] = {}
+        for div in sorted({r.get("division") for r in rows}):
+            top = sorted((r for r in rows if r.get("division") == div and (r.get("division_sequence") or 99) <= 3),
+                         key=lambda r: r["division_sequence"])
+            section[f"{div} top 3"] = [r["team_abbrev"] for r in top]
+        race = sorted((r for r in rows if r.get("wildcard_sequence")), key=lambda r: r["wildcard_sequence"])
+        section["wild cards"] = [r["team_abbrev"] for r in race[:2]]
+        section["next out"] = [r["team_abbrev"] for r in race[2:5]]
+        picture[name] = section
+    return picture
+
+
 def league_facts(standings: list[dict], players: list[dict], playoff_odds: list[dict]) -> dict[str, Any]:
     odds, as_of = odds_by_team(standings, playoff_odds)
     rows = sorted(standings, key=lambda r: r.get("league_sequence") or 99)
+    conferences = sorted({(r.get("division"), r.get("conference")) for r in rows if r.get("division")})
     return _clean({
         "standings_as_of": str(standings[0]["snapshot_date"]) if standings else None,
         "playoff_odds_as_of": as_of,
-        "standings": [standing_row(r, odds.get(r.get("team_abbrev"))) for r in rows],
+        "conference_of_division": {div: conf for div, conf in conferences},
+        "playoff_picture_if_season_ended_today": playoff_picture(standings),
+        "standings": [
+            {k: v for k, v in standing_row(r, odds.get(r.get("team_abbrev"))).items() if k in LEAGUE_ROW_FIELDS}
+            for r in rows
+        ],
         "leaders": leaders(players),
     })
 

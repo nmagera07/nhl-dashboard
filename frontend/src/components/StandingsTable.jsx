@@ -6,12 +6,21 @@ function StreakBadge({ code, count }) {
   return <span className={cls}>{code}{count}</span>;
 }
 
+function formatOdds(pct) {
+  if (pct == null) return "—";
+  const value = Number(pct) * 100;
+  // Never show a flat 0% or 100% unless it's truly settled: 0.4% -> "<1%".
+  if (value > 0 && value < 1) return "<1%";
+  if (value > 99 && value < 100) return ">99%";
+  return `${value.toFixed(0)}%`;
+}
+
 function PlayoffOddsCell({ pct }) {
   if (pct == null) return <td className="col-po">—</td>;
   const value = Number(pct) * 100;
   return (
     <td className={value >= 50 ? "col-po po-in" : "col-po po-out"}>
-      {value.toFixed(0)}%
+      {formatOdds(pct)}
     </td>
   );
 }
@@ -53,7 +62,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
   const displayRows = sortBy ? rows : [...rows].sort((a, b) => a.division_sequence - b.division_sequence);
   const advanced = view === "advanced";
   // rank + team + the view's stat columns
-  const columnCount = 2 + (advanced ? 3 + ADVANCED_SORT_COLUMNS.length : 11);
+  const columnCount = 2 + (advanced ? 2 + ADVANCED_SORT_COLUMNS.length : 12);
 
   return (
     <>
@@ -67,7 +76,6 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
             {advanced ? (
               <>
                 <th className="col-pts">PTS</th>
-                <th className="col-po">PO%</th>
                 {ADVANCED_SORT_COLUMNS.map((col) => (
                   <th
                     key={col.key}
@@ -89,6 +97,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
                 <th>DIFF</th>
                 <th>L10</th>
                 <th>STRK</th>
+                <th className="col-po" title="Playoff odds from a daily Monte Carlo simulation">PO%</th>
               </>
             )}
           </tr>
@@ -109,7 +118,6 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
               {advanced ? (
                 <>
                   <td className="col-pts">{row.points}</td>
-                  <PlayoffOddsCell pct={playoffOddsByTeam?.[row.team_abbrev]} />
                   {ADVANCED_SORT_COLUMNS.map((col) => (
                     <td key={col.key} className={col.key === sortBy ? "col-pts" : ""}>
                       {formatAdvancedValue(col.key, row[col.key])}
@@ -129,6 +137,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
                   </td>
                   <td>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</td>
                   <td><StreakBadge code={row.streak_code} count={row.streak_count} /></td>
+                  <PlayoffOddsCell pct={playoffOddsByTeam?.[row.team_abbrev]} />
                 </>
               )}
             </tr>
@@ -157,6 +166,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
             <span><strong>{row.goal_differential > 0 ? "+" : ""}{row.goal_differential}</strong><small>DIFF</small></span>
             <span><strong>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</strong><small>L10</small></span>
             <span><strong>{row.streak_code ? `${row.streak_code}${row.streak_count}` : "—"}</strong><small>STRK</small></span>
+            <span><strong>{formatOdds(playoffOddsByTeam?.[row.team_abbrev])}</strong><small>PO%</small></span>
           </span>
         </button>
       ))}

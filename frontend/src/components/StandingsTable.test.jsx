@@ -118,18 +118,27 @@ describe("StandingsTable", () => {
 
   // Mobile cards render alongside the table (CSS picks which one shows),
   // so they get their own coverage.
-  it("the standard view shows the classic columns and hides advanced ones", () => {
+  it("the standard view shows the classic columns plus playoff odds, and hides advanced ones", () => {
     render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
-    expect(headers).toEqual(["", "TEAM", "GP", "W", "L", "OT", "PTS", "GF", "GA", "DIFF", "L10", "STRK"]);
+    expect(headers).toEqual(["", "TEAM", "GP", "W", "L", "OT", "PTS", "GF", "GA", "DIFF", "L10", "STRK", "PO%"]);
   });
 
-  it("the advanced view adds playoff odds and the sortable advanced columns", () => {
+  it("the advanced view shows the sortable advanced columns", () => {
     render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 
     const headers = screen.getAllByRole("columnheader").map((th) => th.textContent);
-    expect(headers).toEqual(["", "TEAM", "GP", "PTS", "PO%", "xG%", "xGF", "xGA", "SF", "SA", "PDO"]);
+    expect(headers).toEqual(["", "TEAM", "GP", "PTS", "xG%", "xGF", "xGA", "SF", "SA", "PDO"]);
+  });
+
+  it("formats playoff odds without overstating certainty", () => {
+    const odds = { COL: 0.004, PIT: 0.9962 };
+    render(<StandingsTable rows={rows} playoffOddsByTeam={odds} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("<1%")).toBeInTheDocument();
+    expect(table.getByText(">99%")).toBeInTheDocument();
   });
 
   it("shows each team's logo next to its name", () => {

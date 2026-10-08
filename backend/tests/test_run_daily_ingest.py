@@ -23,18 +23,26 @@ def _fake_runner(exit_codes):
 
 
 class TestRunAll:
-    def test_runs_standings_first_since_player_stats_depend_on_it(self):
-        runner, calls = _fake_runner({"ingest_standings.py": 0, "ingest_player_stats.py": 0})
+    def test_runs_standings_first_since_the_others_depend_on_it(self):
+        runner, calls = _fake_runner(
+            {"ingest_standings.py": 0, "simulate_playoff_odds.py": 0, "ingest_player_stats.py": 0}
+        )
 
         assert run_all(runner=runner) == []
-        assert [cmd[-1] for cmd in calls] == ["ingest_standings.py", "ingest_player_stats.py"]
+        assert [cmd[-1] for cmd in calls] == [
+            "ingest_standings.py",
+            "simulate_playoff_odds.py",
+            "ingest_player_stats.py",
+        ]
         assert all(cmd[0] == sys.executable for cmd in calls)
 
     def test_a_failed_script_does_not_stop_the_next_one(self):
-        runner, calls = _fake_runner({"ingest_standings.py": 1, "ingest_player_stats.py": 0})
+        runner, calls = _fake_runner(
+            {"ingest_standings.py": 0, "simulate_playoff_odds.py": 1, "ingest_player_stats.py": 0}
+        )
 
-        assert run_all(runner=runner) == ["ingest_standings.py"]
-        assert len(calls) == 2
+        assert run_all(runner=runner) == ["simulate_playoff_odds.py"]
+        assert len(calls) == 3
 
 
 @pytest.fixture

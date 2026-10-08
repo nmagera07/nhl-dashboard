@@ -32,6 +32,17 @@ when you actually start building them.
 - Player-level stats (goals, assists, +/-, TOI) — ties into the drill-down view above
 - Advanced stats overlay (Corsi, xG) from MoneyPuck's public CSVs
 - Auto-flag teams on a 5+ game win/lose streak as a callout, not just a table column
+- Contract details on the player page (cap hit, term, expiry, NMC/NTC). No free
+  official source: the NHL API has no contract data, and CapFriendly was bought
+  and shut down by the Capitals in 2024. Options:
+  - Start small: hand-maintained CSV for one team (or favorite players) loaded
+    into a `player_contracts` table. Contracts change a few times a year, so
+    it's manageable.
+  - Paid APIs: PuckPedia or Spotrac (check current pricing and terms)
+  - EliteProspects has a commercial API, good for prospects and junior and
+    international careers, but not a cap source
+  - Avoid scraping: it breaks ToS and fails silently when sites change
+  - Fits the existing pattern: new table + ingestion script + weekly schedule
 
 ### Fun / gimmicky
 - Give teams a "type" based on playstyle (high-scoring = fire, defensive = steel, etc.)

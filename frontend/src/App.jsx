@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import "./App.css";
 import { API_BASE, DIVISION_ORDER } from "./config.js";
@@ -13,9 +13,6 @@ import GamePage from "./pages/GamePage.jsx";
 import Scoreboard from "./components/Scoreboard.jsx";
 
 export default function NHLDashboard() {
-  const [history, setHistory] = useState([]);
-  const [seasonHistory, setSeasonHistory] = useState([]);
-  const [trendMode, setTrendMode] = useState("season"); // season | years
   const [selectedTeam, setSelectedTeam] = useState("PIT");
   const [activeDivision, setActiveDivision] = useState(null);
   const [search, setSearch] = useState("");
@@ -54,18 +51,6 @@ export default function NHLDashboard() {
     `${API_BASE}/playoff-odds`,
     { initialData: [], transform: (data) => (Array.isArray(data) ? data : []) }
   );
-
-  useEffect(() => {
-    if (!selectedTeam) return;
-    fetch(`${API_BASE}/standings/${selectedTeam}`)
-      .then((res) => res.json())
-      .then((data) => setHistory(Array.isArray(data) ? data : []))
-      .catch(() => setHistory([]));
-    fetch(`${API_BASE}/standings/${selectedTeam}/seasons`)
-      .then((res) => res.json())
-      .then((data) => setSeasonHistory(Array.isArray(data) ? data : []))
-      .catch(() => setSeasonHistory([]));
-  }, [selectedTeam]);
 
   const handleViewRoster = (teamAbbrev) => navigate(`/teams/${teamAbbrev}`);
 
@@ -160,10 +145,6 @@ export default function NHLDashboard() {
                 playoffOddsByTeam={playoffOddsByTeam}
                 playoffOddsStatus={playoffOddsStatus}
                 selectedRow={selectedRow}
-                history={history}
-                seasonHistory={seasonHistory}
-                trendMode={trendMode}
-                onTrendModeChange={setTrendMode}
                 onViewRoster={handleViewRoster}
                 sortBy={standingsSortBy}
                 sortDir={standingsSortDir}

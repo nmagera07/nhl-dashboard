@@ -60,6 +60,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-09 — Adjusted xG: a clean null result
+
+**Question:** MoneyPuck also publishes *adjusted* xG (corrected for score
+effects and home ice, and/or for rebound "flurries"). Would a cleaner version
+of xG make the playoff odds better?
+
+**What I did:** Added an `--xg-measures` option to the backtest so all four xG
+flavors run side by side through the same grid and leave-one-season-out test.
+
+**Result:** No. Score/venue-adjusted xG tied raw xG (Brier 0.1161 vs 0.1162,
+well inside the noise, and the same held-out score). Flurry adjustment was
+slightly *worse* (0.1167), so rebound chances seem to carry real signal about
+team strength. I didn't change production.
+
+**What I learned:**
+- Score effects mostly average out over a season, and the 50/50 blend with real
+  goals already smooths the noise the adjustment targets.
+- Two "don't ship" results in a row (strength of schedule, then this) say the
+  model has gotten what it can from team-level season totals. The next gains
+  need *new information* (goaltending, roster changes), not a polished version
+  of the same numbers.
+- Making experiments cheap to run is what makes null results cheap to accept.
+
+**Interview angle:** "Tell me about an experiment that didn't work." I tested
+it properly, it didn't beat what was live, so I kept the simpler model.
+
+---
+
 ## 2026-10-09 — Playoff odds v2.1: the right new data beats more tuning
 
 **What happened:** The diagnostics said tuning was maxed out and the

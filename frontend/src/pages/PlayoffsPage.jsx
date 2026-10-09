@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import OddsChart from "../components/OddsChart.jsx";
+import FavoriteStar from "../components/FavoriteStar.jsx";
+import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups } from "../utils/playoffRace.js";
@@ -22,6 +24,7 @@ function Change({ value }) {
 }
 
 function RaceRows({ label, teams, odds, highlighted, onHighlight }) {
+  const [favorite] = useFavoriteTeam();
   return (
     <>
       <tr className="race-group">
@@ -51,6 +54,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight }) {
                 <Link className="team-abbrev race-team-link" to={`/teams/${row.team_abbrev}`} onClick={(e) => e.stopPropagation()}>
                   {row.team_abbrev}
                 </Link>
+                {row.team_abbrev === favorite && <FavoriteStar />}
                 {status && <span className={`race-badge race-badge-${status.tone}`} title={status.title}>{status.label}</span>}
               </span>
             </td>

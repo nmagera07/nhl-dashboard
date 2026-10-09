@@ -4,6 +4,7 @@ import "./App.css";
 import { API_BASE, DIVISION_ORDER } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
+import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
 import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
 import ScoresPage from "./pages/ScoresPage.jsx";
@@ -21,6 +22,7 @@ export default function NHLDashboard() {
   const [standingsSortBy, setStandingsSortBy] = useState(null);
   const [standingsSortDir, setStandingsSortDir] = useState("desc");
 
+  const [favoriteTeam] = useFavoriteTeam();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,7 +37,8 @@ export default function NHLDashboard() {
       // triggered by clicking a sortable column reorder the same teams,
       // they don't mean "switch the user's selected division tab."
       if (activeDivision != null) return;
-      const firstDivision = data.find((d) => d.division)?.division;
+      const myDivision = data.find((d) => d.team_abbrev === favoriteTeam)?.division;
+      const firstDivision = myDivision || data.find((d) => d.division)?.division;
       if (firstDivision) setActiveDivision(firstDivision);
     },
   });
@@ -138,7 +141,7 @@ export default function NHLDashboard() {
 
       <div className="app-content">
         <Routes>
-          <Route path="/" element={<ScoresPage />} />
+          <Route path="/" element={<ScoresPage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />
           <Route
             path="/standings"
             element={standingsGate || (

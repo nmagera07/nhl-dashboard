@@ -1,4 +1,4 @@
-import { isValidISODate, monthGrid, monthOf, relativeDayLabel, shiftDate, shiftMonth, todayISO } from "./dates.js";
+import { gameTimeLabel, isValidISODate, monthGrid, monthOf, relativeDayLabel, shiftDate, shiftMonth, todayISO } from "./dates.js";
 
 describe("dates", () => {
   it("formats today in local time as YYYY-MM-DD", () => {
@@ -42,5 +42,13 @@ describe("month helpers", () => {
 
   it("gets the month of a date", () => {
     expect(monthOf("2026-10-06")).toBe("2026-10");
+  });
+
+  it("labels a game's start time relative to today", () => {
+    const at = (y, m, d, h) => new Date(y, m - 1, d, h).toISOString();
+    expect(gameTimeLabel(at(2026, 10, 9, 19), "2026-10-09")).toMatch(/^Today 7:00\sPM$/);
+    expect(gameTimeLabel(at(2026, 10, 10, 19), "2026-10-09")).toMatch(/^Tomorrow 7:00\sPM$/);
+    expect(gameTimeLabel(at(2026, 10, 14, 19), "2026-10-09")).toMatch(/^Wed, Oct 14 7:00\sPM$/);
+    expect(gameTimeLabel(null)).toBe("TBD");
   });
 });

@@ -1,5 +1,7 @@
 import { darkLogo } from "../utils/darkLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
+import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
+import FavoriteStar from "./FavoriteStar.jsx";
 
 function StreakBadge({ code, count }) {
   if (!code) return <span className="streak streak-none">—</span>;
@@ -34,19 +36,21 @@ function formatAdvancedValue(key, value) {
   return value; // shots_on_goal_for/against are plain integer counts
 }
 
-function TeamCell({ row }) {
+function TeamCell({ row, favorite }) {
   return (
     <td className="col-team">
       <span className="team-cell">
         {row.logo_url ? <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" /> : <span className="team-cell-logo" />}
         <span className="team-abbrev">{row.team_abbrev}</span>
         <span className="team-name">{row.team_name}</span>
+        {row.team_abbrev === favorite && <FavoriteStar />}
       </span>
     </td>
   );
 }
 
 function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard" }) {
+  const [favorite] = useFavoriteTeam();
   // Rows arrive already ordered by the API when a column sort is active
   // (?sort_by=... on GET /standings/latest) -- only fall back to the
   // default division-rank ordering when no custom sort is in effect.
@@ -105,7 +109,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           {displayRows.map((row) => (
             <tr key={row.team_abbrev} onClick={() => onSelectTeam(row.team_abbrev)}>
               <td className="col-rank">{row.division_sequence}</td>
-              <TeamCell row={row} />
+              <TeamCell row={row} favorite={favorite} />
               <td>{row.games_played}</td>
               {advanced ? (
                 <>
@@ -150,7 +154,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           <span className="standings-team-card-header">
             <span className="standings-team-rank">{row.division_sequence}</span>
             {row.logo_url && <img className="standings-team-logo" src={darkLogo(row.logo_url)} alt="" />}
-            <span className="standings-team-identity"><strong>{row.team_name}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
+            <span className="standings-team-identity"><strong>{row.team_name}{row.team_abbrev === favorite && <FavoriteStar />}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
             <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
           </span>
           <span className="standings-team-card-stats">

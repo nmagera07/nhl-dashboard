@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import TeamSummary from "./TeamSummary.jsx";
 
 function team(overrides) {
@@ -73,5 +74,19 @@ describe("TeamSummary", () => {
     expect(screen.getByText("+12")).toBeInTheDocument();
     expect(screen.getByText("20-13")).toBeInTheDocument();
     expect(screen.getByText("21-12")).toBeInTheDocument();
+  });
+
+  it("makes the team my team, and back", async () => {
+    render(<TeamSummary team={team()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /make my team/i }));
+
+    expect(screen.getByRole("button", { name: /my team/i })).toHaveAttribute("aria-pressed", "true");
+    expect(window.localStorage.getItem("nhl-dash:favorite-team")).toBe("PIT");
+
+    await userEvent.click(screen.getByRole("button", { name: /my team/i }));
+
+    expect(screen.getByRole("button", { name: /make my team/i })).toHaveAttribute("aria-pressed", "false");
+    window.localStorage.clear();
   });
 });

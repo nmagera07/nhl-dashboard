@@ -1,5 +1,7 @@
 import TeamSummary from "./TeamSummary.jsx";
 import SeasonSimulator from "./SeasonSimulator.jsx";
+import StatAbbr from "./StatAbbr.jsx";
+import StatGlossary from "./StatGlossary.jsx";
 
 // Columns marked col-optional hide on phones so the table fits without
 // sideways scrolling; the essentials stay.
@@ -34,13 +36,13 @@ function SkaterTable({ label, players, onSelectPlayer }) {
             <tr>
               <th className="col-rank">#</th>
               <th className="col-team">PLAYER</th>
-              <th>GP</th>
-              <th>G</th>
-              <th>A</th>
-              <th className="col-pts">PTS</th>
-              <th>+/-</th>
-              <th className="col-optional">SOG</th>
-              <th className="col-optional">PIM</th>
+              <th><StatAbbr term="GP" /></th>
+              <th><StatAbbr term="G" /></th>
+              <th><StatAbbr term="A" /></th>
+              <th className="col-pts"><StatAbbr term="PTS" /></th>
+              <th><StatAbbr term="+/-" /></th>
+              <th className="col-optional"><StatAbbr term="SOG" /></th>
+              <th className="col-optional"><StatAbbr term="PIM" /></th>
             </tr>
           </thead>
           <tbody>
@@ -75,13 +77,13 @@ function GoalieTable({ players, onSelectPlayer }) {
             <tr>
               <th className="col-rank">#</th>
               <th className="col-team">PLAYER</th>
-              <th>GP</th>
-              <th>W</th>
-              <th>L</th>
-              <th className="col-optional">OTL</th>
-              <th>GAA</th>
-              <th className="col-pts">SV%</th>
-              <th className="col-optional">SO</th>
+              <th><StatAbbr term="GP" /></th>
+              <th><StatAbbr term="W" /></th>
+              <th><StatAbbr term="L" /></th>
+              <th className="col-optional"><StatAbbr term="OTL" /></th>
+              <th><StatAbbr term="GAA" /></th>
+              <th className="col-pts"><StatAbbr term="SV%" /></th>
+              <th className="col-optional"><StatAbbr term="SO" /></th>
             </tr>
           </thead>
           <tbody>
@@ -118,6 +120,7 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
       <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />
       <GoalieTable players={goalies} onSelectPlayer={onSelectPlayer} />
+      <StatGlossary terms={["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "W", "L", "OTL", "GAA", "SV%", "SO"]} />
     </main>
   );
 }

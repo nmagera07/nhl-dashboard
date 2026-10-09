@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import OddsChart from "../components/OddsChart.jsx";
+import StatAbbr from "../components/StatAbbr.jsx";
+import StatGlossary from "../components/StatGlossary.jsx";
 import FavoriteStar from "../components/FavoriteStar.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { darkLogo } from "../utils/darkLogo.js";
@@ -187,11 +189,11 @@ function PlayoffsPage({ standings }) {
             <thead>
               <tr>
                 <th className="col-team" scope="col">Team</th>
-                <th scope="col">GP</th>
-                <th scope="col">PTS</th>
-                <th scope="col" className="race-col-pace"><abbr title={`${seasonGames(currentSeason)}-game points pace`}>Pace</abbr></th>
-                <th scope="col" className="race-col-odds">PO%</th>
-                <th scope="col"><abbr title="Change in playoff odds over the last 7 days, in percentage points">7d</abbr></th>
+                <th scope="col"><StatAbbr term="GP" /></th>
+                <th scope="col"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
+                <th scope="col" className="race-col-pace"><StatAbbr term="PACE">Pace</StatAbbr></th>
+                <th scope="col" className="race-col-odds"><StatAbbr term="PO%" /></th>
+                <th scope="col"><StatAbbr term="7D">7d</StatAbbr></th>
               </tr>
             </thead>
             <tbody>
@@ -206,6 +208,7 @@ function PlayoffsPage({ standings }) {
         </div>
       </section>
 
+      <StatGlossary terms={["GP", "TEAM_PTS", "PACE", "PO%", "7D"]} labels={{ TEAM_PTS: "PTS", PACE: "Pace", "7D": "7d" }} />
       <p className="data-credit">
         Odds from 10,000 simulations of the rest of the season, blending goals with expected goals (xG) courtesy of{" "}
         <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.

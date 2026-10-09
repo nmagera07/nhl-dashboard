@@ -1,5 +1,7 @@
 import { darkLogo } from "../utils/darkLogo.js";
 import { useState, useMemo } from "react";
+import StatAbbr from "./StatAbbr.jsx";
+import StatGlossary from "./StatGlossary.jsx";
 
 const SKATER_COLUMNS = [
   { key: "points", label: "PTS" },
@@ -160,7 +162,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
                   className={col.key === sortKey ? "sortable-col sortable-col-active" : "sortable-col"}
                   onClick={() => handleSort(col.key)}
                 >
-                  {col.label}{col.key === sortKey ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                  <StatAbbr term={col.label} />{col.key === sortKey ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                 </th>
               ))}
             </tr>
@@ -258,6 +260,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
           </button>
         </nav>
       )}
+      <StatGlossary terms={columns.map((col) => col.label)} />
     </div>
   );
 }

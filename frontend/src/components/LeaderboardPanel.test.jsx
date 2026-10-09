@@ -61,7 +61,7 @@ describe("LeaderboardPanel", () => {
     expect(table().getByText(/fleury/i)).toBeInTheDocument();
     expect(screen.queryByText(/crosby/i)).not.toBeInTheDocument();
     // Switching group also resets the sort column to that group's default.
-    expect(screen.getByText(/W\s*▼/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^W\s*▼$/ })).toBeInTheDocument();
   });
 
   it("clicking a column header sorts by it, clicking again reverses direction", async () => {
@@ -71,10 +71,10 @@ describe("LeaderboardPanel", () => {
     // Both players have games_played: 0 (tied) -- direction can't be
     // observed from row order here, so assert on the header's own arrow
     // instead, which is what actually encodes sort state to the user.
-    expect(screen.getByText(/GP\s*▼/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^GP\s*▼$/ })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("columnheader", { name: /GP/ }));
-    expect(screen.getByText(/GP\s*▲/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^GP\s*▲$/ })).toBeInTheDocument();
   });
 
   it("a lower-is-better column (GAA) defaults to ascending on first click", async () => {
@@ -83,7 +83,7 @@ describe("LeaderboardPanel", () => {
 
     await userEvent.click(screen.getByRole("columnheader", { name: /GAA/ }));
 
-    expect(screen.getByText(/GAA\s*▲/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^GAA\s*▲$/ })).toBeInTheDocument();
   });
 
   it("search filters by name and by team abbreviation, and drops the top-50 cap while searching", async () => {

@@ -1,6 +1,6 @@
 from .root import RootResponse, HealthResponse
 from .teams import Team
-from .playoff_odds import PlayoffOdds
+from .playoff_odds import PlayoffOdds, PlayoffOddsHistory, PlayoffOddsPoint
 from .players import (
     RosterPlayer,
     PlayerLeader,
@@ -18,6 +18,8 @@ __all__ = [
     "HealthResponse",
     "Team",
     "PlayoffOdds",
+    "PlayoffOddsHistory",
+    "PlayoffOddsPoint",
     "RosterPlayer",
     "PlayerLeader",
     "PlayerDetail",

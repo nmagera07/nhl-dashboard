@@ -81,7 +81,7 @@ tests/
   conftest.py                    # fake DB layer + shared fixtures (see below)
   test_simulate_playoff_odds.py  # pure-function tests: win_probability, determine_playoff_teams
   test_ingest_advanced_stats.py  # pure-function tests: MoneyPuck CSV row parsing, PDO calc
-  test_api_misc.py               # GET /, GET /teams, GET /playoff-odds
+  test_api_misc.py               # GET /, GET /teams, GET /playoff-odds (+ /history)
   test_api_roster.py             # GET /teams/{team}/roster
   test_api_players.py            # GET /players/leaders, GET /players/{id}
   test_api_standings.py          # GET /standings/latest, GET /standings/{team}, GET /standings/{team}/seasons
@@ -135,6 +135,7 @@ upserts, nothing duplicates.
 | `ingest_player_stats.py` | Current roster + season-to-date stats, all 32 teams | Weekly in-season (season totals don't need daily polling) |
 | `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team- and skater-level, from MoneyPuck's public seasonSummary CSVs | Weekly in-season |
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
+| `backfill_playoff_odds.py` | Weekly odds for a past season, using xG as of each date (MoneyPuck game-by-game file), for the race chart | One-off |
 | `backfill_season_history.py --years N` | Final standings for the last N completed seasons | One-time, or to extend the range |
 
 Scheduled via an Azure Container Apps Job (`nhl-standings-ingest`, daily at 06:00 UTC, entry point `run_daily_ingest.py`). The other ingestion scripts are run manually — see
@@ -150,6 +151,7 @@ the top-level README for why.
 | `GET /standings/{team}` | Full daily-snapshot history for one team (`?start=&end=` optional) |
 | `GET /standings/{team}/seasons` | Final standings for that team's last 5 completed seasons |
 | `GET /playoff-odds` | Latest Monte Carlo playoff-odds simulation, all teams |
+| `GET /playoff-odds/history?season_id=` | Every odds snapshot for a season (default: latest), for the playoff race chart |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |
 | `GET /players/leaders` | Every rostered player + season stats (league leaderboard) |
 | `GET /players/{id}` | Bio + season-by-season stats + career totals + this season's advanced stats (skaters only; `null` for goalies and for any player MoneyPuck hasn't covered yet) for one player |

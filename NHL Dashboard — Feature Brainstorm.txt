@@ -4,40 +4,30 @@ A running list of ideas for future work. Not commitments, just a parking lot.
 Add to this as new ideas come up; check items off or move them to "In Progress"
 when you actually start building them.
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 
 ---
 
 ## In Progress
-- **Site redesign + installable phone app (PWA)** — built on `dev`, ready to
-  ship together. Scores / Standings / Players sections with a phone tab bar,
-  standings with logos + Advanced toggle, team page with season summary,
-  player page hero + compact tables, polished game cards, dark-theme logos.
-  PWA install: Safari → Share → Add to Home Screen (iPhone), or Chrome →
-  Install app (Android).
+- **Playoff race page** (`/playoffs`) — odds over the season as a chart (tap a
+  team to follow its race; last season backfilled weekly for comparison),
+  plus the conference laid out in the playoff format with PO%, weekly
+  change, and clinched/eliminated badges.
 
 ---
 
 ## Up Next
-- **Playoff odds cleanup** — `simulate_playoff_odds.py` is still manual and the
-  PO% column shows last season's final odds. Clean it up, then add it to
-  `run_daily_ingest.py` (right after standings, since it reads them).
-- **Fix "Ask NHL Intelligence" on game pages** — the dashboard sends
-  `page: "game"`, but nhl-intelligence only accepts player | team |
-  standings, so the chat on game pages is likely rejected. Fix belongs in
-  the nhl-intelligence repo (accept "game", ideally with box score context).
-- **Advanced stats cleanup** — `ingest_advanced_stats.py` (MoneyPuck) is still
-  manual, so xG%/xGF/xGA/SF/SA/PDO are blank this season. Clean it up and add it
-  to the daily job (numbers get meaningful a couple of weeks into the season).
+- **"My team" pinned view** — pick a favorite team once; the app leads with
+  their next game, recent results, odds, and standings spot.
+- **Push notifications** for goals and final scores (see Fan-focused below).
+- **Head-to-head / rivalry view** — season series between two teams, a
+  side-by-side stat comparison, and chat context for "who wins tonight?"
 
 ---
 
 ## Ideas Backlog
 
 ### Fan-focused
-- Pinned "my team" view — Penguins front and center, rest of league secondary
-  (today the dashboard just defaults to PIT selected)
-- Rivalry tracker — head-to-head record vs a specific team over the season
 - Push notifications for goals and final scores ("Goal! PIT 2–1, Crosby (5)").
   Works for installed PWAs on Android and iPhone (iOS 16.4+). Needs: a
   permission prompt + saved subscriptions, a backend that watches live games
@@ -65,10 +55,10 @@ Last updated: 2026-10-08
 - Subjective "power rankings" tab layered over the objective stats
 
 ### Infra / portfolio-flex
-- Short server-side cache on the live game endpoints (`/games/today`,
-  `/games/{id}/boxscore`), so 500 viewers cost the NHL API the same as 1. An
-  in-process TTL cache is enough at this scale; Redis only if the API ever
-  runs more than one replica.
+- Always-on API (min replicas 1, ~$5-10/month) to skip the ~20s cold start
+- Playoff odds: roster-aware preseason ratings (build each team's prior from
+  its current players). The one model idea left with real upside; adjusted
+  xG, strength of schedule, and goaltending were all tested and didn't help.
 - Turn on Sentry in production (already wired into the code; just needs
   `SENTRY_DSN` as a Container App secret). Then drop the last Azure alert and
   take the Azure bill from ~$0.97/month to $0.
@@ -90,8 +80,9 @@ Last updated: 2026-10-08
 - ~~"My Team" drill-down: team roster page → player page (season stats,
   season-by-season, career totals, 5-on-5 advanced)~~
 - ~~Player-level stats + leaderboard (pagination, mobile cards)~~
-- ~~Advanced stats from MoneyPuck (team + skater; still run manually)~~
-- ~~Playoff odds (Monte Carlo) + PO% column (still run manually)~~
+- ~~Advanced stats from MoneyPuck (team + skater), refreshed by the daily job~~
+- ~~Playoff odds (Monte Carlo) + PO% column, in the daily job; v2 calibrated
+  and backtested, v2.1 blends in MoneyPuck xG~~
 - ~~`/health` endpoint (checks the DB, reports the deployed commit)~~
 - ~~Live scoreboard + full game box score (linescore, scoring summary, three
   stars, team stats, per-team player tables; refreshes every 30s while live)~~
@@ -109,3 +100,8 @@ Last updated: 2026-10-08
 - ~~Security: API holds only the read-only DB role; leaked owner password rotated~~
 - ~~Azure bill cut from ~$11.44/month to ~$0.97/month~~
 - ~~Learning log with resume bullets (`docs/LEARNING.md`)~~
+- ~~Site redesign + installable phone app (PWA), Oct 2026~~
+- ~~Past/future scoreboards with a season calendar~~
+- ~~Server-side TTL cache on the live game endpoints~~
+- ~~NHL Intelligence chat in the repo, on free AI providers (Gemini -> Groq),
+  with game-page context and a chat drawer redesign~~

@@ -8,6 +8,7 @@ import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
 import ScoresPage from "./pages/ScoresPage.jsx";
 import StandingsPage from "./pages/StandingsPage.jsx";
+import PlayoffsPage from "./pages/PlayoffsPage.jsx";
 import RosterPage from "./pages/RosterPage.jsx";
 import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
@@ -158,6 +159,7 @@ export default function NHLDashboard() {
               />
             )}
           />
+          <Route path="/playoffs" element={standingsGate || <PlayoffsPage standings={standings} />} />
           <Route
             path="/teams/:teamAbbrev"
             element={<RosterPage key={location.pathname} standings={standings} />}

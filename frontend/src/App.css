@@ -708,6 +708,67 @@
 .po-in { color: #22c55e; }
 .po-out { color: var(--text-dim); }
 
+/* Playoffs page: odds chart + race table. */
+.race-controls { padding: 0 var(--gutter); margin-bottom: 16px; }
+.race-card {
+  margin: 0 var(--gutter) 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.race-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 0;
+}
+.race-card-header h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.race-empty { margin: 0; padding: 28px 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.link-button:hover { text-decoration: underline; }
+.odds-chart { padding: 4px 0 6px; touch-action: pan-y; }
+.odds-chart svg { display: block; cursor: crosshair; }
+.odds-chart-readout { margin: 6px 14px 4px; min-height: 18px; color: var(--text-dim); font-size: 13px; }
+.odds-chart-readout strong { color: var(--accent); }
+.odds-chart-readout strong + * { margin-left: 0; }
+.odds-grid { stroke: var(--border); stroke-width: 1; }
+.odds-grid-mid { stroke: #2c3444; stroke-dasharray: 4 4; }
+.odds-axis { fill: var(--text-dim); font-size: 11px; }
+.odds-hover { stroke: #3a4356; stroke-width: 1; }
+.odds-line { fill: none; stroke: #4b5263; stroke-width: 1.5; stroke-opacity: 0.55; stroke-linejoin: round; stroke-linecap: round; }
+.odds-line-in { stroke: #22c55e; stroke-opacity: 0.4; }
+.odds-line-focus { stroke: var(--accent); stroke-width: 3; stroke-opacity: 1; }
+.odds-dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.race-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.race-table { margin-top: 6px; }
+.race-table abbr { text-decoration: none; cursor: help; }
+.race-group th {
+  padding: 14px 14px 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.race-table tbody tr.race-group, .race-table tbody tr.race-cutline { cursor: default; background: none; }
+.race-cutline td { padding: 0; height: 0; border-bottom: 2px dashed #ef4444 !important; opacity: 0.6; }
+.race-team-link { color: inherit; text-decoration: none; }
+.race-team-link:hover { color: var(--accent); }
+.race-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; }
+.race-badge-in { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.race-badge-out { background: rgba(139, 147, 163, 0.15); color: var(--text-dim); }
+.race-odds { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; font-weight: 700; }
+.race-odds-bar { width: 64px; height: 6px; border-radius: 3px; background: #1f2430; overflow: hidden; }
+.race-odds-bar span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.race-col-odds { min-width: 72px; }
+.race-change { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.race-change-up { color: #4ade80; }
+.race-change-down { color: #f87171; }
+
 @media (max-width: 640px) {
   .dashboard {
     --gutter: 12px;
@@ -730,7 +791,7 @@
     left: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     border-top: 1px solid var(--border);
     background: rgba(18, 20, 26, 0.96);
@@ -749,6 +810,9 @@
   }
   .tabbar-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .tabbar-item-active { color: var(--accent); }
+  .race-col-pace { display: none; }
+  .race-odds-bar { width: 36px; }
+  .race-table th, .race-table td { padding-left: 10px; padding-right: 10px; }
   .leaderboard-controls {
     flex-direction: column;
     align-items: stretch;

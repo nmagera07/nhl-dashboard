@@ -57,7 +57,13 @@ function StandingsPage({
         sortDir={sortDir}
         onSort={onSort}
       />
-      {view === "advanced" && playoffOddsStatus === "error" && (
+      <p className="data-credit">
+        {view === "advanced"
+          ? "5-on-5 advanced stats (xG%, xGF, xGA, shots, PDO) courtesy of "
+          : "Playoff odds (PO%) blend goals with expected goals (xG) courtesy of "}
+        <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+      </p>
+      {playoffOddsStatus === "error" && (
         <div className="status-line status-error">
           Playoff odds unavailable — the PO% column may be incomplete.
         </div>

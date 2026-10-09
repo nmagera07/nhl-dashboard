@@ -1,15 +1,17 @@
 """
-Playoff Odds Simulator (v2)
+Playoff Odds Simulator (v2.1: goals + MoneyPuck xG)
 
 Monte Carlo simulation of the rest of the regular season to estimate each
 team's probability of making the playoffs.
 
 How it works:
-  1. Rate each team by goal differential per game, shrunk toward a prior:
-     half of last season's GD/game (teams drift back toward average year to
-     year), weighted as PRIOR_GAMES pseudo-games. Early in the season the
-     prior dominates; by midseason this season's results take over. This
-     replaces v1's raw point %, which after a 4-0 start rated a team as
+  1. Rate each team by a blend of goal differential and MoneyPuck expected-
+     goals (xG) differential per game, shrunk toward a prior: half of last
+     season's xG differential per game, weighted as PRIOR_GAMES_XG
+     pseudo-games. Early in the season the prior dominates; by midseason
+     this season's results take over. If MoneyPuck is unreachable, it falls
+     back to goals only (prior = last season's GD/game, PRIOR_GAMES).
+     v1 used raw point %, which after a 4-0 start rated a team as
      near-unbeatable.
   2. Pull the remaining regular-season schedule from the NHL API.
   3. Run N simulated seasons. In each one, draw every team's "true"
@@ -57,6 +59,10 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 logger = setup_logging("simulate_playoff_odds")
 STANDINGS_URL = "https://api-web.nhle.com/v1/standings/{date}"
+# MoneyPuck team season summaries (free for non-commercial use with credit,
+# moneypuck.com/data.htm). "all" situations, regular season.
+MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/teams.csv"
+MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
 # Game model -- fit by calibrate_playoff_model.py.
@@ -66,9 +72,17 @@ OT_PROBABILITY = 0.221       # share of games reaching overtime
 SHOOTOUT_SHARE_OF_OT = 0.32  # share of OT games decided in a shootout
 
 # Team-strength model -- chosen by backtest_playoff_odds.py.
-PRIOR_CARRYOVER = 0.5        # how much of last season's GD/game carries over
-PRIOR_GAMES = 45             # weight of the prior, in games
+PRIOR_CARRYOVER = 0.5        # how much of last season's strength carries over
+PRIOR_GAMES = 45             # weight of the prior, in games (goals-only fallback)
 TALENT_SD = 0.35             # spread of true strength (GD/game) with no data
+
+# xG blend (v2.1) -- backtested 2026-10 over 4 seasons with as-of game-by-game
+# MoneyPuck xG: 3.7% better Brier overall, 7.6% better on Nov 1, and better
+# on held-out seasons under leave-one-season-out (unlike strength of
+# schedule). Strength input = half goal differential, half xG differential;
+# prior = last season's xG differential per game.
+XG_WEIGHT = 0.5
+PRIOR_GAMES_XG = 30
 
 DEFAULT_TRIALS = 10000
 
@@ -120,15 +134,84 @@ def fetch_standings_as_of(as_of_date):
     return standings
 
 
-def build_schedule(team_abbrevs, season_id, as_of_date):
-    """Unique remaining regular-season games as (home, away) pairs."""
+def fetch_season_games(team_abbrevs, season_id):
+    """
+    Every regular-season game once, as dicts with date, home, away, and the
+    final score (None until it's played).
+    """
     seen = {}
     for team in team_abbrevs:
         for g in nhl_get(SCHEDULE_URL.format(team=team, season=season_id))["games"]:
-            if g["gameType"] == 2 and g["gameDate"] > str(as_of_date):
-                seen[g["id"]] = (g["homeTeam"]["abbrev"], g["awayTeam"]["abbrev"])
+            if g["gameType"] != 2:
+                continue
+            final = g.get("gameState") in ("OFF", "FINAL")
+            seen[g["id"]] = {
+                "date": g["gameDate"],
+                "home": g["homeTeam"]["abbrev"],
+                "away": g["awayTeam"]["abbrev"],
+                "home_score": g["homeTeam"].get("score") if final else None,
+                "away_score": g["awayTeam"].get("score") if final else None,
+            }
         time.sleep(0.2)
     return list(seen.values())
+
+
+def split_games(games, as_of_date):
+    """(completed games with scores up to the date, remaining (home, away) pairs after it)."""
+    as_of = str(as_of_date)
+    completed = [g for g in games if g["date"] <= as_of and g["home_score"] is not None]
+    remaining = [(g["home"], g["away"]) for g in games if g["date"] > as_of]
+    return completed, remaining
+
+
+def build_schedule(team_abbrevs, season_id, as_of_date):
+    """Unique remaining regular-season games as (home, away) pairs."""
+    return split_games(fetch_season_games(team_abbrevs, season_id), as_of_date)[1]
+
+
+def fetch_moneypuck_xgd(start_year):
+    """
+    {team: (xG for - xG against total, games played)} for one season, all
+    situations, from MoneyPuck. Raises on any network/parse problem so the
+    caller can fall back to the goals-only model.
+    """
+    import csv
+    import io
+
+    response = requests.get(MONEYPUCK_TEAMS_URL.format(year=start_year), headers=MONEYPUCK_HEADERS, timeout=30)
+    response.raise_for_status()
+    out = {}
+    for row in csv.DictReader(io.StringIO(response.text)):
+        if row.get("situation") == "all":
+            out[row["team"]] = (float(row["xGoalsFor"]) - float(row["xGoalsAgainst"]), int(float(row["games_played"])))
+    if len(out) < 30:
+        raise ValueError(f"MoneyPuck returned only {len(out)} teams for {start_year}")
+    return out
+
+
+def blend_xg(standings, xgd_totals, weight=XG_WEIGHT):
+    """Standings with goal_differential replaced by a goals/xG blend, so
+    team_ratings() shrinks the blend exactly like it shrinks raw GD. Teams
+    missing from MoneyPuck keep their goal differential."""
+    out = {}
+    for team, row in standings.items():
+        gd = row.get("goal_differential", 0)
+        xgd = xgd_totals.get(team, (gd, None))[0]
+        out[team] = {**row, "goal_differential": (1 - weight) * gd + weight * xgd}
+    return out
+
+
+def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
+    """Ratings from the xG blend, or None if MoneyPuck is unavailable."""
+    start = season_id // 10000
+    try:
+        current = fetch(start)
+        previous = fetch(start - 1)
+    except Exception as exc:  # network, HTTP, or parse -- fall back to goals only
+        logger.warning(f"MoneyPuck xG unavailable ({exc}); using the goals-only model")
+        return None
+    priors = {t: PRIOR_CARRYOVER * xgd / gp for t, (xgd, gp) in previous.items() if gp}
+    return team_ratings(blend_xg(standings, current), priors, prior_games=PRIOR_GAMES_XG)
 
 
 def load_priors(season_id):
@@ -157,6 +240,38 @@ def team_ratings(standings, priors, prior_games=PRIOR_GAMES, talent_sd=TALENT_SD
         sd = talent_sd * math.sqrt(prior_games / (gp + prior_games))
         ratings[abbrev] = (mean, sd)
     return ratings
+
+
+def adjusted_ratings(teams, completed, priors, prior_games=PRIOR_GAMES, talent_sd=TALENT_SD, iterations=50):
+    """
+    EXPERIMENTAL -- not used in production. Backtested 2026-10 over 4 seasons
+    (backtest_playoff_odds.py --sos): ~0.3% better Brier, within noise, and no
+    gain under leave-one-season-out testing. Kept for future experiments.
+
+    Opponent-adjusted (strength-of-schedule) ratings: solve for ratings r so
+    each completed game's goal margin ~= r_home - r_away + HOME_EDGE, with
+    each team pulled toward its prior as `prior_games` pseudo-games (ridge
+    regression, solved by coordinate descent). Against average opponents it
+    reduces exactly to team_ratings(); beating good teams now counts more.
+    Returns {team: (mean, sd)} like team_ratings().
+    """
+    games_by_team = {t: [] for t in teams}
+    for g in completed:
+        margin = g["home_score"] - g["away_score"] - HOME_EDGE
+        if g["home"] in games_by_team and g["away"] in games_by_team:
+            games_by_team[g["home"]].append((margin, g["away"]))    # r_home = margin + r_away
+            games_by_team[g["away"]].append((-margin, g["home"]))   # r_away = -margin + r_home
+
+    rating = {t: priors.get(t, 0.0) for t in teams}
+    for _ in range(iterations):
+        for t, games in games_by_team.items():
+            target = sum(m + rating[opp] for m, opp in games)
+            rating[t] = (target + prior_games * priors.get(t, 0.0)) / (len(games) + prior_games)
+
+    return {
+        t: (rating[t], talent_sd * math.sqrt(prior_games / (len(games_by_team[t]) + prior_games)))
+        for t in teams
+    }
 
 
 def _tiebreak_key(record):
@@ -271,9 +386,13 @@ def main():
         return
     logger.info(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
 
-    priors = load_priors(args.season)
-    logger.info(f"Loaded {len(priors)} prior ratings from season {previous_season_id(args.season)}")
-    ratings = team_ratings(standings, priors)
+    ratings = xg_model_ratings(standings, args.season)
+    if ratings is not None:
+        logger.info("Using the goals + MoneyPuck xG model")
+    else:
+        priors = load_priors(args.season)
+        logger.info(f"Goals-only model: {len(priors)} prior ratings from season {previous_season_id(args.season)}")
+        ratings = team_ratings(standings, priors)
 
     schedule = build_schedule(list(standings.keys()), args.season, args.as_of)
     logger.info(f"{len(schedule)} remaining games to simulate across {args.trials} trials")

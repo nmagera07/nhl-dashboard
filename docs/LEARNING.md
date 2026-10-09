@@ -57,6 +57,37 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-09 — Playoff odds v3: when the right answer is "don't change it"
+
+**What happened:** Set out to improve the playoff model further *without* new
+data. Built better diagnostics first: a calibration table, leave-one-season-out
+testing, a wider tuning grid over 4 seasons, and a strength-of-schedule
+variant. The finding: **the model was already about as good as this data
+allows, so I didn't ship a "v3."**
+
+**What I learned:**
+- **Calibration:** bucket predictions and check reality. When v2 says 75%,
+  about 75% of those teams make it; v1's "85%" teams made it only 71% of the
+  time. A model can have a decent overall score and still be systematically
+  overconfident, and calibration shows that.
+- **Leave-one-season-out exposes overfitting.** Settings tuned on three
+  seasons scored *worse* on the fourth (0.1244) than the existing fixed
+  settings (0.1208). All the top settings were within 0.0005 of each other,
+  which is noise. Past that point, more tuning just fits randomness.
+- **Negative results are results.** Strength-of-schedule ratings are sound in
+  theory, but measured about 0.3% better (noise) and no better under honest
+  testing. So it's documented as an experiment, not shipped. Shipping it would
+  have added complexity for nothing.
+- **Know which lever is left.** With goals-only data the model is at its
+  ceiling. Remaining error comes from information it doesn't have (shot
+  quality, goaltending), so the next real gain needs new data (MoneyPuck xG),
+  not more tuning.
+
+**Interview angle:** "Tell me about a time you decided *not* to ship
+something." Measured it honestly, found no real gain, kept it simple.
+
+---
+
 ## 2026-10-09 — NHL Intelligence: free AI, real evaluation, less magic
 
 **What happened:** The AI chat was broken: its paid OpenAI key ran out. I

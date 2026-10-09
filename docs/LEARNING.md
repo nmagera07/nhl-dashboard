@@ -47,6 +47,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   model calibrated on ~4,000 real games, official tiebreakers) and validated
   it by backtesting against 3 past seasons: 15% lower Brier score overall,
   29% lower in early season.
+- Added expected-goals (xG) data to the model and proved the gain with
+  leave-one-season-out backtesting on as-of data (no lookahead): a further
+  3.7% lower Brier overall and 7.6% early in the season.
 
 **Data and backend**
 - Fixed a data-integrity bug where cut and released players stayed on team
@@ -54,6 +57,33 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-09 — Playoff odds v2.1: the right new data beats more tuning
+
+**What happened:** The diagnostics said tuning was maxed out and the
+remaining error came from information the model didn't have. So I added
+MoneyPuck's expected goals (xG), which measures the *quality* of chances
+rather than whether they happened to go in.
+
+**What I learned:**
+- **No lookahead in backtests.** MoneyPuck's season files are full-season
+  totals, and using them to "predict" November would leak the future. Their
+  game-by-game file let me compute xG *as of* each checkpoint date, which is
+  the only honest way to test it.
+- **This one passed the bar strength of schedule failed:** 3.7% better
+  overall, 7.6% better on Nov 1, better on held-out seasons, and the *same
+  recipe* won in every leave-one-out fold (50% goals + 50% xG, last season's
+  xG as the prior). Consistent winners are real; shifting winners are noise.
+- **It helps exactly where theory says:** early in the season, when goals
+  are noisy. By March, a team's actual goals have caught up with its chance
+  quality, so xG adds nothing.
+- **Design for the dependency failing:** if MoneyPuck is down, the
+  simulator falls back to the goals-only model instead of failing the job.
+- **Read the data license:** MoneyPuck is free for non-commercial use *with
+  credit*, so the credit is in the UI (with a test so it can't disappear),
+  and the downloader identifies itself honestly instead of posing as a browser.
 
 ---
 

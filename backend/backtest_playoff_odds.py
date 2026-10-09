@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import os
 import random
@@ -103,6 +104,53 @@ def load_season(cur, season_id, cache_dir):
     return data
 
 
+def load_xg(path, situation="all"):
+    """
+    MoneyPuck's game-by-game team file (moneypuck.com/data.htm, free for
+    non-commercial use with credit) -> {season start year: [(date, team,
+    xG for, xG against)]}, regular season only. Lets the backtest compute
+    xG *as of* each checkpoint, with no peeking at later games.
+    """
+    games = defaultdict(list)
+    with open(path) as f:
+        for r in csv.DictReader(f):
+            if r["situation"] != situation or r["gameId"][4:6] != "02":
+                continue
+            d = r["gameDate"]
+            games[int(r["season"])].append(
+                (f"{d[:4]}-{d[4:6]}-{d[6:]}", r["team"], float(r["xGoalsFor"]), float(r["xGoalsAgainst"]))
+            )
+    return games
+
+
+def xg_diff_as_of(season_games, as_of):
+    """Total xG for minus against per team, over games on or before as_of."""
+    totals = defaultdict(float)
+    for d, team, xgf, xga in season_games:
+        if d <= as_of:
+            totals[team] += xgf - xga
+    return totals
+
+
+def season_xgd_per_game(season_games):
+    """Full-season xG differential per game (for priors)."""
+    diff, gp = defaultdict(float), defaultdict(int)
+    for _, team, xgf, xga in season_games:
+        diff[team] += xgf - xga
+        gp[team] += 1
+    return {t: diff[t] / gp[t] for t in diff if gp[t]}
+
+
+def blended_standings(standings, xgd_totals, weight):
+    """Standings with goal_differential replaced by a goals/xG blend, so
+    team_ratings() shrinks the blend exactly like it shrinks raw GD."""
+    out = {}
+    for team, row in standings.items():
+        gd = row.get("goal_differential", 0)
+        out[team] = {**row, "goal_differential": (1 - weight) * gd + weight * xgd_totals.get(team, gd)}
+    return out
+
+
 def calibration_table(pairs, buckets=10):
     """pairs: [(predicted, actual)]. Rows: bucket, n, mean predicted, observed rate."""
     rows = []
@@ -121,10 +169,16 @@ def main():
     parser.add_argument("--trials", type=int, default=1000)
     parser.add_argument("--cache-dir", default=None, help="Cache NHL data here between runs")
     parser.add_argument("--sos", action="store_true", help="Also score strength-of-schedule ratings")
+    parser.add_argument("--xg-file", default=None, help="MoneyPuck all_teams.csv (game by game) to score xG blends")
+    parser.add_argument("--only-production", action="store_true", help="Skip the v2 grid; score v1, production, and xG variants")
     args = parser.parse_args()
 
     brier_by = defaultdict(dict)    # model -> {(season, checkpoint date): brier}
     pairs_by = defaultdict(list)    # model -> [(predicted, actual)] for calibration
+
+    xg = load_xg(args.xg_file) if args.xg_file else None
+    grid = [PRODUCTION] if args.only_production else GRID
+    XG_VARIANTS = [(w, k, prior) for w in (0.5, 1.0) for k in (20, 30, 45) for prior in ("gd", "xgd")]
 
     with psycopg2.connect(sim.DATABASE_URL) as conn, conn.cursor() as cur:
         for season_id in args.seasons:
@@ -136,7 +190,17 @@ def main():
                 completed, remaining = sim.split_games(data["games"], cp["date"])
                 key = (season_id, cp["date"])
                 runs = {"v1": v1_simulate(standings, remaining, args.trials, random.Random(1))}
-                for c, k, sd in GRID:
+                if xg is not None:
+                    start = season_id // 10000
+                    xgd_now = xg_diff_as_of(xg[start], cp["date"])
+                    prior_xgd = season_xgd_per_game(xg[start - 1])
+                    c, _, sd = PRODUCTION
+                    for w, k, prior_src in XG_VARIANTS:
+                        base = prior_xgd if prior_src == "xgd" else data["prior_gd"]
+                        priors = {t: c * v for t, v in base.items()}
+                        ratings = sim.team_ratings(blended_standings(standings, xgd_now, w), priors, prior_games=k, talent_sd=sd)
+                        runs[f"xg w={w} K={k} prior={prior_src}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                for c, k, sd in grid:
                     priors = {t: c * gd for t, gd in data["prior_gd"].items()}
                     ratings = sim.team_ratings(standings, priors, prior_games=k, talent_sd=sd)
                     runs[v2_name(c, k, sd)] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
@@ -151,7 +215,8 @@ def main():
         vals = [b for (s, _), b in brier_by[model].items() if seasons is None or s in seasons]
         return sum(vals) / len(vals)
 
-    v2_models = [v2_name(*g) for g in GRID]
+    v2_models = [v2_name(*g) for g in grid]
+    xg_models = sorted(m for m in brier_by if m.startswith("xg "))
     sos_models = ["sos " + m for m in v2_models] if args.sos else []
     prod = v2_name(*PRODUCTION)
 
@@ -160,6 +225,17 @@ def main():
         print(f"  {name:<26} {mean(name):.4f}")
     print(f"  {'production ' + prod:<26} {mean(prod):.4f}")
     print(f"  {'v1':<26} {mean('v1'):.4f}")
+    if xg_models:
+        print("\nWith MoneyPuck xG blended into team strength (all seasons x checkpoints):")
+        for name in sorted(xg_models, key=mean):
+            print(f"  {name:<30} {mean(name):.4f}")
+        print("  by checkpoint, production vs best xG:")
+        best_xg = min(xg_models, key=mean)
+        for md in CHECKPOINTS:
+            label = md
+            p_vals = [b for (s_, d), b in brier_by[prod].items() if d.endswith(md)]
+            x_vals = [b for (s_, d), b in brier_by[best_xg].items() if d.endswith(md)]
+            print(f"    {label}:  production {sum(p_vals) / len(p_vals):.4f}   {best_xg} {sum(x_vals) / len(x_vals):.4f}")
     if sos_models:
         print("\nWith strength of schedule (top settings):")
         for name in sorted(sos_models, key=mean)[:5]:
@@ -167,7 +243,7 @@ def main():
 
     print("\nLeave-one-season-out (tune on the other seasons, score the held-out one):")
     avg = lambda xs: sum(xs) / len(xs)
-    families = [("v2", v2_models)] + ([("sos", sos_models)] if sos_models else [])
+    families = [("v2", v2_models)] + ([("sos", sos_models)] if sos_models else []) + ([("xg", xg_models)] if xg_models else [])
     for family, models in families:
         held_out_scores, prod_scores, v1_scores = [], [], []
         for held in args.seasons:
@@ -179,7 +255,7 @@ def main():
             print(f"  [{family}] {held}: picked {best:<30} held-out {mean(best, [held]):.4f}   production {mean(prod, [held]):.4f}   v1 {mean('v1', [held]):.4f}")
         print(f"  [{family}] average:  tuned {avg(held_out_scores):.4f}   production {avg(prod_scores):.4f}   v1 {avg(v1_scores):.4f}")
 
-    for name in ("v1", prod):
+    for name in ("v1", prod) + ((min(xg_models, key=mean),) if xg_models else ()):
         print(f"\nCalibration, {name} (when the model says X%, how often did teams make it?):")
         print(f"  {'bucket':<9} {'teams':>5} {'predicted':>10} {'actual':>8}")
         for bucket, n, pred, obs in calibration_table(pairs_by[name]):

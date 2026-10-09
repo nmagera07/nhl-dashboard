@@ -60,6 +60,71 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-09 — Goaltending: the "voodoo" is real
+
+**Question:** Goalies swing seasons, so should the model rate goaltending on
+its own instead of lumping it into goal differential?
+
+**What I checked first (before building anything):** whether goaltending
+*repeats*. If saving more goals than expected early doesn't predict saving more
+later, it's mostly luck and can't help a forecast. On MoneyPuck data since 2010:
+
+| Stat | odd vs. even games | this season vs. next |
+|---|---|---|
+| Team goals saved above expected | 0.23 | 0.18 |
+| Team finishing (goals above expected) | 0.17 | 0.22 |
+| Team xG differential | 0.64 | 0.60 |
+| Individual goalie, year to year | | 0.10 to 0.13 |
+
+Even individual goalies barely carry over, and a 2 to 3 season track record
+doesn't help much (0.13). Hockey analysts call goaltending "voodoo" for
+this reason.
+
+**Backtest:** split the blend into xG + finishing + goaltending with separate
+weights. Best: give goaltending *less* weight (0.25 vs 0.5), Brier 0.1158 vs
+0.1162, but the held-out test picked a different goaltending weight every
+season (0, 0, 0.25, 0.5) and scored worse than plain xG (0.1204 vs 0.1190).
+Shifting winners are noise. Didn't ship.
+
+**What I learned:**
+- Check whether a signal is *repeatable* before modeling it. A correlation
+  check took minutes; a goalie-tracking pipeline would have taken days.
+- Something can matter a lot *after the fact* (a hot goalie explains a season)
+  and still be useless for *predicting* it.
+
+**Interview angle:** "How do you decide whether a feature is worth building?"
+Measure whether the signal persists first.
+
+---
+
+## 2026-10-09 — Adjusted xG: a clean null result
+
+**Question:** MoneyPuck also publishes *adjusted* xG (corrected for score
+effects and home ice, and/or for rebound "flurries"). Would a cleaner version
+of xG make the playoff odds better?
+
+**What I did:** Added an `--xg-measures` option to the backtest so all four xG
+flavors run side by side through the same grid and leave-one-season-out test.
+
+**Result:** No. Score/venue-adjusted xG tied raw xG (Brier 0.1161 vs 0.1162,
+well inside the noise, and the same held-out score). Flurry adjustment was
+slightly *worse* (0.1167), so rebound chances seem to carry real signal about
+team strength. I didn't change production.
+
+**What I learned:**
+- Score effects mostly average out over a season, and the 50/50 blend with real
+  goals already smooths the noise the adjustment targets.
+- Two "don't ship" results in a row (strength of schedule, then this) say the
+  model has gotten what it can from team-level season totals. The next gains
+  need *new information* (goaltending, roster changes), not a polished version
+  of the same numbers.
+- Making experiments cheap to run is what makes null results cheap to accept.
+
+**Interview angle:** "Tell me about an experiment that didn't work." I tested
+it properly, it didn't beat what was live, so I kept the simpler model.
+
+---
+
 ## 2026-10-09 — Playoff odds v2.1: the right new data beats more tuning
 
 **What happened:** The diagnostics said tuning was maxed out and the

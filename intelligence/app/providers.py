@@ -95,19 +95,25 @@ class ProviderChain:
         return self._clients[provider.name]
 
     @staticmethod
-    def _messages(system: str, prompt: str) -> list[dict[str, str]]:
-        return [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+    def _messages(system: str, prompt: str, history=()) -> list[dict[str, str]]:
+        """System, then earlier turns (plain text, no page data), then the
+        new question with the page data attached."""
+        return [
+            {"role": "system", "content": system},
+            *({"role": turn["role"], "content": turn["content"]} for turn in history),
+            {"role": "user", "content": prompt},
+        ]
 
     @staticmethod
     def _why(exc: Exception) -> str:
         status = getattr(exc, "status_code", None)
         return f"HTTP {status}" if status else type(exc).__name__
 
-    async def complete(self, system: str, prompt: str, max_tokens: int) -> tuple[str, Provider]:
+    async def complete(self, system: str, prompt: str, max_tokens: int, history=()) -> tuple[str, Provider]:
         for provider in self.providers:
             try:
                 response = await self._client(provider).chat.completions.create(
-                    model=provider.model, messages=self._messages(system, prompt), max_tokens=max_tokens,
+                    model=provider.model, messages=self._messages(system, prompt, history), max_tokens=max_tokens,
                 )
                 text = (response.choices[0].message.content or "").strip() if response.choices else ""
                 if text:
@@ -117,7 +123,7 @@ class ProviderChain:
                 logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
         raise AllProvidersFailed()
 
-    async def stream(self, system: str, prompt: str, max_tokens: int) -> AsyncIterator[tuple[str, object]]:
+    async def stream(self, system: str, prompt: str, max_tokens: int, history=()) -> AsyncIterator[tuple[str, object]]:
         """
         Yields ("delta", text) chunks, then ("done", provider). Falls back to
         the next provider only before the first chunk -- an answer that has
@@ -128,7 +134,7 @@ class ProviderChain:
             started = False
             try:
                 stream = await self._client(provider).chat.completions.create(
-                    model=provider.model, messages=self._messages(system, prompt),
+                    model=provider.model, messages=self._messages(system, prompt, history),
                     max_tokens=max_tokens, stream=True,
                 )
                 async for chunk in stream:

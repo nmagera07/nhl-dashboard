@@ -72,10 +72,20 @@ export default function NHLDashboard() {
     const game = location.pathname.match(/^\/games\/(\d+)/);
     if (game) return { page: "game", game_id: Number(game[1]) };
 
-    // nhl-intelligence only accepts player | team | standings, so other
-    // pages (scores) use the general league context.
+    // Everything else (scores, standings, leaderboard) uses the league context.
     return { page: "standings" };
   }, [location.pathname]);
+
+  // Human-readable "Asking about: ..." for the chat drawer.
+  const intelligenceLabel = useMemo(() => {
+    if (intelligenceContext.page === "team") {
+      const team = standings.find((r) => r.team_abbrev === intelligenceContext.team_abbrev);
+      return team?.team_name || intelligenceContext.team_abbrev;
+    }
+    if (intelligenceContext.page === "player") return "this player";
+    if (intelligenceContext.page === "game") return "this game";
+    return "league standings & leaders";
+  }, [intelligenceContext, standings]);
 
   const divisions = useMemo(() => {
     const set = new Set(standings.map((r) => r.division).filter(Boolean));
@@ -123,7 +133,7 @@ export default function NHLDashboard() {
   return (
     <div className="dashboard">
       <TopNav search={search} onSearchChange={setSearch} />
-      <IntelligencePanel context={intelligenceContext} />
+      <IntelligencePanel context={intelligenceContext} label={intelligenceLabel} />
 
       <div className="app-content">
         <Routes>

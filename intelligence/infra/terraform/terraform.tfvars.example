@@ -1,5 +1,0 @@
-project_id = "your-google-cloud-project-id"
-region     = "us-east4"
-
-# Build and push this image after bootstrapping Artifact Registry.
-image = "us-east4-docker.pkg.dev/your-google-cloud-project-id/nhl-intelligence-images/nhl-intelligence:COMMIT_SHA"

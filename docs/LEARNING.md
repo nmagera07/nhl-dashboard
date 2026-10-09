@@ -29,6 +29,14 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   that also detects a scheduled job that never runs, and cut the monthly
   Azure bill from ~$11.44 to ~$0.97.
 
+**AI engineering**
+- Rebuilt an LLM chat feature to run on free providers (Gemini → Groq) with
+  automatic failover, cutting AI cost to $0 after the paid key ran out;
+  evaluated models against ground-truth questions (hosted 5/5 vs. local 7B 3/5).
+- Cut LLM context from ~1.3M characters (98% silently truncated) to ~3.4K
+  measured tokens of purpose-built summaries, so answers became correct and
+  free tiers became viable.
+
 **Security**
 - Removed a write-capable database credential that was exposed as a plain-text
   environment variable on the API, enforcing least privilege (the API only
@@ -46,6 +54,54 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-09 — NHL Intelligence: free AI, real evaluation, less magic
+
+**What happened:** The AI chat was broken: its paid OpenAI key ran out. I
+didn't want to pay for an API, so we rebuilt it to run on free tiers, moved it
+into this repo, and deployed it to Azure next to the API.
+
+**What I learned:**
+- **Check what you're actually sending.** The chat sent the model the raw
+  JSON, cut off at 24,000 characters. For league questions that kept **2%**
+  of the data: half the standings, no leaders, no playoff odds. So the model
+  *couldn't* answer correctly. The fix was a compact, purpose-built summary
+  per page, not a bigger model.
+- **Measure tokens, don't estimate.** I guessed ~3,700 tokens with the
+  "4 characters per token" rule. The real count was **5,752**, because JSON
+  full of numbers packs tighter. That was over the local model's 4,096-token
+  window, which *silently* drops the start of the prompt, instructions included.
+- **Do the reasoning in code, give the model the conclusion.** Small models
+  couldn't work out wild-card spots from two rank columns. Computing a plain
+  `playoff_spot` ("Eastern wild card 2 (in)") made those answers correct.
+  Cheap, deterministic code beats asking an LLM to do math.
+- **Evaluate with ground truth.** Five questions with known answers, run
+  against each model:
+
+  | | Gemini Flash-Lite | Groq gpt-oss-20b | Local Qwen 7B |
+  |---|---|---|---|
+  | Correct | **5/5** | **5/5** | 3/5 |
+
+  A 1B model confidently named the wrong overtime scorer even with the right
+  answer in front of it. Model size matters for *reliability*, not just fluency.
+- **Design for free-tier limits:** every free tier has caps, so the service
+  tries providers in order and falls over to the next on a rate limit or
+  outage. Keys have no payment method attached, so the worst case is "busy,"
+  never a bill. Streaming can only switch providers *before* the first word.
+- **Separate service, same repo:** the chat is its own deployable service
+  (its own keys, limits, and failure mode), but lives in the dashboard repo
+  because the two change together. Repos follow ownership; services follow
+  failure boundaries.
+- **Small verification bugs hide in "success" states:** the first deploy
+  went red because Azure said `RunningAtMaxScale`, not `Running`. Production
+  was fine; the check was too strict. The backend workflow had the same
+  latent bug.
+
+**Interview angle:** "How do you make an LLM feature reliable and cheap?"
+Shrink and structure the context, compute anything deterministic in code,
+evaluate against known answers, and design for provider failure.
 
 ---
 

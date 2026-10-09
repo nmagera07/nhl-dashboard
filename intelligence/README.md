@@ -43,49 +43,21 @@ the larger hosted models in production.
 Keys are used only by this service and must never be sent to the browser.
 Answers report which provider responded (`model` in the response).
 
-## Deploy to Google Cloud Run
+## Deploy
 
-> Being replaced: this service is moving to Azure Container Apps next to the
-> dashboard API, deployed by GitHub Actions. The Terraform below still
-> describes the current (OpenAI-based) Cloud Run deployment.
+Deployed to the `nhl-intelligence` Azure Container App (same environment as
+the dashboard API; scales 0-1) by `.github/workflows/intelligence-deploy.yml`
+on every push to `main` that touches `intelligence/`: tests, build and push
+`ghcr.io/nmagera07/nhl-intelligence:<sha>`, update the app, then verify the
+new revision is healthy and `GET /health` reports that commit.
 
-Deployment uses a container image plus Terraform. Terraform owns the Google
-APIs, Artifact Registry repository, runtime service account, Secret Manager
-secret, Cloud Run service, and public invoker policy. The OpenAI key value is
-added separately so it never enters Terraform state.
-
-Prerequisites: authenticated `gcloud`, Terraform 1.5+, Docker or Cloud Build,
-and a Google Cloud project with billing enabled.
+Provider keys are Container App secrets, set once and never in CI or git:
 
 ```bash
-cd infra/terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit project_id and the image path in terraform.tfvars.
-
-terraform init
-
-# Bootstrap APIs, the image repository, service account, and empty secret.
-terraform apply \
-  -target='google_project_service.required' \
-  -target='google_artifact_registry_repository.images' \
-  -target='google_service_account.runtime' \
-  -target='google_secret_manager_secret.openai_api_key'
-
-# Add the key outside Terraform. The command reads it without echoing it.
-read -s OPENAI_KEY
-printf '%s' "$OPENAI_KEY" | gcloud secrets versions add \
-  nhl-intelligence-openai-api-key --data-file=- --project=YOUR_PROJECT_ID
-unset OPENAI_KEY
-
-# From the repository root, build an immutable image tag.
-cd ../..
-IMAGE="us-east4-docker.pkg.dev/YOUR_PROJECT_ID/nhl-intelligence-images/nhl-intelligence:$(git rev-parse --short HEAD)"
-gcloud builds submit --tag "$IMAGE" --project=YOUR_PROJECT_ID .
-
-# Put the exact IMAGE value in infra/terraform/terraform.tfvars, then deploy.
-cd infra/terraform
-terraform apply
-terraform output -raw service_url
+az containerapp secret set -n nhl-intelligence -g nhl-dashboard-rg \
+  --secrets gemini-api-key=<key> groq-api-key=<key>
 ```
 
-Use the final output as `VITE_NHL_INTELLIGENCE_URL` in the dashboard build.
+`GET /health` shows the running commit and which providers are configured
+(names only). The service previously ran on Google Cloud Run via Terraform;
+that was retired in October 2026.

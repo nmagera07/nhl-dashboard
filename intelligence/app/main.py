@@ -39,9 +39,29 @@ class ChatContext(BaseModel):
         return self
 
 
+# Follow-ups: the client sends the last couple of exchanges so "what about
+# their power play?" makes sense. Capped server-side (count and length) so a
+# client can't run up token usage; page data is only attached to the newest
+# question, never repeated in history.
+MAX_HISTORY_MESSAGES = 4  # 2 question/answer exchanges
+MAX_HISTORY_CHARS = 1500  # per message
+
+
+class HistoryTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     context: ChatContext
+    history: list[HistoryTurn] = Field(default_factory=list, max_length=20)
+
+    def trimmed_history(self) -> list[dict[str, str]]:
+        return [
+            {"role": turn.role, "content": turn.content[:MAX_HISTORY_CHARS]}
+            for turn in self.history[-MAX_HISTORY_MESSAGES:]
+        ]
 
 
 class Evidence(BaseModel):
@@ -102,7 +122,8 @@ class IntelligenceService:
         context = await self._context(request)
         try:
             text, provider = await self.chain.complete(
-                SYSTEM_INSTRUCTIONS, self.prompt_for(request, context), self.settings.max_output_tokens
+                SYSTEM_INSTRUCTIONS, self.prompt_for(request, context), self.settings.max_output_tokens,
+                history=request.trimmed_history(),
             )
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
@@ -113,7 +134,9 @@ class IntelligenceService:
         context = await self._context(request)
         prompt = self.prompt_for(request, context)
         try:
-            async for kind, value in self.chain.stream(SYSTEM_INSTRUCTIONS, prompt, self.settings.max_output_tokens):
+            async for kind, value in self.chain.stream(
+                SYSTEM_INSTRUCTIONS, prompt, self.settings.max_output_tokens, history=request.trimmed_history()
+            ):
                 if kind == "delta":
                     yield f"data: {json.dumps({'type': 'delta', 'text': value})}\n\n"
                 else:

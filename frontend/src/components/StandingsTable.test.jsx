@@ -79,7 +79,7 @@ describe("StandingsTable", () => {
   it("shows the active sort column's direction arrow", () => {
     render(<StandingsTable view="advanced" rows={rows} onSelectTeam={vi.fn()} sortBy="pdo" sortDir="asc" onSort={vi.fn()} />);
 
-    expect(screen.getByText(/PDO\s*▲/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^PDO\s*▲$/ })).toBeInTheDocument();
   });
 
   it("formats xG% as a percentage, xGF/xGA to 1 decimal, SF/SA as plain integers, and PDO to 1 decimal", () => {

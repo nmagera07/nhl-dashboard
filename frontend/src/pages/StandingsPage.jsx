@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
 import DivisionTabs from "../components/DivisionTabs.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
+import StatGlossary from "../components/StatGlossary.jsx";
+
+const STANDARD_TERMS = ["GP", "W", "TEAM_L", "OT", "TEAM_PTS", "GF", "GA", "DIFF", "L10", "STRK", "PO%"];
+const ADVANCED_TERMS = ["GP", "TEAM_PTS", "xG%", "xGF", "xGA", "SF", "SA", "PDO"];
+const TERM_LABELS = { TEAM_L: "L", TEAM_PTS: "PTS" };
 
 const VIEWS = [
   { key: "standard", label: "Standard" },
@@ -65,6 +70,7 @@ function StandingsPage({
         <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
         {view === "standard" && <> <Link to="/playoffs">See the playoff race →</Link></>}
       </p>
+      <StatGlossary terms={view === "advanced" ? ADVANCED_TERMS : STANDARD_TERMS} labels={TERM_LABELS} />
       {playoffOddsStatus === "error" && (
         <div className="status-line status-error">
           Playoff odds unavailable — the PO% column may be incomplete.

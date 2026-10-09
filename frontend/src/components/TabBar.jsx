@@ -16,6 +16,14 @@ const ICONS = {
       <path d="M4 6h1M4 12h1M4 18h1" />
     </>
   ),
+  // Trophy
+  playoffs: (
+    <>
+      <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" />
+      <path d="M8 6H5v1.5A3 3 0 0 0 8 10.5M16 6h3v1.5a3 3 0 0 1-3 3" />
+      <path d="M12 13v4M8.5 20h7M10 17h4" />
+    </>
+  ),
   // Person
   players: (
     <>

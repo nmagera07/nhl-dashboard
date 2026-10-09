@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import StandingsPage from "./StandingsPage.jsx";
 
 function renderView(view) {
   return render(
+    <MemoryRouter>
     <StandingsPage
       divisions={["Metropolitan"]}
       activeDivision="Metropolitan"
@@ -18,6 +20,7 @@ function renderView(view) {
       sortDir="desc"
       onSort={vi.fn()}
     />
+    </MemoryRouter>
   );
 }
 
@@ -32,5 +35,10 @@ describe("StandingsPage", () => {
     renderView("standard");
     expect(screen.getByText(/playoff odds \(PO%\) blend goals with expected goals/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "MoneyPuck.com" })).toBeInTheDocument();
+  });
+
+  it("links to the playoff race from the standard view", () => {
+    renderView("standard");
+    expect(screen.getByRole("link", { name: /see the playoff race/i })).toHaveAttribute("href", "/playoffs");
   });
 });

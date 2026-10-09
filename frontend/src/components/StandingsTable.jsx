@@ -1,18 +1,10 @@
 import { darkLogo } from "../utils/darkLogo.js";
+import { formatOdds } from "../utils/playoffRace.js";
 
 function StreakBadge({ code, count }) {
   if (!code) return <span className="streak streak-none">—</span>;
   const cls = code === "W" ? "streak streak-w" : code === "L" ? "streak streak-l" : "streak streak-ot";
   return <span className={cls}>{code}{count}</span>;
-}
-
-function formatOdds(pct) {
-  if (pct == null) return "—";
-  const value = Number(pct) * 100;
-  // Never show a flat 0% or 100% unless it's truly settled: 0.4% -> "<1%".
-  if (value > 0 && value < 1) return "<1%";
-  if (value > 99 && value < 100) return ">99%";
-  return `${value.toFixed(0)}%`;
 }
 
 function PlayoffOddsCell({ pct }) {

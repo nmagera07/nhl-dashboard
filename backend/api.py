@@ -24,7 +24,7 @@ import psycopg2
 import psycopg2.extras
 import sentry_sdk
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Path, Request
+from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -37,6 +37,7 @@ from response_models import (
     HealthResponse,
     Team,
     PlayoffOdds,
+    PlayoffOddsHistory,
     RosterPlayer,
     PlayerLeader,
     PlayerDetail,
@@ -329,6 +330,41 @@ def playoff_odds(request: Request):
             return cur.fetchall()
     except Exception:
         logger.error("Failed to fetch playoff odds", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/playoff-odds/history", response_model=PlayoffOddsHistory)
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def playoff_odds_history(request: Request, season_id: Optional[int] = Query(None, ge=19171918, le=99999999)):
+    """
+    Every odds snapshot for one season (default: the latest season with
+    odds), oldest first -- one point per team per simulated day. Also lists
+    which seasons have odds, so the page can offer a season switch.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT season_id FROM playoff_odds ORDER BY season_id DESC")
+            seasons = [row["season_id"] for row in cur.fetchall()]
+            if season_id is None:
+                season_id = seasons[0] if seasons else None
+            points = []
+            if season_id in seasons:
+                cur.execute(
+                    """
+                    SELECT as_of_date, team_abbrev, playoff_pct
+                    FROM playoff_odds
+                    WHERE season_id = %s
+                    ORDER BY as_of_date, team_abbrev
+                    """,
+                    (season_id,),
+                )
+                points = cur.fetchall()
+            return {"season_id": season_id, "available_seasons": seasons, "points": points}
+    except Exception:
+        logger.error("Failed to fetch playoff odds history", exc_info=True)
         raise
     finally:
         conn.close()

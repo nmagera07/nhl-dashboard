@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS standings_snapshots (
     UNIQUE (snapshot_date, team_abbrev)
 );
 
+-- NHL clinch flag, if any: 'x'/'y'/'z' clinched a spot (wild card/division/
+-- conference), 'p' Presidents' Trophy, 'e' eliminated. NULL while undecided.
+ALTER TABLE standings_snapshots ADD COLUMN IF NOT EXISTS clinch_indicator VARCHAR(1);
+
 CREATE INDEX IF NOT EXISTS idx_snapshots_team_date
     ON standings_snapshots (team_abbrev, snapshot_date);
 

@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -24,3 +24,22 @@ class PlayoffOdds(BaseModel):
     division: Optional[str] = None
     conference: Optional[str] = None
     logo_url: Optional[str] = None
+
+
+class PlayoffOddsPoint(BaseModel):
+    """One team's odds on one date."""
+
+    as_of_date: date
+    team_abbrev: str
+    playoff_pct: float
+
+
+class PlayoffOddsHistory(BaseModel):
+    """
+    Every daily odds snapshot for one season, as returned by
+    GET /playoff-odds/history -- the playoff race chart's data.
+    """
+
+    season_id: Optional[int] = None
+    available_seasons: List[int]
+    points: List[PlayoffOddsPoint]

@@ -33,6 +33,7 @@ class StandingsSnapshotFields(BaseModel):
     conference_sequence: Optional[int] = None
     league_sequence: Optional[int] = None
     wildcard_sequence: Optional[int] = None
+    clinch_indicator: Optional[str] = None
     created_at: datetime
 
 

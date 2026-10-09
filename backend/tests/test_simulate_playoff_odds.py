@@ -249,3 +249,49 @@ class TestDeterminePlayoffTeams:
 
         with pytest.raises(ValueError, match="Empty"):
             determine_playoff_teams(trial_standings, divisions, conferences)
+
+
+# ---------------------------------------------------------------------------
+# adjusted_ratings (strength of schedule)
+# ---------------------------------------------------------------------------
+
+from simulate_playoff_odds import HOME_EDGE, adjusted_ratings, split_games
+
+
+def _game(home, away, hs, as_, date="2026-10-10"):
+    return {"date": date, "home": home, "away": away, "home_score": hs, "away_score": as_}
+
+
+class TestAdjustedRatings:
+    def test_with_no_games_ratings_are_the_priors(self):
+        ratings = adjusted_ratings(["A", "B"], [], {"A": 0.4}, prior_games=30)
+        assert ratings["A"][0] == pytest.approx(0.4)
+        assert ratings["B"][0] == pytest.approx(0.0)
+
+    def test_matches_the_simple_formula_against_average_opponents(self):
+        # A beats B by exactly the home edge -> zero adjusted margin, so both stay at 0.
+        ratings = adjusted_ratings(["A", "B"], [_game("A", "B", 3 + HOME_EDGE, 3)], {}, prior_games=30)
+        assert ratings["A"][0] == pytest.approx(0.0, abs=1e-9)
+
+    def test_beating_a_strong_team_counts_more_than_beating_a_weak_one(self):
+        teams = ["X", "Y", "STRONG", "WEAK"]
+        priors = {"STRONG": 0.8, "WEAK": -0.8}
+        games = [_game("X", "STRONG", 3, 2), _game("Y", "WEAK", 3, 2)]  # identical 1-goal home wins
+
+        ratings = adjusted_ratings(teams, games, priors, prior_games=30)
+
+        assert ratings["X"][0] > ratings["Y"][0]
+
+    def test_uncertainty_shrinks_with_games_played(self):
+        games = [_game("A", "B", 2, 1)] * 10
+        ratings = adjusted_ratings(["A", "B", "C"], games, {}, prior_games=30, talent_sd=0.35)
+        assert ratings["A"][1] < ratings["C"][1] == pytest.approx(0.35)
+
+
+class TestSplitGames:
+    def test_splits_played_games_from_remaining_ones(self):
+        games = [_game("A", "B", 2, 1, "2026-10-08"), {"date": "2026-10-12", "home": "B", "away": "A", "home_score": None, "away_score": None}]
+
+        completed, remaining = split_games(games, "2026-10-09")
+
+        assert len(completed) == 1 and remaining == [("B", "A")]

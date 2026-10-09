@@ -120,15 +120,39 @@ def fetch_standings_as_of(as_of_date):
     return standings
 
 
-def build_schedule(team_abbrevs, season_id, as_of_date):
-    """Unique remaining regular-season games as (home, away) pairs."""
+def fetch_season_games(team_abbrevs, season_id):
+    """
+    Every regular-season game once, as dicts with date, home, away, and the
+    final score (None until it's played).
+    """
     seen = {}
     for team in team_abbrevs:
         for g in nhl_get(SCHEDULE_URL.format(team=team, season=season_id))["games"]:
-            if g["gameType"] == 2 and g["gameDate"] > str(as_of_date):
-                seen[g["id"]] = (g["homeTeam"]["abbrev"], g["awayTeam"]["abbrev"])
+            if g["gameType"] != 2:
+                continue
+            final = g.get("gameState") in ("OFF", "FINAL")
+            seen[g["id"]] = {
+                "date": g["gameDate"],
+                "home": g["homeTeam"]["abbrev"],
+                "away": g["awayTeam"]["abbrev"],
+                "home_score": g["homeTeam"].get("score") if final else None,
+                "away_score": g["awayTeam"].get("score") if final else None,
+            }
         time.sleep(0.2)
     return list(seen.values())
+
+
+def split_games(games, as_of_date):
+    """(completed games with scores up to the date, remaining (home, away) pairs after it)."""
+    as_of = str(as_of_date)
+    completed = [g for g in games if g["date"] <= as_of and g["home_score"] is not None]
+    remaining = [(g["home"], g["away"]) for g in games if g["date"] > as_of]
+    return completed, remaining
+
+
+def build_schedule(team_abbrevs, season_id, as_of_date):
+    """Unique remaining regular-season games as (home, away) pairs."""
+    return split_games(fetch_season_games(team_abbrevs, season_id), as_of_date)[1]
 
 
 def load_priors(season_id):
@@ -157,6 +181,38 @@ def team_ratings(standings, priors, prior_games=PRIOR_GAMES, talent_sd=TALENT_SD
         sd = talent_sd * math.sqrt(prior_games / (gp + prior_games))
         ratings[abbrev] = (mean, sd)
     return ratings
+
+
+def adjusted_ratings(teams, completed, priors, prior_games=PRIOR_GAMES, talent_sd=TALENT_SD, iterations=50):
+    """
+    EXPERIMENTAL -- not used in production. Backtested 2026-10 over 4 seasons
+    (backtest_playoff_odds.py --sos): ~0.3% better Brier, within noise, and no
+    gain under leave-one-season-out testing. Kept for future experiments.
+
+    Opponent-adjusted (strength-of-schedule) ratings: solve for ratings r so
+    each completed game's goal margin ~= r_home - r_away + HOME_EDGE, with
+    each team pulled toward its prior as `prior_games` pseudo-games (ridge
+    regression, solved by coordinate descent). Against average opponents it
+    reduces exactly to team_ratings(); beating good teams now counts more.
+    Returns {team: (mean, sd)} like team_ratings().
+    """
+    games_by_team = {t: [] for t in teams}
+    for g in completed:
+        margin = g["home_score"] - g["away_score"] - HOME_EDGE
+        if g["home"] in games_by_team and g["away"] in games_by_team:
+            games_by_team[g["home"]].append((margin, g["away"]))    # r_home = margin + r_away
+            games_by_team[g["away"]].append((-margin, g["home"]))   # r_away = -margin + r_home
+
+    rating = {t: priors.get(t, 0.0) for t in teams}
+    for _ in range(iterations):
+        for t, games in games_by_team.items():
+            target = sum(m + rating[opp] for m, opp in games)
+            rating[t] = (target + prior_games * priors.get(t, 0.0)) / (len(games) + prior_games)
+
+    return {
+        t: (rating[t], talent_sd * math.sqrt(prior_games / (len(games_by_team[t]) + prior_games)))
+        for t in teams
+    }
 
 
 def _tiebreak_key(record):

@@ -6,7 +6,9 @@ rows fetched from MoneyPuck's real seasonSummary CSV during development,
 hand-verified against the raw CSV before this ingestion script existed.
 """
 
-from ingest_advanced_stats import moneypuck_year, parse_skater_row, parse_team_row, _pdo
+from datetime import date
+
+from ingest_advanced_stats import current_season_id, moneypuck_year, parse_skater_row, parse_team_row, _pdo
 
 
 class TestMoneypuckYear:
@@ -106,3 +108,12 @@ class TestParseSkaterRow:
         parsed = parse_skater_row(row)
 
         assert parsed["pdo"] is None
+
+
+
+class TestCurrentSeasonId:
+    def test_fall_is_the_season_starting_this_year(self):
+        assert current_season_id(date(2026, 10, 9)) == 20262027
+
+    def test_spring_is_the_season_that_started_last_year(self):
+        assert current_season_id(date(2027, 3, 1)) == 20262027

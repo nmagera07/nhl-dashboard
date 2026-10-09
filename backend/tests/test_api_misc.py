@@ -143,3 +143,21 @@ class TestPlayoffOddsHistory:
 
         assert response.status_code == 422
         assert db_router.calls == []
+
+
+class TestSeasonSim:
+    def test_returns_the_latest_inputs(self, client, db_router):
+        payload = {"season_id": 20262027, "teams": {}, "games": []}
+        db_router.when("from season_sim_inputs", [{"payload": payload}])
+
+        response = client.get("/season-sim")
+
+        assert response.status_code == 200
+        assert response.json() == payload
+
+    def test_404_before_the_first_run(self, client, db_router):
+        db_router.when("from season_sim_inputs", [])
+
+        response = client.get("/season-sim")
+
+        assert response.status_code == 404

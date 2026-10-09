@@ -1,4 +1,4 @@
-import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups } from "./playoffRace.js";
+import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups, seasonGames } from "./playoffRace.js";
 
 const row = (team_abbrev, division, division_sequence, wildcard_sequence) => ({ team_abbrev, division, division_sequence, wildcard_sequence });
 
@@ -81,5 +81,12 @@ describe("formatOdds", () => {
     expect(formatOdds(1)).toBe("100%");
     expect(formatOdds(0.426)).toBe("43%");
     expect(formatOdds(null)).toBe("—");
+  });
+});
+
+describe("seasonGames", () => {
+  it("is 84 games from 2026-27 on", () => {
+    expect(seasonGames(20252026)).toBe(82);
+    expect(seasonGames(20262027)).toBe(84);
   });
 });

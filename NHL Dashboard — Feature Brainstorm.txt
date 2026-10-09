@@ -9,6 +9,12 @@ Last updated: 2026-10-09
 ---
 
 ## In Progress
+- **Season simulator** — "Sim the season" on team pages (linked from the My
+  team card): plays out the remaining schedule in the browser with the
+  playoff-odds model, one season per click (final record, playoff seed,
+  game-by-game strip), plus a 3,000-season points spread.
+
+## Done recently
 - **"My team"** — follow a team (★ on its team page, or the picker on
   Scores; remembered in the browser). Scores leads with its card: record,
   division spot, playoff odds, live/next game, last 5 results. A ★ marks it

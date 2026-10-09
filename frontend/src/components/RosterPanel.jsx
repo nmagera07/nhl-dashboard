@@ -1,4 +1,5 @@
 import TeamSummary from "./TeamSummary.jsx";
+import SeasonSimulator from "./SeasonSimulator.jsx";
 
 // Columns marked col-optional hide on phones so the table fits without
 // sideways scrolling; the essentials stay.
@@ -113,6 +114,7 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
     <main className="roster-panel">
       <button className="back-link" onClick={onBack}>&larr; Standings</button>
       <TeamSummary team={team} />
+      {team && <SeasonSimulator team={team} />}
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
       <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />
       <GoalieTable players={goalies} onSelectPlayer={onSelectPlayer} />

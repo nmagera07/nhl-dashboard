@@ -125,6 +125,8 @@ def fetch_standings_as_of(as_of_date):
             "points": team["points"],
             "games_played": team["gamesPlayed"],
             "wins": team["wins"],
+            "losses": team.get("losses", 0),
+            "ot_losses": team.get("otLosses", 0),
             "regulation_wins": team.get("regulationWins", 0),
             "row": team.get("regulationPlusOtWins", 0),
             "goal_differential": team.get("goalDifferential", 0),
@@ -157,16 +159,25 @@ def fetch_season_games(team_abbrevs, season_id):
 
 
 def split_games(games, as_of_date):
-    """(completed games with scores up to the date, remaining (home, away) pairs after it)."""
+    """
+    (completed games with scores up to the date, remaining (home, away)
+    pairs). Standings for a date include that day's games once they're
+    played, so a game on the as-of date is remaining until it has a final
+    score -- the daily run happens before that day's games, and treating
+    them as done dropped them from the simulation entirely.
+    """
+    return [g for g in games if _is_played(g, as_of_date)], [(g["home"], g["away"]) for g in remaining_games(games, as_of_date)]
+
+
+def _is_played(game, as_of_date):
+    return game["date"] <= str(as_of_date) and game["home_score"] is not None
+
+
+def remaining_games(games, as_of_date):
+    """Games still to be played after the standings date, in date order."""
     as_of = str(as_of_date)
-    completed = [g for g in games if g["date"] <= as_of and g["home_score"] is not None]
-    remaining = [(g["home"], g["away"]) for g in games if g["date"] > as_of]
-    return completed, remaining
-
-
-def build_schedule(team_abbrevs, season_id, as_of_date):
-    """Unique remaining regular-season games as (home, away) pairs."""
-    return split_games(fetch_season_games(team_abbrevs, season_id), as_of_date)[1]
+    left = [g for g in games if g["date"] > as_of or (g["date"] == as_of and g["home_score"] is None)]
+    return sorted(left, key=lambda g: g["date"])
 
 
 def fetch_moneypuck_xgd(start_year):
@@ -352,6 +363,66 @@ def simulate(standings, schedule, trials, ratings, rng=random):
     return {team: made_playoffs[team] / trials for team in standings}
 
 
+def sim_inputs(standings, ratings, games, season_id, as_of_date):
+    """
+    Everything the in-browser season simulator needs to play out the rest
+    of the season exactly like simulate() does: the game model's constants,
+    each team's record and strength rating, and the remaining schedule.
+    """
+    return {
+        "season_id": season_id,
+        "as_of_date": str(as_of_date),
+        "model": {
+            "home_edge": HOME_EDGE,
+            "scale": SCALE,
+            "ot_probability": OT_PROBABILITY,
+            "shootout_share_of_ot": SHOOTOUT_SHARE_OF_OT,
+        },
+        "teams": {
+            abbrev: {
+                "points": s["points"],
+                "wins": s["wins"],
+                "losses": s.get("losses", 0),
+                "ot_losses": s.get("ot_losses", 0),
+                "regulation_wins": s.get("regulation_wins", 0),
+                "row": s.get("row", 0),
+                "division": s["division"],
+                "conference": s["conference"],
+                "rating": round(ratings[abbrev][0], 4),
+                "rating_sd": round(ratings[abbrev][1], 4),
+            }
+            for abbrev, s in standings.items()
+        },
+        "games": [[g["date"], g["home"], g["away"]] for g in remaining_games(games, as_of_date)],
+    }
+
+
+def save_sim_inputs(payload):
+    """
+    Store today's simulator inputs (one row per season, latest run wins).
+    Best effort: the odds are already saved, and a failure here (e.g. the
+    table not created yet) shouldn't fail the daily job.
+    """
+    import json
+
+    try:
+        with psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO season_sim_inputs (season_id, as_of_date, payload, computed_at)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (season_id) DO UPDATE SET
+                        as_of_date = EXCLUDED.as_of_date,
+                        payload = EXCLUDED.payload,
+                        computed_at = NOW()
+                    """,
+                    (payload["season_id"], payload["as_of_date"], json.dumps(payload)),
+                )
+    except psycopg2.Error as exc:
+        logger.warning(f"Couldn't save season simulator inputs ({exc}); odds were saved")
+
+
 def save_odds(odds, season_id, as_of_date, trials):
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -394,7 +465,8 @@ def main():
         logger.info(f"Goals-only model: {len(priors)} prior ratings from season {previous_season_id(args.season)}")
         ratings = team_ratings(standings, priors)
 
-    schedule = build_schedule(list(standings.keys()), args.season, args.as_of)
+    games = fetch_season_games(list(standings.keys()), args.season)
+    _, schedule = split_games(games, args.as_of)
     logger.info(f"{len(schedule)} remaining games to simulate across {args.trials} trials")
 
     started = time.time()
@@ -403,6 +475,7 @@ def main():
 
     if not args.no_save:
         save_odds(odds, args.season, args.as_of, args.trials)
+        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of))
 
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
         mean, _ = ratings[team]

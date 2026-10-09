@@ -296,6 +296,38 @@ class TestSplitGames:
 
         assert len(completed) == 1 and remaining == [("B", "A")]
 
+    def test_todays_unplayed_games_are_still_remaining(self):
+        # Regression: the daily run happens before that day's games, and
+        # "date > as_of" dropped them from the simulation entirely.
+        tonight = {"date": "2026-10-09", "home": "CBJ", "away": "PIT", "home_score": None, "away_score": None}
+        played_today = _game("A", "B", 2, 1, "2026-10-09")
+
+        completed, remaining = split_games([tonight, played_today], "2026-10-09")
+
+        assert completed == [played_today] and remaining == [("CBJ", "PIT")]
+
+
+class TestSimInputs:
+    def test_carries_everything_the_browser_simulator_needs(self):
+        from simulate_playoff_odds import SCALE, sim_inputs
+
+        standings = {
+            "PIT": {"points": 4, "wins": 2, "losses": 2, "ot_losses": 0, "regulation_wins": 2, "row": 2,
+                    "division": "Metropolitan", "conference": "Eastern", "games_played": 4, "goal_differential": 5},
+        }
+        games = [
+            {"date": "2026-10-12", "home": "PIT", "away": "BOS", "home_score": None, "away_score": None},
+            {"date": "2026-10-09", "home": "CBJ", "away": "PIT", "home_score": None, "away_score": None},
+            _game("PIT", "MTL", 6, 5, "2026-10-03"),
+        ]
+
+        payload = sim_inputs(standings, {"PIT": (0.123456, 0.2)}, games, 20262027, "2026-10-09")
+
+        assert payload["model"]["scale"] == SCALE
+        assert payload["teams"]["PIT"]["rating"] == 0.1235
+        assert payload["teams"]["PIT"]["losses"] == 2
+        assert payload["games"] == [["2026-10-09", "CBJ", "PIT"], ["2026-10-12", "PIT", "BOS"]]
+
 
 # ---------------------------------------------------------------------------
 # xG blend (MoneyPuck)

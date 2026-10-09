@@ -24,6 +24,11 @@ export function raceGroups(rows) {
   };
 }
 
+// Regular-season length: 82 games through 2025-26, 84 from 2026-27 (2025 CBA).
+export function seasonGames(seasonId) {
+  return seasonId >= 20262027 ? 84 : 82;
+}
+
 // NHL clinchIndicator codes -> a short badge and a full description.
 const CLINCH = {
   p: { label: "Clinched", title: "Clinched the Presidents' Trophy", tone: "in" },

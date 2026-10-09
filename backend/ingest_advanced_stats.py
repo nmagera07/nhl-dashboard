@@ -47,6 +47,7 @@ Usage:
 """
 
 import argparse
+from datetime import date
 import csv
 import io
 import os
@@ -61,11 +62,18 @@ load_dotenv()
 
 CSV_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/{kind}.csv"
 DATABASE_URL = os.environ["DATABASE_URL"]
-DEFAULT_SEASON = 20252026
 SITUATION = "5on5"
-# MoneyPuck blocks requests with no/unfamiliar User-Agent on some paths;
-# a normal browser UA avoids that entirely rather than working around it.
-REQUEST_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+# MoneyPuck's data is free for non-commercial use with credit
+# (moneypuck.com/data.htm). Identify honestly rather than posing as a
+# browser; the published CSV links accept this.
+REQUEST_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
+
+
+def current_season_id(today=None):
+    """Jul-Dec -> season starts this year; Jan-Jun -> it started last year."""
+    today = today or date.today()
+    start_year = today.year if today.month >= 7 else today.year - 1
+    return int(f"{start_year}{start_year + 1}")
 
 logger = setup_logging("ingest_advanced_stats")
 
@@ -233,9 +241,11 @@ def save_player_stats(cur, season_id, stats, valid_player_ids):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--season", type=int, default=DEFAULT_SEASON)
+    parser.add_argument("--season", type=int, default=None, help="Defaults to the current season")
     args = parser.parse_args()
 
+    if args.season is None:
+        args.season = current_season_id()
     year = moneypuck_year(args.season)
     logger.info(f"Fetching MoneyPuck advanced stats for {year} (season_id={args.season})...")
 

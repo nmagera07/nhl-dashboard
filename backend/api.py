@@ -383,6 +383,29 @@ def playoff_odds_history(request: Request, season_id: Optional[int] = Query(None
         conn.close()
 
 
+@app.get("/season-sim")
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def season_sim_inputs(request: Request):
+    """
+    Inputs for the in-browser season simulator, for the latest season: the
+    game model's constants, each team's record and strength rating, and the
+    remaining schedule. Written by the daily simulate_playoff_odds.py run.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
+            row = cur.fetchone()
+    except Exception:
+        logger.error("Failed to fetch season simulator inputs", exc_info=True)
+        raise
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
+    return row["payload"]
+
+
 @app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])
 def team_roster(team_abbrev: str = Path(..., max_length=3)):
     """

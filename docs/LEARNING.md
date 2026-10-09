@@ -60,6 +60,40 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-09 — Season simulator: Monte Carlo in the browser (and a bug it exposed)
+
+**What I built:** A "Sim the season" button on team pages. Each click plays
+out the rest of the regular season (all ~1,280 games, every team) and shows
+your team's final record, playoff seed, and a game-by-game strip. In the
+background it runs 3,000 more seasons to show the likely range of points.
+
+**How:** The daily job saves the model's inputs (constants, each team's record
+and strength rating, the remaining schedule) as one 44 KB JSON document. The
+browser runs the simulation itself, a JavaScript port of the Python model, so
+every click is instant and costs the server nothing.
+
+**Proving the port is right:** I ran 10,000 seasons through both versions on the
+same inputs and compared every team's playoff odds. The average gap was 0.5
+percentage points, exactly what random noise predicts. The model's constants
+come from the API with the inputs, so the two versions can't drift apart.
+
+**The bug it exposed:** Building the inputs, I checked which games count as
+"still to play" and found the daily odds run had been skipping that day's games
+entirely. Standings for a date include that day's games once played, but the
+job runs at 2 AM ET, before they're played, and the code treated every game
+dated today as already done. About half the league was simulated one game
+short, every day. Fixed: a game on the as-of date stays "remaining" until it has
+a final score.
+
+**Also learned:** the NHL season is 84 games starting in 2026-27 (new CBA). The
+simulator's 84-game records caught my hardcoded 82-game points pace.
+
+**Interview angle:** "How do you know your code is correct?" Two independent
+implementations, compared statistically, plus checking the simulation's
+output against reality (records that add up to the real schedule length).
+
+---
+
 ## 2026-10-09 — Goaltending: the "voodoo" is real
 
 **Question:** Goalies swing seasons, so should the model rate goaltending on

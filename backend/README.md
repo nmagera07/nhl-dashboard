@@ -152,6 +152,7 @@ the top-level README for why.
 | `GET /standings/{team}/seasons` | Final standings for that team's last 5 completed seasons |
 | `GET /teams/{team_abbrev}/schedule` | One team's live game, last 5 results, and next 3 games (NHL club schedule, cached) for the My team card |
 | `GET /playoff-odds` | Latest Monte Carlo playoff-odds simulation, all teams |
+| `GET /season-sim` | Inputs for the in-browser season simulator: model constants, each team's record and rating, remaining schedule |
 | `GET /playoff-odds/history?season_id=` | Every odds snapshot for a season (default: latest), for the playoff race chart |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |
 | `GET /players/leaders` | Every rostered player + season stats (league leaderboard) |

@@ -165,7 +165,10 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
             <button type="button" className="link-button" onClick={() => onChangeTeam(null)}>Stop following</button>
           </>
         ) : (
-          <button type="button" className="link-button" onClick={() => setChanging(true)}>Change team</button>
+          <>
+            <Link className="my-team-sim-link" to={`/teams/${team.team_abbrev}#season-sim`}>Sim the season ›</Link>
+            <button type="button" className="link-button" onClick={() => setChanging(true)}>Change team</button>
+          </>
         )}
       </div>
     </section>

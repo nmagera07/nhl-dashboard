@@ -6,8 +6,9 @@ export const API_BASE = (
   "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io"
 ).replace(/\/+$/, "");
 
-// The AI service owns the model key and prompt logic. Keeping the URL overridable
-// lets preview environments point at a different Cloud Run service when needed.
+// NHL Intelligence (intelligence/, on Azure Container Apps) owns the AI provider
+// keys and prompt logic. Overridable so local development can point at a local
+// service (e.g. VITE_NHL_INTELLIGENCE_URL=http://localhost:8001).
 export const INTELLIGENCE_BASE = (
   import.meta.env.VITE_NHL_INTELLIGENCE_URL ||
   "https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io"

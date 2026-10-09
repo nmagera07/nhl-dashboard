@@ -150,6 +150,7 @@ the top-level README for why.
 | `GET /standings/latest` | Most recent day's standings, all teams, joined with this season's 5-on-5 team advanced stats (corsi/fenwick/xG%/PDO). `?sort_by=<field>&sort_dir=asc\|desc` overrides the default league_sequence ordering — see `STANDINGS_SORT_FIELDS` in `api.py` for the allowed field names (400 on an unrecognized one) |
 | `GET /standings/{team}` | Full daily-snapshot history for one team (`?start=&end=` optional) |
 | `GET /standings/{team}/seasons` | Final standings for that team's last 5 completed seasons |
+| `GET /teams/{team_abbrev}/schedule` | One team's live game, last 5 results, and next 3 games (NHL club schedule, cached) for the My team card |
 | `GET /playoff-odds` | Latest Monte Carlo playoff-odds simulation, all teams |
 | `GET /playoff-odds/history?season_id=` | Every odds snapshot for a season (default: latest), for the playoff race chart |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |

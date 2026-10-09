@@ -269,3 +269,50 @@ class TestResponseCache:
             cache.get(f"k{i}", lambda i=i: i, lambda v: 60)
 
         assert list(cache._entries) == ["k2", "k3", "k4"]
+
+
+def _club_game(game_id, start, state, home, away, home_score=None, away_score=None, period="REG", game_type=2):
+    return {
+        "id": game_id, "gameDate": start[:10], "startTimeUTC": start, "gameState": state, "gameType": game_type,
+        "homeTeam": {"abbrev": home, "darkLogo": f"{home}_dark.svg", **({"score": home_score} if home_score is not None else {})},
+        "awayTeam": {"abbrev": away, "darkLogo": f"{away}_dark.svg", **({"score": away_score} if away_score is not None else {})},
+        **({"gameOutcome": {"lastPeriodType": period}} if state in ("FINAL", "OFF") else {}),
+    }
+
+
+class TestTeamSchedule:
+    SCHEDULE = {"games": [
+        _club_game(1, "2026-09-26T19:00:00Z", "OFF", "BUF", "PIT", 1, 3, game_type=1),  # preseason: ignored
+        _club_game(2, "2026-09-30T23:30:00Z", "OFF", "PHI", "PIT", 0, 7),
+        _club_game(3, "2026-10-03T23:00:00Z", "OFF", "PIT", "MTL", 5, 6, "OT"),
+        _club_game(4, "2026-10-05T23:00:00Z", "FINAL", "PIT", "NYR", 2, 4),
+        _club_game(5, "2026-10-10T23:00:00Z", "FUT", "BOS", "PIT"),
+        _club_game(6, "2026-10-08T23:00:00Z", "FUT", "PIT", "CAR"),
+    ]}
+
+    def test_summarizes_results_and_upcoming_games_from_the_teams_side(self, monkeypatch):
+        monkeypatch.setattr(nhl_games, "_get", _fake_get({"/club-schedule-season/PIT/now": self.SCHEDULE}))
+
+        summary = nhl_games.team_schedule("pit")
+
+        assert summary["live"] is None
+        assert [(g["id"], g["result"], g["team_score"], g["opponent_score"], g["home"]) for g in summary["recent"]] == [
+            (4, "L", 2, 4, True), (3, "OTL", 5, 6, True), (2, "W", 7, 0, False),
+        ]
+        assert [(g["id"], g["opponent"], g["home"]) for g in summary["upcoming"]] == [(6, "CAR", True), (5, "BOS", False)]
+        assert summary["upcoming"][1]["opponent_logo"] == "BOS_dark.svg"
+
+    def test_a_game_in_progress_is_the_live_game(self):
+        payload = {"games": [_club_game(7, "2026-10-08T23:00:00Z", "LIVE", "PIT", "CAR", 1, 0)]}
+
+        summary = nhl_games.summarize_team_schedule(payload, "PIT", date(2026, 10, 8))
+
+        assert summary["live"]["id"] == 7 and summary["live"]["team_score"] == 1
+        assert summary["plays_today"] is True
+
+    def test_idle_days_cache_longer_than_game_days(self):
+        idle = nhl_games.summarize_team_schedule(self.SCHEDULE, "PIT", date(2026, 10, 7))
+        game_day = nhl_games.summarize_team_schedule(self.SCHEDULE, "PIT", date(2026, 10, 8))
+
+        assert nhl_games._team_schedule_ttl(idle) == nhl_games.TEAM_SCHEDULE_IDLE_TTL
+        assert nhl_games._team_schedule_ttl(game_day) == nhl_games.SCHEDULED_TTL

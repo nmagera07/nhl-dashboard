@@ -244,3 +244,77 @@ def month_calendar(year: int, month: int, today: date | None = None) -> dict[str
         _CALENDAR_CACHE[key] = (time.time() + ttl, result)
     return result
 
+
+
+# --- One team's schedule ------------------------------------------------------
+
+TEAM_SCHEDULE_IDLE_TTL = 15 * 60  # no game today: results only change after games
+TEAM_SCHEDULE_RECENT = 5
+TEAM_SCHEDULE_UPCOMING = 3
+_COUNTED_GAME_TYPES = {2, 3}  # regular season and playoffs (not preseason)
+
+
+def _team_game(game: dict[str, Any], abbrev: str) -> dict[str, Any]:
+    """One game from the team's point of view."""
+    home = game["homeTeam"]["abbrev"] == abbrev
+    us, them = (game["homeTeam"], game["awayTeam"]) if home else (game["awayTeam"], game["homeTeam"])
+    return {
+        "id": game["id"],
+        "date": game.get("gameDate"),
+        "start_time_utc": game.get("startTimeUTC"),
+        "state": game.get("gameState"),
+        "home": home,
+        "opponent": them["abbrev"],
+        "opponent_logo": them.get("darkLogo") or them.get("logo"),
+        "team_score": us.get("score"),
+        "opponent_score": them.get("score"),
+    }
+
+
+def _result(game: dict[str, Any]) -> str:
+    """W, L, or OTL (lost in overtime or a shootout, which still earns a point)."""
+    if game["team_score"] > game["opponent_score"]:
+        return "W"
+    return "OTL" if game["last_period_type"] in ("OT", "SO") else "L"
+
+
+def summarize_team_schedule(payload: dict[str, Any], abbrev: str, today: date) -> dict[str, Any]:
+    """The live game (if any), the last few results, and the next few games."""
+    recent, upcoming, live = [], [], None
+    for game in payload.get("games", []):
+        if game.get("gameType") not in _COUNTED_GAME_TYPES:
+            continue
+        g = _team_game(game, abbrev)
+        if g["state"] in FINAL_STATES:
+            g["last_period_type"] = (game.get("gameOutcome") or {}).get("lastPeriodType", "REG")
+            g["result"] = _result(g)
+            recent.append(g)
+        elif g["state"] in {"LIVE", "CRIT"}:
+            live = g
+        else:
+            upcoming.append(g)
+    recent.sort(key=lambda g: g["start_time_utc"] or "", reverse=True)
+    upcoming.sort(key=lambda g: g["start_time_utc"] or "")
+    return {
+        "team": abbrev,
+        "live": live,
+        "recent": recent[:TEAM_SCHEDULE_RECENT],
+        "upcoming": upcoming[:TEAM_SCHEDULE_UPCOMING],
+        "plays_today": live is not None or any(g["date"] == today.isoformat() for g in upcoming),
+    }
+
+
+def _team_schedule_ttl(summary: dict[str, Any]) -> int:
+    if summary["live"]:
+        return SCOREBOARD_LIVE_TTL
+    return SCHEDULED_TTL if summary["plays_today"] else TEAM_SCHEDULE_IDLE_TTL
+
+
+def team_schedule(abbrev: str) -> dict[str, Any]:
+    """A team's live game, last results, and next games for the current season."""
+    abbrev = abbrev.upper()
+    return _cache.get(
+        f"team-schedule/{abbrev}",
+        lambda: summarize_team_schedule(_get(f"/club-schedule-season/{abbrev}/now"), abbrev, date.today()),
+        _team_schedule_ttl,
+    )

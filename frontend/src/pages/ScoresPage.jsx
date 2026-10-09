@@ -2,11 +2,15 @@ import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
+import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
+import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
 
 // The selected day lives in the URL (/?date=2026-10-06), so the back
 // button, refreshes, and shared links all keep it. No date = today.
-function ScoresPage() {
+function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
+  const [favorite, setFavorite] = useFavoriteTeam();
+  const myTeam = standings.find((t) => t.team_abbrev === favorite);
   const [searchParams, setSearchParams] = useSearchParams();
   const today = todayISO();
   const param = searchParams.get("date");
@@ -48,6 +52,14 @@ function ScoresPage() {
           )}
         </div>
       </div>
+      {myTeam ? (
+        <MyTeamCard team={myTeam} odds={playoffOddsByTeam[myTeam.team_abbrev]} teams={standings} onChangeTeam={setFavorite} />
+      ) : standings.length > 0 && !favorite ? (
+        <div className="my-team-prompt">
+          <TeamPicker teams={standings} onPick={setFavorite} />
+          <span>Pin your team's next game, results, and playoff odds here.</span>
+        </div>
+      ) : null}
       <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
       <Scoreboard key={date} date={isToday ? null : date} />
     </main>

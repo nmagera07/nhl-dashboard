@@ -35,6 +35,15 @@ export function relativeDayLabel(iso, today = todayISO()) {
   return fromISO(iso).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 }
 
+// A game's start in the viewer's time zone: "Today 7:00 PM",
+// "Tomorrow 7:00 PM", or "Sat, Oct 10 7:00 PM".
+export function gameTimeLabel(startTimeUTC, today = todayISO()) {
+  if (!startTimeUTC) return "TBD";
+  const start = new Date(startTimeUTC);
+  const time = start.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${relativeDayLabel(toISO(start), today)} ${time}`;
+}
+
 export function longDateLabel(iso) {
   return fromISO(iso).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }

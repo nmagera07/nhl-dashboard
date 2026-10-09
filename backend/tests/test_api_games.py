@@ -50,3 +50,29 @@ def test_games_calendar_returns_the_month(client, monkeypatch):
 def test_games_calendar_rejects_a_malformed_month(client):
     assert client.get("/games/calendar/2026-13").status_code == 422
     assert client.get("/games/calendar/october").status_code == 422
+
+
+def test_team_schedule_returns_the_summary(client, monkeypatch):
+    import api
+
+    summary = {"team": "PIT", "live": None, "recent": [], "upcoming": [], "plays_today": False}
+    monkeypatch.setattr(api, "team_schedule", lambda abbrev: summary)
+    response = client.get("/teams/PIT/schedule")
+    assert response.status_code == 200
+    assert response.json() == summary
+
+
+def test_team_schedule_rejects_a_malformed_abbreviation(client):
+    response = client.get("/teams/PITT/schedule")
+    assert response.status_code == 422
+
+
+def test_team_schedule_reports_an_nhl_outage(client, monkeypatch):
+    import api
+
+    def unavailable(abbrev):
+        raise api.NHLGamesUnavailable("The NHL live game feed is temporarily unavailable.")
+
+    monkeypatch.setattr(api, "team_schedule", unavailable)
+    response = client.get("/teams/PIT/schedule")
+    assert response.status_code == 503

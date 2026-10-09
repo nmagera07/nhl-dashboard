@@ -45,7 +45,7 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
-from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, today_games
+from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
 
 load_dotenv()
 
@@ -288,6 +288,19 @@ def game_box_score(game_id: int = Path(..., gt=0)):
     """Detailed NHL gamecenter box score for a selected game."""
     try:
         return game_boxscore(game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/teams/{team_abbrev}/schedule")
+def team_schedule_summary(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
+    """
+    One team's live game (if any), last 5 results, and next 3 games this
+    season, from the NHL's club schedule (cached; see nhl_games.py). Powers
+    the "My team" card.
+    """
+    try:
+        return team_schedule(team_abbrev)
     except NHLGamesUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

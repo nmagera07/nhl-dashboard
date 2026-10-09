@@ -9,16 +9,14 @@ Last updated: 2026-10-09
 ---
 
 ## In Progress
-- **Playoff race page** (`/playoffs`) — odds over the season as a chart (tap a
-  team to follow its race; last season backfilled weekly for comparison),
-  plus the conference laid out in the playoff format with PO%, weekly
-  change, and clinched/eliminated badges.
+- **"My team"** — follow a team (★ on its team page, or the picker on
+  Scores; remembered in the browser). Scores leads with its card: record,
+  division spot, playoff odds, live/next game, last 5 results. A ★ marks it
+  in standings and the race table, and Standings opens on its division.
 
 ---
 
 ## Up Next
-- **"My team" pinned view** — pick a favorite team once; the app leads with
-  their next game, recent results, odds, and standings spot.
 - **Push notifications** for goals and final scores (see Fan-focused below).
 - **Head-to-head / rivalry view** — season series between two teams, a
   side-by-side stat comparison, and chat context for "who wins tonight?"
@@ -103,5 +101,6 @@ Last updated: 2026-10-09
 - ~~Site redesign + installable phone app (PWA), Oct 2026~~
 - ~~Past/future scoreboards with a season calendar~~
 - ~~Server-side TTL cache on the live game endpoints~~
+- ~~Playoff race page: odds-over-time chart + playoff-format race table~~
 - ~~NHL Intelligence chat in the repo, on free AI providers (Gemini -> Groq),
   with game-page context and a chat drawer redesign~~

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { phase, sortGames, statusLabel } from "./gameStatus.js";
 import { darkLogo } from "../utils/darkLogo.js";
+import { todayISO } from "../utils/dates.js";
 
 function networks(game) {
   const names = (game.tvBroadcasts || []).filter((b) => b.market === "N").map((b) => b.network);
@@ -49,16 +50,18 @@ function GameCard({ game, onOpen }) {
 
 // date: "YYYY-MM-DD" for another day, or null for today (which also
 // refreshes every minute; other days don't change often enough to poll).
+// Today is fetched by its date, not the NHL's "score/now" feed: that feed
+// keeps showing last night's games until late morning, which put
+// yesterday's finals under today's date.
 export default function Scoreboard({ date = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [games, setGames] = useState([]);
   const [status, setStatus] = useState("loading");
-  const url = date ? `${API_BASE}/games/date/${date}` : `${API_BASE}/games/today`;
-
   useEffect(() => {
     let active = true;
-    const load = () => fetch(url)
+    // Re-read "today" on each refresh, so a page left open past midnight moves on.
+    const load = () => fetch(`${API_BASE}/games/date/${date || todayISO()}`)
       .then((response) => {
         if (!response.ok) throw new Error("scoreboard unavailable");
         return response.json();
@@ -72,7 +75,7 @@ export default function Scoreboard({ date = null }) {
     load();
     const timer = date ? null : window.setInterval(load, 60_000);
     return () => { active = false; if (timer) window.clearInterval(timer); };
-  }, [url, date]);
+  }, [date]);
 
   // Remember which day we came from, so the box score's back link returns there.
   const openGame = (id) => navigate(`/games/${id}`, { state: { from: `${location.pathname}${location.search}` } });

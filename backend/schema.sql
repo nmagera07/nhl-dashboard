@@ -323,3 +323,13 @@ CREATE TABLE IF NOT EXISTS playoff_odds (
 
 CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
     ON playoff_odds (season_id, as_of_date);
+-- Inputs for the in-browser season simulator (frontend/src/utils/seasonSim.js):
+-- the game model's constants, each team's record and strength rating, and the
+-- remaining schedule, as one JSON document. One row per season, replaced by
+-- each daily run. See simulate_playoff_odds.sim_inputs().
+CREATE TABLE IF NOT EXISTS season_sim_inputs (
+    season_id               INTEGER PRIMARY KEY,
+    as_of_date              DATE NOT NULL,
+    payload                 JSONB NOT NULL,
+    computed_at             TIMESTAMP DEFAULT NOW()
+);

@@ -39,7 +39,17 @@ jobs:
           latest_time=$(git log -1 --format=%ct "$latest")
           echo "Latest backend commit on main: $latest ($(git log -1 --format='%ci %s' "$latest"))"
 
-          deployed=$(curl -s --max-time 15 "$HEALTH_URL" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit', 'unknown'))" || echo "unreachable")
+          # The API scales to zero when idle, and a cold start takes ~20s, so
+          # give it time to wake (and retry) before calling it unreachable.
+          deployed="unreachable"
+          for attempt in 1 2 3; do
+            if commit=$(curl -s --max-time 60 "$HEALTH_URL" | python3 -c "import json,sys; print(json.load(sys.stdin).get('commit', 'unknown'))" 2>/dev/null); then
+              deployed="$commit"
+              break
+            fi
+            echo "attempt $attempt: no response from /health (cold start?), retrying"
+            sleep 10
+          done
           echo "Production reports: $deployed"
 
           # Up to date if production's backend/ matches main's, compared by

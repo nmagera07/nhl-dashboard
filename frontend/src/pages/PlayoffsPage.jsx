@@ -7,7 +7,7 @@ import FavoriteStar from "../components/FavoriteStar.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
-import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups } from "../utils/playoffRace.js";
+import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups, seasonGames } from "../utils/playoffRace.js";
 
 const CONFERENCES = ["Eastern", "Western"];
 const EMPTY_HISTORY = { season_id: null, available_seasons: [], points: [] };
@@ -60,7 +60,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight }) {
             </td>
             <td>{row.games_played}</td>
             <td className="col-pts">{row.points}</td>
-            <td className="race-col-pace">{Math.round((row.points / Math.max(row.games_played, 1)) * 82)}</td>
+            <td className="race-col-pace">{Math.round((row.points / Math.max(row.games_played, 1)) * seasonGames(row.season_id))}</td>
             <td className="race-col-odds">
               <span className="race-odds">
                 <span className="race-odds-bar" aria-hidden="true">
@@ -189,7 +189,7 @@ function PlayoffsPage({ standings }) {
                 <th className="col-team" scope="col">Team</th>
                 <th scope="col">GP</th>
                 <th scope="col">PTS</th>
-                <th scope="col" className="race-col-pace"><abbr title="82-game points pace">Pace</abbr></th>
+                <th scope="col" className="race-col-pace"><abbr title={`${seasonGames(currentSeason)}-game points pace`}>Pace</abbr></th>
                 <th scope="col" className="race-col-odds">PO%</th>
                 <th scope="col"><abbr title="Change in playoff odds over the last 7 days, in percentage points">7d</abbr></th>
               </tr>

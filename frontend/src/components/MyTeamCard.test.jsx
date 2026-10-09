@@ -47,6 +47,7 @@ describe("MyTeamCard", () => {
     const chips = within(screen.getByRole("list")).getAllByRole("link");
     expect(chips.map((c) => c.getAttribute("title"))).toEqual(["Lost 3–5 @ WSH", "Lost in SO 5–6 vs MTL", "Won 7–0 @ PHI"]);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/teams\/PIT\/schedule$/));
+    expect(screen.getByRole("link", { name: /sim the season/i })).toHaveAttribute("href", "/teams/PIT#season-sim");
   });
 
   it("shows the live game instead of the next one", async () => {

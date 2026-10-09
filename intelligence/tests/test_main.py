@@ -89,3 +89,19 @@ async def test_dashboard_retries_transient_timeout():
 
     assert attempts == 2
     assert context.facts["player"]["name"] == "Player One"
+
+
+def test_health_reports_commit_and_configured_providers(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import app.main as main
+
+    monkeypatch.setenv("GIT_SHA", "abc123")
+    monkeypatch.setenv("GROQ_API_KEY", "k")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    with TestClient(main.app) as client:
+        body = client.get("/health").json()
+
+    assert body["status"] == "ok"
+    assert body["commit"] == "abc123"
+    assert "groq" in body["providers"] and "gemini" not in body["providers"]

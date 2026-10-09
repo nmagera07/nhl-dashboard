@@ -34,7 +34,7 @@ describe("IntelligencePanel", () => {
     expect(screen.getByText(/evidence: team standings/i)).toBeInTheDocument();
     expect(screen.getByText("Answered by Groq")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://nhl-intelligence-kaxll7b4fq-uk.a.run.app/chat/stream",
+      "https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io/chat/stream",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({

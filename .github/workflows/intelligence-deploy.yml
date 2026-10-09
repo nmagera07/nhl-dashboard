@@ -1,0 +1,141 @@
+name: Intelligence Deploy
+#
+# Tests, builds, and deploys NHL Intelligence (the AI chat service in
+# intelligence/) on every push to main that touches it. Same pattern as
+# backend-deploy.yml: image built on the runner and pushed to GHCR (public,
+# no registry credential), rolled out to the nhl-intelligence Container App,
+# then verified: the new revision must be healthy AND /health must report
+# this exact commit. Azure auth is OIDC via the same "production"
+# environment federated credential as the backend.
+#
+# AI provider keys are Container App secrets (gemini-api-key,
+# groq-api-key), set once with `az containerapp secret set`; this workflow
+# never sees them.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "intelligence/**"
+      - ".github/workflows/intelligence-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+# Never run two deploys at once; queue the newer one instead.
+concurrency:
+  group: intelligence-deploy
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: nhl-dashboard-rg
+  IMAGE: ghcr.io/nmagera07/nhl-intelligence
+  CONTAINER_APP: nhl-intelligence
+  HEALTH_URL: https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io/health
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Intelligence tests
+    defaults:
+      run:
+        working-directory: intelligence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: intelligence/requirements*.txt
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - run: python -m pytest
+
+  # Tagged with the full commit SHA, which is also baked in for GET /health.
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Build and push image
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: intelligence
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Deploy
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update the Container App
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$IMAGE:${GITHUB_SHA}" \
+            -o none
+
+      # `az containerapp update` only means the request was accepted. In
+      # single-revision mode the OLD revision keeps serving the public URL
+      # while a crash-looping new one sits underneath, so the public URL
+      # alone can't be trusted. This checks the new revision's own state,
+      # and that /health reports this exact commit -- which only the new
+      # revision can do.
+      - name: Verify the new revision is healthy and serving this commit
+        run: |
+          NEW_REVISION=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.latestRevisionName" -o tsv)
+          echo "New revision: $NEW_REVISION"
+
+          # Scaled to zero: the health request itself wakes the new revision.
+          for i in $(seq 1 24); do
+            state=$(az containerapp revision show \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --revision "$NEW_REVISION" \
+              --query "join('/', [properties.healthState, properties.runningState])" -o tsv 2>/dev/null || echo "Unknown")
+            body=$(curl -s --max-time 10 "$HEALTH_URL" || echo "")
+            echo "attempt $i/24: revision=$state health=$body"
+
+            if [ "$state" = "Healthy/Running" ] \
+               && echo "$body" | grep -q '"status":"ok"' \
+               && echo "$body" | grep -q "\"commit\":\"${GITHUB_SHA}\""; then
+              echo "Production is healthy and serving ${GITHUB_SHA}."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "::error::Revision $NEW_REVISION did not come up healthy serving ${GITHUB_SHA} within 4 minutes."
+          exit 1

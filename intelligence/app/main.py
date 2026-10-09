@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
@@ -141,7 +142,12 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "commit": os.getenv("GIT_SHA") or "unknown",
+        "providers": [p.name for p in app.state.intelligence.settings.providers]
+        if hasattr(app.state, "intelligence") else [],
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)

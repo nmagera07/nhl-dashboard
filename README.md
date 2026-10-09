@@ -95,6 +95,7 @@ Azure Static      Azure Container
 | `ingest_player_stats.py` | Full roster + season stats, all 32 teams; marks cut/released players off-roster | Daily |
 | `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team + skater, from MoneyPuck (free for non-commercial use with credit) | Daily |
 | `backfill_season_history.py` | Last 5 completed seasons' final standings | One-time |
+| `backfill_playoff_odds.py` | Weekly playoff odds for a past season (xG as of each date), so the race chart has a full season | One-off |
 
 The daily scripts (standings, advanced stats, playoff odds, then player
 stats) run through `run_daily_ingest.py`, the entry point of the

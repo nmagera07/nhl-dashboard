@@ -80,7 +80,7 @@ def insert_snapshot(cur, snapshot_date, team):
             l10_wins, l10_losses, l10_ot_losses,
             streak_code, streak_count,
             division_sequence, conference_sequence, league_sequence,
-            wildcard_sequence
+            wildcard_sequence, clinch_indicator
         ) VALUES (
             %s, %s, %s, %s,
             %s, %s, %s, %s, %s,
@@ -89,7 +89,7 @@ def insert_snapshot(cur, snapshot_date, team):
             %s, %s, %s,
             %s, %s,
             %s, %s, %s,
-            %s
+            %s, %s
         )
         ON CONFLICT (snapshot_date, team_abbrev) DO UPDATE SET
             season_id = EXCLUDED.season_id,
@@ -115,6 +115,7 @@ def insert_snapshot(cur, snapshot_date, team):
             conference_sequence = EXCLUDED.conference_sequence,
             league_sequence = EXCLUDED.league_sequence,
             wildcard_sequence = EXCLUDED.wildcard_sequence,
+            clinch_indicator = EXCLUDED.clinch_indicator,
             created_at = NOW()
         """,
         (
@@ -143,6 +144,7 @@ def insert_snapshot(cur, snapshot_date, team):
             team["conferenceSequence"],
             team["leagueSequence"],
             team["wildcardSequence"],
+            team.get("clinchIndicator"),  # only present once a team clinches or is eliminated
         ),
     )
 

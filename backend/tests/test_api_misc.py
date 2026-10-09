@@ -92,3 +92,54 @@ class TestPlayoffOdds:
 
         assert response.status_code == 200
         assert response.json() == []
+
+
+class TestPlayoffOddsHistory:
+    POINTS = [
+        {"as_of_date": "2026-10-08", "team_abbrev": "PIT", "playoff_pct": 0.42},
+        {"as_of_date": "2026-10-09", "team_abbrev": "PIT", "playoff_pct": 0.45},
+    ]
+
+    def test_defaults_to_the_latest_season(self, client, db_router):
+        db_router.when("select distinct season_id", [{"season_id": 20262027}, {"season_id": 20252026}])
+        db_router.when("where season_id = %s", self.POINTS)
+
+        response = client.get("/playoff-odds/history")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["season_id"] == 20262027
+        assert body["available_seasons"] == [20262027, 20252026]
+        assert [p["playoff_pct"] for p in body["points"]] == [0.42, 0.45]
+        assert db_router.calls[-1][1] == (20262027,)
+
+    def test_a_specific_season(self, client, db_router):
+        db_router.when("select distinct season_id", [{"season_id": 20262027}, {"season_id": 20252026}])
+        db_router.when("where season_id = %s", self.POINTS)
+
+        response = client.get("/playoff-odds/history?season_id=20252026")
+
+        assert response.json()["season_id"] == 20252026
+        assert db_router.calls[-1][1] == (20252026,)
+
+    def test_a_season_without_odds_returns_no_points_and_skips_the_query(self, client, db_router):
+        db_router.when("select distinct season_id", [{"season_id": 20262027}])
+
+        response = client.get("/playoff-odds/history?season_id=20102011")
+
+        assert response.status_code == 200
+        assert response.json()["points"] == []
+        assert len(db_router.calls) == 1
+
+    def test_no_odds_at_all(self, client, db_router):
+        db_router.when("select distinct season_id", [])
+
+        response = client.get("/playoff-odds/history")
+
+        assert response.json() == {"season_id": None, "available_seasons": [], "points": []}
+
+    def test_rejects_a_malformed_season(self, client, db_router):
+        response = client.get("/playoff-odds/history?season_id=2026")
+
+        assert response.status_code == 422
+        assert db_router.calls == []

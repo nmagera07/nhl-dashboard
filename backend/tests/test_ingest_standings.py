@@ -60,3 +60,12 @@ class TestInsertSnapshot:
         _, params = cur.calls[0]
         assert params[:4] == ("2026-10-08", "PIT", 20262027, 5)
         assert params[7] == 6
+
+
+    def test_stores_the_clinch_flag_and_tolerates_its_absence(self):
+        cur = _RecordingCursor()
+        insert_snapshot(cur, "2026-04-10", _team(clinchIndicator="x"))
+        insert_snapshot(cur, "2026-10-08", _team())
+
+        assert cur.calls[0][1][-1] == "x"
+        assert cur.calls[1][1][-1] is None

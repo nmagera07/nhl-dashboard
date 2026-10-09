@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import DivisionTabs from "../components/DivisionTabs.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 
@@ -62,6 +63,7 @@ function StandingsPage({
           ? "5-on-5 advanced stats (xG%, xGF, xGA, shots, PDO) courtesy of "
           : "Playoff odds (PO%) blend goals with expected goals (xG) courtesy of "}
         <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+        {view === "standard" && <> <Link to="/playoffs">See the playoff race →</Link></>}
       </p>
       {playoffOddsStatus === "error" && (
         <div className="status-line status-error">

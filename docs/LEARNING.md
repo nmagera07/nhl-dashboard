@@ -51,12 +51,80 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   leave-one-season-out backtesting on as-of data (no lookahead): a further
   3.7% lower Brier overall and 7.6% early in the season.
 
+- Built an in-browser season simulator by porting the Monte Carlo model to
+  JavaScript, validated against the Python original over 10,000 simulated
+  seasons (mean gap 0.5 percentage points, the noise floor); runs ~7,000
+  full seasons per second client-side at zero server cost.
+- Found and fixed a date-boundary bug that silently dropped each day's games
+  from the daily playoff simulation (about half the league simulated one game
+  short, every day), with a regression test.
+- Tested three more model ideas (adjusted xG, strength of schedule,
+  goaltending) with held-out backtests and shipped none after showing the
+  gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
+
+**Frontend**
+- Built an interactive playoff race page with a hand-written responsive SVG
+  chart (no chart library): hover and tap to follow a team, live readout,
+  and a full prior season backfilled from as-of data for comparison.
+- Built a personalized "My team" experience without accounts: a
+  `useSyncExternalStore` preference hook keeps every component (and every
+  open tab) in sync, with a team card showing live/next game, recent results,
+  and playoff odds.
+- Made heavy client-side computation feel instant by running 3,000 seasons in
+  small slices so the histogram fills in live without freezing the page.
+
 **Data and backend**
 - Fixed a data-integrity bug where cut and released players stayed on team
   rosters indefinitely (~580 stale records), using a soft-delete flag that
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-09 — "My team": personalization without accounts
+
+**What I built:** Follow a team (star on its team page, or a picker on Scores)
+and the app leads with it: record, division place, playoff odds, the live or
+next game, and the last 5 results. A star marks it in tables, and Standings
+opens on its division.
+
+**What I learned:**
+- **`useSyncExternalStore`** is React's built-in way to read outside state
+  (here, localStorage). Every component reading the favorite updates together,
+  and a `storage` event listener keeps other tabs in sync too.
+- localStorage can throw (private mode, blocked cookies), so every read and
+  write is wrapped and the app still works without saving.
+- **Testing found a real bug:** the card said "Pittsburgh plays tonight" but
+  the scoreboard didn't show the game. The NHL's `score/now` feed keeps serving
+  last night's games until late morning, so the Scores page labeled
+  yesterday's finals as today. Fixed by asking for today's games by date.
+
+**Interview angle:** "How would you add personalization without user
+accounts?" Local preference, shared through one hook, synced across tabs.
+
+---
+
+## 2026-10-09 — Playoff race page: a hand-built SVG chart
+
+**What I built:** A Playoffs tab showing every team's odds over the season as
+a line chart (tap or hover to follow one team), plus the conference laid out
+the way the playoffs work: division top 3s, wild cards, the cut line, weekly
+change, and clinched/eliminated badges.
+
+**What I learned:**
+- **SVG by hand instead of a chart library:** about 150 lines for exactly what I
+  needed, with no dependency. Measuring the container with `ResizeObserver`
+  and drawing at real pixel size keeps labels readable on phones, where a
+  scaled `viewBox` would shrink the text.
+- **No hindsight in the backfill:** to show last season's race, I re-ran the
+  model for each week using only the data available on that date (xG from
+  the game-by-game file, cut off at each date).
+- **Database changes come before the code that needs them:** the new clinch
+  column had to exist before the release that writes to it.
+
+**Interview angle:** "Have you built data visualizations?" Yes, from scratch,
+responsive, interactive, and accessible.
 
 ---
 

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
+import StatAbbr from "../components/StatAbbr.jsx";
+import StatGlossary from "../components/StatGlossary.jsx";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
 const LIVE_REFRESH_MS = 30000;
@@ -201,15 +203,15 @@ function SkaterTable({ title, players }) {
         <thead>
           <tr>
             <th className="col-team">{title}</th>
-            <th>G</th>
-            <th>A</th>
-            <th>P</th>
-            <th>+/-</th>
-            <th>SOG</th>
-            <th>HIT</th>
-            <th>BLK</th>
-            <th>PIM</th>
-            <th>TOI</th>
+            <th><StatAbbr term="G" /></th>
+            <th><StatAbbr term="A" /></th>
+            <th><StatAbbr term="P" /></th>
+            <th><StatAbbr term="+/-" /></th>
+            <th><StatAbbr term="SOG" /></th>
+            <th><StatAbbr term="HIT" /></th>
+            <th><StatAbbr term="BLK" /></th>
+            <th><StatAbbr term="PIM" /></th>
+            <th><StatAbbr term="TOI" /></th>
           </tr>
         </thead>
         <tbody>
@@ -248,11 +250,11 @@ function GoalieTable({ goalies }) {
         <thead>
           <tr>
             <th className="col-team">Goalies</th>
-            <th>SA</th>
-            <th>SV</th>
-            <th>GA</th>
-            <th>SV%</th>
-            <th>TOI</th>
+            <th><StatAbbr term="SA" /></th>
+            <th><StatAbbr term="SV" /></th>
+            <th><StatAbbr term="GA" /></th>
+            <th><StatAbbr term="SV%" /></th>
+            <th><StatAbbr term="TOI" /></th>
           </tr>
         </thead>
         <tbody>
@@ -421,6 +423,7 @@ export default function GamePage() {
         <section className="boxscore-card">
           <h2>Player stats</h2>
           <PlayerStats playerStats={playerStats} away={away} home={home} />
+          <StatGlossary terms={["G", "A", "P", "+/-", "SOG", "HIT", "BLK", "PIM", "TOI", "SA", "SV", "GA", "SV%"]} />
         </section>
       )}
     </main>

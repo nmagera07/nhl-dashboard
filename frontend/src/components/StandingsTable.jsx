@@ -2,6 +2,7 @@ import { darkLogo } from "../utils/darkLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import FavoriteStar from "./FavoriteStar.jsx";
+import StatAbbr from "./StatAbbr.jsx";
 
 function StreakBadge({ code, count }) {
   if (!code) return <span className="streak streak-none">—</span>;
@@ -68,32 +69,32 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           <tr>
             <th className="col-rank"></th>
             <th className="col-team">TEAM</th>
-            <th>GP</th>
+            <th><StatAbbr term="GP" /></th>
             {advanced ? (
               <>
-                <th className="col-pts">PTS</th>
+                <th className="col-pts"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
                 {ADVANCED_SORT_COLUMNS.map((col) => (
                   <th
                     key={col.key}
                     className={col.key === sortBy ? "sortable-col sortable-col-active" : "sortable-col"}
                     onClick={() => onSort(col.key)}
                   >
-                    {col.label}{col.key === sortBy ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+                    <StatAbbr term={col.label} />{col.key === sortBy ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
                   </th>
                 ))}
               </>
             ) : (
               <>
-                <th>W</th>
-                <th>L</th>
-                <th>OT</th>
-                <th className="col-pts">PTS</th>
-                <th>GF</th>
-                <th>GA</th>
-                <th>DIFF</th>
-                <th>L10</th>
-                <th>STRK</th>
-                <th className="col-po" title="Playoff odds from a daily Monte Carlo simulation">PO%</th>
+                <th><StatAbbr term="W" /></th>
+                <th><StatAbbr term="TEAM_L">L</StatAbbr></th>
+                <th><StatAbbr term="OT" /></th>
+                <th className="col-pts"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
+                <th><StatAbbr term="GF" /></th>
+                <th><StatAbbr term="GA" /></th>
+                <th><StatAbbr term="DIFF" /></th>
+                <th><StatAbbr term="L10" /></th>
+                <th><StatAbbr term="STRK" /></th>
+                <th className="col-po" title="Playoff odds from a daily Monte Carlo simulation"><StatAbbr term="PO%" /></th>
               </>
             )}
           </tr>

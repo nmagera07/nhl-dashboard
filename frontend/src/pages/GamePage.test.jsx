@@ -136,7 +136,7 @@ describe("GamePage", () => {
     renderGame(finalGame());
     await loaded();
 
-    expect(screen.getByText("Shots on goal")).toBeInTheDocument();
+    expect(within(screen.getByRole("heading", { name: "Team stats" }).closest("section")).getByText("Shots on goal")).toBeInTheDocument();
     expect(screen.getByText("35.8%")).toBeInTheDocument();
     expect(screen.getByText("1/3")).toBeInTheDocument();
     // Redundant categories are dropped.

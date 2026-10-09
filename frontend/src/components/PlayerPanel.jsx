@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 import { darkLogo } from "../utils/darkLogo.js";
+import StatAbbr from "./StatAbbr.jsx";
+import StatGlossary from "./StatGlossary.jsx";
 
 const POSITION_LABELS = { C: "Center", L: "Left Wing", R: "Right Wing", D: "Defense", G: "Goalie" };
 
@@ -95,7 +97,7 @@ function StatsTable({ rows, columns, firstColumn, label }) {
           <tr>
             <th className="col-team">{firstColumn}</th>
             {columns.map((col) => (
-              <th key={col.key} className={columnClass(col)}>{col.label}</th>
+              <th key={col.key} className={columnClass(col)}><StatAbbr term={col.label} /></th>
             ))}
           </tr>
         </thead>
@@ -192,15 +194,15 @@ function PlayerPanel({ player, onBack, backLabel }) {
           <div className="player-card">
             <dl className="stat-strip">
               {[
-                ["Corsi %", formatPct(advancedStats.corsi_for_pct)],
-                ["Fenwick %", formatPct(advancedStats.fenwick_for_pct)],
-                ["xG %", formatPct(advancedStats.xgoals_for_pct)],
-                ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`],
-                ["Ind. xG", formatDecimal(advancedStats.individual_xgoals)],
-                ["PDO", formatDecimal(advancedStats.pdo, 1)],
-              ].map(([label, value]) => (
+                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
+                ["Fenwick %", formatPct(advancedStats.fenwick_for_pct), "FENWICK%"],
+                ["xG %", formatPct(advancedStats.xgoals_for_pct), "xG%"],
+                ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`, "ONICE_XG"],
+                ["Ind. xG", formatDecimal(advancedStats.individual_xgoals), "IND_XG"],
+                ["PDO", formatDecimal(advancedStats.pdo, 1), "PDO"],
+              ].map(([label, value, term]) => (
                 <div key={label} className="stat-strip-item">
-                  <dt>{label}</dt>
+                  <dt><StatAbbr term={term}>{label}</StatAbbr></dt>
                   <dd>{value}</dd>
                 </div>
               ))}
@@ -255,6 +257,10 @@ function PlayerPanel({ player, onBack, backLabel }) {
           )}
         </Section>
       )}
+      <StatGlossary
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "CORSI%", "FENWICK%", "xG%", "ONICE_XG", "IND_XG", "PDO"]}
+        labels={{ "CORSI%": "Corsi %", "FENWICK%": "Fenwick %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG" }}
+      />
     </main>
   );
 }

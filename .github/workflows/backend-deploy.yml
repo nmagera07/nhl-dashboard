@@ -137,7 +137,10 @@ jobs:
             body=$(curl -s --max-time 10 "$HEALTH_URL" || echo "")
             echo "attempt $i/24: revision=$state health=$body"
 
-            if [ "$state" = "Healthy/Running" ] \
+            # Any healthy running state counts: "Running", or
+            # "RunningAtMaxScale" when the app is at its replica cap
+            # (always true for a max-replicas=1 app once it's up).
+            if [[ "$state" == Healthy/Running* ]] \
                && echo "$body" | grep -q '"status":"ok"' \
                && echo "$body" | grep -q '"database":"connected"' \
                && echo "$body" | grep -q "\"commit\":\"${GITHUB_SHA}\""; then

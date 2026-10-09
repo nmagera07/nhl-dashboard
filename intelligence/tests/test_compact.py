@@ -49,6 +49,31 @@ class TestStandingRow:
         assert compact.standing_row(standing("PIT", wildcard_sequence=2))["wildcard_rank"] == 2
 
 
+class TestPlayoffSpot:
+    def test_spells_out_the_playoff_picture(self):
+        assert compact.playoff_spot(standing("NYR", division_sequence=1, wildcard_sequence=0)) == "Metropolitan #1 (in)"
+        assert compact.playoff_spot(standing("PIT", division_sequence=4, wildcard_sequence=2, conference="Eastern")) == "Eastern wild card 2 (in)"
+        assert compact.playoff_spot(standing("CBJ", division_sequence=5, wildcard_sequence=6, conference="Eastern")) == "Outside (Eastern wild-card race #6)"
+
+
+class TestPlayoffPicture:
+    def test_lists_division_top_threes_and_conference_wild_cards(self):
+        rows = [
+            standing("NYR", division_sequence=1, wildcard_sequence=0),
+            standing("CAR", division_sequence=2, wildcard_sequence=0),
+            standing("WSH", division_sequence=3, wildcard_sequence=0),
+            standing("PIT", division_sequence=4, wildcard_sequence=2),
+            standing("BUF", division="Atlantic", division_sequence=4, wildcard_sequence=1),
+            standing("CBJ", division_sequence=5, wildcard_sequence=3),
+        ]
+
+        east = compact.playoff_picture(rows)["Eastern"]
+
+        assert east["Metropolitan top 3"] == ["NYR", "CAR", "WSH"]
+        assert east["wild cards"] == ["BUF", "PIT"]
+        assert east["next out"] == ["CBJ"]
+
+
 class TestLeagueFacts:
     def test_includes_every_team_odds_and_top_leaders_but_not_every_player(self):
         standings = [standing("NYR", league_sequence=1), standing("PIT", league_sequence=17)]

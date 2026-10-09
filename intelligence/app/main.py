@@ -1,12 +1,13 @@
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from openai import AsyncOpenAI, OpenAIError
+from openai import OpenAIError
 from pydantic import BaseModel, Field, model_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -15,6 +16,7 @@ from slowapi.util import get_remote_address
 
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
+from .providers import AllProvidersFailed, ProviderChain
 
 
 logger = logging.getLogger(__name__)
@@ -50,17 +52,23 @@ class Evidence(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     evidence: list[Evidence]
+    model: str | None = None  # which provider answered, e.g. "Google Gemini"
+
+
+NOT_CONFIGURED = "NHL Intelligence is not configured yet."
+ALL_BUSY = "NHL Intelligence is taking a breather (its free AI providers are busy). Try again in a minute."
+MID_ANSWER_FAILURE = "NHL Intelligence lost its connection mid-answer. Try asking again."
 
 
 SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
-Use only the supplied dashboard data. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
+Use only the supplied dashboard data. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
 
 
 class IntelligenceService:
-    def __init__(self, settings: Settings, dashboard: DashboardClient | None = None, openai_client=None):
+    def __init__(self, settings: Settings, dashboard: DashboardClient | None = None, chain: ProviderChain | None = None):
         self.settings = settings
         self.dashboard = dashboard or DashboardClient(settings.dashboard_api_url)
-        self.openai_client = openai_client or (AsyncOpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None)
+        self.chain = chain if chain is not None else ProviderChain(settings.providers)
 
     async def context_for(self, context: ChatContext) -> ContextBundle:
         if context.page == "player":
@@ -82,71 +90,39 @@ class IntelligenceService:
             f"\n\nDashboard data (JSON): {facts}"
         )
 
-    async def answer(self, request: ChatRequest) -> ChatResponse:
-        if not self.openai_client:
-            raise HTTPException(status_code=503, detail="NHL Intelligence is not configured yet.")
+    async def _context(self, request: ChatRequest) -> ContextBundle:
+        if not self.chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         try:
-            context = await self.context_for(request.context)
+            return await self.context_for(request.context)
         except DashboardUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    async def answer(self, request: ChatRequest) -> ChatResponse:
+        context = await self._context(request)
         try:
-            response = await self.openai_client.responses.create(
-                model=self.settings.openai_model,
-                instructions=SYSTEM_INSTRUCTIONS,
-                input=self.prompt_for(request, context),
-                max_output_tokens=self.settings.max_output_tokens,
+            text, provider = await self.chain.complete(
+                SYSTEM_INSTRUCTIONS, self.prompt_for(request, context), self.settings.max_output_tokens
             )
-        except OpenAIError as exc:
-            logger.exception("OpenAI response failed")
-            status_code = getattr(exc, "status_code", None)
-            if status_code in {401, 403}:
-                detail = "NHL Intelligence's AI provider configuration needs attention."
-            elif status_code == 429:
-                detail = "NHL Intelligence has reached its current AI usage limit."
-            else:
-                detail = "NHL Intelligence's AI provider is temporarily unavailable."
-            raise HTTPException(status_code=503, detail=detail) from exc
-        answer = getattr(response, "output_text", "").strip()
-        if not answer:
-            raise HTTPException(status_code=502, detail="The model returned an empty response.")
-        return ChatResponse(answer=answer, evidence=[Evidence(**item) for item in context.evidence])
+        except AllProvidersFailed as exc:
+            raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
+        return ChatResponse(answer=text, evidence=[Evidence(**item) for item in context.evidence], model=provider.label)
 
     async def answer_stream(self, request: ChatRequest):
         """Yield server-sent events as the model produces answer text."""
-        if not self.openai_client:
-            raise HTTPException(status_code=503, detail="NHL Intelligence is not configured yet.")
-        try:
-            context = await self.context_for(request.context)
-        except DashboardUnavailable as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-
+        context = await self._context(request)
         prompt = self.prompt_for(request, context)
         try:
-            stream = await self.openai_client.responses.create(
-                model=self.settings.openai_model,
-                instructions=SYSTEM_INSTRUCTIONS,
-                input=prompt,
-                stream=True,
-                max_output_tokens=self.settings.max_output_tokens,
-            )
-            async for event in stream:
-                if getattr(event, "type", None) == "response.output_text.delta":
-                    delta = getattr(event, "delta", "")
-                    if delta:
-                        yield f"data: {json.dumps({'type': 'delta', 'text': delta})}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'evidence': context.evidence})}\n\n"
-        except OpenAIError as exc:
-            logger.exception("OpenAI streaming response failed")
-            yield f"data: {json.dumps({'type': 'error', 'message': self.provider_error(exc)})}\n\n"
-
-    @staticmethod
-    def provider_error(exc: OpenAIError) -> str:
-        status_code = getattr(exc, "status_code", None)
-        if status_code in {401, 403}:
-            return "NHL Intelligence's AI provider configuration needs attention."
-        if status_code == 429:
-            return "NHL Intelligence has reached its current AI usage limit."
-        return "NHL Intelligence's AI provider is temporarily unavailable."
+            async for kind, value in self.chain.stream(SYSTEM_INSTRUCTIONS, prompt, self.settings.max_output_tokens):
+                if kind == "delta":
+                    yield f"data: {json.dumps({'type': 'delta', 'text': value})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'done', 'evidence': context.evidence, 'model': value.label})}\n\n"
+        except AllProvidersFailed:
+            yield f"data: {json.dumps({'type': 'error', 'message': ALL_BUSY})}\n\n"
+        except OpenAIError:
+            logger.exception("AI provider failed mid-answer")
+            yield f"data: {json.dumps({'type': 'error', 'message': MID_ANSWER_FAILURE})}\n\n"
 
 
 @asynccontextmanager
@@ -166,7 +142,12 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "commit": os.getenv("GIT_SHA") or "unknown",
+        "providers": [p.name for p in app.state.intelligence.settings.providers]
+        if hasattr(app.state, "intelligence") else [],
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)

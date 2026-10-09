@@ -28,8 +28,9 @@ describe("StandingsPage", () => {
     expect(screen.getByRole("link", { name: "MoneyPuck.com" })).toHaveAttribute("href", "https://moneypuck.com");
   });
 
-  it("doesn't show the credit on the standard view, which has no MoneyPuck data", () => {
+  it("credits MoneyPuck on the standard view too, since playoff odds use its xG", () => {
     renderView("standard");
-    expect(screen.queryByText(/MoneyPuck/)).not.toBeInTheDocument();
+    expect(screen.getByText(/playoff odds \(PO%\) blend goals with expected goals/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "MoneyPuck.com" })).toBeInTheDocument();
   });
 });

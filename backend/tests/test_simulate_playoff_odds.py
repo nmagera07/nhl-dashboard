@@ -295,3 +295,40 @@ class TestSplitGames:
         completed, remaining = split_games(games, "2026-10-09")
 
         assert len(completed) == 1 and remaining == [("B", "A")]
+
+
+# ---------------------------------------------------------------------------
+# xG blend (MoneyPuck)
+# ---------------------------------------------------------------------------
+
+from simulate_playoff_odds import PRIOR_CARRYOVER, PRIOR_GAMES_XG, blend_xg, xg_model_ratings
+
+
+class TestXgBlend:
+    def test_blends_goal_and_xg_differential(self):
+        blended = blend_xg({"PIT": {"goal_differential": 6, "games_played": 4}}, {"PIT": (2.0, 4)}, weight=0.5)
+        assert blended["PIT"]["goal_differential"] == pytest.approx(4.0)
+        assert blended["PIT"]["games_played"] == 4
+
+    def test_a_team_missing_from_moneypuck_keeps_its_goal_differential(self):
+        assert blend_xg({"UTA": {"goal_differential": 3}}, {}, weight=0.5)["UTA"]["goal_differential"] == 3
+
+
+class TestXgModelRatings:
+    standings = {"PIT": {"goal_differential": 6, "games_played": 4}, "BOS": {"goal_differential": -6, "games_played": 4}}
+
+    def test_uses_last_seasons_xg_as_the_prior(self):
+        def fetch(year):
+            return {"PIT": (2.0, 4), "BOS": (-2.0, 4)} if year == 2026 else {"PIT": (82.0, 82), "BOS": (-41.0, 82)}
+
+        ratings = xg_model_ratings(self.standings, 20262027, fetch=fetch)
+
+        pit_prior = PRIOR_CARRYOVER * 1.0
+        assert ratings["PIT"][0] == pytest.approx((4.0 + PRIOR_GAMES_XG * pit_prior) / (4 + PRIOR_GAMES_XG))
+        assert ratings["PIT"][0] > ratings["BOS"][0]
+
+    def test_returns_none_when_moneypuck_is_down_so_the_caller_falls_back(self):
+        def down(year):
+            raise ConnectionError("moneypuck unreachable")
+
+        assert xg_model_ratings(self.standings, 20262027, fetch=down) is None

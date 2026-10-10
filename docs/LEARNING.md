@@ -10,6 +10,9 @@ and how I'd describe it on a resume or in an interview. Newest first.
 Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 **CI/CD and reliability**
+- Traced a missed push notification across every hop (detection, database claim, job logs,
+  push service) to Android's idle batching plus a short expiry; fixed with high-urgency
+  delivery, per-event expiry, and per-device delivery logging.
 - Migrated backend CI/CD from Azure DevOps to GitHub Actions with OIDC
   federated identity, removing every stored cloud credential from the pipeline.
 - Added post-deploy verification (the new revision must be healthy *and* report
@@ -30,6 +33,8 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   Azure bill from ~$11.44 to ~$0.97.
 
 **AI engineering**
+- Fixed stale answers from an AI agent by moving its schedule tool from a daily snapshot to
+  live data and giving the model today's date and Eastern start times.
 - Shipped a daily AI-written digest as a batch job (one LLM call a day, shared by all users),
   with facts computed by code, AI keys confined to one service, and a facts-only fallback.
 - Built an eval suite for an LLM agent: live ground truth from the app's API, tool-use and
@@ -77,6 +82,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Replaced silent PWA updates with a prompted "new version ready" flow built on the
+  service-worker lifecycle, with hourly checks, verified by simulating a release in a real
+  browser.
 - Built an interactive playoff race page with a hand-written responsive SVG
   chart (no chart library): hover and tap to follow a team, live readout,
   and a full prior season backfilled from as-of data for comparison.
@@ -93,6 +101,79 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-10 — "A new version is ready": taking control of app updates
+
+**The problem:** After a release, the installed app kept showing the old version.
+The morning digest card didn't appear until I'd closed and reopened the app, sometimes
+twice.
+
+**Why:** A PWA's service worker serves the cached app instantly, then downloads the new
+version in the background. With "auto update", the new version only takes over on a
+*later* launch, so users never know an update exists.
+
+**The fix:** Prompted updates. The new version downloads and *waits*, and a banner says
+"🏒 A new version of NHL Dash is ready. [Refresh]". Tapping Refresh activates it and
+reloads. The app also checks hourly, for sessions left open all evening.
+
+**What I learned:**
+- **The service-worker lifecycle** (install → waiting → activate) is the core of PWA
+  updates; "skip waiting" is the switch between silent and prompted updates.
+- **Test the real behavior, not just the component:** I simulated a release in a real
+  browser (load v1, build v2, watch for the banner, tap Refresh, confirm the new bundle).
+  My first fake release didn't work because the build strips CSS comments, so v2 was
+  byte-for-byte identical to v1. Make sure the test actually exercises what you think it does.
+- **A process lesson:** I reverted a test change with `git checkout` and wiped
+  uncommitted work along with it. Commit before running tests that modify files.
+
+**Interview angle:** "How do you ship updates to a PWA?" The service-worker lifecycle,
+prompted vs. silent updates, and how I tested it end to end.
+
+---
+
+## 2026-10-10 — The chat gave a "next game" that had already happened
+
+**The bug:** The evening after a Penguins game, I asked the chat when they play next, and
+it named the game they'd just finished.
+
+**Why:** The schedule tool read the playoff model's *morning snapshot*, refreshed at 2 AM ET.
+By evening, a game the snapshot called "upcoming" was over. That's the exact window when
+people ask. The model also didn't know today's date, so "next" and "tonight" were guesses.
+
+**The fix:** The schedule tool reads the live NHL schedule (cached about a minute on game
+days); "what if they win their next 4" skips games finished since the snapshot; every
+question includes today's date in Eastern time; start times are in Eastern ("7:00 PM ET").
+I also added `tzdata` after noticing the time-zone conversion could break on a slim server
+image while passing every test locally.
+
+**What I learned:** Know each data source's freshness. A daily snapshot is right for the
+playoff model and wrong for "what's next". And an AI agent's answers are only as current
+as its tools, plus whatever it's told about "now".
+
+---
+
+## 2026-10-10 — The missed final-score notification
+
+**The bug:** No alert came when the Penguins' shootout loss ended, even though goal
+alerts were turned on.
+
+**Tracing it end to end:** The database showed the final was detected and claimed within a
+minute. The job's logs showed "Sent 2 notifications" with no errors, so Google's push
+service had *accepted* them. They were lost after that.
+
+**Why:** I sent alerts at the default "normal" urgency with a 10-minute expiry. Android
+holds normal-urgency messages while the phone is idle and delivers them in batches. Held
+long enough, they expire, and Google silently drops them.
+
+**The fix:** High urgency on every alert (wakes the phone), finals valid for 3 hours and goals
+for 15 minutes, and the push service's response logged per device so a missing alert can be
+traced. A test script sends a real alert on demand; it arrived on my Android phone within
+seconds.
+
+**What I learned:** "Sent" isn't "delivered". Push delivery has hidden policies (urgency,
+TTL, battery saving), and logging each hop is what turns "it didn't work" into a diagnosis.
 
 ---
 

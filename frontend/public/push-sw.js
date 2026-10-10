@@ -3,7 +3,7 @@
 // backend/notify_live_games.py: { title, body, url, tag }.
 
 self.addEventListener("push", (event) => {
-  let data = {};
+  let data;
   try {
     data = event.data ? event.data.json() : {};
   } catch {

@@ -55,12 +55,16 @@ async def run_case(service, case, truth, judge_chain):
     trace, answer, error = [], "", None
     started = time.monotonic()
     try:
-        request = ChatRequest(message=case.question, context=ChatContext(**case.context))
-        async for event in service.run_agent(request):
-            if event[0] == "tool_result":
-                trace.append(event[1:])
-            elif event[0] == "answer":
-                answer = event[1]
+        if case.digest:
+            answer = (await service.write_digest(truth["facts_input"])).text
+            trace = [("facts", "{}", json.dumps(truth["facts_input"]))]  # grounding source
+        else:
+            request = ChatRequest(message=case.question, context=ChatContext(**case.context))
+            async for event in service.run_agent(request):
+                if event[0] == "tool_result":
+                    trace.append(event[1:])
+                elif event[0] == "answer":
+                    answer = event[1]
     except Exception as exc:  # a provider outage or rate limit is a failed case, not a crashed run
         error = f"{type(exc).__name__}: {exc}"
     finally:
@@ -83,7 +87,7 @@ async def run_case(service, case, truth, judge_chain):
             checks.append(vars(await judge(judge_chain, case.question, answer, truth["rubric"])))
     return {
         "case": case.id, "question": case.question, "answer": answer, "seconds": round(seconds, 1),
-        "model_calls": calls, "tools": [f"{n}({a})" for n, a, _ in trace], "checks": checks,
+        "model_calls": calls, "tools": [f"{n}({a})" for n, a, _ in trace if n != "facts"], "checks": checks,
         "passed": all(c["passed"] for c in checks),
     }
 
@@ -93,7 +97,11 @@ async def main():
     parser.add_argument("--providers", default="gemini,groq")
     parser.add_argument("--cases", default="", help="comma-separated case ids (default: all)")
     parser.add_argument("--api", default=os.getenv("NHL_DASHBOARD_API_URL", DEFAULT_API))
+    parser.add_argument("--digest-facts", help="facts JSON for the morning_digest case (default: the API's latest)")
     args = parser.parse_args()
+    if args.digest_facts:
+        from . import cases as cases_module
+        cases_module.DIGEST_FACTS_FILE = args.digest_facts
 
     load_dotenv()
     available = {p.name: p for p in providers_from_env()}

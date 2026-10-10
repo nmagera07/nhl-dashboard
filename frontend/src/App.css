@@ -982,6 +982,26 @@ a.my-team-game:hover { border-color: #2c3a58; }
 .alerts-hint { color: var(--text-dim); font-size: 12px; }
 .alerts-error { color: #f87171; flex-basis: 100%; text-align: right; }
 
+/* Morning digest (Scores page). */
+.daily-digest {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.daily-digest summary { display: flex; align-items: baseline; gap: 10px; cursor: pointer; list-style: none; }
+.daily-digest summary::-webkit-details-marker { display: none; }
+.daily-digest summary::after { content: "▾"; margin-left: auto; color: var(--text-dim); font-size: 12px; transition: transform 0.15s; }
+.daily-digest:not([open]) summary::after { transform: rotate(-90deg); }
+.daily-digest-title { font-size: 14px; font-weight: 700; }
+.daily-digest-date { color: var(--text-dim); font-size: 12px; }
+.daily-digest-body { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+.daily-digest-body .chat-markdown-heading { margin: 12px 0 4px; color: var(--text-dim); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.daily-digest-body ul { margin: 0; padding-left: 18px; }
+.daily-digest-body p { margin: 0 0 6px; }
+.daily-digest-meta { margin: 10px 0 0; color: var(--text-dim); font-size: 11px; }
+
 @media (max-width: 640px) {
   .dashboard {
     --gutter: 12px;

@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -64,6 +65,28 @@ class ChatRequest(BaseModel):
             {"role": turn.role, "content": turn.content[:MAX_HISTORY_CHARS]}
             for turn in self.history[-MAX_HISTORY_MESSAGES:]
         ]
+
+
+class DigestRequest(BaseModel):
+    facts: dict
+
+
+class DigestResponse(BaseModel):
+    text: str
+    model: str
+
+
+DIGEST_INSTRUCTIONS = """You write the morning NHL digest for a hockey stats app, from a JSON list of facts.
+Format (Markdown):
+- First line: a bold one-sentence headline about LAST NIGHT's biggest result (never about tonight's games).
+- Then sections with these headings, skipping any with no facts: "### Last night", "### Playoff race", "### Tonight".
+- 2 to 4 short bullets per section. Each game, odds move, and the game of the night has a ready-made "line": use those lines (you may rephrase them) rather than translating abbreviations yourself.
+- In "Playoff race", give the odds moves with both numbers (e.g. "from 54% to 44%"); they come from the app's playoff-odds model.
+- In "Tonight", mention only the game of the night and the model's win probability for it. Do not list the other games.
+Last night's games and tonight's games are different games: never mix them up.
+Use only the facts. No invented stats, injuries, streaks, or storylines. Keep it under 170 words."""
+MAX_DIGEST_FACTS_CHARS = 12000
+DIGEST_MAX_TOKENS = 1500
 
 
 class Evidence(BaseModel):
@@ -218,6 +241,23 @@ class IntelligenceService:
             yield f"data: {json.dumps({'type': 'error', 'message': error})}\n\n"
 
 
+    async def write_digest(self, facts: dict) -> DigestResponse:
+        if not self.chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+        text = json.dumps(facts, default=str, separators=(",", ":"))
+        if len(text) > MAX_DIGEST_FACTS_CHARS:
+            raise HTTPException(status_code=413, detail="Too many facts for one digest.")
+        messages = [{"role": "system", "content": DIGEST_INSTRUCTIONS}, {"role": "user", "content": f"Facts (JSON): {text}"}]
+        try:
+            # Reasoning models (Groq's gpt-oss) think from the same budget they
+            # write from: at 600 tokens the digest came back empty, and cutting
+            # reasoning effort instead made the evals catch it garbling facts.
+            message, provider, _ = await self.chain.complete_with_tools(messages, None, DIGEST_MAX_TOKENS)
+        except AllProvidersFailed as exc:
+            raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
+        return DigestResponse(text=(message.content or "").strip(), model=provider.label)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.intelligence = IntelligenceService(get_settings())
@@ -241,6 +281,21 @@ async def health():
         "providers": [p.name for p in app.state.intelligence.settings.providers]
         if hasattr(app.state, "intelligence") else [],
     }
+
+
+@app.post("/digest/write", response_model=DigestResponse)
+@limiter.limit("10/hour")
+async def digest_write(payload: DigestRequest, request: Request):
+    """
+    Write the morning digest from the daily job's facts. Private: requires
+    the shared X-Digest-Token, so nobody else can spend the AI budget here.
+    """
+    expected = request.app.state.intelligence.settings.digest_token
+    if not expected:
+        raise HTTPException(status_code=503, detail="Digest writing isn't configured.")
+    if not hmac.compare_digest(request.headers.get("X-Digest-Token", ""), expected):
+        raise HTTPException(status_code=401, detail="Unauthorized.")
+    return await request.app.state.intelligence.write_digest(payload.facts)
 
 
 @app.post("/chat", response_model=ChatResponse)

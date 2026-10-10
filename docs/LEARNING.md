@@ -30,6 +30,8 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   Azure bill from ~$11.44 to ~$0.97.
 
 **AI engineering**
+- Shipped a daily AI-written digest as a batch job (one LLM call a day, shared by all users),
+  with facts computed by code, AI keys confined to one service, and a facts-only fallback.
 - Built an eval suite for an LLM agent: live ground truth from the app's API, tool-use and
   argument checks, a made-up-number (grounding) detector, and a cross-provider LLM judge;
   it caught a hallucination and a tool-calling bug on day one (10/12 and 9/12 → 12/12).
@@ -91,6 +93,48 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-10 — The morning digest: batch AI that costs the same for 2 users or 2,000
+
+**What I built:** A "☀️ Morning digest" card on the Scores page: last night's results
+and standouts, the biggest playoff-odds moves, and tonight's game of the night with the
+model's win probability, written up by AI once a day.
+
+**How:** The daily job (2 AM ET, after every game ends) gathers the **facts with code**:
+finals, multi-goal and 3-point nights from the scoring summaries, odds moves between the
+last two simulations, and tonight's games with the same win-probability model as the odds.
+It sends them to NHL Intelligence's private `/digest/write` endpoint (shared-secret
+header, constant-time comparison), stores the text and the facts, and the page shows it.
+If the AI is down, the page shows the facts as a list instead.
+
+**Design decisions:**
+- **One AI call a day, shared by everyone:** the cost doesn't grow with visitors.
+- **The AI keys live in one service:** the job asks NHL Intelligence to write; it never
+  holds provider keys itself.
+- **Graceful degradation:** facts are stored either way, so the card never goes empty.
+
+**What I learned:**
+- **Grounded isn't the same as correct.** Groq's first digest had every number right
+  and the headline wrong: "Blue Jackets edge *Blues* in a shootout" (they beat the
+  Penguins; the Blues game was that night). The made-up-number check passed. Fixes: a
+  tighter prompt (headline about last night only, never mix last night and tonight), and
+  an eval case where a judge checks every claim against the facts.
+- **Reasoning models need room to think, and evals settle the trade-off.** Groq's gpt-oss
+  returned nothing on the digest: it spent the whole token budget thinking. Turning reasoning
+  effort to low fixed the empty output, but the evals then caught it getting things wrong:
+  Crosby's PDO read backwards in chat, a shootout called "overtime", and the Blue Jackets
+  turned into the Sabres. The fix was a bigger output budget at the default effort. Without
+  evals I'd have shipped the "fix" that made answers worse.
+- **Do the precise parts in code, again:** instead of making the model translate team
+  abbreviations, the facts include ready-made lines ("Blue Jackets 3, Penguins 2 (SO)").
+  It rephrases; it can't mislabel.
+- **Give the model the context it lacks:** a headline said "Saturday's action" for Friday's
+  games, and another called October "a late-season surge", until the facts included last
+  night's date and season progress (games played of 84).
+- **Judges need precise rubrics too:** a judge failed a correct digest for "missing games"
+  the digest was told to leave out. Rubric fixed: omissions are fine; wrong claims fail.
 
 ---
 

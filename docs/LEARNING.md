@@ -174,6 +174,12 @@ Each question's correct answer is computed live from the app's API at eval time
   and never let a model grade its own answers.
 - Read the failures. Two of my first four "AI failures" were eval failures.
 
+**Picking a model with evals instead of vibes (later that day):** after Groq's small
+`gpt-oss-20b` kept stumbling, I ran the same suite on the two bigger models my free Groq key
+offered. `gpt-oss-120b`: 13/13 on a confirmation run (12/13 the first time; its one miss was a
+missing caveat). `qwen3.8-27b`: no quality misses, but it hit Groq's per-minute token cap twice,
+which is risky for a *backup* that gets used exactly when traffic spikes. Switched to the 120b.
+
 **Interview angle:** "How do you know your AI feature works?" An eval suite with live
 ground truth, tool-use and grounding checks, a cross-provider judge, and a before/after
 record showing it caught a hallucination.

@@ -70,8 +70,7 @@ async def odds_history(api) -> Truth:
 async def last_result(api) -> Truth:
     last = (await api("/teams/PIT/schedule"))["recent"][0]
     us, them = last["team_score"], last["opponent_score"]
-    return {"tool": (("get_recent_results", "get_game"), None),
-            "facts": [f"{us}-{them}", f"{them}-{us}"]}
+    return {"tool": (("get_recent_results", "get_game"), None), "score": (us, them)}
 
 
 async def last_game_scorers(api) -> Truth:

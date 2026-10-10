@@ -2,7 +2,7 @@
 
 import json
 
-from evals.checks import grounded_percentages, mentions_any, percent_near, tool_called
+from evals.checks import grounded_percentages, mentions_any, percent_near, score_mentioned, tool_called
 
 SCENARIO = json.dumps({"baseline": {"playoff_pct": 0.597}, "with_scenario": {"playoff_pct": 0.728, "avg_points": 100.3}})
 
@@ -45,3 +45,10 @@ def test_tool_called_checks_name_and_arguments():
 def test_mentions_any_treats_every_dash_alike():
     assert mentions_any("Detroit needs an 8‑2 record.", ["8-2"]).passed  # non-breaking hyphen
     assert mentions_any("Final: 3–2", ["3-2"]).passed                     # en dash
+
+
+def test_score_mentioned_accepts_dashes_or_words():
+    assert score_mentioned("Lost 3\u20132 in a shootout.", 2, 3).passed
+    assert score_mentioned("Pittsburgh scored 2 goals while Columbus scored 3.", 2, 3).passed
+    assert not score_mentioned("Pittsburgh lost a close one, 4-1 in shots.", 2, 3).passed
+    assert not score_mentioned("Their odds fell 2% to 3%.", 2, 3).passed  # percentages aren't scores

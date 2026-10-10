@@ -33,7 +33,7 @@ from app.main import ChatContext, ChatRequest, IntelligenceService
 from app.providers import ProviderChain, providers_from_env
 
 from .cases import CASES
-from .checks import grounded_percentages, mentions_any, percent_near, tool_called
+from .checks import grounded_percentages, mentions_any, percent_near, score_mentioned, tool_called
 from .judge import judge
 
 DEFAULT_API = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io"
@@ -80,6 +80,8 @@ async def run_case(service, case, truth, judge_chain):
             checks.append(vars(tool_called(trace, names, args)))
         if truth.get("facts"):
             checks.append(vars(mentions_any(answer, truth["facts"])))
+        if truth.get("score"):
+            checks.append(vars(score_mentioned(answer, *truth["score"])))
         if truth.get("percent") is not None:
             checks.append(vars(percent_near(answer, truth["percent"])))
         checks.append(vars(grounded_percentages(answer, [r for _, _, r in trace])))

@@ -53,7 +53,9 @@ def providers_from_env(env: Mapping[str, str] = os.environ) -> list[Provider]:
     if get("GROQ_API_KEY"):
         available["groq"] = Provider(
             "groq", "Groq", "https://api.groq.com/openai/v1",
-            get("GROQ_API_KEY"), get("GROQ_MODEL", "openai/gpt-oss-20b"),
+            # 120b over 20b: in the eval bake-off (2026-10-10) the 20b garbled
+            # digest facts and misread stats; the 120b didn't, same limits.
+            get("GROQ_API_KEY"), get("GROQ_MODEL", "openai/gpt-oss-120b"),
         )
     if get("CLOUDFLARE_API_TOKEN") and get("CLOUDFLARE_ACCOUNT_ID"):
         available["cloudflare"] = Provider(

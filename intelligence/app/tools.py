@@ -57,6 +57,15 @@ TOOLS = [
         "What a team needs: its playoff odds for every possible record over its next games (e.g. 0-10 up to 10-0), from the model.",
         {"team": TEAM, "games": {"type": "integer", "minimum": 1, "maximum": 15, "description": "Default 10."}},
         ["team"]),
+    _fn("get_recent_results", "A team's most recent results (up to its last 5 games): scores, opponents, W/L/OT, and any game in progress.",
+        {"team": TEAM}, ["team"]),
+    _fn("get_game",
+        "One game's box score (scoring summary, three stars, team and player stats). Finds the team's most recent game, "
+        "or the one on a date, or the latest one against an opponent.",
+        {"team": TEAM,
+         "date": {"type": "string", "description": "Optional, YYYY-MM-DD."},
+         "opponent": {"type": "string", "description": "Optional opponent abbreviation, e.g. CBJ."}},
+        ["team"]),
     _fn("find_player", "Look up a player by name: season stats, career, and 5-on-5 advanced stats.",
         {"name": {"type": "string", "description": "Full or last name, e.g. 'Crosby'."}}, ["name"]),
     _fn("get_leaders", "League leaders: points, goals, and goalie wins."),
@@ -71,6 +80,8 @@ LABELS = {
     "rank_schedule_strength": ("Ranking remaining schedules", "Strength of remaining schedules"),
     "simulate_scenario": ("Simulating 2,000 seasons", "Season simulation (playoff-odds model)"),
     "playoff_path": ("Simulating every record", "Season simulation (playoff-odds model)"),
+    "get_recent_results": ("Checking recent results", "Recent results"),
+    "get_game": ("Pulling up the box score", "NHL game box score"),
     "find_player": ("Looking up the player", "Player profile and stats"),
     "get_leaders": ("Checking the league leaders", "League leaders"),
 }
@@ -219,6 +230,44 @@ class ToolRunner:
         abbrev = await self._team(team)
         return await self.dashboard._get(f"/season-sim/path?team={abbrev}&games={int(games)}")
 
+    async def _tool_get_recent_results(self, team: str):
+        abbrev = await self._team(team)
+        schedule = await self._get(f"/teams/{abbrev}/schedule")
+        game = lambda g: compact._clean({  # noqa: E731
+            "date": g.get("date"), "opponent": g.get("opponent"), "home": g.get("home"),
+            "result": g.get("result"), "score": f"{g.get('team_score')}-{g.get('opponent_score')}",
+            "decided_in": g.get("last_period_type") if g.get("last_period_type") in ("OT", "SO") else None,
+        })
+        return compact._clean({
+            "team": abbrev,
+            "in_progress": game(schedule["live"]) | {"result": "LIVE"} if schedule.get("live") else None,
+            "recent_newest_first": [game(g) for g in schedule.get("recent", [])],
+            "score_note": "Scores are this team's goals first.",
+        })
+
+    async def _tool_get_game(self, team: str, date: str | None = None, opponent: str | None = None):
+        abbrev = await self._team(team)
+        opp = await self._team(opponent) if opponent else None
+        if date:
+            try:
+                day = str(_parse_date(date))
+            except ValueError as exc:
+                raise ToolError("date must be YYYY-MM-DD") from exc
+            games = (await self._get(f"/games/date/{day}")).get("games", [])
+            match = next((g for g in games if abbrev in (g["awayTeam"]["abbrev"], g["homeTeam"]["abbrev"])
+                          and (not opp or opp in (g["awayTeam"]["abbrev"], g["homeTeam"]["abbrev"]))), None)
+            if not match:
+                raise ToolError(f"{abbrev} didn't play{' ' + opp if opp else ''} on {day}.")
+            game_id = match["id"]
+        else:
+            schedule = await self._get(f"/teams/{abbrev}/schedule")
+            candidates = ([schedule["live"]] if schedule.get("live") else []) + schedule.get("recent", [])
+            match = next((g for g in candidates if not opp or g.get("opponent") == opp), None)
+            if not match:
+                raise ToolError(f"No recent {abbrev} game{' against ' + opp if opp else ''}; give a date (YYYY-MM-DD).")
+            game_id = match["id"]
+        return compact.game_facts(await self._get(f"/games/{game_id}/boxscore"))
+
     async def _tool_find_player(self, name: str):
         query = (name or "").strip().lower()
         if len(query) < 2:
@@ -238,6 +287,12 @@ class ToolRunner:
 
     async def _tool_get_leaders(self):
         return compact.leaders(await self._get("/players/leaders"))
+
+
+def _parse_date(value: str):
+    from datetime import date
+
+    return date.fromisoformat(value.strip()[:10])
 
 
 def _days_before(iso: str, days: int) -> str:

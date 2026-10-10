@@ -19,6 +19,9 @@ STANDINGS = [
     {"team_abbrev": "COL", "team_name": "Colorado Avalanche", "common_name": "Avalanche", "conference": "Western",
      "division": "Central", "season_id": 20262027, "snapshot_date": "2026-10-10", "league_sequence": 1,
      "games_played": 5, "wins": 5, "losses": 0, "ot_losses": 0, "points": 10, "division_sequence": 1, "wildcard_sequence": 0},
+    *({"team_abbrev": t, "team_name": n, "common_name": n.split()[-1], "conference": "Eastern", "division": "Metropolitan",
+       "season_id": 20262027, "snapshot_date": "2026-10-10", "league_sequence": 20} for t, n in
+      [("WSH", "Washington Capitals"), ("CBJ", "Columbus Blue Jackets")]),
 ]
 SIM_INPUTS = {
     "as_of_date": "2026-10-10",
@@ -31,6 +34,10 @@ HISTORY = {"season_id": 20262027, "available_seasons": [20262027], "points": [
     {"as_of_date": "2026-10-01", "team_abbrev": "PIT", "playoff_pct": 0.5},
     {"as_of_date": "2026-10-03", "team_abbrev": "PIT", "playoff_pct": 0.4},
     {"as_of_date": "2026-10-10", "team_abbrev": "PIT", "playoff_pct": 0.6},
+]}
+TEAM_SCHEDULE = {"team": "PIT", "live": None, "upcoming": [], "recent": [
+    {"id": 68, "date": "2026-10-09", "opponent": "CBJ", "home": False, "team_score": 2, "opponent_score": 3, "result": "OTL", "last_period_type": "SO"},
+    {"id": 53, "date": "2026-10-07", "opponent": "WSH", "home": False, "team_score": 3, "opponent_score": 5, "result": "L", "last_period_type": "REG"},
 ]}
 PLAYERS = [
     {"player_id": 87, "first_name": "Sidney", "last_name": "Crosby", "team_abbrev": "PIT", "position_code": "C", "points": 5, "goals": 2},
@@ -51,6 +58,13 @@ def dashboard(seen=None):
         }
         if request.url.path == "/season-sim/scenario":
             return httpx.Response(200, json=SCENARIO)
+        if request.url.path == "/teams/PIT/schedule":
+            return httpx.Response(200, json=TEAM_SCHEDULE)
+        if request.url.path == "/games/date/2026-10-07":
+            return httpx.Response(200, json={"games": [{"id": 53, "awayTeam": {"abbrev": "PIT"}, "homeTeam": {"abbrev": "WSH"}}]})
+        if request.url.path.startswith("/games/") and request.url.path.endswith("/boxscore"):
+            gid = int(request.url.path.split("/")[2])
+            return httpx.Response(200, json={"id": gid, "gameState": "OFF", "awayTeam": {"abbrev": "PIT", "score": 2}, "homeTeam": {"abbrev": "CBJ" if gid == 68 else "WSH", "score": 3}})
         return httpx.Response(200, json=routes.get(request.url.path, {}))
     return httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler))
 
@@ -97,6 +111,24 @@ class TestTools:
     async def test_playoff_odds_history(self):
         result = await self.call("get_playoff_odds", {"team": "PIT"})
         assert (result["now_pct"], result["week_ago_pct"], result["season_start_pct"], result["low_pct"]) == (60.0, 40.0, 50.0, 40.0)
+
+    async def test_recent_results(self):
+        result = await self.call("get_recent_results", {"team": "PIT"})
+
+        assert result["recent_newest_first"][0] == {"date": "2026-10-09", "opponent": "CBJ", "home": False, "result": "OTL", "score": "2-3", "decided_in": "SO"}
+        assert "in_progress" not in result
+
+    async def test_get_game_finds_the_latest_by_date_or_by_opponent(self):
+        seen = []
+        await self.call("get_game", {"team": "PIT"}, seen)
+        await self.call("get_game", {"team": "PIT", "opponent": "WSH"}, seen)
+        await self.call("get_game", {"team": "PIT", "date": "2026-10-07"}, seen)
+
+        assert [p for p in seen if p.endswith("/boxscore")] == ["/games/68/boxscore", "/games/53/boxscore", "/games/53/boxscore"]
+
+    async def test_get_game_explains_misses(self):
+        assert "didn't play" in (await self.call("get_game", {"team": "COL", "date": "2026-10-07"}))["error"]
+        assert "YYYY-MM-DD" in (await self.call("get_game", {"team": "PIT", "date": "last tuesday"}))["error"]
 
     async def test_find_player(self):
         assert (await self.call("find_player", {"name": "crosby"}))["name"] == "Sidney Crosby"

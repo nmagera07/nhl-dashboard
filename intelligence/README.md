@@ -23,6 +23,8 @@ rounds per question.
 | `rank_schedule_strength` | "Who has the easiest remaining schedule?" |
 | `simulate_scenario` | "What if PIT wins their next 4?" |
 | `playoff_path` | "What does Detroit need over its next 10?" |
+| `get_recent_results` | "How have the Penguins played lately?" |
+| `get_game` | "How did PIT do last night? Who scored?" (latest game, a date, or vs. an opponent) |
 | `find_player` / `get_leaders` | "How's Crosby doing?" / "Who leads in goals?" |
 
 The model decides *what to ask*; the numbers come from the dashboard API and

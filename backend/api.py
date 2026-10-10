@@ -15,6 +15,7 @@ generates this automatically from the code below).
 """
 
 import asyncio
+from collections import OrderedDict
 import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -46,6 +47,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import push
+import season_scenarios
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
 
@@ -406,6 +408,78 @@ def season_sim_inputs(request: Request):
     if row is None:
         raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
     return row["payload"]
+
+
+# "What if" simulations (NHL Intelligence's scenario tools). A few seconds of
+# CPU each, so results are cached per day's inputs: the same question asked
+# again (by anyone) is free until the next morning's run.
+_SCENARIO_CACHE: OrderedDict = OrderedDict()
+_SCENARIO_CACHE_SIZE = 256
+
+
+def _latest_sim_inputs():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT payload FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
+    return row["payload"]
+
+
+def _cached_scenario(key, compute):
+    payload = _latest_sim_inputs()
+    key = (payload["as_of_date"], *key)
+    if key in _SCENARIO_CACHE:
+        _SCENARIO_CACHE.move_to_end(key)
+        return _SCENARIO_CACHE[key]
+    try:
+        result = compute(payload)
+    except season_scenarios.UnknownTeam as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown team '{exc}'.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _SCENARIO_CACHE[key] = result
+    while len(_SCENARIO_CACHE) > _SCENARIO_CACHE_SIZE:
+        _SCENARIO_CACHE.popitem(last=False)
+    return result
+
+
+@app.get("/season-sim/scenario")
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def season_sim_scenario(
+    request: Request,
+    team: str = Query(..., pattern=r"^[A-Za-z]{3}$"),
+    games: int = Query(..., ge=1, le=30),
+    wins: int = Query(..., ge=0, le=30),
+    ot_losses: int = Query(0, ge=0, le=30),
+):
+    """
+    A team's playoff odds and projected points if it goes wins-losses(-OT)
+    over its next `games`, next to its odds as things stand (same simulated
+    seasons, so the difference is the scenario, not noise).
+    """
+    return _cached_scenario(
+        ("scenario", team.upper(), games, wins, ot_losses),
+        lambda payload: season_scenarios.scenario(payload, team, games, wins, ot_losses),
+    )
+
+
+@app.get("/season-sim/path")
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def season_sim_path(
+    request: Request,
+    team: str = Query(..., pattern=r"^[A-Za-z]{3}$"),
+    games: int = Query(10, ge=1, le=15),
+):
+    """A team's playoff odds for every possible record over its next `games`: what it needs."""
+    return _cached_scenario(
+        ("path", team.upper(), games),
+        lambda payload: season_scenarios.playoff_path(payload, team, games),
+    )
 
 
 # --- Push notifications ------------------------------------------------------

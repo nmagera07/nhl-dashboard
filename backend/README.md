@@ -155,6 +155,8 @@ the top-level README for why.
 | `GET /playoff-odds` | Latest Monte Carlo playoff-odds simulation, all teams |
 | `GET /push/config` | VAPID public key for browsers subscribing to notifications |
 | `POST /push/subscriptions` / `DELETE /push/subscriptions` | Save or remove a device's push subscription and followed teams (the API's only writes; push-service endpoints only) |
+| `GET /season-sim/scenario?team=&games=&wins=&ot_losses=` | A team's playoff odds and projected points if it goes a given record over its next games, vs. its baseline (same simulated seasons); cached per day |
+| `GET /season-sim/path?team=&games=` | A team's playoff odds for every record over its next games; cached per day |
 | `GET /season-sim` | Inputs for the in-browser season simulator: model constants, each team's record and rating, remaining schedule |
 | `GET /playoff-odds/history?season_id=` | Every odds snapshot for a season (default: latest), for the playoff race chart |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |

@@ -71,19 +71,21 @@ class DashboardClient:
             ],
         )
 
-    async def league_context(self) -> ContextBundle:
-        standings, player_leaders, playoff_odds = await asyncio.gather(
-            self._get("/standings/latest"),
-            self._get("/players/leaders"),
-            self._get("/playoff-odds"),
-        )
+    async def league_summary(self) -> ContextBundle:
+        """
+        The league page's context for the agent: just the playoff picture and
+        dates (~150 tokens). The full standings, odds, and leaders (~3,300
+        tokens) are one tool call away, and sending them with every request
+        pushed a single question over Groq's per-minute token cap.
+        """
+        standings = await self._get("/standings/latest")
         return ContextBundle(
-            facts=compact.league_facts(standings, player_leaders, playoff_odds),
-            evidence=[
-                {"label": "Current standings", "endpoint": "/standings/latest"},
-                {"label": "Player leaderboard", "endpoint": "/players/leaders"},
-                {"label": "Playoff simulation", "endpoint": "/playoff-odds"},
-            ],
+            facts=compact._clean({
+                "standings_as_of": str(standings[0]["snapshot_date"]) if standings else None,
+                "playoff_picture_if_season_ended_today": compact.playoff_picture(standings),
+                "note": "Use tools for standings, playoff odds, leaders, schedules, players, and simulations.",
+            }),
+            evidence=[{"label": "Current standings", "endpoint": "/standings/latest"}],
         )
 
     async def game_context(self, game_id: int) -> ContextBundle:

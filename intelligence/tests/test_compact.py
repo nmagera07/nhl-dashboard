@@ -74,29 +74,23 @@ class TestPlayoffPicture:
         assert east["next out"] == ["CBJ"]
 
 
-class TestLeagueFacts:
-    def test_includes_every_team_odds_and_top_leaders_but_not_every_player(self):
-        standings = [standing("NYR", league_sequence=1), standing("PIT", league_sequence=17)]
+class TestLeadersAndOdds:
+    def test_leaders_are_the_top_few_not_every_player(self):
         players = [skater(i, pts=i % 20, goals=i % 7) for i in range(1, 1200)] + [goalie(5000, wins=3), goalie(5001, wins=0, gp=0)]
-        odds = [{"team_abbrev": "PIT", "playoff_pct": 0.669, "season_id": 20262027, "as_of_date": "2026-10-08"}]
 
-        facts = compact.league_facts(standings, players, odds)
+        top = compact.leaders(players)
 
-        assert [r["team"] for r in facts["standings"]] == ["NYR", "PIT"]
-        assert facts["standings"][1]["playoff_odds_pct"] == 66.9
-        assert facts["playoff_odds_as_of"] == "2026-10-08"
-        assert len(facts["leaders"]["points"]) == compact.TOP_POINTS
-        assert facts["leaders"]["points"][0]["pts"] == 19
-        assert [g["name"] for g in facts["leaders"]["goalie_wins"]] == ["Goalie 5000"]  # 0 GP excluded
-        assert len(json.dumps(facts)) < 24000
+        assert len(top["points"]) == compact.TOP_POINTS
+        assert top["points"][0]["pts"] == 19
+        assert [g["name"] for g in top["goalie_wins"]] == ["Goalie 5000"]  # 0 GP excluded
+        assert len(json.dumps(top)) < 4000
 
     def test_ignores_playoff_odds_from_another_season(self):
         odds = [{"team_abbrev": "PIT", "playoff_pct": 1.0, "season_id": 20252026, "as_of_date": "2026-04-17"}]
 
-        facts = compact.league_facts([standing("PIT")], [], odds)
+        by_team, as_of = compact.odds_by_team([standing("PIT")], odds)
 
-        assert "playoff_odds_pct" not in facts["standings"][0]
-        assert "playoff_odds_as_of" not in facts
+        assert by_team == {} and as_of is None
 
 
 class TestTeamFacts:

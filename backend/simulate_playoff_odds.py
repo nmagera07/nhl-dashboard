@@ -55,7 +55,9 @@ from logging_config import setup_logging
 
 load_dotenv()
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+# Not required at import: the API imports this module for the scenario
+# tools (season_scenarios.py) and only holds its read-only credential.
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 logger = setup_logging("simulate_playoff_odds")
 STANDINGS_URL = "https://api-web.nhle.com/v1/standings/{date}"
@@ -447,6 +449,8 @@ def main():
     parser.add_argument("--trials", type=int, default=DEFAULT_TRIALS)
     parser.add_argument("--no-save", action="store_true", help="Print results without writing to the DB")
     args = parser.parse_args()
+    if not DATABASE_URL and not args.no_save:
+        raise SystemExit("DATABASE_URL is not set")
 
     if args.season is None:
         args.season = current_season_id(date.fromisoformat(args.as_of))

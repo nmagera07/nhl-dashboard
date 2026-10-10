@@ -30,6 +30,12 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   Azure bill from ~$11.44 to ~$0.97.
 
 **AI engineering**
+- Turned an LLM chat into a tool-calling agent over the app's data and its Monte
+  Carlo model: the model chooses the query, deterministic code produces every
+  number, so "what if" and "what does this team need" answers are grounded.
+- Designed the agent around free-tier limits: measured prompt tokens per round,
+  cut the default context from ~4,200 to ~1,100 tokens, and cached simulations,
+  so multi-step questions fit a free provider's per-minute budget.
 - Rebuilt an LLM chat feature to run on free providers (Gemini → Groq) with
   automatic failover, cutting AI cost to $0 after the paid key ran out;
   evaluated models against ground-truth questions (hosted 5/5 vs. local 7B 3/5).
@@ -82,6 +88,45 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-10 — NHL Intelligence becomes an agent (tool calling)
+
+**What I built:** The chat used to get one page's data and answer from it. Now
+it's an **agent**: it gets tools (standings, schedules, schedule strength,
+playoff odds history, players, and the playoff-odds model's simulations) and
+decides which to call. "What if Pittsburgh wins its next 4?" runs 2,000
+simulated seasons and comes back with 59.7% → 72.8%. "What does Detroit
+need?" returns its odds for every record over the next 10 games.
+
+**The key design rule:** the model decides *what to ask*; deterministic code
+produces *every number*. The LLM never estimates odds itself, so answers are
+grounded in the same model that powers the rest of the app.
+
+**What broke, and what I learned:**
+- **Gemini's thought signatures:** Gemini picked the right tool every time,
+  then rejected the follow-up with HTTP 400. Newer Gemini models attach a
+  hidden "thought signature" to each tool call and require it back with the
+  result. The fix: echo tool calls exactly as received. Provider "OpenAI
+  compatibility" has edges.
+- **Token budgets are architecture:** Groq's free tier caps tokens per
+  minute, and every tool round resends the conversation. I measured it: the
+  league page data was 3,300 of the 4,200 tokens per request, and redundant once
+  the model could fetch standings itself. Sending a 150-token summary instead
+  made multi-step questions fit.
+- **Consistent answers to the same question:** the "what does Detroit need"
+  table first came from seasons where Detroit *happened* to win more, which
+  are also seasons where it happened to be rated better, so it disagreed with
+  the "what if" tool. I switched it to forced results so both tools answer
+  the same question the same way.
+- **Model quality varies:** asked about Crosby, Gemini correctly read a PDO of
+  91.9 as bad luck; Groq's model called it "close to average." That's exactly
+  what an eval suite should catch automatically, which is the next step.
+
+**Interview angle:** "Have you built an AI agent?" Yes: tool calling over real
+data and a simulation engine, multi-provider failover, a token budget I
+measured and designed for, and grounding (the model never makes up numbers).
 
 ---
 

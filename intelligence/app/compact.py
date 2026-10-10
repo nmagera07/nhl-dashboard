@@ -146,10 +146,9 @@ def leaders(players: list[dict]) -> dict[str, list[dict]]:
 
 # --- contexts ---------------------------------------------------------------
 
-# League context has to cover 32 teams, so each row keeps only the most-asked
-# columns (team pages get the full row). Measured on real data this keeps a
-# league question around 3K tokens: inside a local model's default 4K window,
-# and light on free tiers that cap tokens per minute.
+# League-wide rows (get_standings) keep only the most-asked columns; team
+# questions get the full row. 32 full rows would be most of a free tier's
+# per-minute token budget on their own.
 LEAGUE_ROW_FIELDS = (
     "team", "division", "gp", "record", "points", "goal_diff",
     "last_10", "streak", "conference_rank", "playoff_spot", "playoff_odds_pct",
@@ -174,23 +173,6 @@ def playoff_picture(standings: list[dict]) -> dict[str, dict[str, list[str]]]:
         section["next out"] = [r["team_abbrev"] for r in race[2:5]]
         picture[name] = section
     return picture
-
-
-def league_facts(standings: list[dict], players: list[dict], playoff_odds: list[dict]) -> dict[str, Any]:
-    odds, as_of = odds_by_team(standings, playoff_odds)
-    rows = sorted(standings, key=lambda r: r.get("league_sequence") or 99)
-    conferences = sorted({(r.get("division"), r.get("conference")) for r in rows if r.get("division")})
-    return _clean({
-        "standings_as_of": str(standings[0]["snapshot_date"]) if standings else None,
-        "playoff_odds_as_of": as_of,
-        "conference_of_division": {div: conf for div, conf in conferences},
-        "playoff_picture_if_season_ended_today": playoff_picture(standings),
-        "standings": [
-            {k: v for k, v in standing_row(r, odds.get(r.get("team_abbrev"))).items() if k in LEAGUE_ROW_FIELDS}
-            for r in rows
-        ],
-        "leaders": leaders(players),
-    })
 
 
 def team_facts(abbrev: str, standings: list[dict], roster: list[dict], playoff_odds: list[dict]) -> dict[str, Any]:

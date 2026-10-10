@@ -1,4 +1,4 @@
-# NHL Dashboard — Feature Brainstorm
+# PuckPulse (formerly NHL Dashboard) — Feature Brainstorm
 
 A running list of ideas for future work. Not commitments, just a parking lot.
 Add to this as new ideas come up; check items off or move them to "In Progress"
@@ -35,6 +35,10 @@ Last updated: 2026-10-09
 ---
 
 ## Up Next
+- **Game predictions** — the model's win probability on every game card and
+  game page, a pregame preview, and a public track record (accuracy +
+  calibration). Percentages only, no betting formats.
+- **Custom domain** — puckpulse.io on Static Web Apps (free managed TLS).
 - **Head-to-head / rivalry view** — season series between two teams, a
   side-by-side stat comparison, and chat context for "who wins tonight?"
 
@@ -117,6 +121,7 @@ Last updated: 2026-10-09
 - ~~Learning log with resume bullets (`docs/LEARNING.md`)~~
 - ~~Site redesign + installable phone app (PWA), Oct 2026~~
 - ~~"New version ready" banner (prompted service-worker updates, hourly checks)~~
+- ~~Renamed to PuckPulse (puckpulse.io); "NHL" kept out of the product name (trademark)~~
 - ~~Past/future scoreboards with a season calendar~~
 - ~~Server-side TTL cache on the live game endpoints~~
 - ~~Playoff race page: odds-over-time chart + playoff-format race table~~

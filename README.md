@@ -1,10 +1,14 @@
-# NHL Stats Dashboard
+# PuckPulse
 
-A full-stack NHL analytics app: live scores and box scores, standings with
-a from-scratch Monte Carlo playoff-odds model, team and player pages, a
-league leaderboard, 5-on-5 advanced stats from MoneyPuck, and an AI chat
-("NHL Intelligence") grounded in the app's own data. Installable on phones
-as a PWA.
+A full-stack hockey analytics app: live scores and box scores, standings with
+a from-scratch Monte Carlo playoff-odds model, a playoff race page and season
+simulator, team and player pages, goal alerts (Web Push), a daily AI-written
+digest, and **PuckPulse AI**: a tool-calling agent grounded in the app's own
+data and model, with an eval suite. Installable on phones as a PWA.
+
+*Formerly "NHL Dashboard"; the repo and Azure resources keep their original
+names. Data from the NHL and MoneyPuck.com. Not affiliated with or endorsed by
+the NHL.*
 
 **Live:** https://ashy-sky-01e4eba1e.7.azurestaticapps.net
 

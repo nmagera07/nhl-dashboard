@@ -50,6 +50,18 @@ class TestScenario:
             sc.scenario(_payload(), "XYZ", games=3, wins=1, trials=10)
 
 
+class TestPlayedSinceSnapshot:
+    def test_games_finished_since_the_snapshot_are_skipped(self):
+        p = _payload()
+        first = next(g for g in p["games"] if "OTT" in g[1:])
+        played = frozenset({tuple(first)})
+
+        stale = sc.scenario(p, "OTT", games=2, wins=1, trials=20)
+        fresh = sc.scenario(p, "OTT", games=2, wins=1, trials=20, played=played)
+
+        assert stale["games"][0].startswith(first[0]) and fresh["games"][0] == stale["games"][1]
+
+
 class TestPlayoffPath:
     def test_more_wins_never_means_worse_odds(self):
         path = sc.playoff_path(_payload(), "CBJ", games=6, trials_per_record=300)
@@ -60,6 +72,12 @@ class TestPlayoffPath:
 
 
 class TestEndpoints:
+    @pytest.fixture(autouse=True)
+    def no_live_games(self, monkeypatch):
+        import api
+
+        monkeypatch.setattr(api, "team_schedule", lambda team: {"recent": []})
+
     def test_scenario_is_cached_per_day_of_inputs(self, client, db_router, monkeypatch):
         import api
 
@@ -84,3 +102,18 @@ class TestEndpoints:
         assert client.get("/season-sim/scenario?team=XYZ&games=3&wins=1").status_code == 404
         assert client.get("/season-sim/scenario?team=OTT&games=3&wins=4").status_code == 400
         assert client.get("/season-sim/path?team=OTT&games=40").status_code == 422
+
+    def test_tonights_finished_game_drops_out_of_the_window(self, client, db_router, monkeypatch):
+        import api
+
+        api._SCENARIO_CACHE.clear()
+        p = _payload()
+        first = next(g for g in p["games"] if "OTT" in g[1:])
+        db_router.when("from season_sim_inputs", [{"payload": p}])
+        home = first[1] == "OTT"
+        monkeypatch.setattr(api, "team_schedule", lambda team: {"recent": [
+            {"date": first[0], "home": home, "opponent": first[2] if home else first[1]}]})
+
+        body = client.get("/season-sim/scenario?team=OTT&games=1&wins=1").json()
+
+        assert not body["games"][0].startswith(f"{first[0]} {'vs' if home else '@'} {first[2] if home else first[1]}")

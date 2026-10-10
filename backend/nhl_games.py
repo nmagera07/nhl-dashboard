@@ -250,7 +250,7 @@ def month_calendar(year: int, month: int, today: date | None = None) -> dict[str
 
 TEAM_SCHEDULE_IDLE_TTL = 15 * 60  # no game today: results only change after games
 TEAM_SCHEDULE_RECENT = 5
-TEAM_SCHEDULE_UPCOMING = 3
+TEAM_SCHEDULE_UPCOMING = 20  # NHL Intelligence's schedule tool reads up to 20; the My team card shows one
 _COUNTED_GAME_TYPES = {2, 3}  # regular season and playoffs (not preseason)
 
 
@@ -281,9 +281,12 @@ def _result(game: dict[str, Any]) -> str:
 def summarize_team_schedule(payload: dict[str, Any], abbrev: str, today: date) -> dict[str, Any]:
     """The live game (if any), the last few results, and the next few games."""
     recent, upcoming, live = [], [], None
+    regular_left = 0
     for game in payload.get("games", []):
         if game.get("gameType") not in _COUNTED_GAME_TYPES:
             continue
+        if game.get("gameType") == 2 and game.get("gameState") not in FINAL_STATES:
+            regular_left += 1
         g = _team_game(game, abbrev)
         if g["state"] in FINAL_STATES:
             g["last_period_type"] = (game.get("gameOutcome") or {}).get("lastPeriodType", "REG")
@@ -300,6 +303,7 @@ def summarize_team_schedule(payload: dict[str, Any], abbrev: str, today: date) -
         "live": live,
         "recent": recent[:TEAM_SCHEDULE_RECENT],
         "upcoming": upcoming[:TEAM_SCHEDULE_UPCOMING],
+        "regular_season_games_left": regular_left,
         "plays_today": live is not None or any(g["date"] == today.isoformat() for g in upcoming),
     }
 

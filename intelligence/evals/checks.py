@@ -32,6 +32,19 @@ def mentions_any(answer: str, options, name="facts") -> CheckResult:
     return CheckResult(name, hit is not None, f"found '{hit}'" if hit else f"expected one of {options}")
 
 
+def score_mentioned(answer: str, us: int, them: int, name="facts") -> CheckResult:
+    """
+    The final score is in the answer: "2-3"/"3-2" (any dash), or both numbers
+    stated in words ("Pittsburgh scored 2 goals while Columbus scored 3").
+    """
+    text = _norm(answer)
+    if f"{us}-{them}" in text or f"{them}-{us}" in text:
+        return CheckResult(name, True, f"found {us}-{them}")
+    numbers = re.findall(r"(?<![\d.])\d+(?!\d|\.\d|\s?%)", text)  # whole numbers, not 3.5 or 3%
+    ok = str(us) in numbers and str(them) in numbers
+    return CheckResult(name, ok, f"both {us} and {them} stated" if ok else f"expected the score {us}-{them}")
+
+
 def percent_near(answer: str, expected_pct: float, tolerance=1.0, name="number") -> CheckResult:
     """Some percentage in the answer is within `tolerance` points of the expected one."""
     found = [float(m) for m in PERCENT.findall(answer)]

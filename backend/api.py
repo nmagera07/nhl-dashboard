@@ -205,7 +205,9 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://ashy-sky-01e4eba1e.7.azurestaticapps.net",
+        "https://puckpulse.io",
+        "https://www.puckpulse.io",
+        "https://ashy-sky-01e4eba1e.7.azurestaticapps.net",  # Azure's default address, still served
         "http://localhost:5173",  # local Vite dev server
     ],
     allow_methods=["GET", "POST", "DELETE"],

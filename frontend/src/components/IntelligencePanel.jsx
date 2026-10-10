@@ -6,7 +6,7 @@ import { SUGGESTIONS } from "./chatSuggestions.js";
 // Follow-ups: send the last 2 exchanges so "what about their power play?"
 // makes sense. The service enforces the same cap.
 const HISTORY_MESSAGES = 4;
-const FALLBACK_ERROR = "NHL Intelligence could not answer right now.";
+const FALLBACK_ERROR = "PuckPulse AI could not answer right now.";
 
 let nextId = 0;
 const newId = () => ++nextId;
@@ -21,7 +21,7 @@ async function streamAnswer({ message, context, history, onStatus, onDelta, onDo
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || FALLBACK_ERROR);
   }
-  if (!response.body) throw new Error("NHL Intelligence returned an empty response.");
+  if (!response.body) throw new Error("PuckPulse AI returned an empty response.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -123,18 +123,18 @@ export default function IntelligencePanel({ context, label }) {
   const suggestions = SUGGESTIONS[context.page] || SUGGESTIONS.standings;
 
   return (
-    <aside className="intelligence" aria-label="NHL Intelligence">
+    <aside className="intelligence" aria-label="PuckPulse AI">
       {!open && (
         <button
           className="intelligence-toggle"
           type="button"
           aria-expanded={false}
-          aria-label="Ask NHL Intelligence"
+          aria-label="Ask PuckPulse"
           onClick={() => setOpen(true)}
         >
           <span aria-hidden="true">✦ </span>
           {/* Full label on desktop; just "Ask" on phones so it covers less content. */}
-          <span className="intelligence-toggle-full" aria-hidden="true">Ask NHL Intelligence</span>
+          <span className="intelligence-toggle-full" aria-hidden="true">Ask PuckPulse</span>
           <span className="intelligence-toggle-short" aria-hidden="true">Ask</span>
         </button>
       )}
@@ -142,10 +142,10 @@ export default function IntelligencePanel({ context, label }) {
       {open && (
         <>
           <div className="intelligence-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-          <section className="intelligence-drawer" role="dialog" aria-label="NHL Intelligence chat">
+          <section className="intelligence-drawer" role="dialog" aria-label="PuckPulse AI chat">
             <header className="intelligence-header">
               <div>
-                <strong>✦ NHL Intelligence</strong>
+                <strong>✦ PuckPulse AI</strong>
                 <span className="intelligence-context">Asking about: {label}</span>
               </div>
               <div className="intelligence-header-actions">
@@ -196,7 +196,7 @@ export default function IntelligencePanel({ context, label }) {
               <textarea
                 ref={inputRef}
                 rows={1}
-                aria-label="Question for NHL Intelligence"
+                aria-label="Question for PuckPulse AI"
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);

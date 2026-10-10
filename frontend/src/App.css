@@ -1034,6 +1034,9 @@ a.my-team-game:hover { border-color: #2c3a58; }
 }
 .update-banner-dismiss { padding: 4px 6px; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
 
+.app-footer { margin: 32px var(--gutter) 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
+.app-footer a { color: var(--text-dim); }
+
 @media (max-width: 640px) {
   .dashboard {
     --gutter: 12px;
@@ -1146,6 +1149,7 @@ a.my-team-game:hover { border-color: #2c3a58; }
   .team-summary-identity .playoff-badge { margin-left: 0; }
   .my-team-card { padding: 12px; }
   .update-banner { bottom: calc(var(--tabbar-height) + 12px + env(safe-area-inset-bottom, 0px)); }
+  .app-footer { margin-bottom: 64px; }  /* scroll clear of the floating Ask button */
   .season-sim { padding: 14px; }
   .season-sim-header { align-items: flex-start; flex-direction: column; }
   .sim-button { width: 100%; }

@@ -20,7 +20,7 @@ describe("UpdateBanner", () => {
     pwaState.updateServiceWorker = update;
     render(<UpdateBanner />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("A new version of NHL Dash is ready.");
+    expect(screen.getByRole("status")).toHaveTextContent("A new version of PuckPulse is ready.");
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
     expect(update).toHaveBeenCalledWith(true);

@@ -1,20 +1,21 @@
-// Starter questions per page type: things the page's data can actually
-// answer (see intelligence/app/compact.py for what each page sends).
+// Starter questions per page type. Each leans on what that page's data or the
+// agent's tools can actually answer (see intelligence/app/tools.py): standings,
+// schedules, odds history, players, and the playoff-odds model's simulations.
 export const SUGGESTIONS = {
   standings: [
     "Who's in the wild-card race in each conference?",
-    "Which team is hottest over its last 10 games?",
-    "Which team has a good goal differential but is outside a playoff spot?",
+    "What does Detroit need over its next 10 games to make the playoffs?",
+    "Who has the easiest remaining schedule?",
   ],
   team: [
-    "What's driving this team's start?",
-    "Is their record backed up by their goal differential?",
-    "How's the goaltending?",
+    "What happens to their playoff odds if they win their next 5?",
+    "How hard is their upcoming schedule?",
+    "How have their playoff odds moved this season?",
   ],
   player: [
     "How does this season compare to his last five?",
     "Is he on pace for a career year?",
-    "What stands out about his career?",
+    "What do his advanced stats say?",
   ],
   game: [
     "How did this game go?",

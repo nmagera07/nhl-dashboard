@@ -22,7 +22,7 @@ every default can be overridden with its *_MODEL variable.
 import logging
 import os
 from dataclasses import dataclass
-from typing import AsyncIterator, Mapping
+from typing import Mapping
 
 from openai import AsyncOpenAI, OpenAIError
 
@@ -95,59 +95,29 @@ class ProviderChain:
         return self._clients[provider.name]
 
     @staticmethod
-    def _messages(system: str, prompt: str, history=()) -> list[dict[str, str]]:
-        """System, then earlier turns (plain text, no page data), then the
-        new question with the page data attached."""
-        return [
-            {"role": "system", "content": system},
-            *({"role": turn["role"], "content": turn["content"]} for turn in history),
-            {"role": "user", "content": prompt},
-        ]
-
-    @staticmethod
     def _why(exc: Exception) -> str:
         status = getattr(exc, "status_code", None)
         return f"HTTP {status}" if status else type(exc).__name__
 
-    async def complete(self, system: str, prompt: str, max_tokens: int, history=()) -> tuple[str, Provider]:
-        for provider in self.providers:
+    async def complete_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0):
+        """
+        One agent turn: the reply message (text and/or tool calls) and the
+        provider that gave it, plus its index so later turns of the same
+        question start there (a provider that just failed isn't retried
+        every round). The message list is plain OpenAI format, so a turn
+        that falls back mid-conversation continues it on the next provider.
+        """
+        for index in range(start, len(self.providers)):
+            provider = self.providers[index]
             try:
+                extra = {"tools": tools} if tools else {}
                 response = await self._client(provider).chat.completions.create(
-                    model=provider.model, messages=self._messages(system, prompt, history), max_tokens=max_tokens,
+                    model=provider.model, messages=messages, max_tokens=max_tokens, **extra,
                 )
-                text = (response.choices[0].message.content or "").strip() if response.choices else ""
-                if text:
-                    return text, provider
-                logger.warning("%s returned an empty answer; trying the next provider", provider.name)
+                message = response.choices[0].message if response.choices else None
+                if message and (message.tool_calls or (message.content or "").strip()):
+                    return message, provider, index
+                logger.warning("%s returned an empty turn; trying the next provider", provider.name)
             except OpenAIError as exc:
-                logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
-        raise AllProvidersFailed()
-
-    async def stream(self, system: str, prompt: str, max_tokens: int, history=()) -> AsyncIterator[tuple[str, object]]:
-        """
-        Yields ("delta", text) chunks, then ("done", provider). Falls back to
-        the next provider only before the first chunk -- an answer that has
-        started streaming can't switch models mid-sentence, so a failure
-        after that raises.
-        """
-        for provider in self.providers:
-            started = False
-            try:
-                stream = await self._client(provider).chat.completions.create(
-                    model=provider.model, messages=self._messages(system, prompt, history),
-                    max_tokens=max_tokens, stream=True,
-                )
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta.content if chunk.choices else None
-                    if delta:
-                        started = True
-                        yield "delta", delta
-                if started:
-                    yield "done", provider
-                    return
-                logger.warning("%s streamed an empty answer; trying the next provider", provider.name)
-            except OpenAIError as exc:
-                if started:
-                    raise
                 logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
         raise AllProvidersFailed()

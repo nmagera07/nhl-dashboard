@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from slowapi.util import get_remote_address
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
 from .providers import AllProvidersFailed, ProviderChain
+from .tools import LABELS, TOOLS, ToolRunner
 
 
 logger = logging.getLogger(__name__)
@@ -80,8 +82,26 @@ ALL_BUSY = "NHL Intelligence is taking a breather (its free AI providers are bus
 MID_ANSWER_FAILURE = "NHL Intelligence lost its connection mid-answer. Try asking again."
 
 
+TOOL_INSTRUCTIONS = """
+You have tools for standings, teams, schedules, playoff odds history, players, and the playoff-odds model's season simulations. Call a tool whenever the question needs numbers that aren't in the page data. For any "what if" question or "what does X need", call simulate_scenario or playoff_path: never estimate odds or projections yourself. For a scenario, compare with_scenario to that tool's own baseline (not other odds figures). Report the tools' numbers as given (rounded is fine) and say they come from the playoff-odds model's simulations. Use 3-letter team abbreviations in tool calls."""
+
+# Each round resends the conversation, so keep it short: free tiers cap
+# tokens per minute, and three rounds cover even multi-team questions.
+MAX_TOOL_ROUNDS = 3
+
 SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
-Use only the supplied dashboard data. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
+Use only the supplied dashboard data and tool results. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
+
+
+def _echo(call) -> dict:
+    """
+    A tool call exactly as the provider sent it, extra fields included:
+    Gemini attaches a "thought signature" (extra_content) to each call and
+    rejects the follow-up request (HTTP 400) if it isn't sent back.
+    """
+    if hasattr(call, "model_dump"):
+        return call.model_dump(exclude_none=True)
+    return {"id": call.id, "type": "function", "function": {"name": call.function.name, "arguments": call.function.arguments}}
 
 
 class IntelligenceService:
@@ -97,7 +117,7 @@ class IntelligenceService:
             return await self.dashboard.team_context(context.team_abbrev)
         if context.page == "game":
             return await self.dashboard.game_context(context.game_id)
-        return await self.dashboard.league_context()
+        return await self.dashboard.league_summary()
 
     def prompt_for(self, request: ChatRequest, context: ContextBundle) -> str:
         facts = json.dumps(context.facts, default=str, separators=(",", ":"))
@@ -118,34 +138,72 @@ class IntelligenceService:
         except DashboardUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-    async def answer(self, request: ChatRequest) -> ChatResponse:
+    async def run_agent(self, request: ChatRequest):
+        """
+        The agent loop. The model sees the page data and the tools; each round
+        it either answers or asks for tools, which run here (in parallel) and
+        go back to it as results. Yields ("tool", label) while working, then
+        ("answer", text, provider, evidence).
+        """
         context = await self._context(request)
-        try:
-            text, provider = await self.chain.complete(
-                SYSTEM_INSTRUCTIONS, self.prompt_for(request, context), self.settings.max_output_tokens,
-                history=request.trimmed_history(),
+        runner = ToolRunner(self.dashboard)
+        messages = [
+            {"role": "system", "content": SYSTEM_INSTRUCTIONS + TOOL_INSTRUCTIONS},
+            *request.trimmed_history(),
+            {"role": "user", "content": self.prompt_for(request, context)},
+        ]
+        evidence = list(context.evidence)
+        start = 0
+        for round_number in range(MAX_TOOL_ROUNDS + 1):
+            last_round = round_number == MAX_TOOL_ROUNDS
+            if last_round:
+                messages.append({"role": "user", "content": "Answer now using the results you have; no more tools."})
+            message, provider, start = await self.chain.complete_with_tools(
+                messages, None if last_round else TOOLS, self.settings.max_output_tokens, start=start,
             )
+            calls = [] if last_round else list(message.tool_calls or [])
+            if not calls:
+                yield ("answer", (message.content or "").strip(), provider, evidence)
+                return
+            messages.append({"role": "assistant", "content": message.content, "tool_calls": [_echo(c) for c in calls]})
+            for call in calls:
+                status, source = LABELS.get(call.function.name, ("Looking that up", "Dashboard data"))
+                yield ("tool", status)
+                if not any(e["label"] == source for e in evidence):
+                    evidence.append({"label": source, "endpoint": f"tool:{call.function.name}"})
+            results = await asyncio.gather(*(runner.run(c.function.name, c.function.arguments) for c in calls))
+            messages.extend({"role": "tool", "tool_call_id": c.id, "content": r} for c, r in zip(calls, results))
+
+    async def answer(self, request: ChatRequest) -> ChatResponse:
+        try:
+            async for event in self.run_agent(request):
+                if event[0] == "answer":
+                    _, text, provider, evidence = event
+                    return ChatResponse(answer=text, evidence=[Evidence(**e) for e in evidence], model=provider.label)
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
-        return ChatResponse(answer=text, evidence=[Evidence(**item) for item in context.evidence], model=provider.label)
+        raise HTTPException(status_code=503, detail=ALL_BUSY)
 
     async def answer_stream(self, request: ChatRequest):
-        """Yield server-sent events as the model produces answer text."""
-        context = await self._context(request)
-        prompt = self.prompt_for(request, context)
+        """Server-sent events: a status line per tool while the agent works, then the answer."""
+        error = None
         try:
-            async for kind, value in self.chain.stream(
-                SYSTEM_INSTRUCTIONS, prompt, self.settings.max_output_tokens, history=request.trimmed_history()
-            ):
-                if kind == "delta":
-                    yield f"data: {json.dumps({'type': 'delta', 'text': value})}\n\n"
+            async for event in self.run_agent(request):
+                if event[0] == "tool":
+                    yield f"data: {json.dumps({'type': 'status', 'text': event[1] + '…'})}\n\n"
                 else:
-                    yield f"data: {json.dumps({'type': 'done', 'evidence': context.evidence, 'model': value.label})}\n\n"
+                    _, text, provider, evidence = event
+                    yield f"data: {json.dumps({'type': 'delta', 'text': text})}\n\n"
+                    yield f"data: {json.dumps({'type': 'done', 'evidence': evidence, 'model': provider.label})}\n\n"
+        except HTTPException as exc:  # not configured, or the dashboard is down
+            error = exc.detail
         except AllProvidersFailed:
-            yield f"data: {json.dumps({'type': 'error', 'message': ALL_BUSY})}\n\n"
+            error = ALL_BUSY
         except OpenAIError:
             logger.exception("AI provider failed mid-answer")
-            yield f"data: {json.dumps({'type': 'error', 'message': MID_ANSWER_FAILURE})}\n\n"
+            error = MID_ANSWER_FAILURE
+        if error:
+            yield f"data: {json.dumps({'type': 'error', 'message': error})}\n\n"
 
 
 @asynccontextmanager

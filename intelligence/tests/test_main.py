@@ -65,10 +65,10 @@ async def test_no_providers_configured_is_a_503():
 async def test_stream_reports_which_provider_answered():
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One"}))
     async with httpx.AsyncClient(base_url="https://dashboard.test", transport=transport) as client:
-        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain(["Fine ", "season."]))
+        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain("Fine season."))
         events = [e async for e in service.answer_stream(ChatRequest(message="?", context=ChatContext(page="player", player_id=7)))]
 
-    assert '"text": "Fine "' in events[0]
+    assert '"text": "Fine season."' in events[0]
     assert '"type": "done"' in events[-1] and '"model": "Groq"' in events[-1]
 
 
@@ -118,6 +118,7 @@ async def test_follow_ups_send_only_the_last_two_exchanges_without_page_data():
 
     messages = calls[0][1]["messages"]
     assert [m["role"] for m in messages] == ["system", "user", "assistant", "user", "assistant", "user"]
+    assert calls[0][1]["tools"]  # the model always gets the tools
     assert messages[1]["content"].startswith("turn 2")           # oldest turns dropped
     assert all(len(m["content"]) <= 1500 for m in messages[1:5])  # each turn capped
     assert "Dashboard data" not in messages[1]["content"]         # page data only on the new question

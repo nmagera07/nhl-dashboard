@@ -3,7 +3,7 @@
 import pytest
 
 from app.providers import AllProvidersFailed, Provider, ProviderChain, providers_from_env
-from tests.fakes import fake_factory, rate_limited
+from tests.fakes import fake_factory, rate_limited, tool_call
 
 
 def provider(name):
@@ -35,63 +35,56 @@ class TestProvidersFromEnv:
         assert providers_from_env({}) == []
 
 
+MESSAGES = [{"role": "system", "content": "sys"}, {"role": "user", "content": "q"}]
+TOOLS = [{"type": "function", "function": {"name": "get_leaders", "parameters": {"type": "object", "properties": {}}}}]
+
+
 @pytest.mark.asyncio
-class TestComplete:
-    async def test_the_first_provider_answers(self):
+class TestCompleteWithTools:
+    async def test_the_first_provider_answers_and_gets_the_tools(self):
         calls = []
         chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": "Hi", "groq": "unused"}, calls))
 
-        text, used = await chain.complete("sys", "q", 100)
+        message, used, index = await chain.complete_with_tools(MESSAGES, TOOLS, 100)
 
-        assert (text, used.name) == ("Hi", "gemini")
+        assert (message.content, used.name, index) == ("Hi", "gemini", 0)
         assert [name for name, _ in calls] == ["gemini"]
-        assert calls[0][1]["messages"][0] == {"role": "system", "content": "sys"}
+        assert calls[0][1]["messages"] == MESSAGES and calls[0][1]["tools"] == TOOLS
 
-    async def test_a_rate_limited_provider_falls_back_to_the_next(self):
+    async def test_a_tool_call_turn_counts_as_an_answer(self):
+        chain = ProviderChain([provider("gemini")], client_factory=fake_factory({"gemini": [tool_call("get_leaders", "{}")]}, []))
+
+        message, _, _ = await chain.complete_with_tools(MESSAGES, TOOLS, 100)
+
+        assert message.tool_calls[0].function.name == "get_leaders"
+
+    async def test_a_rate_limited_provider_falls_back_and_later_turns_start_there(self):
         calls = []
         chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": rate_limited(), "groq": "From Groq"}, calls))
 
-        text, used = await chain.complete("sys", "q", 100)
+        message, used, index = await chain.complete_with_tools(MESSAGES, TOOLS, 100)
+        await chain.complete_with_tools(MESSAGES, TOOLS, 100, start=index)
 
-        assert (text, used.name) == ("From Groq", "groq")
+        assert (message.content, used.name, index) == ("From Groq", "groq", 1)
+        assert [name for name, _ in calls] == ["gemini", "groq", "groq"]
 
     async def test_an_empty_answer_also_falls_back(self):
         chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": "  ", "groq": "Real answer"}, []))
 
-        text, _ = await chain.complete("sys", "q", 100)
+        message, _, _ = await chain.complete_with_tools(MESSAGES, TOOLS, 100)
 
-        assert text == "Real answer"
+        assert message.content == "Real answer"
+
+    async def test_no_tools_means_none_are_sent(self):
+        calls = []
+        chain = ProviderChain([provider("gemini")], client_factory=fake_factory({"gemini": "Done"}, calls))
+
+        await chain.complete_with_tools(MESSAGES, None, 100)
+
+        assert "tools" not in calls[0][1]
 
     async def test_all_failing_raises(self):
         chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": rate_limited(), "groq": rate_limited()}, []))
 
         with pytest.raises(AllProvidersFailed):
-            await chain.complete("sys", "q", 100)
-
-
-@pytest.mark.asyncio
-class TestStream:
-    async def collect(self, chain):
-        return [item async for item in chain.stream("sys", "q", 100)]
-
-    async def test_falls_back_before_the_first_chunk(self):
-        chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": rate_limited(), "groq": ["Hel", "lo"]}, []))
-
-        events = await self.collect(chain)
-
-        assert events[:2] == [("delta", "Hel"), ("delta", "lo")]
-        assert events[2][0] == "done" and events[2][1].name == "groq"
-
-    async def test_a_failure_mid_answer_is_not_retried_elsewhere(self):
-        calls = []
-        chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=fake_factory({"gemini": ["Hel", rate_limited()], "groq": ["unused"]}, calls))
-
-        with pytest.raises(Exception):
-            await self.collect(chain)
-        assert [name for name, _ in calls] == ["gemini"]
-
-    async def test_all_failing_raises(self):
-        chain = ProviderChain([provider("gemini")], client_factory=fake_factory({"gemini": rate_limited()}, []))
-
-        with pytest.raises(AllProvidersFailed):
-            await self.collect(chain)
+            await chain.complete_with_tools(MESSAGES, TOOLS, 100)

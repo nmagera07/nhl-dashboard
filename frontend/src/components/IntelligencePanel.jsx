@@ -11,7 +11,7 @@ const FALLBACK_ERROR = "NHL Intelligence could not answer right now.";
 let nextId = 0;
 const newId = () => ++nextId;
 
-async function streamAnswer({ message, context, history, onDelta, onDone }) {
+async function streamAnswer({ message, context, history, onStatus, onDelta, onDone }) {
   const response = await fetch(`${INTELLIGENCE_BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,7 +34,8 @@ async function streamAnswer({ message, context, history, onDelta, onDone }) {
       const line = event.split("\n").find((item) => item.startsWith("data: "));
       if (!line) return;
       const payload = JSON.parse(line.slice(6));
-      if (payload.type === "delta") onDelta(payload.text);
+      if (payload.type === "status") onStatus?.(payload.text);
+      else if (payload.type === "delta") onDelta(payload.text);
       else if (payload.type === "done") onDone(payload);
       else if (payload.type === "error") throw new Error(payload.message);
     });
@@ -100,6 +101,7 @@ export default function IntelligencePanel({ context, label }) {
         message: question,
         context,
         history,
+        onStatus: (status) => updateLast(() => ({ status })),
         onDelta: (delta) => updateLast((m) => ({ content: m.content + delta })),
         onDone: (payload) => updateLast(() => ({ pending: false, model: payload.model, evidence: payload.evidence || [] })),
       });
@@ -177,7 +179,7 @@ export default function IntelligencePanel({ context, label }) {
                     ) : m.content ? (
                       <ChatMarkdown text={m.content} />
                     ) : (
-                      <p className="intelligence-typing" aria-label="Thinking">Thinking…</p>
+                      <p className="intelligence-typing" role="status">{m.status || "Thinking…"}</p>
                     )}
                     {!m.pending && !m.error && (m.model || m.evidence?.length > 0) && (
                       <small className="intelligence-meta">
@@ -210,7 +212,7 @@ export default function IntelligencePanel({ context, label }) {
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h12M10 4l6 6-6 6" /></svg>
               </button>
             </form>
-            <p className="intelligence-footnote">AI-generated from this page's stats. It can make mistakes.</p>
+            <p className="intelligence-footnote">AI answers from the app's stats and playoff-odds model. It can make mistakes.</p>
           </section>
         </>
       )}

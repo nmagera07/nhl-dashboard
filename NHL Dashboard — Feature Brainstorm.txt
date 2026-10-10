@@ -9,6 +9,11 @@ Last updated: 2026-10-09
 ---
 
 ## In Progress
+- **NHL Intelligence as an agent** — tool calling over the app's data and the
+  playoff-odds model: standings, schedules, schedule strength, odds history,
+  players, "what if they win their next 4", and "what does Detroit need".
+  Next: an eval suite (does it pick the right tool; do answers match the
+  tools' numbers?), then "why did the odds change?" and a daily digest.
 - **Push notifications** — "🔔 Goal alerts" on the My team card: a push for
   every goal in your team's games (either side) and the final score, within
   about a minute. Watched by the nhl-live-notifier job (every minute during

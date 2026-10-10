@@ -93,6 +93,14 @@ SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
 Use only the supplied dashboard data and tool results. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
 
 
+def today_eastern() -> str:
+    """The date fans mean by "today" and "tonight" (NHL schedules are Eastern)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("America/New_York")).strftime("%A, %B %-d, %Y")
+
+
 def _echo(call) -> dict:
     """
     A tool call exactly as the provider sent it, extra fields included:
@@ -126,6 +134,7 @@ class IntelligenceService:
             logger.warning("Context for %s is %d chars; truncating", request.context.page, len(facts))
             facts = facts[: self.settings.max_context_chars] + "\n[Dashboard context truncated to control usage.]"
         return (
+            f"Today is {today_eastern()} (US Eastern).\n\n"
             f"Question: {request.message}\n\nPage context: {request.context.model_dump_json()}"
             f"\n\nDashboard data (JSON): {facts}"
         )

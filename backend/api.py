@@ -430,14 +430,32 @@ def _latest_sim_inputs():
     return row["payload"]
 
 
-def _cached_scenario(key, compute):
+def _played_since_snapshot(payload, team):
+    """
+    The team's games that finished after the morning snapshot, from the live
+    schedule (cached), as (date, home, away) -- so "its next 4 games" skips
+    tonight's game once it's over. Best effort: if the NHL feed is down, the
+    snapshot is used as is.
+    """
+    try:
+        recent = team_schedule(team)["recent"]
+    except NHLGamesUnavailable:
+        return frozenset()
+    return frozenset(
+        (g["date"], team if g["home"] else g["opponent"], g["opponent"] if g["home"] else team)
+        for g in recent if g["date"] >= payload["as_of_date"]
+    )
+
+
+def _cached_scenario(key, compute, team):
     payload = _latest_sim_inputs()
-    key = (payload["as_of_date"], *key)
+    played = _played_since_snapshot(payload, team.upper())
+    key = (payload["as_of_date"], len(played), *key)
     if key in _SCENARIO_CACHE:
         _SCENARIO_CACHE.move_to_end(key)
         return _SCENARIO_CACHE[key]
     try:
-        result = compute(payload)
+        result = compute(payload, played)
     except season_scenarios.UnknownTeam as exc:
         raise HTTPException(status_code=404, detail=f"Unknown team '{exc}'.") from exc
     except ValueError as exc:
@@ -464,7 +482,8 @@ def season_sim_scenario(
     """
     return _cached_scenario(
         ("scenario", team.upper(), games, wins, ot_losses),
-        lambda payload: season_scenarios.scenario(payload, team, games, wins, ot_losses),
+        lambda payload, played: season_scenarios.scenario(payload, team, games, wins, ot_losses, played=played),
+        team,
     )
 
 
@@ -478,7 +497,8 @@ def season_sim_path(
     """A team's playoff odds for every possible record over its next `games`: what it needs."""
     return _cached_scenario(
         ("path", team.upper(), games),
-        lambda payload: season_scenarios.playoff_path(payload, team, games),
+        lambda payload, played: season_scenarios.playoff_path(payload, team, games, played=played),
+        team,
     )
 
 

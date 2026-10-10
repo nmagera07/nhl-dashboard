@@ -6,11 +6,37 @@
 
 A standalone, grounded conversational layer for the NHL Dashboard. It reads structured data from the dashboard public API, so it never receives dashboard database credentials.
 
-## Phase 1
+## How it answers
 
-- Player, team, and standings questions
-- Evidence labels showing which dashboard data was used
-- No game recap claims until Phase 2 adds game-level data
+An **agent loop** (`app/main.py: run_agent`). The model gets the page's
+context (player, team, game box score, or a small league summary) and a set of
+**tools** (`app/tools.py`). Each round it either answers or asks for tools,
+which run here, in parallel, and go back to it as results. At most 3 tool
+rounds per question.
+
+| Tool | For questions like |
+|---|---|
+| `get_standings` | "Who's in the wild-card race?" |
+| `get_team` | "How's Florida doing?" |
+| `get_playoff_odds` | "How have PIT's odds moved this season?" |
+| `get_schedule` | "Who does Toronto play next week?" |
+| `rank_schedule_strength` | "Who has the easiest remaining schedule?" |
+| `simulate_scenario` | "What if PIT wins their next 4?" |
+| `playoff_path` | "What does Detroit need over its next 10?" |
+| `find_player` / `get_leaders` | "How's Crosby doing?" / "Who leads in goals?" |
+
+The model decides *what to ask*; the numbers come from the dashboard API and
+the playoff-odds model's simulations (`GET /season-sim/scenario` and
+`/season-sim/path` on the backend), never from the model's own arithmetic.
+
+Budget notes: tool results are compact, and the league page sends a ~150-token
+summary instead of full standings, since every round resends the conversation
+and Groq's free tier caps tokens per minute. Gemini requires each tool call's
+"thought signature" (`extra_content`) to be echoed back, so tool calls are
+returned to the model exactly as received.
+
+The chat streams a status line per tool ("Simulating 2,000 seasons…"), then
+the answer with evidence labels for the data and tools used.
 
 ## Run locally
 

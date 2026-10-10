@@ -141,4 +141,31 @@ describe("IntelligencePanel", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /ask nhl intelligence/i })).toBeInTheDocument();
   });
+
+  it("shows what the agent is doing while it works", async () => {
+    let finish;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "status", text: "Simulating 2,000 seasons…" })}\n\n`));
+          finish = () => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "delta", text: "Odds rise to 73%." })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", evidence: [], model: "Gemini" })}\n\n`));
+            controller.close();
+          };
+        },
+      }),
+    });
+    render(<IntelligencePanel context={{ page: "team", team_abbrev: "PIT" }} label="Pittsburgh" />);
+    await open();
+
+    await ask("What if they win 4?");
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Simulating 2,000 seasons…");
+    finish();
+    expect(await screen.findByText("Odds rise to 73%.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });

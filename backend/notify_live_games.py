@@ -12,6 +12,7 @@ two without touching the database.
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -60,6 +61,7 @@ def goal_event(game, goal):
     return {
         "key": f"goal:{game['id']}:{goal.get('period')}:{goal.get('timeInPeriod')}:{goal.get('teamAbbrev')}",
         "kind": "goals",
+        "ttl": 15 * 60,  # a goal alert much later than that is noise
         "teams": [away, home],
         "payload": {
             "title": f"🚨 {goal.get('teamAbbrev')} goal! {_scoreline(away, home, goal.get('awayScore'), goal.get('homeScore'))}",
@@ -78,6 +80,7 @@ def final_event(game):
     return {
         "key": f"final:{game['id']}",
         "kind": "finals",
+        "ttl": 3 * 60 * 60,  # still worth seeing when the phone wakes up
         "teams": [away["abbrev"], home["abbrev"]],
         "payload": {
             "title": f"Final{suffix}: {_scoreline(away['abbrev'], home['abbrev'], away.get('score'), home.get('score'))}",
@@ -145,13 +148,17 @@ def run(now=None, fetch=None):
         fresh = claim(cur, [e["key"] for e in candidates])
         conn.commit()  # claimed before sending: a crash mid-send can't cause a duplicate later
         for event in (e for e in candidates if e["key"] in fresh):
+            statuses = []
             for sub in subscribers(cur, event["teams"], event["kind"]):
                 try:
-                    push.send(sub, event["payload"])
-                    sent += 1
+                    status = push.send(sub, event["payload"], ttl=event["ttl"])
+                    statuses.append(f"{urlparse(sub['endpoint']).hostname}:{status}")
+                    sent += 1 if status and status < 300 else 0
                 except push.SubscriptionGone:
+                    statuses.append(f"{urlparse(sub['endpoint']).hostname}:gone")
                     cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))
-            logger.info("%s -> %s", event["key"], event["payload"]["title"])
+            # Which push services accepted it (e.g. fcm.googleapis.com:201), for tracing a missed alert.
+            logger.info("%s -> %s [%s]", event["key"], event["payload"]["title"], ", ".join(statuses) or "no subscribers")
         cur.execute("DELETE FROM push_events_sent WHERE sent_at < NOW() - INTERVAL '3 days'")
     return sent
 

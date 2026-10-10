@@ -1002,6 +1002,38 @@ a.my-team-game:hover { border-color: #2c3a58; }
 .daily-digest-body p { margin: 0 0 6px; }
 .daily-digest-meta { margin: 10px 0 0; color: var(--text-dim); font-size: 11px; }
 
+/* "A new version is ready" (UpdateBanner): above the tab bar on phones. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 10px 10px 10px 16px;
+  border: 1px solid #2c3a58;
+  border-radius: 12px;
+  background: #111a2e;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.update-banner-refresh {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.update-banner-dismiss { padding: 4px 6px; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
+
 @media (max-width: 640px) {
   .dashboard {
     --gutter: 12px;
@@ -1113,6 +1145,7 @@ a.my-team-game:hover { border-color: #2c3a58; }
   .team-summary-identity .follow-button { margin-left: 60px; }
   .team-summary-identity .playoff-badge { margin-left: 0; }
   .my-team-card { padding: 12px; }
+  .update-banner { bottom: calc(var(--tabbar-height) + 12px + env(safe-area-inset-bottom, 0px)); }
   .season-sim { padding: 14px; }
   .season-sim-header { align-items: flex-start; flex-direction: column; }
   .sim-button { width: 100%; }

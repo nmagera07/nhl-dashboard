@@ -116,6 +116,7 @@ Last updated: 2026-10-09
 - ~~Azure bill cut from ~$11.44/month to ~$0.97/month~~
 - ~~Learning log with resume bullets (`docs/LEARNING.md`)~~
 - ~~Site redesign + installable phone app (PWA), Oct 2026~~
+- ~~"New version ready" banner (prompted service-worker updates, hourly checks)~~
 - ~~Past/future scoreboards with a season calendar~~
 - ~~Server-side TTL cache on the live game endpoints~~
 - ~~Playoff race page: odds-over-time chart + playoff-format race table~~

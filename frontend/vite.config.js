@@ -11,7 +11,10 @@ export default defineConfig({
     // (JS/CSS/HTML/icons) so it launches instantly; API calls always go to
     // the network, since scores and standings must never be served stale.
     VitePWA({
-      registerType: 'autoUpdate',
+      // Prompt, not autoUpdate: a downloaded release waits for the user to
+      // tap Refresh in UpdateBanner, instead of appearing only after the
+      // installed app is closed and reopened.
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'NHL Dashboard',
@@ -42,6 +45,7 @@ export default defineConfig({
   ],
   test: {
     environment: 'jsdom',
+    alias: { 'virtual:pwa-register/react': '/src/test/pwaRegisterStub.js' },
     setupFiles: './src/test/setup.js',
     globals: true,
   },

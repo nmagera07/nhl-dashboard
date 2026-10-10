@@ -9,6 +9,7 @@ resends the conversation, and free tiers cap tokens per minute.
 """
 
 import asyncio
+import inspect
 import json
 import logging
 from typing import Any
@@ -68,7 +69,8 @@ TOOLS = [
         ["team"]),
     _fn("find_player", "Look up a player by name: season stats, career, and 5-on-5 advanced stats.",
         {"name": {"type": "string", "description": "Full or last name, e.g. 'Crosby'."}}, ["name"]),
-    _fn("get_leaders", "League leaders: points, goals, and goalie wins."),
+    _fn("get_leaders", "League leaders: points, goals, or goalie wins.",
+        {"category": {"type": "string", "enum": ["points", "goals", "goalie_wins"], "description": "Default: all three."}}),
 ]
 
 # What the chat shows while a tool runs, and the evidence label after.
@@ -112,6 +114,13 @@ class ToolRunner:
             handler = getattr(self, f"_tool_{name}", None)
             if handler is None:
                 raise ToolError(f"Unknown tool '{name}'.")
+            # Small models sometimes send junk keys (Groq's gpt-oss called
+            # get_leaders with {"": ""}); drop what the tool doesn't take.
+            accepted = inspect.signature(handler).parameters
+            extra = [k for k in args if k not in accepted]
+            if extra:
+                logger.info("Ignoring unexpected arguments to %s: %s", name, extra)
+                args = {k: v for k, v in args.items() if k in accepted}
             result = await handler(**args)
         except (ToolError, TypeError, ValueError) as exc:  # bad arguments from the model
             result = {"error": str(exc)}
@@ -291,8 +300,9 @@ class ToolRunner:
         player = await self._get(f"/players/{matches[0]['player_id']}")
         return compact.player_facts(player)
 
-    async def _tool_get_leaders(self):
-        return compact.leaders(await self._get("/players/leaders"))
+    async def _tool_get_leaders(self, category: str | None = None):
+        leaders = compact.leaders(await self._get("/players/leaders"))
+        return {category: leaders[category]} if category in leaders else leaders
 
 
 def _eastern_time(utc_iso: str | None) -> str | None:

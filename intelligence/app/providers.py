@@ -109,15 +109,28 @@ class ProviderChain:
         """
         for index in range(start, len(self.providers)):
             provider = self.providers[index]
-            try:
-                extra = {"tools": tools} if tools else {}
-                response = await self._client(provider).chat.completions.create(
-                    model=provider.model, messages=messages, max_tokens=max_tokens, **extra,
-                )
-                message = response.choices[0].message if response.choices else None
-                if message and (message.tool_calls or (message.content or "").strip()):
-                    return message, provider, index
-                logger.warning("%s returned an empty turn; trying the next provider", provider.name)
-            except OpenAIError as exc:
-                logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
+            for attempt in (1, 2):
+                try:
+                    extra = {"tools": tools} if tools else {}
+                    response = await self._client(provider).chat.completions.create(
+                        model=provider.model, messages=messages, max_tokens=max_tokens, **extra,
+                    )
+                    message = response.choices[0].message if response.choices else None
+                    if message and (message.tool_calls or (message.content or "").strip()):
+                        return message, provider, index
+                    logger.warning("%s returned an empty turn; trying the next provider", provider.name)
+                    break
+                except OpenAIError as exc:
+                    # Groq rejects a turn (HTTP 400 "tool_use_failed") when the
+                    # model writes a malformed tool call; it's a sampling
+                    # hiccup, and asking again usually works.
+                    if attempt == 1 and self._malformed_tool_call(exc):
+                        logger.info("%s wrote a malformed tool call; retrying once", provider.name)
+                        continue
+                    logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
+                    break
         raise AllProvidersFailed()
+
+    @staticmethod
+    def _malformed_tool_call(exc: Exception) -> bool:
+        return getattr(exc, "status_code", None) == 400 and "tool_use_failed" in str(exc)

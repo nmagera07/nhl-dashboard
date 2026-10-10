@@ -93,6 +93,13 @@ class TestTools:
         result = await self.call("get_team", {"team": "Quebec Nordiques"})
         assert "Unknown team" in result["error"]
 
+    async def test_junk_arguments_are_ignored(self):
+        result = await self.call("get_leaders", {"": ""})  # what Groq's model actually sent
+        assert "points" in result
+
+    async def test_leaders_by_category(self):
+        assert list(await self.call("get_leaders", {"category": "goals"})) == ["goals"]
+
     async def test_bad_arguments_and_unknown_tools_are_errors_not_crashes(self):
         assert "error" in await self.call("simulate_scenario", {"team": "PIT"})  # missing games/wins
         assert "Unknown tool" in (await self.call("drop_tables", {}))["error"]

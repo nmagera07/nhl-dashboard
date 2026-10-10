@@ -90,7 +90,7 @@ You have tools for standings, teams, schedules, playoff odds history, players, a
 MAX_TOOL_ROUNDS = 3
 
 SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
-Use only the supplied dashboard data and tool results. Do not invent game events, injuries, line combinations, or facts absent from the context. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
+Use only the supplied dashboard data and tool results. Do not invent game events, injuries, line combinations, or facts absent from the context. You have no injury, lineup, or transaction data: if asked whether someone is injured, healthy, scratched, or traded, say you don't have that information, and don't infer health from games played. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
 
 
 def today_eastern() -> str:
@@ -151,8 +151,9 @@ class IntelligenceService:
         """
         The agent loop. The model sees the page data and the tools; each round
         it either answers or asks for tools, which run here (in parallel) and
-        go back to it as results. Yields ("tool", label) while working, then
-        ("answer", text, provider, evidence).
+        go back to it as results. Yields ("tool", label) while working,
+        ("tool_result", name, arguments, result) as each finishes (for evals
+        and tracing), then ("answer", text, provider, evidence).
         """
         context = await self._context(request)
         runner = ToolRunner(self.dashboard)
@@ -182,6 +183,8 @@ class IntelligenceService:
                     evidence.append({"label": source, "endpoint": f"tool:{call.function.name}"})
             results = await asyncio.gather(*(runner.run(c.function.name, c.function.arguments) for c in calls))
             messages.extend({"role": "tool", "tool_call_id": c.id, "content": r} for c, r in zip(calls, results))
+            for c, r in zip(calls, results):
+                yield ("tool_result", c.function.name, c.function.arguments, r)
 
     async def answer(self, request: ChatRequest) -> ChatResponse:
         try:
@@ -200,7 +203,7 @@ class IntelligenceService:
             async for event in self.run_agent(request):
                 if event[0] == "tool":
                     yield f"data: {json.dumps({'type': 'status', 'text': event[1] + '…'})}\n\n"
-                else:
+                elif event[0] == "answer":
                     _, text, provider, evidence = event
                     yield f"data: {json.dumps({'type': 'delta', 'text': text})}\n\n"
                     yield f"data: {json.dumps({'type': 'done', 'evidence': evidence, 'model': provider.label})}\n\n"

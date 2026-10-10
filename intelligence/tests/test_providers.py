@@ -88,3 +88,20 @@ class TestCompleteWithTools:
 
         with pytest.raises(AllProvidersFailed):
             await chain.complete_with_tools(MESSAGES, TOOLS, 100)
+
+
+@pytest.mark.asyncio
+async def test_a_malformed_tool_call_is_retried_once_on_the_same_provider():
+    import httpx
+    from openai import APIStatusError
+
+    request = httpx.Request("POST", "https://groq.test/chat/completions")
+    malformed = APIStatusError("tool_use_failed: Failed to call a function", response=httpx.Response(400, request=request), body=None)
+    calls = []
+    chain = ProviderChain([provider("groq"), provider("gemini")],
+                          client_factory=fake_factory({"groq": (malformed, "Second try"), "gemini": "unused"}, calls))
+
+    message, used, _ = await chain.complete_with_tools(MESSAGES, TOOLS, 100)
+
+    assert (message.content, used.name) == ("Second try", "groq")
+    assert [name for name, _ in calls] == ["groq", "groq"]

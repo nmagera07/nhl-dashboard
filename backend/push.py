@@ -60,19 +60,25 @@ def valid_keys(p256dh: str, auth: str) -> bool:
     )
 
 
-def send(subscription: dict, payload: dict, ttl: int = 600) -> None:
+def send(subscription: dict, payload: dict, ttl: int = 600, urgency: str = "high") -> int | None:
     """
-    Send one notification. subscription: {endpoint, p256dh, auth}. Raises
+    Send one notification; returns the push service's HTTP status (None on
+    failure). subscription: {endpoint, p256dh, auth}. Raises
     SubscriptionGone when the browser has unsubscribed, so the caller can
     delete it; other failures are logged and swallowed (one bad device
     shouldn't stop everyone else's notifications).
+
+    Urgency defaults to high: at "normal", an idle Android phone holds the
+    message for batched delivery, which can outlast the TTL -- the push
+    service accepts it and it's silently dropped. (That's how a shootout
+    final went missing on 2026-10-09.)
     """
     from pywebpush import WebPushException, webpush
 
     if not is_allowed_endpoint(subscription["endpoint"]):
         raise SubscriptionGone("endpoint is not a known push service")
     try:
-        webpush(
+        response = webpush(
             subscription_info={
                 "endpoint": subscription["endpoint"],
                 "keys": {"p256dh": subscription["p256dh"], "auth": subscription["auth"]},
@@ -80,9 +86,11 @@ def send(subscription: dict, payload: dict, ttl: int = 600) -> None:
             data=json.dumps(payload),
             vapid_private_key=VAPID_PRIVATE_KEY,
             vapid_claims={"sub": VAPID_SUBJECT},
-            ttl=ttl,  # a goal alert an hour late is noise; let the push service drop it
+            ttl=ttl,
+            headers={"Urgency": urgency},
             timeout=10,
         )
+        return getattr(response, "status_code", None)
     except WebPushException as exc:
         status = getattr(exc.response, "status_code", None)
         if status in (404, 410):

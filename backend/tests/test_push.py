@@ -89,3 +89,38 @@ class TestSubscribeEndpoint:
         body = client.get("/push/config").json()
 
         assert body == {"vapid_public_key": "BPublicKey", "enabled": True}
+
+
+class TestSend:
+    def test_sends_with_high_urgency_and_returns_the_status(self, monkeypatch):
+        import pywebpush
+
+        captured = {}
+
+        class Response:
+            status_code = 201
+
+        def fake_webpush(**kwargs):
+            captured.update(kwargs)
+            return Response()
+
+        monkeypatch.setattr(pywebpush, "webpush", fake_webpush)
+
+        status = push.send({"endpoint": FCM, "p256dh": P256DH, "auth": AUTH}, {"title": "t"}, ttl=900)
+
+        assert status == 201
+        assert captured["headers"] == {"Urgency": "high"} and captured["ttl"] == 900
+
+    def test_a_dropped_subscription_raises_gone(self, monkeypatch):
+        import pywebpush
+
+        class Gone:
+            status_code = 410
+
+        def fake_webpush(**kwargs):
+            raise pywebpush.WebPushException("gone", response=Gone())
+
+        monkeypatch.setattr(pywebpush, "webpush", fake_webpush)
+
+        with pytest.raises(push.SubscriptionGone):
+            push.send({"endpoint": FCM, "p256dh": P256DH, "auth": AUTH}, {"title": "t"})

@@ -33,6 +33,21 @@ def _num(value, digits=2) -> float | None:
     return None if value is None else round(float(value), digits)
 
 
+def pdo_reading(pdo) -> str | None:
+    """
+    PDO's meaning in words, computed here rather than left to the model:
+    with low reasoning effort, Groq's model read 96.2 as above average.
+    """
+    if pdo is None:
+        return None
+    pdo = float(pdo)
+    if pdo < 99:
+        return "below the ~100 average: on-ice shooting + save % running cold, usually bad luck that evens out"
+    if pdo > 101:
+        return "above the ~100 average: on-ice shooting + save % running hot, usually good luck that fades"
+    return "about average (~100): no unusual luck either way"
+
+
 def _name(p: dict[str, Any]) -> str:
     return f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
 
@@ -225,6 +240,7 @@ def player_facts(player: dict[str, Any]) -> dict[str, Any]:
             "xgoals_for_pct": _pct(advanced.get("xgoals_for_pct")),
             "individual_xgoals": _num(advanced.get("individual_xgoals")),
             "pdo": _num(advanced.get("pdo"), 1),
+            "pdo_reading": pdo_reading(advanced.get("pdo")),
         }) if advanced else None,
         "career_regular_season": stats(career["regular_season"]) if career.get("regular_season") else None,
         "career_playoffs": stats(career["playoffs"]) if career.get("playoffs") else None,

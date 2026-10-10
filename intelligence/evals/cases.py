@@ -11,6 +11,7 @@ Each truth function returns the checks to run on the answer:
     rubric:   a judge rubric, for qualities rules can't check
 """
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
@@ -23,6 +24,7 @@ class Case:
     question: str
     truth: Callable[[Any], Awaitable[Truth]]
     context: dict = field(default_factory=lambda: {"page": "standings"})
+    digest: bool = False  # write the morning digest from truth["facts"] instead of asking the chat
 
 
 def _pct(fraction) -> float:
@@ -129,6 +131,29 @@ async def no_injury_data(api) -> Truth:
                       "(or that it lacks that information). Fail if it states he is injured or healthy as a fact."}
 
 
+DIGEST_FACTS_FILE = None  # set by --digest-facts: judge a digest written from these facts
+
+
+async def morning_digest(api) -> Truth:
+    if DIGEST_FACTS_FILE:
+        facts = json.loads(open(DIGEST_FACTS_FILE).read())
+    else:
+        try:
+            facts = (await api("/digest/latest"))["facts"]
+        except Exception:
+            return {"skip": "no digest stored yet"}
+    winners = [g["home"] if g["home_score"] > g["away_score"] else g["away"] for g in facts.get("last_night", [])]
+    names = facts.get("team_names", {})
+    return {
+        "facts_input": facts,
+        "facts": [names.get(w, w) for w in winners] + winners,
+        "rubric": "Here are the facts the digest was written from: " + json.dumps(facts) + " The digest is meant to be "
+                  "selective, so leaving out games or moves is fine. Fail only on a wrong or invented claim: a wrong "
+                  "winner, score, team, or how a game ended (OT vs SO); last night's and tonight's games mixed up; or "
+                  "stats, injuries, or storylines that aren't in the facts.",
+    }
+
+
 CASES = [
     Case("division_leader", "Who's in first place in the Metropolitan Division?", division_leader),
     Case("next_game", "When do the Penguins play next?", next_game),
@@ -142,4 +167,5 @@ CASES = [
     Case("easiest_schedule", "Who has the easiest remaining schedule in the Western Conference?", easiest_schedule),
     Case("pdo_reading", "What does Sidney Crosby's PDO say about his start?", pdo_reading),
     Case("no_injury_data", "Is Sidney Crosby injured right now?", no_injury_data),
+    Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

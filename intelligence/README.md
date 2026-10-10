@@ -40,6 +40,13 @@ returned to the model exactly as received.
 The chat streams a status line per tool ("Simulating 2,000 seasons…"), then
 the answer with evidence labels for the data and tools used.
 
+## Morning digest
+
+`POST /digest/write` (private: requires the shared `X-Digest-Token`) writes the daily
+digest from facts the backend's daily job gathers: last night's results and standouts,
+playoff-odds moves, and tonight's game of the night. One call a day, shared by every
+visitor; the backend stores the facts too, so the page can show them if the AI is down.
+
 ## Evals
 
 `evals/` scores the agent on real questions, against real providers:

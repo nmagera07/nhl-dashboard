@@ -11,6 +11,7 @@ class Settings:
     providers: list[Provider] = field(default_factory=list)
     max_output_tokens: int = 600
     max_context_chars: int = 24000
+    digest_token: str = ""  # shared secret: only the daily job may ask for a digest
 
 
 def _env(name: str, legacy: str, default: str) -> str:
@@ -29,4 +30,5 @@ def get_settings() -> Settings:
         providers=providers_from_env(),
         max_output_tokens=int(_env("AI_MAX_OUTPUT_TOKENS", "OPENAI_MAX_OUTPUT_TOKENS", "600")),
         max_context_chars=int(_env("AI_MAX_CONTEXT_CHARS", "OPENAI_MAX_CONTEXT_CHARS", "24000")),
+        digest_token=os.getenv("DIGEST_TOKEN", ""),
     )

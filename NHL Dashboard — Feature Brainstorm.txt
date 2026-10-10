@@ -9,6 +9,9 @@ Last updated: 2026-10-09
 ---
 
 ## In Progress
+- **Morning digest** — one AI-written summary a day on the Scores page (last night,
+  playoff race, tonight's game of the night), facts gathered by the daily job,
+  written by NHL Intelligence, facts-only fallback if the AI is down.
 - **NHL Intelligence as an agent** — tool calling over the app's data and the
   playoff-odds model: standings, schedules, schedule strength, odds history,
   players, "what if they win their next 4", and "what does Detroit need".

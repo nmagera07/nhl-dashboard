@@ -355,3 +355,14 @@ CREATE TABLE IF NOT EXISTS push_events_sent (
     event_key               TEXT PRIMARY KEY,
     sent_at                 TIMESTAMP DEFAULT NOW()
 );
+
+-- The morning digest (daily_digest.py): the facts it was written from, and
+-- the AI-written text (NULL if the AI was unavailable; the page then shows
+-- the facts as a list). One row per day, latest run wins.
+CREATE TABLE IF NOT EXISTS daily_digest (
+    digest_date             DATE PRIMARY KEY,
+    facts                   JSONB NOT NULL,
+    text                    TEXT,
+    model                   TEXT,
+    created_at              TIMESTAMP DEFAULT NOW()
+);

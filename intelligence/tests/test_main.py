@@ -137,3 +137,59 @@ def test_every_question_says_what_day_it_is():
     prompt = service.prompt_for(ChatRequest(message="When do they play next?", context=ChatContext(page="standings")),
                                 type("Ctx", (), {"facts": {}, "evidence": []})())
     assert prompt.startswith(f"Today is {today_eastern()} (US Eastern).")
+
+
+FACTS = {"date": "Saturday, October 10", "last_night": [{"away": "PIT", "away_score": 2, "home": "CBJ", "home_score": 3, "ended": "SO"}]}
+
+
+@pytest.mark.asyncio
+async def test_write_digest_sends_only_the_facts_without_tools():
+    calls = []
+    service = IntelligenceService(settings(), chain=chain("**Columbus wins in a shootout.**", calls))
+
+    digest = await service.write_digest(FACTS)
+
+    assert digest.text == "**Columbus wins in a shootout.**" and digest.model == "Groq"
+    kwargs = calls[0][1]
+    assert "tools" not in kwargs
+    assert '"home":"CBJ"' in kwargs["messages"][1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_write_digest_rejects_oversized_facts():
+    service = IntelligenceService(settings(), chain=chain("unused"))
+    with pytest.raises(HTTPException) as error:
+        await service.write_digest({"blob": "x" * 20000})
+    assert error.value.status_code == 413
+
+
+def _digest_client(monkeypatch, token):
+    from fastapi.testclient import TestClient
+
+    import app.main as main
+
+    monkeypatch.setenv("DIGEST_TOKEN", token)
+    monkeypatch.setenv("GROQ_API_KEY", "k")
+    client = TestClient(main.app)
+    client.__enter__()
+    client.app.state.intelligence = IntelligenceService(main.get_settings(), chain=chain("Digest text."))
+    return client
+
+
+def test_digest_endpoint_requires_the_shared_token(monkeypatch):
+    client = _digest_client(monkeypatch, "s3cret")
+    try:
+        assert client.post("/digest/write", json={"facts": FACTS}).status_code == 401
+        assert client.post("/digest/write", json={"facts": FACTS}, headers={"X-Digest-Token": "nope"}).status_code == 401
+        ok = client.post("/digest/write", json={"facts": FACTS}, headers={"X-Digest-Token": "s3cret"})
+        assert ok.status_code == 200 and ok.json() == {"text": "Digest text.", "model": "Groq"}
+    finally:
+        client.__exit__(None, None, None)
+
+
+def test_digest_endpoint_is_off_without_a_token(monkeypatch):
+    client = _digest_client(monkeypatch, "")
+    try:
+        assert client.post("/digest/write", json={"facts": FACTS}, headers={"X-Digest-Token": ""}).status_code == 503
+    finally:
+        client.__exit__(None, None, None)

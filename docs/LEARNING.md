@@ -22,6 +22,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   required frontend and backend test checks on every PR.
 
 **Cloud and cost**
+- Launched the app on a custom domain (puckpulse.io): DNS ownership validation (TXT), apex
+  and www CNAMEs with Cloudflare CNAME flattening, auto-renewing managed TLS on Azure Static
+  Web Apps, and CORS updates across two services, verified end to end in a browser.
 - Moved container images from Azure Container Registry to GitHub Container
   Registry with a zero-downtime expand → migrate → contract migration,
   cutting monthly hosting costs by ~87%.
@@ -82,6 +85,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Rebranded the product (NHL Dashboard → PuckPulse) to avoid league trademark issues: vetted
+  names for existing apps and open domains, changed every user-facing surface, and kept storage
+  keys stable so users' saved settings survived.
 - Replaced silent PWA updates with a prompted "new version ready" flow built on the
   service-worker lifecycle, with hourly checks, verified by simulating a release in a real
   browser.
@@ -101,6 +107,53 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-10 — PuckPulse: a real name, a real domain
+
+**What happened:** Renamed the app from "NHL Dashboard" to **PuckPulse** and put it on
+its own domain, **https://puckpulse.io**, with HTTPS.
+
+**Why rename:** "NHL" is a league trademark. Using it in a product name is fine for a
+side project, but it's the kind of thing that draws a takedown once real people use it.
+Fan apps use their own name and credit the data. The footer now says "Data from the NHL
+and MoneyPuck.com. Not affiliated with or endorsed by the NHL."
+
+**Picking the name:** I checked each candidate for an existing hockey app and for open
+domains before falling for it. "Rinkside" was already a live hockey app (and every good
+domain was taken), and "FrozenEdge" collided with the NHL's own "NHL EDGE" stats brand.
+PuckPulse was clear, and "pulse" fits an app about live scores, alerts, and moving odds.
+
+**The rename itself:** Everything users see changed (title, header, installed-app name,
+"Ask PuckPulse", notifications). Internal names (repo, Azure resources, saved-setting keys)
+stayed on purpose: renaming them means redeploying for no visible benefit, and changing
+the storage keys would have wiped everyone's followed team.
+
+**Putting it on puckpulse.io (DNS, refreshed):**
+- **TXT record:** Azure gave me a random token to publish on the domain, proving I own
+  it, so nobody else can attach my domain to their site.
+- **CNAME records:** `puckpulse.io` and `www` are *aliases* for the app's Azure hostname,
+  rather than A records pointing at an IP, so they follow Azure if it moves the site.
+- **CNAME flattening:** DNS rules don't allow a CNAME on the bare domain. Cloudflare
+  resolves it behind the scenes and answers with the final IP, which is why the bare
+  domain works without a "www" redirect.
+- **Proxy off ("DNS only"):** with Cloudflare's proxy on, Azure would see Cloudflare
+  instead of itself and couldn't validate the domain or issue the certificate.
+- **CORS:** the API and the AI service only accept requests from known sites, so both
+  needed the new origins (one in code, one in the Container App's settings), plus a test
+  that unknown origins stay blocked.
+
+**Result:** both names validated and got free, auto-renewing TLS certificates (DigiCert,
+via Azure Static Web Apps). I verified it in a real browser on the new domain: data loads,
+the AI answers, and no requests fail.
+
+**Lesson:** browsers treat a new domain as a brand-new site. Saved settings and push
+subscriptions belong to the old address, so users re-install, re-pick their team, and
+re-enable alerts. Worth knowing *before* a domain move, and worth telling users.
+
+**Interview angle:** "Walk me through putting an app on a custom domain." DNS record
+types, ownership validation, apex CNAME flattening, managed TLS, and CORS.
 
 ---
 

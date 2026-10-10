@@ -7,10 +7,10 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "NHL Dash", body: event.data ? event.data.text() : "" };
+    data = { title: "PuckPulse", body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || "NHL Dash", {
+    self.registration.showNotification(data.title || "PuckPulse", {
       body: data.body || "",
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",

@@ -17,9 +17,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'NHL Dashboard',
-        short_name: 'NHL Dash',
-        description: 'Live NHL scores, box scores, standings, rosters, and player stats.',
+        name: 'PuckPulse',
+        short_name: 'PuckPulse',
+        description: 'Live NHL scores, playoff odds, goal alerts, and an AI hockey analyst.',
         start_url: '/',
         scope: '/',
         display: 'standalone',

@@ -76,7 +76,7 @@ class DigestResponse(BaseModel):
     model: str
 
 
-DIGEST_INSTRUCTIONS = """You write the morning NHL digest for a hockey stats app, from a JSON list of facts.
+DIGEST_INSTRUCTIONS = """You write the morning digest for PuckPulse, a hockey stats app, from a JSON list of facts.
 Format (Markdown):
 - First line: a bold one-sentence headline about LAST NIGHT's biggest result (never about tonight's games).
 - Then sections with these headings, skipping any with no facts: "### Last night", "### Playoff race", "### Tonight".
@@ -100,9 +100,9 @@ class ChatResponse(BaseModel):
     model: str | None = None  # which provider answered, e.g. "Google Gemini"
 
 
-NOT_CONFIGURED = "NHL Intelligence is not configured yet."
-ALL_BUSY = "NHL Intelligence is taking a breather (its free AI providers are busy). Try again in a minute."
-MID_ANSWER_FAILURE = "NHL Intelligence lost its connection mid-answer. Try asking again."
+NOT_CONFIGURED = "PuckPulse AI is not configured yet."
+ALL_BUSY = "PuckPulse AI is taking a breather (its free AI providers are busy). Try again in a minute."
+MID_ANSWER_FAILURE = "PuckPulse AI lost its connection mid-answer. Try asking again."
 
 
 TOOL_INSTRUCTIONS = """
@@ -112,7 +112,7 @@ You have tools for standings, teams, schedules, playoff odds history, players, a
 # tokens per minute, and three rounds cover even multi-team questions.
 MAX_TOOL_ROUNDS = 3
 
-SYSTEM_INSTRUCTIONS = """You are NHL Intelligence, a concise hockey analyst.
+SYSTEM_INSTRUCTIONS = """You are PuckPulse AI, the hockey analyst in the PuckPulse app: concise and friendly.
 Use only the supplied dashboard data and tool results. Do not invent game events, injuries, line combinations, or facts absent from the context. You have no injury, lineup, or transaction data: if asked whether someone is injured, healthy, scratched, or traded, say you don't have that information, and don't infer health from games played. On a game page you get that game's box score (scoring summary, three stars, team and player stats) but no play-by-play; on other pages you get season-level data only, so if asked what happened in a specific game there, say to open that game's page. League context lists only the top leaders, not every player. Write player names exactly as they appear in the data; never expand an initial into a first name. Explain statistics in plain language, distinguish facts from reasonable inferences, and keep answers under 220 words."""
 
 
@@ -265,7 +265,7 @@ async def lifespan(app: FastAPI):
 
 
 settings = get_settings()
-app = FastAPI(title="NHL Intelligence", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="PuckPulse AI (NHL Intelligence service)", version="0.1.0", lifespan=lifespan)
 limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

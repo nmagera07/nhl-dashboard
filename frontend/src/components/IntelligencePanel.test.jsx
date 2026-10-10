@@ -25,12 +25,12 @@ function answer(text, model = "Groq") {
 }
 
 async function open() {
-  await userEvent.click(screen.getByRole("button", { name: /ask nhl intelligence/i }));
-  return screen.getByRole("dialog", { name: /nhl intelligence chat/i });
+  await userEvent.click(screen.getByRole("button", { name: /ask puckpulse/i }));
+  return screen.getByRole("dialog", { name: /puckpulse ai chat/i });
 }
 
 async function ask(text) {
-  await userEvent.type(screen.getByRole("textbox", { name: /question for nhl intelligence/i }), text);
+  await userEvent.type(screen.getByRole("textbox", { name: /question for puckpulse ai/i }), text);
   await userEvent.click(screen.getByRole("button", { name: "Send" }));
 }
 
@@ -122,14 +122,14 @@ describe("IntelligencePanel", () => {
   it("shows the API's message when a request fails", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
-      json: async () => ({ detail: "NHL Intelligence is taking a breather." }),
+      json: async () => ({ detail: "PuckPulse AI is taking a breather." }),
     });
     render(<IntelligencePanel context={{ page: "standings" }} label="the league" />);
     await open();
 
     await ask("Who leads?");
 
-    expect(await screen.findByText("NHL Intelligence is taking a breather.")).toBeInTheDocument();
+    expect(await screen.findByText("PuckPulse AI is taking a breather.")).toBeInTheDocument();
   });
 
   it("closes on Escape", async () => {
@@ -139,7 +139,7 @@ describe("IntelligencePanel", () => {
     await userEvent.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ask nhl intelligence/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ask puckpulse/i })).toBeInTheDocument();
   });
 
   it("shows what the agent is doing while it works", async () => {

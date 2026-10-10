@@ -21,7 +21,7 @@ function UpdateBanner() {
   if (!needRefresh) return null;
   return (
     <div className="update-banner" role="status">
-      <span>🏒 A new version of NHL Dash is ready.</span>
+      <span>🏒 A new version of PuckPulse is ready.</span>
       <button type="button" className="update-banner-refresh" onClick={() => updateServiceWorker(true)}>Refresh</button>
       <button type="button" className="update-banner-dismiss" aria-label="Dismiss" onClick={() => setNeedRefresh(false)}>✕</button>
     </div>

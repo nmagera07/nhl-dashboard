@@ -8,9 +8,9 @@ function TopNav({ search, onSearchChange }) {
   return (
     <header className="topnav">
       <div className="topnav-inner">
-        <Link className="brand" to="/" aria-label="NHL Dash home">
+        <Link className="brand" to="/" aria-label="PuckPulse home">
           <img className="brand-icon" src="/icon.svg" alt="" />
-          <span className="brand-name">NHL Dash</span>
+          <span className="brand-name">PuckPulse</span>
         </Link>
         {/* Desktop navigation; phones use the bottom TabBar instead. */}
         <nav className="nav-tabs" aria-label="Sections">

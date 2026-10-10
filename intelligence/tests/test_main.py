@@ -58,7 +58,7 @@ async def test_no_providers_configured_is_a_503():
     service = IntelligenceService(Settings("https://dashboard.test", []), dashboard=DashboardClient("https://dashboard.test"))
     with pytest.raises(HTTPException) as error:
         await service.answer(ChatRequest(message="Hi", context=ChatContext(page="standings")))
-    assert error.value.detail == "NHL Intelligence is not configured yet."
+    assert error.value.detail == "PuckPulse AI is not configured yet."
 
 
 @pytest.mark.asyncio

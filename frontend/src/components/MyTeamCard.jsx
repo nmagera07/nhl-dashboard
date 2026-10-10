@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { gameTimeLabel } from "../utils/dates.js";
+import GoalAlerts from "./GoalAlerts.jsx";
 
 const LIVE_REFRESH_MS = 30_000;
 function ordinal(n) {
@@ -166,6 +167,7 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
           </>
         ) : (
           <>
+            <GoalAlerts team={team.team_abbrev} />
             <Link className="my-team-sim-link" to={`/teams/${team.team_abbrev}#season-sim`}>Sim the season ›</Link>
             <button type="button" className="link-button" onClick={() => setChanging(true)}>Change team</button>
           </>

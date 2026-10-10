@@ -107,6 +107,9 @@ class FakeConnection:
     def cursor(self):
         return FakeCursor(self.router)
 
+    def commit(self):
+        pass
+
     def close(self):
         self.closed = True
 

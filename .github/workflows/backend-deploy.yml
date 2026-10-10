@@ -39,6 +39,7 @@ env:
   IMAGE: ghcr.io/nmagera07/nhl-dashboard-api
   CONTAINER_APP: nhl-dashboard-api
   INGESTION_JOB: nhl-standings-ingest
+  NOTIFIER_JOB: nhl-live-notifier
   HEALTH_URL: https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health
 
 jobs:
@@ -101,7 +102,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Update API and ingestion job
+      - name: Update API, ingestion job, and live notifier
         run: |
           az containerapp update \
             --name "$CONTAINER_APP" \
@@ -113,6 +114,16 @@ jobs:
             --resource-group "$RESOURCE_GROUP" \
             --image "$IMAGE:${GITHUB_SHA}" \
             -o none
+          # The live notifier is created once by backend/scripts/setup_push_notifications.py.
+          if az containerapp job show --name "$NOTIFIER_JOB" --resource-group "$RESOURCE_GROUP" -o none 2>/dev/null; then
+            az containerapp job update \
+              --name "$NOTIFIER_JOB" \
+              --resource-group "$RESOURCE_GROUP" \
+              --image "$IMAGE:${GITHUB_SHA}" \
+              -o none
+          else
+            echo "::notice::$NOTIFIER_JOB doesn't exist yet; skipping (run backend/scripts/setup_push_notifications.py)"
+          fi
 
       # `az containerapp update` only means the request was accepted. In
       # single-revision mode the OLD revision keeps serving the public URL

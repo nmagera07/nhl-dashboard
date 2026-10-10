@@ -38,6 +38,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   free tiers became viable.
 
 **Security**
+- Designed push notifications with SSRF protection (only real push-service
+  endpoints accepted) and least-privilege database access (the API can write
+  one table; the signing key lives only in the notifier's secrets).
 - Removed a write-capable database credential that was exposed as a plain-text
   environment variable on the API, enforcing least privilege (the API only
   holds a read-only credential, stored as a secret).
@@ -79,6 +82,45 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-09 — Push notifications: goal alerts on your phone
+
+**What I built:** "🔔 Goal alerts" on the My team card. Your phone gets a
+notification for every goal in your team's games and the final score, and
+tapping it opens the box score.
+
+**How it works:**
+- **Web Push:** the browser subscribes through its push service (Google,
+  Apple, Mozilla, Microsoft) and hands back a private endpoint plus
+  encryption keys. The server signs messages with a VAPID key pair and
+  encrypts them so only that device can read them.
+- **The watcher:** a Container Apps Job runs every minute during game hours,
+  reads the NHL's live scoreboard (one request covers every game), and turns
+  new goals and finals into notifications. Cost stays inside Azure's free
+  allowance, versus ~$5-10/month for an always-on worker.
+- **No duplicates:** each event is claimed in the database
+  (`INSERT ... ON CONFLICT DO NOTHING RETURNING`) *before* sending, so
+  overlapping runs or a crash mid-send never double-notify.
+
+**Security decisions:**
+- The server POSTs to whatever endpoint a subscription names, so the API only
+  accepts real push-service hosts. Otherwise someone could register an
+  internal URL and use the notifier to make requests (SSRF).
+- The API's database role stays read-only except for the one subscriptions
+  table. The private signing key only exists as a secret on the notifier job.
+
+**Tested for real:** a browser subscribed through Google's push service, the
+server encrypted and sent a goal alert, and the service worker displayed it.
+
+**iPhone gotcha:** Apple only allows push for web apps installed to the home
+screen (iOS 16.4+), so the app explains that instead of showing a button
+that can't work.
+
+**Interview angle:** "Design a notification system": polling vs. push,
+at-most-once delivery with an idempotency key, cost trade-offs, and SSRF
+protection.
 
 ---
 

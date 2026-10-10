@@ -113,3 +113,11 @@ class TestTeamAbbrevPathValidation:
 
         assert response.status_code == 422
         assert db_router.calls == []
+
+
+def test_cors_allows_the_puckpulse_domains_and_nothing_else(client, db_router):
+    db_router.when("select 1", [])
+    for origin in ("https://puckpulse.io", "https://www.puckpulse.io"):
+        r = client.get("/health", headers={"Origin": origin})
+        assert r.headers.get("access-control-allow-origin") == origin
+    assert "access-control-allow-origin" not in client.get("/health", headers={"Origin": "https://evil.example"}).headers

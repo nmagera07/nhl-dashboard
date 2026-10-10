@@ -10,7 +10,7 @@ data and model, with an eval suite. Installable on phones as a PWA.
 names. Data from the NHL and MoneyPuck.com. Not affiliated with or endorsed by
 the NHL.*
 
-**Live:** https://ashy-sky-01e4eba1e.7.azurestaticapps.net
+**Live:** https://puckpulse.io
 
 ## What it does
 

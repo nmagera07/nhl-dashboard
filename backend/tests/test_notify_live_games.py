@@ -118,7 +118,11 @@ def _run(monkeypatch, games, already_sent=(), subs=(), send=None):
     monkeypatch.setattr(n.psycopg2, "connect", lambda url: _Conn(cur))
     monkeypatch.setattr(n.psycopg2.extras, "execute_values", fake_execute_values)
     sent = []
-    monkeypatch.setattr(push, "send", send or (lambda sub, payload: sent.append((sub["endpoint"], payload["title"]))))
+    def default_send(sub, payload, ttl=None):
+        sent.append((sub["endpoint"], payload["title"], ttl))
+        return 201
+
+    monkeypatch.setattr(push, "send", send or default_send)
     count = n.run(now=NOW, fetch=lambda: {"games": games})
     return count, sent, cur
 
@@ -130,7 +134,7 @@ class TestRun:
     def test_sends_a_new_goal_to_followers(self, monkeypatch):
         count, sent, _ = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB])
 
-        assert count == 1 and sent == [(SUB["endpoint"], "🚨 PIT goal! PIT 1, CBJ 0")]
+        assert count == 1 and sent == [(SUB["endpoint"], "🚨 PIT goal! PIT 1, CBJ 0", 15 * 60)]
 
     def test_never_sends_the_same_event_twice(self, monkeypatch):
         count, sent, _ = _run(
@@ -146,9 +150,15 @@ class TestRun:
         assert n.run(now=NOW, fetch=lambda: {"games": [_game("FUT")]}) == 0
 
     def test_removes_subscriptions_the_browser_dropped(self, monkeypatch):
-        def gone(sub, payload):
+        def gone(sub, payload, ttl=None):
             raise push.SubscriptionGone("410")
 
         _, _, cur = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB], send=gone)
 
         assert ("DELETE FROM push_subscriptions WHERE endpoint = %s", (SUB["endpoint"],)) in cur.sql
+
+
+    def test_finals_get_a_longer_ttl_than_goals(self, monkeypatch):
+        _, sent, _ = _run(monkeypatch, [_game("FINAL", away_score=2, home_score=3)], subs=[SUB])
+
+        assert sent == [(SUB["endpoint"], "Final: PIT 2, CBJ 3", 3 * 60 * 60)]

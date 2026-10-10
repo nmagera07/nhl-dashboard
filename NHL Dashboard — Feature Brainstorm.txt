@@ -9,6 +9,10 @@ Last updated: 2026-10-09
 ---
 
 ## In Progress
+- **Push notifications** — "🔔 Goal alerts" on the My team card: a push for
+  every goal in your team's games (either side) and the final score, within
+  about a minute. Watched by the nhl-live-notifier job (every minute during
+  game hours, inside Azure's free allowance).
 - **Season simulator** — "Sim the season" on team pages (linked from the My
   team card): plays out the remaining schedule in the browser with the
   playoff-odds model, one season per click (final record, playoff seed,
@@ -23,7 +27,6 @@ Last updated: 2026-10-09
 ---
 
 ## Up Next
-- **Push notifications** for goals and final scores (see Fan-focused below).
 - **Head-to-head / rivalry view** — season series between two teams, a
   side-by-side stat comparison, and chat context for "who wins tonight?"
 

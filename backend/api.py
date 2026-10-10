@@ -45,6 +45,8 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
+import push
+from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
 
 load_dotenv()
@@ -204,7 +206,7 @@ app.add_middleware(
         "https://ashy-sky-01e4eba1e.7.azurestaticapps.net",
         "http://localhost:5173",  # local Vite dev server
     ],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type", "Accept"],
 )
 
@@ -404,6 +406,79 @@ def season_sim_inputs(request: Request):
     if row is None:
         raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
     return row["payload"]
+
+
+# --- Push notifications ------------------------------------------------------
+#
+# The only endpoints that write to the database. The API's role can change
+# push_subscriptions and nothing else (see schema.sql).
+
+SUBSCRIBE_RATE_LIMIT = "10/minute"
+
+
+@app.get("/push/config")
+def push_config():
+    """The VAPID public key browsers need to subscribe (empty if push isn't set up)."""
+    return {"vapid_public_key": push.VAPID_PUBLIC_KEY, "enabled": bool(push.VAPID_PUBLIC_KEY)}
+
+
+@app.post("/push/subscriptions", status_code=204)
+@limiter.limit(SUBSCRIBE_RATE_LIMIT)
+def push_subscribe(request: Request, body: PushSubscriptionIn):
+    """
+    Save (or update) a browser's push subscription and the teams it
+    follows. Only real browser push services are accepted as endpoints,
+    and only known team abbreviations.
+    """
+    if not push.is_allowed_endpoint(body.endpoint):
+        raise HTTPException(status_code=400, detail="Not a browser push service endpoint.")
+    if not push.valid_keys(body.keys.p256dh, body.keys.auth):
+        raise HTTPException(status_code=400, detail="Invalid subscription keys.")
+    teams = sorted({t.upper() for t in body.teams})
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT team_abbrev FROM teams WHERE team_abbrev = ANY(%s)", (teams,))
+            if len(cur.fetchall()) != len(teams):
+                raise HTTPException(status_code=400, detail="Unknown team.")
+            cur.execute(
+                """
+                INSERT INTO push_subscriptions (endpoint, p256dh, auth, teams, notify_goals, notify_finals)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (endpoint) DO UPDATE SET
+                    p256dh = EXCLUDED.p256dh,
+                    auth = EXCLUDED.auth,
+                    teams = EXCLUDED.teams,
+                    notify_goals = EXCLUDED.notify_goals,
+                    notify_finals = EXCLUDED.notify_finals,
+                    updated_at = NOW()
+                """,
+                (body.endpoint, body.keys.p256dh, body.keys.auth, teams, body.goals, body.finals),
+            )
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Failed to save push subscription", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+@app.delete("/push/subscriptions", status_code=204)
+@limiter.limit(SUBSCRIBE_RATE_LIMIT)
+def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
+    """Forget a subscription. The endpoint itself is the secret that proves ownership."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (body.endpoint,))
+        conn.commit()
+    except Exception:
+        logger.error("Failed to delete push subscription", exc_info=True)
+        raise
+    finally:
+        conn.close()
 
 
 @app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])

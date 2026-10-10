@@ -333,3 +333,25 @@ CREATE TABLE IF NOT EXISTS season_sim_inputs (
     payload                 JSONB NOT NULL,
     computed_at             TIMESTAMP DEFAULT NOW()
 );
+
+-- Web Push subscriptions (see push.py): one row per browser/device that
+-- turned on notifications, with the teams it follows. The API writes this
+-- table -- the only table its otherwise read-only role can change:
+--   GRANT SELECT, INSERT, UPDATE, DELETE ON push_subscriptions TO nhl_api_readonly;
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint                TEXT PRIMARY KEY,
+    p256dh                  TEXT NOT NULL,
+    auth                    TEXT NOT NULL,
+    teams                   TEXT[] NOT NULL,
+    notify_goals            BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_finals           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at              TIMESTAMP DEFAULT NOW(),
+    updated_at              TIMESTAMP DEFAULT NOW()
+);
+
+-- Goals and finals already notified (notify_live_games.py), so overlapping
+-- runs never send twice. Rows older than a few days are pruned.
+CREATE TABLE IF NOT EXISTS push_events_sent (
+    event_key               TEXT PRIMARY KEY,
+    sent_at                 TIMESTAMP DEFAULT NOW()
+);

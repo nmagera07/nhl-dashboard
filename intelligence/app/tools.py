@@ -187,18 +187,24 @@ class ToolRunner:
         return {t: i + 1 for i, t in enumerate(ordered)}
 
     async def _tool_get_schedule(self, team: str, games: int = 5):
+        # Dates come from the live NHL schedule, not the model's morning
+        # snapshot: by evening, a game the snapshot calls "upcoming" may be
+        # over (asked "when do they play next?" after a game, it answered
+        # with the game they'd just played).
         abbrev = await self._team(team)
-        inputs = await self._sim_inputs()
+        schedule, inputs = await asyncio.gather(self._get(f"/teams/{abbrev}/schedule"), self._sim_inputs())
         ranks = self._strength_ranks(inputs)
-        upcoming = [(d, h, a) for d, h, a in inputs["games"] if abbrev in (h, a)]
-        return {
+        live = schedule.get("live")
+        return compact._clean({
             "team": abbrev,
-            "games_left": len(upcoming),
-            "next": [{"date": d, "opponent": a if h == abbrev else h, "home": h == abbrev,
-                      "opponent_strength_rank": ranks.get(a if h == abbrev else h)}
-                     for d, h, a in upcoming[: max(1, min(int(games), 20))]],
+            "playing_now": {"opponent": live["opponent"], "home": live["home"],
+                            "score": f"{live.get('team_score')}-{live.get('opponent_score')}"} if live else None,
+            "regular_season_games_left": schedule.get("regular_season_games_left"),
+            "next": [{"date": g["date"], "start": _eastern_time(g.get("start_time_utc")), "opponent": g["opponent"],
+                      "home": g["home"], "opponent_strength_rank": ranks.get(g["opponent"])}
+                     for g in schedule.get("upcoming", [])[: max(1, min(int(games), 20))]],
             "strength_rank_note": "1 = strongest team by the playoff-odds model's rating.",
-        }
+        })
 
     async def _tool_rank_schedule_strength(self, conference: str | None = None):
         inputs = await self._sim_inputs()
@@ -287,6 +293,17 @@ class ToolRunner:
 
     async def _tool_get_leaders(self):
         return compact.leaders(await self._get("/players/leaders"))
+
+
+def _eastern_time(utc_iso: str | None) -> str | None:
+    """'2026-10-10T23:00:00Z' -> '7:00 PM ET' (how fans read start times)."""
+    if not utc_iso:
+        return None
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    local = datetime.fromisoformat(utc_iso.replace("Z", "+00:00")).astimezone(ZoneInfo("America/New_York"))
+    return local.strftime("%-I:%M %p ET")
 
 
 def _parse_date(value: str):

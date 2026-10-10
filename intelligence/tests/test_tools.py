@@ -35,7 +35,10 @@ HISTORY = {"season_id": 20262027, "available_seasons": [20262027], "points": [
     {"as_of_date": "2026-10-03", "team_abbrev": "PIT", "playoff_pct": 0.4},
     {"as_of_date": "2026-10-10", "team_abbrev": "PIT", "playoff_pct": 0.6},
 ]}
-TEAM_SCHEDULE = {"team": "PIT", "live": None, "upcoming": [], "recent": [
+TEAM_SCHEDULE = {"team": "PIT", "live": None, "regular_season_games_left": 79, "upcoming": [
+    {"id": 76, "date": "2026-10-10", "start_time_utc": "2026-10-10T23:00:00Z", "opponent": "COL", "home": True},
+    {"id": 90, "date": "2026-10-13", "start_time_utc": "2026-10-13T23:30:00Z", "opponent": "CBJ", "home": False},
+], "recent": [
     {"id": 68, "date": "2026-10-09", "opponent": "CBJ", "home": False, "team_score": 2, "opponent_score": 3, "result": "OTL", "last_period_type": "SO"},
     {"id": 53, "date": "2026-10-07", "opponent": "WSH", "home": False, "team_score": 3, "opponent_score": 5, "result": "L", "last_period_type": "REG"},
 ]}
@@ -94,13 +97,15 @@ class TestTools:
         assert "error" in await self.call("simulate_scenario", {"team": "PIT"})  # missing games/wins
         assert "Unknown tool" in (await self.call("drop_tables", {}))["error"]
 
-    async def test_schedule_with_opponent_strength(self):
+    async def test_schedule_comes_from_the_live_feed_with_model_strength_ranks(self):
+        # The model's snapshot (SIM_INPUTS) still lists Oct 11/12 games; the live
+        # schedule is the truth for dates, so last night's game can't show up as "next".
         result = await self.call("get_schedule", {"team": "PIT", "games": 2})
 
-        assert result["games_left"] == 2
+        assert result["regular_season_games_left"] == 79
         assert result["next"] == [
-            {"date": "2026-10-11", "opponent": "COL", "home": True, "opponent_strength_rank": 1},
-            {"date": "2026-10-12", "opponent": "CBJ", "home": False, "opponent_strength_rank": 3},
+            {"date": "2026-10-10", "start": "7:00 PM ET", "opponent": "COL", "home": True, "opponent_strength_rank": 1},
+            {"date": "2026-10-13", "start": "7:30 PM ET", "opponent": "CBJ", "home": False, "opponent_strength_rank": 3},
         ]
 
     async def test_schedule_strength_ranks_easiest_first(self):

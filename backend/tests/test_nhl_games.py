@@ -301,6 +301,7 @@ class TestTeamSchedule:
         ]
         assert [(g["id"], g["opponent"], g["home"]) for g in summary["upcoming"]] == [(6, "CAR", True), (5, "BOS", False)]
         assert summary["upcoming"][1]["opponent_logo"] == "BOS_dark.svg"
+        assert summary["regular_season_games_left"] == 2
 
     def test_a_game_in_progress_is_the_live_game(self):
         payload = {"games": [_club_game(7, "2026-10-08T23:00:00Z", "LIVE", "PIT", "CAR", 1, 0)]}

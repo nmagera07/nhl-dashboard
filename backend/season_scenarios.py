@@ -20,9 +20,14 @@ class UnknownTeam(ValueError):
     pass
 
 
-def _next_games(payload, team, n):
-    """Indexes (into payload['games']) of the team's next n games."""
-    found = [i for i, (_, home, away) in enumerate(payload["games"]) if team in (home, away)]
+def _next_games(payload, team, n, played=frozenset()):
+    """
+    Indexes (into payload['games']) of the team's next n games. `played`
+    holds (date, home, away) for games already over: the inputs are a
+    morning snapshot, so by evening one of its "upcoming" games may be done.
+    """
+    found = [i for i, (date, home, away) in enumerate(payload["games"])
+             if team in (home, away) and (date, home, away) not in played]
     return found[:n]
 
 
@@ -104,10 +109,10 @@ def _opponents(payload, team, window):
     return out
 
 
-def scenario(payload, team, games, wins, ot_losses=0, trials=DEFAULT_TRIALS, seed=7):
+def scenario(payload, team, games, wins, ot_losses=0, trials=DEFAULT_TRIALS, seed=7, played=frozenset()):
     """The team's playoff odds and projected points if it goes wins-losses(-OT) in its next `games`."""
     team = _check_team(payload, team)
-    window = _next_games(payload, team, games)
+    window = _next_games(payload, team, games, played)
     games = len(window)
     if wins < 0 or ot_losses < 0 or wins + ot_losses > games:
         raise ValueError(f"{team} has {games} games left in that span; wins + OT losses can't exceed it")
@@ -124,7 +129,7 @@ def scenario(payload, team, games, wins, ot_losses=0, trials=DEFAULT_TRIALS, see
     }
 
 
-def playoff_path(payload, team, games=10, trials_per_record=500, seed=11):
+def playoff_path(payload, team, games=10, trials_per_record=500, seed=11, played=frozenset()):
     """
     The team's playoff odds for every record over its next `games` (0 wins
     up to all of them), each from its own forced-results simulation -- the
@@ -132,7 +137,7 @@ def playoff_path(payload, team, games=10, trials_per_record=500, seed=11):
     answer agree. Shared seeds keep the rows from wobbling against each other.
     """
     team = _check_team(payload, team)
-    window = _next_games(payload, team, games)
+    window = _next_games(payload, team, games, played)
     base = _simulate(payload, trials_per_record, seed, team, window)
     rows = []
     for wins in range(len(window) + 1):

@@ -7,6 +7,7 @@ import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
 import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
+import UpdateBanner from "./components/UpdateBanner.jsx";
 import ScoresPage from "./pages/ScoresPage.jsx";
 import StandingsPage from "./pages/StandingsPage.jsx";
 import PlayoffsPage from "./pages/PlayoffsPage.jsx";
@@ -176,6 +177,7 @@ export default function NHLDashboard() {
         </Routes>
       </div>
 
+      <UpdateBanner />
       <TabBar />
     </div>
   );

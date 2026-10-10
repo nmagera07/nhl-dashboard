@@ -8,7 +8,10 @@ Runs each ingestion script in its own process, in order:
                                  for non-commercial use, credited in the UI)
   3. simulate_playoff_odds.py -- Monte Carlo playoff odds (v2) from today's
                                  standings
-  4. ingest_player_stats.py   -- rosters + season stats, including marking
+  4. daily_digest.py          -- the morning digest: facts gathered here,
+                                 written up by NHL Intelligence (reads the
+                                 odds and ratings step 3 just saved)
+  5. ingest_player_stats.py   -- rosters + season stats, including marking
                                  cut/released players off-roster
 
 A failure in one script doesn't stop the next, since e.g. a playoff-odds
@@ -38,6 +41,7 @@ SCRIPTS = [
     "ingest_standings.py",
     "ingest_advanced_stats.py",
     "simulate_playoff_odds.py",
+    "daily_digest.py",
     "ingest_player_stats.py",
 ]
 

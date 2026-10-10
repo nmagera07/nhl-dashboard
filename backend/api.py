@@ -410,6 +410,27 @@ def season_sim_inputs(request: Request):
     return row["payload"]
 
 
+@app.get("/digest/latest")
+def latest_digest():
+    """
+    The most recent morning digest: AI-written text (or null if the AI was
+    unavailable), the facts it was written from, and which model wrote it.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT digest_date, text, model, facts, created_at FROM daily_digest ORDER BY digest_date DESC LIMIT 1")
+            row = cur.fetchone()
+    except Exception:
+        logger.error("Failed to fetch the digest", exc_info=True)
+        raise
+    finally:
+        conn.close()
+    if row is None:
+        raise HTTPException(status_code=404, detail="No digest yet.")
+    return row
+
+
 # "What if" simulations (NHL Intelligence's scenario tools). A few seconds of
 # CPU each, so results are cached per day's inputs: the same question asked
 # again (by anyone) is free until the next morning's run.

@@ -158,3 +158,10 @@ class TestGameFacts:
         assert facts["three_stars"][0]["name"] == "G. McKenna"
         assert [g["name"] for g in facts["home_players"]["goalies"]] == ["Starter"]
         assert "current_period" not in facts  # only for live games
+
+
+def test_pdo_comes_with_its_meaning():
+    assert compact.pdo_reading(96.2).startswith("below")
+    assert compact.pdo_reading(103.5).startswith("above")
+    assert compact.pdo_reading(100.4).startswith("about average")
+    assert compact.pdo_reading(None) is None

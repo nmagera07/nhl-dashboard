@@ -1,12 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- PuckPulse app icon: the puck mark on a navy tile. Full-bleed so it also
-       works as a maskable icon; the mark sits inside the central safe zone. -->
-  <rect width="512" height="512" fill="#0b1730"/>
-  <g transform="translate(256 262) scale(1.12) translate(-256 -262)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 120 392 270">
+  <!-- The puck mark alone (transparent), for the header next to the wordmark. -->
   <path d="M80 226 v84 a176 72 0 0 0 352 0 v-84" fill="#16253f"/>
   <path d="M82 242 a176 72 0 0 0 348 0" fill="none" stroke="#f1f5f9" stroke-width="12"/>
   <ellipse cx="256" cy="226" rx="176" ry="72" fill="#1b2b47"/>
   <ellipse cx="256" cy="226" rx="176" ry="72" fill="none" stroke="#3a5278" stroke-width="5"/>
   <polyline points="118,230 222,230 238,206 254,250 274,150 294,282 310,222 396,222" fill="none" stroke="#22a8f2" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
 </svg>

@@ -9,8 +9,8 @@ function TopNav({ search, onSearchChange }) {
     <header className="topnav">
       <div className="topnav-inner">
         <Link className="brand" to="/" aria-label="PuckPulse home">
-          <img className="brand-icon" src="/icon.svg" alt="" />
-          <span className="brand-name">PuckPulse</span>
+          <img className="brand-icon" src="/logo-mark.svg" alt="" />
+          <span className="brand-name">Puck<span className="brand-accent">Pulse</span></span>
         </Link>
         {/* Desktop navigation; phones use the bottom TabBar instead. */}
         <nav className="nav-tabs" aria-label="Sections">

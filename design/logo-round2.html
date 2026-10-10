@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PuckPulse logo round 2</title>
+<style>
+  :root { --bg: #0a0b0f; --card: #12141a; --border: #1f2430; --text: #e5e7eb; --dim: #8b93a3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .lede { margin: 0 0 24px; color: var(--dim); font-size: 14px; }
+  h2 { margin: 28px 0 10px; font-size: 15px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+  .panel { padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); margin-bottom: 14px; }
+  .light { background: #ffffff; border-color: #e5e7eb; }
+  .row { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
+  .size { display: grid; justify-items: center; gap: 6px; color: var(--dim); font-size: 11px; }
+  .circle svg { border-radius: 50%; } .squircle svg { border-radius: 24%; } .tile svg { border-radius: 18%; }
+  .header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 10px; background: #0d0f14; border: 1px solid var(--border); max-width: 520px; }
+  .tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px 10px 0 0; background: #1b1e26; color: var(--text); font-size: 13px; }
+  .note { color: var(--dim); font-size: 13px; margin: 10px 0 0; line-height: 1.45; max-width: 760px; }
+</style>
+</head>
+<body>
+<h1>PuckPulse logo, round 2</h1>
+<p class="lede">The ChatGPT design rebuilt as vector, plus the dark-mode version the app needs. Everything here is the same SVG, just scaled.</p>
+
+<h2>Full logo</h2>
+<div class="panel light" id="light-logo"></div>
+<div class="panel" id="dark-logo"></div>
+<p class="note">Light version: the original look (navy "Puck", sky-blue "Pulse"). Dark version, for the app: "Puck" goes white, the puck gets a lighter top and an edge highlight so it separates from the near-black background, and the white rim stays as the defining detail.</p>
+
+<h2>App icon (home screen, Android crops)</h2>
+<div class="panel"><div class="row" id="icons"></div></div>
+<p class="note">Two tile options: the puck on the app's dark background, or on a deep navy tile that pops on busy home screens. Android crops to circles and rounded squares; the puck sits inside the safe zone.</p>
+
+<h2>Small sizes (browser tab, notifications)</h2>
+<div class="panel"><div class="row" id="small"></div></div>
+
+<h2>In the app</h2>
+<div class="panel"><div id="inapp"></div></div>
+
+<script>
+const SKY = "#22a8f2";
+// The mark, drawn in a 512x512 box. Dark variant lifts the puck off a dark background.
+function mark(theme) {
+  const dark = theme === "dark";
+  const top = dark ? "#1b2b47" : "#0b1a33";
+  const side = dark ? "#16253f" : "#06142a";
+  const edge = dark ? '<ellipse cx="256" cy="226" rx="176" ry="72" fill="none" stroke="#3a5278" stroke-width="5"/>' : "";
+  return `
+    <path d="M80 226 v84 a176 72 0 0 0 352 0 v-84" fill="${side}"/>
+    <path d="M82 242 a176 72 0 0 0 348 0" fill="none" stroke="#f1f5f9" stroke-width="12"/>
+    <ellipse cx="256" cy="226" rx="176" ry="72" fill="${top}"/>
+    ${edge}
+    <polyline points="118,230 222,230 238,206 254,250 274,150 294,282 310,222 396,222" fill="none" stroke="${SKY}" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+const icon = (theme, tile, size) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}"><rect width="512" height="512" fill="${tile}"/><g transform="translate(256 262) scale(1.12) translate(-256 -262)">${mark(theme)}</g></svg>`;
+const bare = (theme, size) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 120 392 270" width="${size * 392 / 270}" height="${size}">${mark(theme)}</svg>`;
+function logo(theme, h) {
+  const puck = theme === "dark" ? "#f8fafc" : "#0b1a33";
+  return `<div style="display:flex;align-items:center;gap:${h * 0.28}px">
+    ${bare(theme, h)}
+    <span style="font: 800 ${h * 0.82}px/1 Inter, system-ui, sans-serif; letter-spacing:-0.02em"><span style="color:${puck}">Puck</span><span style="color:${SKY}">Pulse</span></span>
+  </div>`;
+}
+document.getElementById("light-logo").innerHTML = logo("light", 72);
+document.getElementById("dark-logo").innerHTML = logo("dark", 72);
+document.getElementById("icons").innerHTML = [
+  ["#0a0b0f", "app background"], ["#0b1730", "navy tile"],
+].map(([tile, label]) => `
+  <div class="size tile">${icon("dark", tile, 128)}<span>${label}</span></div>
+  <div class="size circle">${icon("dark", tile, 72)}<span>circle</span></div>
+  <div class="size squircle">${icon("dark", tile, 72)}<span>rounded square</span></div>`).join("");
+document.getElementById("small").innerHTML = [48, 32, 24, 16].map((s) => `<div class="size">${icon("dark", "#0b1730", s)}<span>${s}px</span></div>`).join("")
+  + `<div class="size"><div class="tab">${icon("dark", "#0b1730", 16)}PuckPulse</div><span>browser tab</span></div>`;
+document.getElementById("inapp").innerHTML = `<div class="header">${logo("dark", 26)}</div>`;
+</script>
+</body>
+</html>

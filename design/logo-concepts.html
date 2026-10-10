@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PuckPulse logo concepts</title>
+<style>
+  :root { --bg: #0a0b0f; --card: #12141a; --border: #1f2430; --text: #e5e7eb; --dim: #8b93a3; --accent: #3b82f6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .lede { margin: 0 0 24px; color: var(--dim); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; max-width: 1400px; }
+  .card { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--card); }
+  .card h2 { margin: 0; font-size: 16px; }
+  .card p { margin: 4px 0 14px; color: var(--dim); font-size: 13px; line-height: 1.4; }
+  .hero svg { display: block; width: 100%; max-width: 240px; height: auto; margin: 0 auto 14px; border-radius: 22px; }
+  .row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .size { display: grid; justify-items: center; gap: 4px; color: var(--dim); font-size: 10px; }
+  .masks { display: flex; gap: 14px; margin-bottom: 12px; }
+  .masks .circle svg { border-radius: 50%; }
+  .masks .squircle svg { border-radius: 26%; }
+  .header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #0d0f14; border: 1px solid var(--border); }
+  .header strong { font-size: 17px; letter-spacing: -0.01em; }
+  .tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: rgba(59,130,246,.15); color: var(--accent); font-size: 11px; font-weight: 700; vertical-align: 2px; }
+</style>
+</head>
+<body>
+  <h1>PuckPulse logo concepts</h1>
+  <p class="lede">Each shown big, at real sizes (home screen → browser tab), cropped the way Android crops app icons, and in the app header. The tiny sizes are the real test.</p>
+  <div class="grid" id="grid"></div>
+
+<script>
+const BG = '<rect width="512" height="512" fill="#0a0b0f"/>';
+const CONCEPTS = [
+  {
+    id: "A", name: "Pulse Puck", tag: "my pick",
+    note: "A puck with a heartbeat line running across it. Says hockey + live in one shape; the line breaking out past the puck's edges reads as energy.",
+    svg: `${BG}
+      <path d="M106 236 v52 a150 56 0 0 0 300 0 v-52" fill="#0f172a"/>
+      <ellipse cx="256" cy="236" rx="150" ry="56" fill="#1f2937" stroke="#334155" stroke-width="8"/>
+      <polyline points="64,236 176,236 206,236 230,166 262,310 292,196 314,236 448,236" fill="none" stroke="#3b82f6" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  {
+    id: "B", name: "Pulse P", tag: "monogram",
+    note: "A bold P with a pulse cutting through its bowl. Most 'brand-like' and holds up at 16px, but loses the hockey cue unless next to the name.",
+    svg: `${BG}
+      <path d="M190 404 V128 H282 a86 86 0 0 1 0 172 H190" fill="none" stroke="#3b82f6" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="110,214 214,214 240,170 270,262 296,214 410,214" fill="none" stroke="#0a0b0f" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="110,214 214,214 240,170 270,262 296,214 410,214" fill="none" stroke="#e5e7eb" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  {
+    id: "C", name: "Peak Puck", tag: "minimal",
+    note: "A heartbeat line whose peak lifts a puck. Clever and clean, but the puck gets small; best for the header, weaker as a home-screen icon.",
+    svg: `${BG}
+      <polyline points="56,322 180,322 214,350 252,200 292,398 326,322 456,322" fill="none" stroke="#3b82f6" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M200 150 v26 a52 20 0 0 0 104 0 v-26" fill="#0f172a"/>
+      <ellipse cx="252" cy="150" rx="52" ry="20" fill="#1f2937" stroke="#334155" stroke-width="6"/>`,
+  },
+  {
+    id: "D", name: "Live Puck", tag: "broadcast",
+    note: "A puck seen from above with 'live' signal waves. Reads like a live-sports app at a glance; the waves thin out at the smallest sizes.",
+    svg: `${BG}
+      <circle cx="256" cy="256" r="104" fill="#1f2937" stroke="#334155" stroke-width="14"/>
+      <polyline points="178,258 214,258 232,222 256,298 278,240 292,258 334,258" fill="none" stroke="#3b82f6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M392 176 a160 160 0 0 1 0 160 M120 176 a160 160 0 0 0 0 160" fill="none" stroke="#3b82f6" stroke-width="18" stroke-linecap="round"/>
+      <path d="M434 140 a210 210 0 0 1 0 232 M78 140 a210 210 0 0 0 0 232" fill="none" stroke="#3b82f6" stroke-width="16" stroke-linecap="round" opacity="0.45"/>`,
+  },
+];
+
+const svg = (c, size) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="${size}" height="${size}" role="img" aria-label="${c.name}">${c.svg}</svg>`;
+
+document.getElementById("grid").innerHTML = CONCEPTS.map((c) => `
+  <section class="card">
+    <h2>${c.id}. ${c.name}<span class="tag">${c.tag}</span></h2>
+    <p>${c.note}</p>
+    <div class="hero">${svg(c, 240)}</div>
+    <div class="row">${[96, 48, 32, 16].map((s) => `<div class="size">${svg(c, s)}<span>${s}px</span></div>`).join("")}</div>
+    <div class="masks"><div class="size circle">${svg(c, 64)}<span>Android circle</span></div><div class="size squircle">${svg(c, 64)}<span>rounded square</span></div></div>
+    <div class="header">${svg(c, 28)}<strong>PuckPulse</strong></div>
+  </section>`).join("");
+</script>
+</body>
+</html>

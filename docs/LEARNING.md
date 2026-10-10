@@ -30,6 +30,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   Azure bill from ~$11.44 to ~$0.97.
 
 **AI engineering**
+- Built an eval suite for an LLM agent: live ground truth from the app's API, tool-use and
+  argument checks, a made-up-number (grounding) detector, and a cross-provider LLM judge;
+  it caught a hallucination and a tool-calling bug on day one (10/12 and 9/12 → 12/12).
 - Turned an LLM chat into a tool-calling agent over the app's data and its Monte
   Carlo model: the model chooses the query, deterministic code produces every
   number, so "what if" and "what does this team need" answers are grounded.
@@ -88,6 +91,48 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-10 — An eval suite for the AI agent (and what it caught on day one)
+
+**What I built:** `intelligence/evals/`: 12 real questions run through the agent
+exactly as the app would run them, on each free provider, and scored automatically.
+Each question's correct answer is computed live from the app's API at eval time
+(standings and schedules change daily, so hardcoded answers would rot).
+
+**Four kinds of checks:**
+- **Tool:** did "what if PIT wins its next 4" call `simulate_scenario` with team=PIT, games=4, wins=4?
+- **Facts / number:** does the answer contain the right team, date, scorer, record, or percentage?
+- **Grounded:** every percentage in the answer must appear in what the tools returned
+  (or be the difference between two of them). That's an automatic made-up-number detector.
+- **Judge (LLM-as-a-judge):** a *different* provider grades fuzzy rubrics, like
+  "did it read a PDO of 96 as bad luck?" or "did it admit it has no injury data?"
+
+**First run: Gemini 10/12, Groq 9/12. After fixes: 12/12 on both.** What it found:
+- **A real hallucination:** asked "Is Crosby injured?", Gemini said "he is not listed
+  as injured", inferring health from data it doesn't have. Fixed with an explicit
+  instruction: no injury/lineup/transaction data, say so.
+- **A real robustness bug:** Groq's model called `get_leaders` (no arguments) with
+  junk like `{"": ""}`. Sometimes Groq rejected the turn (HTTP 400
+  "tool_use_failed"); sometimes my tool runner crashed on it. Fixes: drop unknown
+  arguments, retry a malformed tool call once, and give the tool a real optional
+  argument so the model has something valid to send.
+- **Two bugs in my own eval:** the judge fell through to a small local model that
+  misgraded a correct answer (and Groq's reasoning model needed a bigger output budget
+  to grade at all), and a correct "8‑2" failed because the model used a non-breaking
+  hyphen. A bad eval is worse than none, so I read every failure before believing it.
+
+**What I learned:**
+- Evals catch what unit tests can't: the code worked; the *behavior* was wrong.
+- Compute ground truth from the source of truth, not hardcoded expectations.
+- Deterministic checks first (cheap, never wrong), judges only for what rules can't check,
+  and never let a model grade its own answers.
+- Read the failures. Two of my first four "AI failures" were eval failures.
+
+**Interview angle:** "How do you know your AI feature works?" An eval suite with live
+ground truth, tool-use and grounding checks, a cross-provider judge, and a before/after
+record showing it caught a hallucination.
 
 ---
 

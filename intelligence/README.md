@@ -40,6 +40,23 @@ returned to the model exactly as received.
 The chat streams a status line per tool ("Simulating 2,000 seasons…"), then
 the answer with evidence labels for the data and tools used.
 
+## Evals
+
+`evals/` scores the agent on real questions, against real providers:
+
+```bash
+.venv/bin/python -m evals.run                                  # 12 cases, gemini + groq (~8 min)
+.venv/bin/python -m evals.run --providers groq --cases scenario,pdo_reading
+```
+
+Each case's correct answer is computed live from the dashboard API, and the answer is
+checked for the right **tool** (and arguments), the right **facts**/**number**, that it's
+**grounded** (no percentage without a source in the tool results), and, for fuzzy
+rubrics, by a **judge** (a different hosted provider, never a local model). Results
+print as a scorecard and are saved to `evals/results/`. It uses real free-tier requests,
+so it runs on demand (after prompt, tool, or model changes), not in CI; the scoring rules
+themselves are unit-tested in `tests/test_eval_checks.py`.
+
 ## Run locally
 
 ```bash

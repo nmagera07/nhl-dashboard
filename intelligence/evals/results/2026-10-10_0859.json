@@ -1,0 +1,654 @@
+{
+  "started": "2026-10-10T12:50:52+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "The New York Rangers (NYR) are in first place in the Metropolitan Division with 8 points (a 4-2-0 record through 6 games).",
+          "seconds": 3.7,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'NYR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins play next tonight, Saturday, October 10, 2026, at 7:00 PM ET at home against the Dallas Stars.",
+          "seconds": 4.6,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'DAL'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "According to the playoff-odds model's simulations, if Pittsburgh wins their next 4 games (going 4-0-0), their playoff odds increase from a baseline of **56.0%** to **68.5%**, and their projected average points rise from 95.5 to 99.2.",
+          "seconds": 4.1,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"team\":\"PIT\",\"games\":4,\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'team': 'PIT', 'games': 4, 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~68.5%, answer has [56.0, 68.5]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "Based on simulations from the playoff-odds model, Detroit needs at least an **8-2** record over its next 10 games to have a better-than-even chance at making the playoffs (projecting to 54.8% playoff odds). \n\nHere are the playoff odds for various records through that 10-game stretch:\n* **7-3:** 47.0%\n* **8-2:** 54.8%\n* **9-1:** 61.4%\n* **10-0:** 68.6%\n\n*(Note: Losses in this model are counted as regulation losses; each overtime loss would add an extra point and slightly improve those odds.)*",
+          "seconds": 4.3,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"team\":\"DET\",\"games\":10})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'team': 'DET', 'games': 10})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '8-2'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "5 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "According to the playoff-odds model, Toronto's playoff odds at the start of the season were **22.1%**.",
+          "seconds": 4.1,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_playoff_odds({'team': 'TOR'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~22.1%, answer has [22.1]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "In their last game on October 9, 2026, the Pittsburgh Penguins lost 3-2 in a shootout on the road against the Columbus Blue Jackets (OTL).",
+          "seconds": 4.1,
+          "model_calls": 2,
+          "tools": [
+            "get_recent_results({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_recent_results({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '3-2'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In Pittsburgh's last game (a 3\u20132 shootout loss to the Columbus Blue Jackets on October 9, 2026), the goalscorers for the Penguins were **B. Rust** (assisted by S. Girard) and **E. Malkin** (assisted by E. Karlsson).",
+          "seconds": 3.8,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Rust'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has **2 points** (0 goals, 2 assists) in 5 games this season for the Pittsburgh Penguins.",
+          "seconds": 5.3,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "Jack Eichel (VGK) and Connor McDavid (EDM) are tied for the NHL scoring lead with 12 points each. \n\nEichel has 3 goals and 9 assists in 5 games, while McDavid has 3 goals and 9 assists in 4 games.",
+          "seconds": 3.9,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Eichel'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "Based on the schedule strength rankings, the **Anaheim Ducks (ANA)** have the easiest remaining schedule in the Western Conference, with an average opponent rating of -0.023 across their 80 remaining games. \n\nHowever, because the gaps under about 0.05 goals per game are considered negligible (particularly early in the season), the Colorado Avalanche (COL) at -0.021 and Vegas Golden Knights (VGK) at -0.017 face essentially comparable remaining schedule strengths.",
+          "seconds": 3.2,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'ANA'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer explicitly states gaps are negligible and treats them as marginal."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "Sidney Crosby\u2019s 5-on-5 PDO is **96.2**. \n\nPDO combines a player's on-ice shooting percentage and on-ice save percentage at 5-on-5. A number below 100 (typically around 100 league-wide) suggests a player has experienced some bad luck with lower-than-average conversion rates or goaltending while he's on the ice. Through 5 games this season, Crosby has 0 goals and 2 assists.",
+          "seconds": 5.4,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "ollama: Does not interpret the PDO as below average"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "no_injury_data",
+          "question": "Is Sidney Crosby injured right now?",
+          "answer": "Based on the provided data, Sidney Crosby is not listed as injured. He has played 5 games for the Pittsburgh Penguins in the 2026-27 season, recording 2 assists.",
+          "seconds": 5.5,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Answer incorrectly asserts injury status."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-20b",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "First place in the Metropolitan Division is the New\u202fYork Rangers (NYR).",
+          "seconds": 3.0,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'NYR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins\u2019 next game is tonight, Saturday\u202fOctober\u202f10,\u202f2026.  \n\u2022 **Opponent:** Dallas Stars  \n\u2022 **Date & Time:** 7:00\u202fPM ET  \n\u2022 **Location:** Home (Pittsburgh)\n\nThis information comes from the schedule data for the Penguins (next five games).",
+          "seconds": 3.6,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":5,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'games': 5, 'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'DAL'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "Pittsburgh\u2019s current playoff probability, according to the playoff\u2011odds model, is **56\u202f%** (averaging about 95.5 points for the season).  \n\nIf the Penguins win each of their next four games (a 4\u20110\u20130 record over the next 4), the model projects their odds rise to **\u224868.5\u202f%** (average points increase to about 99.2).  \n\nThis change comes from a \u201cwhat\u2011if\u201d simulation run with the model\u2019s own baseline, so it reflects the scenario\u2019s impact on the odds and point projection.",
+          "seconds": 4.4,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"games\":4,\"team\":\"PIT\",\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'team': 'PIT', 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~68.5%, answer has [56.0, 68.5]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "To have a better\u2011than\u2011even chance of making the playoffs, Detroit must finish its first 10 games with at least an **8\u20112 record** (or better).\n\n| Record over 10 games | Playoff\u2011odds model estimate |\n|----------------------|-----------------------------|\n| 8\u20112 | 54.8\u202f% |\n| 7\u20113 | 47.0\u202f% |\n\nThe playoff\u2011odds model (500 simulations per scenario) shows that a 7\u20113 finish gives only a 47\u202f% chance, below the 50\u202f% threshold. An 8\u20112 record pushes the odds above 50\u202f%, giving Detroit a better\u2011than\u2011even probability of securing a playoff spot.",
+          "seconds": 4.5,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"games\":10,\"team\":\"DET\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'games': 10, 'team': 'DET'})"
+            },
+            {
+              "name": "facts",
+              "passed": false,
+              "detail": "expected one of ['8-2', '8\u20132']"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "5 percentage(s), all sourced"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "Toronto\u2019s playoff odds at the beginning of the 2026\u201127 season were **22.1\u202f%**.  \nThe playoff\u2011odds model shows that this percentage was recorded on the season start date, **2026\u201110\u201108**, and it also represents the highest probability that the model projected for Toronto that year (22.1\u202f%) and the lowest (21.2\u202f%) from the week prior.  \n\nSo, right out of the gate, Toronto had a little over one\u2011chance\u2011in\u2011five chance of making the playoffs according to the model.",
+          "seconds": 3.5,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_playoff_odds({'team': 'TOR'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~22.1%, answer has [22.1, 22.1, 21.2]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "The Penguins\u2019 most recent game ended in a 2\u20133 loss to the Columbus\u202fBlue Jackets after a shootout.",
+          "seconds": 3.8,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2\u20133'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In their most recent outing, Pittsburgh\u2019s only goals came from **B. Rust** (second\u2011period) and **E.\u202fMalkin** (third\u2011period).",
+          "seconds": 3.2,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Rust'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 2 points this season (2026\u201127) \u2013 0 goals and 2 assists in 5 games.",
+          "seconds": 5.0,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 1.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "**Easiest remaining schedule in the Western Conference**\n\nAccording to the model\u2019s schedule\u2011strength ranking, the Anaheim Ducks (ANA) have the lowest average opponent rating for the rest of the season, indicating the easiest path. The next closest teams are Colorado (COL), Vancouver (VGK), and the Los\u202fAngeles Kings (LAK). The differences are small\u2014under about 0.05 goals per game\u2014so the advantage is modest rather than decisive.",
+          "seconds": 2.8,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'ANA'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer explicitly states that the differences are small and the advantage is modest."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "Sidney\u202fCrosby\u2019s 5\u2011game PDO is **96.2**.  \nPDO is the sum of a team\u2019s shooting percentage and the goalie\u2019s save percentage when that player is on the ice. An average league PDO is 100, so 96.2 is below the norm.  \n\nWith only five games, the figure is still fairly small\u2011sample. The 0\u20112 goal line, 2\u2011assist tally, +\u20113 and 15 shots per game all point to a modest, but not dramatic, under\u2011performance. The low PDO suggests that either Crosby\u2019s team has been a bit unlucky or the opposition has been hitting the puck harder on his shifts.  \n\nIn plain terms, the numbers imply that the Penguins\u2019 start has been a little below expectations, but the early\u2011season sample makes it too early to draw firm conclusions about a long\u2011term slump.",
+          "seconds": 4.7,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies the PDO as 96.2, notes it is below the 100 average, and attributes it to bad luck that is part of a small-sample start."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "no_injury_data",
+          "question": "Is Sidney Crosby injured right now?",
+          "answer": "",
+          "seconds": 1.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        }
+      ]
+    }
+  }
+}

@@ -364,3 +364,89 @@ class TestXgModelRatings:
             raise ConnectionError("moneypuck unreachable")
 
         assert xg_model_ratings(self.standings, 20262027, fetch=down) is None
+
+
+# ---------------------------------------------------------------------------
+# "Why these odds?"
+# ---------------------------------------------------------------------------
+
+from simulate_playoff_odds import (
+    HOME_EDGE,
+    PRIOR_GAMES,
+    XG_WEIGHT,
+    odds_explanations,
+    rating_parts,
+    schedule_strength,
+    team_ratings,
+)
+
+
+def _remaining(home, away, day="2026-10-20"):
+    return {"date": day, "home": home, "away": away, "home_score": None, "away_score": None}
+
+
+class TestRatingParts:
+    standings = {"PIT": {"goal_differential": 5, "games_played": 12}, "BOS": {"goal_differential": -3, "games_played": 12}}
+    xgd = {"PIT": (0.4, 12), "BOS": (-1.0, 12)}
+    priors = {"PIT": 0.1, "BOS": -0.2}
+
+    def test_the_parts_add_up_to_the_rating(self):
+        ratings = team_ratings(blend_xg(self.standings, self.xgd), self.priors, prior_games=PRIOR_GAMES_XG)
+        parts = rating_parts(self.standings, self.xgd, self.priors, PRIOR_GAMES_XG, XG_WEIGHT)
+
+        for team, p in parts.items():
+            assert p["goals"] + p["xg"] + p["last_season"] == pytest.approx(ratings[team][0], abs=1e-3)
+
+    def test_explains_the_pit_case_goals_up_xg_even(self):
+        p = rating_parts(self.standings, self.xgd, self.priors, PRIOR_GAMES_XG, XG_WEIGHT)["PIT"]
+
+        assert p["goals"] > 0.05 and abs(p["xg"]) < 0.01
+        assert p["last_season_per_game"] == pytest.approx(0.1 / PRIOR_CARRYOVER)
+        assert p["last_season_share"] == pytest.approx(PRIOR_GAMES_XG / (12 + PRIOR_GAMES_XG), abs=1e-3)
+
+    def test_goals_only_fallback_has_no_xg_part(self):
+        ratings = team_ratings(self.standings, self.priors)
+        p = rating_parts(self.standings, {}, self.priors, PRIOR_GAMES, 0.0)["PIT"]
+
+        assert p["xg"] is None and p["xg_diff"] is None
+        assert p["goals"] + p["last_season"] == pytest.approx(ratings["PIT"][0], abs=1e-3)
+
+
+class TestScheduleStrength:
+    ratings = {"GOOD": (0.5, 0.1), "BAD": (-0.5, 0.1), "MID": (0.0, 0.1)}
+
+    def test_facing_weaker_opponents_is_an_easier_road(self):
+        games = [_remaining("GOOD", "BAD"), _remaining("BAD", "GOOD"), _remaining("MID", "GOOD"), _remaining("GOOD", "MID")]
+        s = schedule_strength(self.ratings, games, "2026-10-19")
+
+        # MID only plays GOOD (avg opp +0.5); BAD only plays GOOD too; GOOD
+        # plays BAD and MID (avg opp -0.25).
+        assert s["GOOD"]["effect"] > s["MID"]["effect"]
+        assert s["GOOD"]["games_left"] == 4
+
+    def test_extra_home_games_help(self):
+        games = [_remaining("GOOD", "BAD"), _remaining("GOOD", "BAD")]
+        s = schedule_strength(self.ratings, games, "2026-10-19")
+
+        assert s["GOOD"]["home_games"] == 2
+        # Same opponents' average for both sides relative to typical, plus home ice.
+        assert s["GOOD"]["effect"] - s["BAD"]["effect"] == pytest.approx(2 * HOME_EDGE + 1.0 * 2 / 2, abs=1e-3)
+
+    def test_played_games_and_the_offseason_count_for_nothing(self):
+        played = _game("GOOD", "BAD", 3, 1, "2026-10-10")
+        s = schedule_strength(self.ratings, [played], "2026-10-19")
+
+        assert s["GOOD"] == {"games_left": 0, "home_games": 0, "effect": 0.0}
+
+
+class TestOddsExplanations:
+    def test_ranks_ratings_and_schedules(self):
+        ratings = {"GOOD": (0.5, 0.1), "BAD": (-0.5, 0.1)}
+        standings = {"GOOD": {"goal_differential": 6, "games_played": 10}, "BAD": {"goal_differential": -6, "games_played": 10}}
+        parts = rating_parts(standings, {}, {}, PRIOR_GAMES, 0.0)
+
+        why = odds_explanations(ratings, parts, [_remaining("GOOD", "BAD")], "2026-10-19")
+
+        assert why["GOOD"]["rating_rank"] == 1 and why["BAD"]["rating_rank"] == 2
+        assert why["GOOD"]["schedule"]["rank"] == 1  # plays the weak team, at home
+        assert why["GOOD"]["goal_diff"] == 6

@@ -93,7 +93,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why }) {
 // and the current standings laid out in the playoff format (division top
 // 3s, two wild cards, then everyone chasing), with each team's odds and
 // how they've moved this week.
-function PlayoffsPage({ standings }) {
+function PlayoffsPage({ standings, standingsStatus = "ready" }) {
   const [conference, setConference] = useState("Eastern");
   const [chartSeason, setChartSeason] = useState(null); // null = the latest season with odds
   const [highlighted, setHighlighted] = useState(null);
@@ -211,6 +211,11 @@ function PlayoffsPage({ standings }) {
           <h2 id="race-table-title">Where it stands</h2>
           {why && <p className="race-hint">Tap a team to see why</p>}
         </div>
+        {standingsStatus !== "ready" && standings.length === 0 ? (
+          <p className={standingsStatus === "error" ? "status-line status-error" : "status-line"}>
+            {standingsStatus === "error" ? "Couldn't load the standings." : "Loading standings…"}
+          </p>
+        ) : (
         <div className="race-table-scroll">
           <table className="standings-table race-table">
             <thead>
@@ -233,6 +238,7 @@ function PlayoffsPage({ standings }) {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <StatGlossary terms={["GP", "TEAM_PTS", "PACE", "PO%", "7D"]} labels={{ TEAM_PTS: "PTS", PACE: "Pace", "7D": "7d" }} />

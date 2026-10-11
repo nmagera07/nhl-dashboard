@@ -155,6 +155,18 @@ describe("PlayoffsPage", () => {
     expect(within(rowFor("PIT")).getByText("—", { selector: ".race-odds" })).toBeInTheDocument();
   });
 
+  it("shows the odds chart while the standings are still loading", async () => {
+    mockApi();
+    render(
+      <MemoryRouter>
+        <PlayoffsPage standings={[]} standingsStatus="loading" />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Odds over the season")).toBeInTheDocument();
+    expect(screen.getByText("Loading standings…")).toBeInTheDocument();
+  });
+
   it("shows an error when the odds can't load", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
     renderPage();

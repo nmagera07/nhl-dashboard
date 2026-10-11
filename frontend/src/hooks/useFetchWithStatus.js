@@ -9,7 +9,10 @@ import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 // - Pass a falsy `url` to skip fetching entirely (status stays "idle").
 // - Stale-while-revalidate: if this URL was fetched earlier in the session,
 //   its last response shows immediately (status "ready") while a fresh one
-//   loads, so returning to a page doesn't flash empty.
+//   loads, so returning to a page doesn't flash empty. Once-a-day data also
+//   survives across visits (see responseCache.js). If the refresh fails
+//   while a cached copy is showing, the copy stays ("ready") rather than
+//   being replaced by an error: last night's standings beat a dead page.
 //
 // Note: this effect only ever calls setState inside the async .then/.catch
 // callbacks, never synchronously in the effect body -- that's what keeps it
@@ -32,7 +35,7 @@ export function useFetchWithStatus(url, { initialData = null, transform, onSucce
         setStatus("ready");
         if (onSuccess) onSuccess(value);
       })
-      .catch(() => setStatus("error"));
+      .catch(() => setStatus(cachedResponse(url) !== undefined ? "ready" : "error"));
   }, [url]);
 
   return { data, status };

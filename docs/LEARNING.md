@@ -36,6 +36,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   Azure bill from ~$11.44 to ~$0.97.
 
 **AI engineering**
+- Built a write-once prediction log for a live model: every game prediction stored before
+  puck drop with its model version and inputs, graded automatically after the final, and
+  scored by favorite win rate, Brier score vs. a coin flip, and calibration, served by a
+  public API.
 - Fixed stale answers from an AI agent by moving its schedule tool from a daily snapshot to
   live data and giving the model today's date and Eastern start times.
 - Shipped a daily AI-written digest as a batch job (one LLM call a day, shared by all users),
@@ -80,11 +84,19 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Found and fixed a date-boundary bug that silently dropped each day's games
   from the daily playoff simulation (about half the league simulated one game
   short, every day), with a regression test.
+- Diagnosed why our playoff odds differed from MoneyPuck's by 16 points for one team (a goals
+  vs. expected-goals blend and different priors) and turned the question into a measurable
+  head-to-head through prediction logging.
 - Tested three more model ideas (adjusted xG, strength of schedule,
   goaltending) with held-out backtests and shipped none after showing the
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Added game highlights (recaps, condensed games, per-goal clips) by mining feeds the app
+  already loaded, with link allowlisting and cache timing tuned to when the NHL posts videos.
+- Built pregame previews (model win probability, form, ranked team stats, top goalies, season
+  series) and a stale-while-revalidate cache so back navigation is instant while live data
+  stays fresh.
 - Designed and shipped the PuckPulse brand: explored logo directions as SVG at real sizes and
   in Android icon crops, built a full PWA icon set from one master SVG with a dark-mode variant,
   and fixed stale home-screen icons by cache-busting icon URLs.
@@ -110,6 +122,136 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — A track record for the model: write once, grade later
+
+**What I built:** Every game the model predicts is now logged and graded. Each morning
+at 2 AM ET, the daily job saves every game on that day's slate with the model's
+home-win probability, both teams' ratings, and the model version, before any puck
+drops. It then grades earlier predictions once they're final (score, regulation, OT or
+shootout, and who won). An API endpoint turns that into a scorecard.
+
+**Why:** I asked why MoneyPuck had the Penguins at 45% to make the playoffs and we had
+them at 61% (entry below). The honest answer was "nobody knows yet." The only way to
+know is to write predictions down *before* the games and score them *after*. Backtests
+had already shown the model was good on past seasons. This is the live version: it
+proves the model keeps working on games it has never seen.
+
+**Design decisions:**
+- **Write once.** A logged prediction is never updated (`ON CONFLICT DO NOTHING`), so
+  re-running the job can't quietly swap in a "better" prediction after the fact.
+- **Skip when inputs are stale.** If that morning's odds run failed, nothing is logged.
+  Logging yesterday's ratings as today's prediction would be dishonest.
+- **Backfill only real predictions.** The morning digest had already stored genuine
+  pre-game odds for two days. I backfilled those 17 games, marked `source='digest'`. I
+  didn't backfill earlier days, because rebuilding "what the model would have said"
+  afterwards risks leaking information the model couldn't have had.
+- **Scoring logic is a pure module** (`prediction_record.py`), separate from the job's
+  database code, so the API doesn't import the daily job and the math is easy to test.
+
+**The metrics:**
+- **Favorite win rate:** how often the team the model favored won. It's easy to grasp,
+  but it ignores confidence.
+- **Brier score:** the mean of (probability − outcome)². A coin flip scores 0.25 and
+  lower is better. It rewards being confident *and* right, and punishes confident and
+  wrong. Good hockey models land around 0.23–0.24, because single games are close to
+  coin flips.
+- **Calibration:** group predictions by confidence ("said 60–65%") and check how often
+  they happened. A model can have a good Brier score and still be over-confident;
+  calibration shows that.
+
+**First numbers:** 14 graded games, the favorite won 10 of 13 (plus one 50/50 call),
+Brier 0.221. That's a lucky start on a tiny sample. The 60–65% bucket went 4-for-4 and
+the only 65%+ pick lost. It takes a few hundred games before the buckets mean anything.
+
+**What I learned:**
+- This is the same mindset as the AI eval suite: decide how you'll measure success,
+  capture ground truth automatically, and don't trust a number you can't check.
+- Data integrity is a design choice: immutability and provenance (the `source` and
+  `model_version` columns) are what make a track record believable.
+- Small samples lie. Report the sample size next to every metric.
+
+**Interview angle:** "How do you know your model works in production, not just in
+backtests?" Log predictions before outcomes exist, grade them automatically, and track
+calibration as well as accuracy.
+
+---
+
+## 2026-10-11 — Why MoneyPuck says 45% and we say 61%
+
+**Question I asked:** MoneyPuck had the Penguins at 44.9% to make the playoffs; PuckPulse
+said 61%. What's different?
+
+**What I found** by breaking down our Penguins rating:
+- They were 3-2-1 with a **+5 goal differential** but **even expected goals**
+  (0.0 xGD): they'd finished their chances and gotten saves at a better-than-expected
+  rate.
+- Our model blends goals and xG 50/50 (the blend won the backtest), so half the rating
+  came from that +5. A model that leans harder on xG treats it as luck that will fade.
+- Our starting point is last season's xG, which was decent for Pittsburgh.
+  Serious models often start from the **current roster** (age, who left, who
+  arrived), which probably rates an older Penguins team lower.
+
+**What I learned:**
+- Early in the season, every model is mostly its assumptions: six games is almost no
+  data. Models disagree most in October and converge as results pile up.
+- Two good models can disagree a lot about one team and still both be well calibrated
+  overall. One team's number isn't a verdict on the model.
+- The way to settle it is a track record (entry above), not an argument.
+- Next modeling lever: roster-aware starting points (priors).
+
+---
+
+## 2026-10-11 — Highlights: using data that was already there
+
+**What I built:** a "▶ Recap" button on every finished game on the Scores page, a
+Highlights card in the box score (3-minute recap and condensed game), and a "▶ Watch"
+link next to every goal.
+
+**How:** I checked the NHL's feeds before planning anything. Goal clips were already in
+the box score data the app loads; recaps were on the daily score feed. The gamecenter
+feeds only had bare video IDs, which nhl.com can't open, so the links come from the score
+feed, which carries the full URL paths. No new API, key, or cost.
+
+**Decisions:**
+- **Link out instead of embedding.** Playing the NHL's videos inside the app would mean
+  using its video player in a way the NHL doesn't publicly offer. Linking to its
+  public share URLs is clearly fine. It's a product trade-off made for legal reasons.
+- **Cache with the data's timing in mind.** Finished games were cached for an hour, but
+  recaps get posted a while after the final horn, so a cached "no recap" would hide the
+  link for up to an hour. Recent finals without a recap now recheck every 5 minutes.
+- **Allowlist links.** Only `https://nhl.com/video/...` URLs are ever rendered, so bad
+  upstream data can't put a strange (or `javascript:`) link in front of users.
+- **Accessible markup.** Links can't go inside buttons, so the recap link sits next to the
+  card's button, not inside it.
+
+**What I learned:** look at the real data before designing. The feature I expected to
+need a new integration was already sitting in responses the app was downloading.
+
+---
+
+## 2026-10-11 — Game previews, and back navigation without a reload
+
+**Game preview:** before puck drop, a box score used to be empty. Now it shows a
+preview: win probability from our model (labeled "a lean, not a lock", and not betting
+advice), division standing and playoff odds, last-10 form, team stats with league ranks,
+players to watch, each team's top goalie, and the season series. Most of it comes from the
+NHL's own pregame feeds, merged into the same box-score response.
+
+**Back navigation:** going from a box score back to Scores reloaded the whole page
+(empty cards, loading messages). I added a small **stale-while-revalidate** cache: show
+the last response immediately, refresh in the background, and swap in the new data.
+Live scores stay live, and going back shows 3 cards and 0 loading messages instead of 0
+cards and 2 loading messages.
+
+**What I learned:**
+- Stale-while-revalidate is the right pattern for "fast but fresh" data, and it's the
+  same idea behind HTTP's `stale-while-revalidate` header and libraries like SWR and
+  React Query.
+- A shared in-memory cache needs resetting between tests, or results leak from one test
+  into the next.
 
 ---
 

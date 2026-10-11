@@ -212,6 +212,7 @@ function PlayoffsPage({ standings }) {
       <p className="data-credit">
         Odds from 10,000 simulations of the rest of the season, blending goals with expected goals (xG) courtesy of{" "}
         <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+        {" "}<Link className="accent-link" to="/track-record">How accurate is the model?</Link>
       </p>
     </main>
   );

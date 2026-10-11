@@ -814,6 +814,19 @@
 .race-change { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
 .race-change-up { color: #4ade80; }
 .race-change-down { color: #f87171; }
+.race-hint { margin: 0; color: var(--text-dim); font-size: 12px; }
+/* "Why these odds?" -- opens under the selected race row. */
+.race-table tbody tr.race-why-row { cursor: default; background: #161d2e; }
+.race-why-row td { padding: 4px 14px 14px; text-align: left; white-space: normal; }
+.odds-why { max-width: 560px; }
+.odds-why-title { margin: 0 0 8px; font-size: 13px; color: var(--text-dim); }
+.odds-why-title strong { color: var(--text); }
+.odds-why-list { display: grid; gap: 6px; margin: 0; }
+.odds-why-list > div { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: baseline; }
+.odds-why-list dt { font-weight: 700; font-size: 12px; }
+.odds-why-list dd { margin: 0; font-size: 12px; color: var(--text-dim); }
+.odds-why-effect { white-space: nowrap; font-size: 12px; color: var(--text-dim); }
+.odds-why-note { margin: 8px 0 0; font-size: 11px; color: var(--text-dim); }
 
 /* My team: card on the Scores page, follow button, and star markers. */
 .my-team-card {
@@ -1158,6 +1171,8 @@ a.my-team-game:hover { border-color: #2c3a58; }
   .tabbar-item-active { color: var(--accent); }
   .race-col-pace { display: none; }
   .race-odds-bar { width: 36px; }
+  .odds-why-list > div { grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .odds-why-list dd:not(:last-child) { grid-column: 1 / -1; grid-row: 2; }
   .race-table th, .race-table td { padding-left: 10px; padding-right: 10px; }
   .leaderboard-controls {
     flex-direction: column;

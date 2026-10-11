@@ -216,8 +216,9 @@ def blend_xg(standings, xgd_totals, weight=XG_WEIGHT):
     return out
 
 
-def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
-    """Ratings from the xG blend, or None if MoneyPuck is unavailable."""
+def xg_model_inputs(season_id, fetch=fetch_moneypuck_xgd):
+    """(this season's xG totals, last season's xG priors), or None if
+    MoneyPuck is unavailable."""
     start = season_id // 10000
     try:
         current = fetch(start)
@@ -226,7 +227,99 @@ def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
         logger.warning(f"MoneyPuck xG unavailable ({exc}); using the goals-only model")
         return None
     priors = {t: PRIOR_CARRYOVER * xgd / gp for t, (xgd, gp) in previous.items() if gp}
+    return current, priors
+
+
+def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
+    """Ratings from the xG blend, or None if MoneyPuck is unavailable."""
+    inputs = xg_model_inputs(season_id, fetch)
+    if inputs is None:
+        return None
+    current, priors = inputs
     return team_ratings(blend_xg(standings, current), priors, prior_games=PRIOR_GAMES_XG)
+
+
+def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight):
+    """
+    Each team's rating split into what pushed it there, in goals/game:
+    this season's goals, this season's xG, and last season's prior. The
+    three add up to the team_ratings() mean exactly. For the goals-only
+    fallback, pass xg_weight=0 (the xG part is then None).
+    """
+    parts = {}
+    for abbrev, s in standings.items():
+        gp = s["games_played"]
+        gd = s.get("goal_differential", 0)
+        xgd = xgd_totals.get(abbrev, (gd, None))[0] if xg_weight else None
+        denom = gp + prior_games
+        prior = priors.get(abbrev, 0.0)
+        parts[abbrev] = {
+            "games_played": gp,
+            "goal_diff": gd,
+            "xg_diff": None if xgd is None else round(xgd, 1),
+            "goals": round((1 - xg_weight) * gd / denom, 4),
+            "xg": None if xgd is None else round(xg_weight * xgd / denom, 4),
+            "last_season": round(prior_games * prior / denom, 4),
+            # Last season's per-game differential before the carryover haircut.
+            "last_season_per_game": round(prior / PRIOR_CARRYOVER, 3),
+            "last_season_share": round(prior_games / denom, 3),
+        }
+    return parts
+
+
+def schedule_strength(ratings, games, as_of_date):
+    """
+    How the remaining schedule helps or hurts each team, in goals/game like
+    the rating: how much weaker than a typical team's opponents its
+    opponents are, plus home ice for any extra home games. Positive = an
+    easier road ahead. {team: {"games_left", "home_games", "effect"}}.
+    """
+    opponents = defaultdict(list)
+    home_games = defaultdict(int)
+    for g in remaining_games(games, as_of_date):
+        if g["home"] in ratings and g["away"] in ratings:
+            opponents[g["home"]].append(ratings[g["away"]][0])
+            opponents[g["away"]].append(ratings[g["home"]][0])
+            home_games[g["home"]] += 1
+    avg_opp = {t: sum(o) / len(o) for t, o in opponents.items()}
+    if not avg_opp:
+        return {t: {"games_left": 0, "home_games": 0, "effect": 0.0} for t in ratings}
+    typical = sum(avg_opp.values()) / len(avg_opp)
+    out = {}
+    for team in ratings:
+        n = len(opponents[team])
+        if not n:
+            out[team] = {"games_left": 0, "home_games": 0, "effect": 0.0}
+            continue
+        home_tilt = HOME_EDGE * (2 * home_games[team] - n) / n
+        out[team] = {
+            "games_left": n,
+            "home_games": home_games[team],
+            "effect": round(typical - avg_opp[team] + home_tilt, 4),
+        }
+    return out
+
+
+def odds_explanations(ratings, parts, games, as_of_date):
+    """
+    "Why these odds?" for every team: the rating's parts, the schedule's
+    effect, and where each ranks in the league (1 = best rating / easiest
+    schedule). Saved with the simulator inputs; served by
+    GET /playoff-odds/why.
+    """
+    schedule = schedule_strength(ratings, games, as_of_date)
+    by_rating = sorted(ratings, key=lambda t: -ratings[t][0])
+    by_schedule = sorted(schedule, key=lambda t: -schedule[t]["effect"])
+    return {
+        team: {
+            **parts[team],
+            "rating": round(ratings[team][0], 4),
+            "rating_rank": by_rating.index(team) + 1,
+            "schedule": {**schedule[team], "rank": by_schedule.index(team) + 1},
+        }
+        for team in ratings
+        if team in parts
+    }
 
 
 def load_priors(season_id):
@@ -367,13 +460,15 @@ def simulate(standings, schedule, trials, ratings, rng=random):
     return {team: made_playoffs[team] / trials for team in standings}
 
 
-def sim_inputs(standings, ratings, games, season_id, as_of_date):
+def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None):
     """
     Everything the in-browser season simulator needs to play out the rest
     of the season exactly like simulate() does: the game model's constants,
     each team's record and strength rating, and the remaining schedule.
+    `why` (odds_explanations()) rides along for GET /playoff-odds/why.
     """
     return {
+        "why": why or {},
         "season_id": season_id,
         "as_of_date": str(as_of_date),
         "model": {
@@ -464,13 +559,17 @@ def main():
         return
     logger.info(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
 
-    ratings = xg_model_ratings(standings, args.season)
-    if ratings is not None:
+    xg_inputs = xg_model_inputs(args.season)
+    if xg_inputs is not None:
         logger.info("Using the goals + MoneyPuck xG model")
+        current_xgd, priors = xg_inputs
+        ratings = team_ratings(blend_xg(standings, current_xgd), priors, prior_games=PRIOR_GAMES_XG)
+        parts = rating_parts(standings, current_xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT)
     else:
         priors = load_priors(args.season)
         logger.info(f"Goals-only model: {len(priors)} prior ratings from season {previous_season_id(args.season)}")
         ratings = team_ratings(standings, priors)
+        parts = rating_parts(standings, {}, priors, PRIOR_GAMES, 0.0)
 
     games = fetch_season_games(list(standings.keys()), args.season)
     _, schedule = split_games(games, args.as_of)
@@ -482,7 +581,8 @@ def main():
 
     if not args.no_save:
         save_odds(odds, args.season, args.as_of, args.trials)
-        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of))
+        why = odds_explanations(ratings, parts, games, args.as_of)
+        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why))
 
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
         mean, _ = ratings[team]

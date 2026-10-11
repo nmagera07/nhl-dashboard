@@ -29,9 +29,23 @@ const LAST_SEASON = {
   points: [...pts("2025-11-01", { PIT: 0.2 }), ...pts("2025-12-01", { PIT: 0.6 })],
 };
 
-function mockApi(current = CURRENT) {
+const WHY = {
+  season_id: 20262027,
+  as_of_date: "2026-11-08",
+  teams: {
+    PIT: {
+      games_played: 10, goal_diff: 5, xg_diff: 0.1, goals: 0.063, xg: 0.001, last_season: 0.12,
+      last_season_per_game: 0.32, last_season_share: 0.75, rating: 0.184, rating_rank: 9,
+      schedule: { games_left: 74, home_games: 37, effect: -0.01, rank: 5 },
+    },
+  },
+};
+
+function mockApi(current = CURRENT, why = WHY) {
   return vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
-    Promise.resolve({ json: async () => (url.includes("season_id=20252026") ? LAST_SEASON : current) })
+    Promise.resolve({
+      json: async () => (url.includes("/why") ? why : url.includes("season_id=20252026") ? LAST_SEASON : current),
+    })
   );
 }
 
@@ -88,6 +102,38 @@ describe("PlayoffsPage", () => {
 
     expect(rowFor("PIT")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("PIT", { selector: ".odds-chart-readout strong" })).toBeInTheDocument();
+  });
+
+  it("explains a team's odds under its row, loading the breakdown only when asked", async () => {
+    const fetchMock = mockApi();
+    renderPage();
+    await screen.findByRole("img", { name: /playoff odds/i });
+    expect(screen.getByText("Tap a team to see why")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/playoff-odds/why"));
+
+    await userEvent.click(rowFor("PIT"));
+
+    expect(await screen.findByText("Why 42%?")).toBeInTheDocument();
+    expect(screen.getByText(/rated 9th of 11/i)).toBeInTheDocument();
+    expect(screen.getByText("+5 goal differential in 10 games")).toBeInTheDocument();
+    expect(screen.getByText(/\+0\.1 xG differential/)).toBeInTheDocument();
+    expect(screen.getByText(/still 75% of the rating/i)).toBeInTheDocument();
+    expect(screen.getByText(/74 games left, about average \(5th easiest of 11\)/)).toBeInTheDocument();
+    expect(screen.getAllByText("▲ pushes up")).toHaveLength(2); // goals, last season
+    expect(screen.getAllByText("– little effect")).toHaveLength(2); // xG, schedule
+
+    await userEvent.click(rowFor("PIT"));
+    expect(screen.queryByText("Why 42%?")).not.toBeInTheDocument();
+  });
+
+  it("says the breakdown is coming when the latest run predates it", async () => {
+    mockApi(CURRENT, { ...WHY, teams: {} });
+    renderPage();
+    await screen.findByRole("img", { name: /playoff odds/i });
+
+    await userEvent.click(rowFor("BOS"));
+
+    expect(await screen.findByText(/arrives with the next morning update/i)).toBeInTheDocument();
   });
 
   it("offers last season's race while this season's chart is still empty", async () => {

@@ -54,6 +54,30 @@ class TestGameBoxscore:
         assert game["shotsByPeriod"] == RIGHT_RAIL["shotsByPeriod"]
         assert game["teamGameStats"] == RIGHT_RAIL["teamGameStats"]
 
+    def test_a_final_gets_its_recap_links_from_the_score_feed(self, monkeypatch):
+        boxscore = {**BOXSCORE, "gameDate": "2026-10-10"}
+        score = {"games": [
+            {"id": 1, "threeMinRecap": "/video/other-recap-1"},
+            {"id": 2026020044, "threeMinRecap": "/video/nsh-at-tor-recap-6406612944112",
+             "condensedGame": "/video/nsh-at-tor-condensed-game-6406611376112"},
+        ]}
+        monkeypatch.setattr(nhl_games, "_get", _fake_get(
+            {"/boxscore": boxscore, "/landing": LANDING, "/right-rail": RIGHT_RAIL, "/score/2026-10-10": score}))
+
+        game = game_boxscore(2026020044)
+
+        assert game["gameVideo"] == {
+            "threeMinRecap": "/video/nsh-at-tor-recap-6406612944112",
+            "condensedGame": "/video/nsh-at-tor-condensed-game-6406611376112",
+        }
+
+    def test_a_score_feed_outage_just_means_no_recap_links(self, monkeypatch):
+        boxscore = {**BOXSCORE, "gameDate": "2026-10-10"}
+        monkeypatch.setattr(nhl_games, "_get", _fake_get({"/boxscore": boxscore, "/landing": LANDING,
+                                                          "/right-rail": RIGHT_RAIL, "/score/2026-10-10": NHLGamesUnavailable("down")}))
+
+        assert game_boxscore(2026020044)["gameVideo"] == {}
+
     def test_an_upcoming_game_carries_the_preview(self, monkeypatch):
         boxscore = {"id": 84, "gameState": "FUT", "awayTeam": {"abbrev": "SEA"}, "homeTeam": {"abbrev": "WSH"}}
         landing = {"awayTeam": {"abbrev": "SEA", "record": "3-2-0"}, "homeTeam": {"abbrev": "WSH", "record": "3-1-0"},
@@ -255,6 +279,19 @@ class TestResponseCache:
         assert nhl_games._boxscore_ttl({"gameState": "LIVE"}) == nhl_games.LIVE_TTL
         assert nhl_games._boxscore_ttl({"gameState": "OFF"}) == nhl_games.FINAL_TTL
         assert nhl_games._boxscore_ttl({"gameState": "FUT"}) == nhl_games.SCHEDULED_TTL
+
+    def test_recent_finals_without_a_recap_are_rechecked_soon(self):
+        today = date.today().isoformat()
+        waiting = {"gameState": "OFF", "gameDate": today}
+        posted = {**waiting, "gameVideo": {"threeMinRecap": "/video/x"}}
+        old = {"gameState": "OFF", "gameDate": "2025-01-01"}
+        assert nhl_games._boxscore_ttl(waiting) == nhl_games.RECAP_PENDING_TTL
+        assert nhl_games._boxscore_ttl(posted) == nhl_games.FINAL_TTL
+        assert nhl_games._boxscore_ttl(old) == nhl_games.FINAL_TTL
+        assert nhl_games._scoreboard_ttl([{"gameState": "OFF", "gameDate": today, "threeMinRecap": "/video/x"}, waiting]) \
+            == nhl_games.RECAP_PENDING_TTL
+        assert nhl_games._scoreboard_ttl([{"gameState": "OFF", "gameDate": today, "threeMinRecap": "/video/x"}]) \
+            == nhl_games.FINAL_TTL
 
     def test_concurrent_requests_share_one_upstream_fetch(self, monkeypatch):
         import threading

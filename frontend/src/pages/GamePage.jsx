@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
+import { nhlVideoUrl } from "../utils/highlights.js";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
 const LIVE_REFRESH_MS = 30000;
@@ -124,6 +125,7 @@ function ScoringSummary({ scoring, away, home }) {
         const team = abbrevOf(goal.teamAbbrev);
         const strength = STRENGTH_LABELS[goal.strength];
         const assists = (goal.assists || []).map((a) => `${nameOf(a.name)} (${a.assistsToDate})`).join(", ");
+        const clip = nhlVideoUrl(goal.highlightClipSharingUrl);
         return (
           <div className="goal-row" key={goal.eventId ?? goalIndex}>
             <span className="goal-time">{goal.timeInPeriod}</span>
@@ -137,6 +139,12 @@ function ScoringSummary({ scoring, away, home }) {
                 {strength && <span className="goal-tag">{strength}</span>}
                 {goal.goalModifier === "empty-net" && <span className="goal-tag">EN</span>}
                 {goal.goalModifier === "penalty-shot" && <span className="goal-tag">PS</span>}
+                {clip && (
+                  <a className="goal-clip" href={clip} target="_blank" rel="noopener noreferrer"
+                    aria-label={`Watch ${nameOf(goal.name)}'s goal on NHL.com`}>
+                    ▶ Watch
+                  </a>
+                )}
               </span>
               <small>{assists ? `Assists: ${assists}` : "Unassisted"}</small>
             </span>
@@ -148,6 +156,27 @@ function ScoringSummary({ scoring, away, home }) {
       })}
     </div>
   ));
+}
+
+function Highlights({ video }) {
+  const links = [
+    ["threeMinRecap", "3-minute recap"],
+    ["condensedGame", "Condensed game"],
+  ].map(([key, label]) => [nhlVideoUrl(video?.[key]), label]).filter(([url]) => url);
+  if (links.length === 0) return null;
+  return (
+    <section className="boxscore-card">
+      <h2>Highlights</h2>
+      <div className="highlight-links">
+        {links.map(([url, label]) => (
+          <a key={label} className="highlight-link" href={url} target="_blank" rel="noopener noreferrer">
+            ▶ {label}
+          </a>
+        ))}
+      </div>
+      <p className="preview-note">Videos open on NHL.com. Goal clips are in the scoring summary.</p>
+    </section>
+  );
 }
 
 function ThreeStars({ stars }) {
@@ -392,6 +421,8 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
       </div>
 
       {!started && <GamePreview game={game} standingsByTeam={standingsByTeam} playoffOddsByTeam={playoffOddsByTeam} />}
+
+      {FINAL_STATES.has(game.gameState) && <Highlights video={game.gameVideo} />}
 
       {linescore.length > 0 && (
         <section className="boxscore-card">

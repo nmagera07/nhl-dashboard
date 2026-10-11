@@ -67,6 +67,8 @@ MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
+MODEL_VERSION = "v2.1"       # logged with every game prediction (game_predictions.py)
+
 # Game model -- fit by calibrate_playoff_model.py.
 HOME_EDGE = 0.264            # goals/game of home-ice advantage
 SCALE = 1.47                 # logistic steepness, in goals/game
@@ -375,6 +377,7 @@ def sim_inputs(standings, ratings, games, season_id, as_of_date):
         "season_id": season_id,
         "as_of_date": str(as_of_date),
         "model": {
+            "version": MODEL_VERSION,
             "home_edge": HOME_EDGE,
             "scale": SCALE,
             "ot_probability": OT_PROBABILITY,

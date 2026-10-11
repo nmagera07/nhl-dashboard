@@ -262,6 +262,7 @@ class IntelligenceService:
 async def lifespan(app: FastAPI):
     app.state.intelligence = IntelligenceService(get_settings())
     yield
+    await app.state.intelligence.dashboard.aclose()
 
 
 settings = get_settings()

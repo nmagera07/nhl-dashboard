@@ -328,6 +328,15 @@ class TestSimInputs:
         assert payload["teams"]["PIT"]["losses"] == 2
         assert payload["games"] == [["2026-10-09", "CBJ", "PIT"], ["2026-10-12", "PIT", "BOS"]]
 
+    def test_carries_player_values_keyed_by_string_id(self):
+        from simulate_playoff_odds import sim_inputs
+
+        standings = {"PIT": {"points": 0, "wins": 0, "division": "Metropolitan", "conference": "Eastern"}}
+        payload = sim_inputs(standings, {"PIT": (0.1, 0.2)}, [], 20262027, "2026-10-09",
+                             players={8471675: {"name": "Sidney Crosby", "value": 0.15}})
+
+        assert payload["players"] == {"8471675": {"name": "Sidney Crosby", "value": 0.15}}
+
 
 # ---------------------------------------------------------------------------
 # xG blend (MoneyPuck)

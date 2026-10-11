@@ -117,3 +117,72 @@ class TestEndpoints:
         body = client.get("/season-sim/scenario?team=OTT&games=1&wins=1").json()
 
         assert not body["games"][0].startswith(f"{first[0]} {'vs' if home else '@'} {first[2] if home else first[1]}")
+
+
+def _with_players():
+    p = _payload()
+    p["players"] = {
+        "8470001": {"name": "Star Center", "team": "OTT", "pos": "C", "gp": 10, "value": 0.3},
+        "8470002": {"name": "Depth Winger", "team": "BOS", "pos": "L", "gp": 10, "value": 0.01},
+    }
+    return p
+
+
+class TestRosterChange:
+    def test_losing_a_star_costs_the_team_and_his_new_team_gains(self):
+        result = sc.roster_change(_with_players(), [(8470001, "BOS")], trials=400)
+
+        by_team = {t["team"]: t for t in result["teams"]}
+        assert set(by_team) == {"BOS", "OTT"}
+        assert by_team["OTT"]["rating_change"] == -0.3 and by_team["BOS"]["rating_change"] == 0.3
+        assert by_team["OTT"]["with_change"]["playoff_pct"] < by_team["OTT"]["baseline"]["playoff_pct"]
+        assert by_team["BOS"]["with_change"]["playoff_pct"] > by_team["BOS"]["baseline"]["playoff_pct"]
+        assert result["moves"][0] == {"player": "Star Center", "position": "C", "from": "OTT", "to": "BOS",
+                                      "value_goals_per_game": 0.3, "games_this_season": 10}
+
+    def test_a_player_who_is_just_gone_only_moves_his_team(self):
+        result = sc.roster_change(_with_players(), [(8470001, None)], trials=200)
+
+        assert [t["team"] for t in result["teams"]] == ["OTT"]
+
+    def test_a_swap_nets_out(self):
+        result = sc.roster_change(_with_players(), [(8470001, "BOS"), (8470002, "OTT")], trials=50)
+
+        assert {t["team"]: t["rating_change"] for t in result["teams"]} == {"BOS": 0.29, "OTT": -0.29}
+
+    def test_bad_moves(self):
+        with pytest.raises(sc.UnknownPlayer):
+            sc.roster_change(_with_players(), [(8479999, None)], trials=10)
+        with pytest.raises(ValueError, match="already plays"):
+            sc.roster_change(_with_players(), [(8470001, "OTT")], trials=10)
+        with pytest.raises(sc.UnknownTeam):
+            sc.roster_change(_with_players(), [(8470001, "XYZ")], trials=10)
+        with pytest.raises(ValueError, match="aren't available"):
+            sc.roster_change(_payload(), [(8470001, None)], trials=10)
+
+
+class TestRosterChangeEndpoint:
+    def test_simulates_and_caches(self, client, db_router, monkeypatch):
+        db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
+        calls = []
+        real = sc.roster_change
+        monkeypatch.setattr(sc, "roster_change", lambda *a, **k: calls.append(a) or real(*a, trials=20))
+
+        first = client.get("/season-sim/roster-change?move=8470001:bos")
+        second = client.get("/season-sim/roster-change?move=8470001:BOS")
+
+        assert first.status_code == 200 and first.json() == second.json()
+        assert len(calls) == 1 and calls[0][1] == [(8470001, "BOS")]
+
+    def test_bad_requests(self, client, db_router):
+        db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
+
+        assert client.get("/season-sim/roster-change?move=larkin:DET").status_code == 422
+        assert client.get("/season-sim/roster-change?move=8470001:NONE&move=8470001:BOS").status_code == 422
+        assert client.get("/season-sim/roster-change?move=8479999:NONE").status_code == 404
+        assert client.get("/season-sim/roster-change?move=8470001:OTT").status_code == 400
+
+    def test_the_browser_payload_leaves_out_player_values(self, client, db_router):
+        db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
+
+        assert "players" not in client.get("/season-sim").json()

@@ -15,6 +15,8 @@ import logging
 import math
 from typing import Any
 
+import httpx
+
 from . import compact
 from .dashboard import DashboardClient, DashboardUnavailable
 
@@ -62,6 +64,14 @@ TOOLS = [
          "wins": {"type": "integer", "minimum": 0, "maximum": 30},
          "ot_losses": {"type": "integer", "minimum": 0, "maximum": 30, "description": "Losses in overtime/shootout (still a point). Default 0."}},
         ["team", "games", "wins"]),
+    _fn("simulate_roster_change",
+        "Simulate a hypothetical trade or a player missing the rest of the season with the playoff-odds model: each "
+        "affected team's playoff odds with and without the move, from the player's value in goals/game. Use for "
+        "'what if they traded X', 'what if X goes to Y', 'X for Y', or 'what if X is out for the season'. Skaters only.",
+        {"player": {"type": "string", "description": "The player who moves, e.g. 'Dylan Larkin'."},
+         "to_team": {"type": "string", "description": "Optional team he goes to. Leave out if unknown or he's just out."},
+         "player_back": {"type": "string", "description": "Optional player coming back in the trade (he joins the first player's team)."}},
+        ["player"]),
     _fn("playoff_path",
         "What a team needs: its playoff odds for every possible record over its next games (e.g. 0-10 up to 10-0), from the model.",
         {"team": TEAM, "games": {"type": "integer", "minimum": 1, "maximum": 15, "description": "Default 10."}},
@@ -90,6 +100,7 @@ LABELS = {
     "explain_odds": ("Breaking down the odds", "Playoff-odds model breakdown"),
     "rank_schedule_strength": ("Ranking remaining schedules", "Strength of remaining schedules"),
     "simulate_scenario": ("Simulating 2,000 seasons", "Season simulation (playoff-odds model)"),
+    "simulate_roster_change": ("Simulating the trade", "Season simulation with the roster change (playoff-odds model)"),
     "playoff_path": ("Simulating every record", "Season simulation (playoff-odds model)"),
     "get_recent_results": ("Checking recent results", "Recent results"),
     "get_game": ("Pulling up the box score", "NHL game box score"),
@@ -342,22 +353,61 @@ class ToolRunner:
             game_id = match["id"]
         return compact.game_facts(await self._get(f"/games/{game_id}/boxscore"))
 
-    async def _tool_find_player(self, name: str):
+    async def _match_players(self, name: str) -> list[dict]:
         query = (name or "").strip().lower()
         if len(query) < 2:
             raise ToolError("Give at least part of the player's name.")
         players = await self._get("/players/leaders")
-        matches = [p for p in players if query in f"{p.get('first_name', '')} {p.get('last_name', '')}".lower()]
+        full = lambda p: f"{p.get('first_name', '')} {p.get('last_name', '')}".lower()  # noqa: E731
+        matches = [p for p in players if query in full(p)]
         if not matches:
             raise ToolError(f"No current player matches '{name}'.")
-        if len(matches) > 1 and not any(query == f"{p['first_name']} {p['last_name']}".lower() for p in matches):
-            exact_last = [p for p in matches if (p.get("last_name") or "").lower() == query]
-            matches = exact_last or matches
+        exact = [p for p in matches if full(p) == query] or [p for p in matches if (p.get("last_name") or "").lower() == query]
+        return exact or matches
+
+    @staticmethod
+    def _ambiguous(matches: list[dict]) -> dict:
+        return {"multiple_matches": [compact._name(p) + f" ({p.get('team_abbrev')})" for p in matches[:8]],
+                "hint": "Ask again with the full name."}
+
+    async def _tool_find_player(self, name: str):
+        matches = await self._match_players(name)
         if len(matches) > 1:
-            return {"multiple_matches": [compact._name(p) + f" ({p.get('team_abbrev')})" for p in matches[:8]],
-                    "hint": "Ask again with the full name."}
+            return self._ambiguous(matches)
         player = await self._get(f"/players/{matches[0]['player_id']}")
         return compact.player_facts(player)
+
+    async def _tool_simulate_roster_change(self, player: str, to_team: str | None = None, player_back: str | None = None):
+        out = await self._match_players(player)
+        if len(out) > 1:
+            return self._ambiguous(out)
+        out = out[0]
+        back = None
+        if player_back:
+            back = await self._match_players(player_back)
+            if len(back) > 1:
+                return self._ambiguous(back)
+            back = back[0]
+        to = await self._team(to_team) if to_team else (back["team_abbrev"] if back else None)
+        moves = [f"{out['player_id']}:{to or 'NONE'}"]
+        if back:
+            moves.append(f"{back['player_id']}:{out['team_abbrev']}")
+        try:
+            result = await self.dashboard._get("/season-sim/roster-change?" + "&".join(f"move={m}" for m in moves))
+        except DashboardUnavailable as exc:
+            cause = exc.__cause__
+            if isinstance(cause, httpx.HTTPStatusError) and cause.response.status_code < 500:
+                # The API's reason: a goalie, same team, or values not computed yet.
+                raise ToolError(cause.response.json().get("detail", "That move can't be simulated.")) from exc
+            raise
+        return {
+            **result,
+            "how_to_read": "value_goals_per_game = the player's worth over a replacement-level player, in the same "
+                           "goals/game units as team ratings (about 0.3 for the very best skaters). Compare each team's "
+                           "with_change to its own baseline. With no destination or return, his minutes go to a "
+                           "replacement-level player; a player who arrives is assumed to replace one. It's the rest "
+                           "of the season, a rough estimate that ignores line chemistry and the salary cap: say so.",
+        }
 
     async def _tool_get_leaders(self, category: str | None = None):
         leaders = compact.leaders(await self._get("/players/leaders"))

@@ -17,6 +17,7 @@ generates this automatically from the code below).
 import asyncio
 from collections import OrderedDict
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from typing import List, Optional
@@ -410,7 +411,8 @@ def season_sim_inputs(request: Request):
         conn.close()
     if row is None:
         raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
-    return row["payload"]
+    # Player values are for the roster-change endpoint; the browser doesn't need them.
+    return {k: v for k, v in row["payload"].items() if k != "players"}
 
 
 @app.get("/playoff-odds/why")
@@ -568,6 +570,47 @@ def season_sim_path(
         lambda payload, played: season_scenarios.playoff_path(payload, team, games, played=played),
         team,
     )
+
+
+MOVE_PATTERN = r"^\d{7}:([A-Za-z]{3}|NONE)$"
+
+
+@app.get("/season-sim/roster-change")
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def season_sim_roster_change(
+    request: Request,
+    move: List[str] = Query(..., min_length=1, max_length=4, description="PLAYER_ID:TEAM, or PLAYER_ID:NONE if he's just gone"),
+):
+    """
+    "What if they traded X?": each affected team's playoff odds with and
+    without the moves, from player values in goals/game (player_values.py).
+    A player moved to NONE leaves for an unknown return (or is out for the
+    season); his minutes go to a replacement-level player.
+    """
+    for m in move:
+        if not re.match(MOVE_PATTERN, m):
+            raise HTTPException(status_code=422, detail=f"Bad move '{m}': use PLAYER_ID:TEAM or PLAYER_ID:NONE.")
+    parsed = [(int(pid), None if to.upper() == "NONE" else to.upper()) for pid, to in (m.split(":") for m in move)]
+    moves = tuple(sorted(parsed, key=lambda m: (m[0], m[1] or "")))
+    if len({pid for pid, _ in moves}) != len(moves):
+        raise HTTPException(status_code=422, detail="Each player can only move once.")
+    payload = _latest_sim_inputs()
+    key = (payload["as_of_date"], "roster", moves)
+    if key in _SCENARIO_CACHE:
+        _SCENARIO_CACHE.move_to_end(key)
+        return _SCENARIO_CACHE[key]
+    try:
+        result = season_scenarios.roster_change(payload, list(moves))
+    except season_scenarios.UnknownPlayer as exc:
+        raise HTTPException(status_code=404, detail=f"No value for player {exc} (goalie, or not on a roster).") from exc
+    except season_scenarios.UnknownTeam as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown team '{exc}'.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _SCENARIO_CACHE[key] = result
+    while len(_SCENARIO_CACHE) > _SCENARIO_CACHE_SIZE:
+        _SCENARIO_CACHE.popitem(last=False)
+    return result
 
 
 # --- Push notifications ------------------------------------------------------

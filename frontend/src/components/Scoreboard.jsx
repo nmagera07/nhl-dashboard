@@ -5,6 +5,7 @@ import { phase, sortGames, statusLabel } from "./gameStatus.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { todayISO } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
+import { nhlVideoUrl } from "../utils/highlights.js";
 
 const scoresUrl = (date) => `${API_BASE}/games/date/${date || todayISO()}`;
 
@@ -32,22 +33,32 @@ function GameCard({ game, onOpen }) {
   const decided = p === "final" && away?.score != null && home?.score != null && away.score !== home.score;
   const awayWon = decided && away.score > home.score;
   const tv = p === "upcoming" ? networks(game) : "";
+  const recap = p === "final" ? nhlVideoUrl(game.threeMinRecap) : null;
 
   return (
-    <button
-      className={`scoreboard-game game-card-${p}`}
-      type="button"
-      onClick={onOpen}
-      aria-label={`${away?.abbrev} at ${home?.abbrev}, ${statusLabel(game)}`}
-    >
-      <span className="game-card-status">
-        {p === "live" && <span className="live-dot" />}
-        {statusLabel(game)}
-        {tv && <span className="game-card-tv">{tv}</span>}
-      </span>
-      <TeamLine team={away} phase={p} isWinner={decided && awayWon} isLoser={decided && !awayWon} />
-      <TeamLine team={home} phase={p} isWinner={decided && !awayWon} isLoser={decided && awayWon} />
-    </button>
+    <div className="game-card-wrap">
+      <button
+        className={`scoreboard-game game-card-${p}`}
+        type="button"
+        onClick={onOpen}
+        aria-label={`${away?.abbrev} at ${home?.abbrev}, ${statusLabel(game)}`}
+      >
+        <span className="game-card-status">
+          {p === "live" && <span className="live-dot" />}
+          {statusLabel(game)}
+          {tv && <span className="game-card-tv">{tv}</span>}
+        </span>
+        <TeamLine team={away} phase={p} isWinner={decided && awayWon} isLoser={decided && !awayWon} />
+        <TeamLine team={home} phase={p} isWinner={decided && !awayWon} isLoser={decided && awayWon} />
+      </button>
+      {/* A sibling, not inside the button: links can't nest in buttons. */}
+      {recap && (
+        <a className="game-card-recap" href={recap} target="_blank" rel="noopener noreferrer"
+          aria-label={`Watch the ${away?.abbrev} at ${home?.abbrev} recap on NHL.com`}>
+          ▶ Recap
+        </a>
+      )}
+    </div>
   );
 }
 

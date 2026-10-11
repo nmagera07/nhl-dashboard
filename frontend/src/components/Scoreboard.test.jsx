@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Scoreboard from "./Scoreboard.jsx";
 import { sortGames, statusLabel } from "./gameStatus.js";
@@ -94,5 +94,21 @@ describe("Scoreboard", () => {
     render(<MemoryRouter><Scoreboard /></MemoryRouter>);
 
     expect(await screen.findByText("No games scheduled today.")).toBeInTheDocument();
+  });
+
+  it("coming back to Scores shows the last scores immediately, then updates", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ games: [live] }) });
+    const first = render(<MemoryRouter><Scoreboard /></MemoryRouter>);
+    await screen.findByRole("button", { name: /PIT at WSH/ });
+    first.unmount();
+
+    let resolveFresh;
+    globalThis.fetch = vi.fn().mockReturnValue(new Promise((r) => { resolveFresh = r; }));
+    render(<MemoryRouter><Scoreboard /></MemoryRouter>);
+
+    // Before the refresh lands, the previous scores are already on screen (no blank flash).
+    expect(screen.getByRole("button", { name: /PIT at WSH/ })).toBeInTheDocument();
+    resolveFresh({ ok: true, json: () => Promise.resolve({ games: [live, upcoming] }) });
+    await waitFor(() => expect(screen.getAllByRole("button", { name: / at / })).toHaveLength(2));
   });
 });

@@ -34,7 +34,7 @@ describe("DailyDigest", () => {
 
     expect(await screen.findByText("Penguins 2, Blue Jackets 3 (SO)")).toBeInTheDocument();
     expect(screen.getByText("Blue Jackets: 47% → 53%")).toBeInTheDocument();
-    expect(screen.getByText(/game of the night: blue jackets at blues, 7:00 pm et \(model: blues 50%\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/game of the night: blue jackets at blues, 7:00 pm et \(the model gives the blues a 50% chance to win\)/i)).toBeInTheDocument();
     expect(screen.getByText(/straight from the data/i)).toBeInTheDocument();
   });
 

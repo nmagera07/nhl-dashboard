@@ -719,6 +719,41 @@
 .po-in { color: #22c55e; }
 .po-out { color: var(--text-dim); }
 
+/* Track record page. */
+.record-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 var(--gutter) 12px; }
+.record-tile { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.record-tile-label { color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.record-tile-value { font-size: 28px; font-variant-numeric: tabular-nums; }
+.record-tile-detail { color: var(--text-dim); font-size: 12px; }
+.record-sample-note { margin: 0 var(--gutter) 16px; padding: 10px 14px; border-radius: 10px; background: rgba(59, 130, 246, 0.1); color: var(--text-dim); font-size: 13px; line-height: 1.45; }
+.record-intro { margin: 6px 14px 0; color: var(--text-dim); font-size: 13px; line-height: 1.45; }
+.calibration-list { display: grid; gap: 14px; margin: 0; padding: 14px; list-style: none; }
+.calibration-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 4px 12px; }
+.calibration-label { font-size: 13px; font-weight: 700; }
+.calibration-bar { position: relative; height: 12px; border-radius: 999px; background: #1c2230; }
+.calibration-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); opacity: 0.8; }
+.calibration-marker { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--text); }
+.calibration-detail { grid-column: 2; color: var(--text-dim); font-size: 12px; }
+.pick-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.pick-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto 22px; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); color: var(--text); font-size: 13px; text-decoration: none; }
+.pick-row:hover { background: rgba(255, 255, 255, 0.03); }
+.pick-date { color: var(--text-dim); font-size: 12px; }
+.pick-game { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-call { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.pick-mark { font-weight: 800; text-align: center; }
+.pick-mark-right { color: #22c55e; }
+.pick-mark-wrong { color: #ef4444; }
+.pick-mark-no-pick { color: var(--text-dim); }
+.record-how ul { margin: 0; padding: 10px 14px 14px 32px; color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+.record-how li + li { margin-top: 6px; }
+.record-how strong { color: var(--text); }
+.data-credit .accent-link, .preview-note .accent-link { color: var(--accent); }
+@media (max-width: 640px) {
+  .record-tiles { gap: 8px; }
+  .record-tile { padding: 10px; }
+  .record-tile-value { font-size: 22px; }
+}
+
 /* Playoffs page: odds chart + race table. */
 .race-controls { padding: 0 var(--gutter); margin-bottom: 16px; }
 .race-card {

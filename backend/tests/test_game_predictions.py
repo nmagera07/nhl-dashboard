@@ -98,6 +98,7 @@ class TestTrackRecord:
         ]
         record = track_record(rows)
         assert record["games"] == 4
+        assert (record["picks"], record["favorite_correct"]) == (3, 1)
         assert record["favorite_won"] == pytest.approx(1 / 3, abs=1e-4)
         assert record["brier"] == pytest.approx((0.09 + 0.36 + 0.2704 + 0.25) / 4, abs=1e-4)
         assert [b["label"] for b in record["calibration"]] == ["50-55%", "60-65%", "65%+"]

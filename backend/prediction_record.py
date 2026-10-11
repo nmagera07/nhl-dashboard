@@ -23,7 +23,7 @@ def track_record(rows: list[dict], recent: int = 20) -> dict:
     """
     graded = [r for r in rows if r.get("home_won") is not None]
     if not graded:
-        return {"games": 0, "favorite_won": None, "brier": None, "coin_flip_brier": 0.25,
+        return {"games": 0, "picks": 0, "favorite_correct": 0, "favorite_won": None, "brier": None, "coin_flip_brier": 0.25,
                 "calibration": [], "recent": []}
 
     picks = []  # (favorite's probability, favorite won)
@@ -47,6 +47,8 @@ def track_record(rows: list[dict], recent: int = 20) -> dict:
     newest = sorted(graded, key=lambda r: (str(r.get("game_date")), r.get("game_id", 0)), reverse=True)[:recent]
     return {
         "games": len(graded),
+        "picks": len(picks),  # games with a favorite (not a 50/50 call)
+        "favorite_correct": sum(won for _, won in picks),
         "favorite_won": round(sum(won for _, won in picks) / len(picks), 4) if picks else None,
         "brier": round(brier, 4),
         "coin_flip_brier": 0.25,

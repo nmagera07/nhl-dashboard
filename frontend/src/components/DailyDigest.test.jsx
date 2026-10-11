@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import DailyDigest from "./DailyDigest.jsx";
 import { todayISO, shiftDate } from "../utils/dates.js";
 
@@ -14,7 +15,10 @@ function mockDigest(digest) {
 }
 
 describe("DailyDigest", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
 
   it("shows today's AI-written digest and who wrote it", async () => {
     mockDigest({ digest_date: todayISO(), text: "**Columbus wins in a shootout.**\n### Last night\n- Blue Jackets 3, Penguins 2 (SO)", model: "Google Gemini", facts: FACTS });
@@ -40,5 +44,34 @@ describe("DailyDigest", () => {
 
     await new Promise((r) => setTimeout(r, 0));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("starts collapsed to its headline, so it doesn't push the scores down", async () => {
+    mockDigest({ digest_date: todayISO(), text: "**Columbus wins in a shootout.**\n### Last night\n- Blue Jackets 3, Penguins 2 (SO)", model: "Gemini", facts: FACTS });
+    const { container } = render(<DailyDigest />);
+
+    const details = await screen.findByText("☀️ Morning digest").then((el) => el.closest("details"));
+    expect(details).not.toHaveAttribute("open");
+    expect(container.querySelector(".daily-digest-teaser")).toHaveTextContent("Columbus wins in a shootout.");
+  });
+
+  it("remembers that it was opened today", async () => {
+    mockDigest({ digest_date: todayISO(), text: "**Headline.**", model: "Gemini", facts: FACTS });
+    const first = render(<DailyDigest />);
+    await userEvent.click(await screen.findByText("☀️ Morning digest"));
+    expect(screen.getByText("☀️ Morning digest").closest("details")).toHaveAttribute("open");
+    first.unmount();
+
+    render(<DailyDigest />);
+
+    expect((await screen.findByText("☀️ Morning digest")).closest("details")).toHaveAttribute("open");
+  });
+
+  it("uses the first result as the headline when the AI couldn't write it", async () => {
+    mockDigest({ digest_date: todayISO(), text: null, facts: { ...FACTS, last_night: [{ ...FACTS.last_night[0], line: "Blue Jackets 3, Penguins 2 (SO)" }] } });
+    const { container } = render(<DailyDigest />);
+
+    await screen.findByText("☀️ Morning digest");
+    expect(container.querySelector(".daily-digest-teaser")).toHaveTextContent("Blue Jackets 3, Penguins 2 (SO)");
   });
 });

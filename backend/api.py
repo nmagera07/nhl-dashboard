@@ -49,6 +49,7 @@ from response_models import (
 import push
 import season_scenarios
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
+from prediction_record import track_record
 from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
 
 load_dotenv()
@@ -431,6 +432,33 @@ def latest_digest():
     if row is None:
         raise HTTPException(status_code=404, detail="No digest yet.")
     return row
+
+
+@app.get("/predictions/track-record")
+def prediction_track_record():
+    """
+    How the model's game predictions have done this season: how often its
+    favorite won, its Brier score against a coin flip, calibration buckets,
+    and the most recent graded games. See game_predictions.py.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT game_id, game_date, home_abbrev, away_abbrev, home_win_prob, home_score, away_score, "
+                "ended, home_won, model_version, source FROM game_predictions "
+                "WHERE season_id = (SELECT MAX(season_id) FROM game_predictions)"
+            )
+            rows = cur.fetchall()
+            cur.execute("SELECT COUNT(*) AS n FROM game_predictions WHERE home_won IS NULL "
+                        "AND season_id = (SELECT MAX(season_id) FROM game_predictions)")
+            pending = cur.fetchone()["n"]
+    except Exception:
+        logger.error("Failed to fetch the prediction track record", exc_info=True)
+        raise
+    finally:
+        conn.close()
+    return {**track_record(rows), "pending": pending}
 
 
 # "What if" simulations (NHL Intelligence's scenario tools). A few seconds of

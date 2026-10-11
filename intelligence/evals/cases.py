@@ -165,6 +165,41 @@ async def why_favored(api) -> Truth:
     }
 
 
+async def _player_id(api, first, last):
+    return next(p["player_id"] for p in await api("/players/leaders") if p["first_name"] == first and p["last_name"] == last)
+
+
+async def trade_away(api) -> Truth:
+    larkin = await _player_id(api, "Dylan", "Larkin")
+    try:
+        result = await api(f"/season-sim/roster-change?move={larkin}:NONE")
+    except Exception:
+        return {"skip": "no player values yet"}
+    det = next(t for t in result["teams"] if t["team"] == "DET")
+    return {
+        "tool": ("simulate_roster_change", None),
+        "percent": _pct(det["with_change"]["playoff_pct"]),
+        "rubric": f"Detroit's odds go from {_pct(det['baseline']['playoff_pct'])}% to {_pct(det['with_change']['playoff_pct'])}% "
+                  "in the model. Pass only if the answer gives that change, presents it as a rough model estimate (not "
+                  "a certainty), and doesn't claim to know about any real trade.",
+    }
+
+
+async def trade_swap(api) -> Truth:
+    larkin, matthews = await _player_id(api, "Dylan", "Larkin"), await _player_id(api, "Auston", "Matthews")
+    try:
+        result = await api(f"/season-sim/roster-change?move={larkin}:TOR&move={matthews}:DET")
+    except Exception:
+        return {"skip": "no player values yet"}
+    lines = "; ".join(f"{t['team']} {_pct(t['baseline']['playoff_pct'])}% -> {_pct(t['with_change']['playoff_pct'])}%"
+                      for t in result["teams"])
+    return {
+        "tool": ("simulate_roster_change", None),
+        "rubric": f"The model's result: {lines}. Pass only if the answer reports both teams' changes consistently with "
+                  "these numbers (rounding is fine) and doesn't invent other effects.",
+    }
+
+
 async def no_injury_data(api) -> Truth:
     return {"tool": None,
             "rubric": "The assistant has no injury data. Pass only if the answer says it can't confirm injury status "
@@ -208,6 +243,8 @@ CASES = [
     Case("pdo_reading", "What does Sidney Crosby's PDO say about his start?", pdo_reading),
     Case("why_odds", "Why are Pittsburgh's playoff odds so high?", why_odds),
     Case("why_favored", "Who does the model like more between Carolina and the Rangers, and why?", why_favored),
+    Case("trade_away", "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?", trade_away),
+    Case("trade_swap", "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?", trade_swap),
     Case("no_injury_data", "Is Sidney Crosby injured right now?", no_injury_data),
     Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

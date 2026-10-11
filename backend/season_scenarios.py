@@ -31,7 +31,7 @@ def _next_games(payload, team, n, played=frozenset()):
     return found[:n]
 
 
-def _simulate(payload, trials, seed, team, window, forced=None):
+def _simulate(payload, trials, seed, team, window, forced=None, shift=None, track=None):
     """
     Plays out the season `trials` times and returns `team`'s playoff odds
     and average final points. `window` is the team's next games.
@@ -40,7 +40,11 @@ def _simulate(payload, trials, seed, team, window, forced=None):
     random numbers whether forced or not, so a scenario and its baseline
     with the same seed differ only because of the forced results -- the
     comparison isn't drowned in simulation noise.
+    `shift` = {team: goals/game} moves teams' ratings (a roster change);
+    with `track` (a list of teams), returns results for each of them.
     """
+    shift = shift or {}
+    tracked = track or [team]
     model, teams, games = payload["model"], payload["teams"], payload["games"]
     home_edge, scale = model["home_edge"], model["scale"]
     ot_p, so_share = model["ot_probability"], model["shootout_share_of_ot"]
@@ -50,10 +54,10 @@ def _simulate(payload, trials, seed, team, window, forced=None):
         conferences[abbrev] = t["conference"]
 
     rng, shuffle_rng = random.Random(seed), random.Random(seed + 1)
-    made = points = 0
+    made, points = defaultdict(int), defaultdict(int)
 
     for _ in range(trials):
-        strength = {a: rng.gauss(t["rating"], t["rating_sd"]) for a, t in teams.items()}
+        strength = {a: rng.gauss(t["rating"], t["rating_sd"]) + shift.get(a, 0.0) for a, t in teams.items()}
         rec = {a: {"points": t["points"], "wins": t["wins"], "regulation_wins": t["regulation_wins"], "row": t["row"]}
                for a, t in teams.items()}
         outcomes = None
@@ -87,11 +91,13 @@ def _simulate(payload, trials, seed, team, window, forced=None):
                 rec[winner]["regulation_wins"] += 1
                 rec[winner]["row"] += 1
 
-        in_playoffs = team in sim.determine_playoff_teams(rec, divisions, conferences)
-        made += in_playoffs
-        points += rec[team]["points"]
+        in_playoffs = sim.determine_playoff_teams(rec, divisions, conferences)
+        for t in tracked:
+            made[t] += t in in_playoffs
+            points[t] += rec[t]["points"]
 
-    return {"playoff_pct": made / trials, "avg_points": points / trials}
+    results = {t: {"playoff_pct": made[t] / trials, "avg_points": points[t] / trials} for t in tracked}
+    return results if track else results[team]
 
 
 def _check_team(payload, team):
@@ -151,4 +157,50 @@ def playoff_path(payload, team, games=10, trials_per_record=500, seed=11, played
         "by_record": rows,
         "note": "Losses counted as regulation losses; each overtime loss instead would add a point.",
         "trials_per_record": trials_per_record,
+    }
+
+
+class UnknownPlayer(ValueError):
+    pass
+
+
+def roster_change(payload, moves, trials=DEFAULT_TRIALS, seed=13):
+    """
+    Each team's playoff odds with and without a set of player moves, for
+    "what if they traded X?". `moves` = [(player_id, to_team or None)]:
+    None means he's gone (traded for an unknown return, or out for the
+    season) and his minutes go to a replacement-level player; a team means
+    he joins it, replacing a replacement-level player there. Values come
+    from player_values.py, in goals/game like the team ratings.
+    """
+    players = payload.get("players") or {}
+    if not players:
+        raise ValueError("Player values aren't available yet; they're computed each morning.")
+    shift, details = defaultdict(float), []
+    for player_id, to_team in moves:
+        player = players.get(str(player_id))
+        if player is None:
+            raise UnknownPlayer(str(player_id))
+        from_team = player["team"]
+        to_team = _check_team(payload, to_team) if to_team else None
+        if to_team == from_team:
+            raise ValueError(f"{player['name']} already plays for {from_team}")
+        shift[from_team] -= player["value"]
+        if to_team:
+            shift[to_team] += player["value"]
+        details.append({"player": player["name"], "position": player["pos"], "from": from_team, "to": to_team,
+                        "value_goals_per_game": player["value"], "games_this_season": player["gp"]})
+    track = sorted(t for t in shift if t in payload["teams"])
+    base = _simulate(payload, trials, seed, track[0], [], track=track)
+    after = _simulate(payload, trials, seed, track[0], [], shift=dict(shift), track=track)
+    return {
+        "as_of": payload["as_of_date"],
+        "moves": details,
+        "teams": [
+            {"team": t, "rating_change": round(shift[t], 3),
+             "baseline": {"playoff_pct": round(base[t]["playoff_pct"], 3), "avg_points": round(base[t]["avg_points"], 1)},
+             "with_change": {"playoff_pct": round(after[t]["playoff_pct"], 3), "avg_points": round(after[t]["avg_points"], 1)}}
+            for t in track
+        ],
+        "trials": trials,
     }

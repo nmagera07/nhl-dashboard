@@ -55,6 +55,8 @@ PLAYERS = [
     {"player_id": 87, "first_name": "Sidney", "last_name": "Crosby", "team_abbrev": "PIT", "position_code": "C", "points": 5, "goals": 2},
     {"player_id": 71, "first_name": "Evgeni", "last_name": "Malkin", "team_abbrev": "PIT", "position_code": "C", "points": 4, "goals": 1},
     {"player_id": 9, "first_name": "Sidney", "last_name": "Smith", "team_abbrev": "BOS", "position_code": "D", "points": 1, "goals": 0},
+    {"player_id": 8477946, "first_name": "Dylan", "last_name": "Larkin", "team_abbrev": "COL", "position_code": "C", "points": 6, "goals": 3},
+    {"player_id": 8471000, "first_name": "Tristan", "last_name": "Jarry", "team_abbrev": "PIT", "position_code": "G", "points": 0, "goals": 0},
 ]
 
 
@@ -68,6 +70,11 @@ def dashboard(seen=None):
             "/playoff-odds/history": HISTORY, "/players/leaders": PLAYERS,
             "/players/87": {"first_name": "Sidney", "last_name": "Crosby", "position_code": "C"},
         }
+        if request.url.path == "/season-sim/roster-change":
+            moves = request.url.params.get_list("move")
+            if moves[0].startswith("8471000"):
+                return httpx.Response(404, json={"detail": "No value for player 8471000 (goalie, or not on a roster)."})
+            return httpx.Response(200, json={"moves": moves, "teams": []})
         if request.url.path == "/season-sim/scenario":
             return httpx.Response(200, json=SCENARIO)
         if request.url.path == "/teams/PIT/schedule":
@@ -161,6 +168,26 @@ class TestTools:
 
     async def test_explain_odds_rejects_the_same_team_twice(self):
         assert "error" in await self.call("explain_odds", {"team": "PIT", "opponent": "Penguins"})
+
+    async def test_roster_change_with_no_destination(self):
+        result = await self.call("simulate_roster_change", {"player": "Larkin"})
+
+        assert result["moves"] == ["8477946:NONE"] and "replacement-level" in result["how_to_read"]
+
+    async def test_roster_change_trade_for_a_named_return(self):
+        result = await self.call("simulate_roster_change", {"player": "Dylan Larkin", "player_back": "Sidney Crosby"})
+
+        # Larkin goes to Crosby's team; Crosby comes to Larkin's.
+        assert result["moves"] == ["8477946:PIT", "87:COL"]
+
+    async def test_roster_change_to_a_named_team(self):
+        result = await self.call("simulate_roster_change", {"player": "Larkin", "to_team": "Penguins"})
+
+        assert result["moves"] == ["8477946:PIT"]
+
+    async def test_roster_change_errors_reach_the_model(self):
+        assert "goalie" in (await self.call("simulate_roster_change", {"player": "Jarry"}))["error"]
+        assert "multiple_matches" in await self.call("simulate_roster_change", {"player": "Sidney"})
 
     async def test_playoff_odds_history(self):
         result = await self.call("get_playoff_odds", {"team": "PIT"})

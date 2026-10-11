@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import OddsChart from "../components/OddsChart.jsx";
+import OddsWhy from "../components/OddsWhy.jsx";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import FavoriteStar from "../components/FavoriteStar.jsx";
@@ -13,6 +14,7 @@ import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups, se
 
 const CONFERENCES = ["Eastern", "Western"];
 const EMPTY_HISTORY = { season_id: null, available_seasons: [], points: [] };
+const EMPTY_WHY = { season_id: null, teams: {} };
 
 function Change({ value }) {
   if (value == null) return <span className="race-change">—</span>;
@@ -25,7 +27,7 @@ function Change({ value }) {
   );
 }
 
-function RaceRows({ label, teams, odds, highlighted, onHighlight }) {
+function RaceRows({ label, teams, odds, highlighted, onHighlight, why }) {
   const [favorite] = useFavoriteTeam();
   return (
     <>
@@ -37,42 +39,50 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight }) {
         const teamOdds = odds[row.team_abbrev];
         const selected = row.team_abbrev === highlighted;
         return (
-          <tr
-            key={row.team_abbrev}
-            className={selected ? "row-selected" : undefined}
-            onClick={() => onHighlight(selected ? null : row.team_abbrev)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onHighlight(selected ? null : row.team_abbrev);
-              }
-            }}
-            tabIndex={0}
-            aria-selected={selected}
-          >
-            <td className="col-team">
-              <span className="team-cell">
-                <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" />
-                <Link className="team-abbrev race-team-link" to={`/teams/${row.team_abbrev}`} onClick={(e) => e.stopPropagation()}>
-                  {row.team_abbrev}
-                </Link>
-                {row.team_abbrev === favorite && <FavoriteStar />}
-                {status && <span className={`race-badge race-badge-${status.tone}`} title={status.title}>{status.label}</span>}
-              </span>
-            </td>
-            <td>{row.games_played}</td>
-            <td className="col-pts">{row.points}</td>
-            <td className="race-col-pace">{Math.round((row.points / Math.max(row.games_played, 1)) * seasonGames(row.season_id))}</td>
-            <td className="race-col-odds">
-              <span className="race-odds">
-                <span className="race-odds-bar" aria-hidden="true">
-                  <span style={{ width: `${(teamOdds?.pct ?? 0) * 100}%` }} />
+          <Fragment key={row.team_abbrev}>
+            <tr
+              className={selected ? "row-selected" : undefined}
+              onClick={() => onHighlight(selected ? null : row.team_abbrev)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onHighlight(selected ? null : row.team_abbrev);
+                }
+              }}
+              tabIndex={0}
+              aria-selected={selected}
+            >
+              <td className="col-team">
+                <span className="team-cell">
+                  <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" />
+                  <Link className="team-abbrev race-team-link" to={`/teams/${row.team_abbrev}`} onClick={(e) => e.stopPropagation()}>
+                    {row.team_abbrev}
+                  </Link>
+                  {row.team_abbrev === favorite && <FavoriteStar />}
+                  {status && <span className={`race-badge race-badge-${status.tone}`} title={status.title}>{status.label}</span>}
                 </span>
-                {formatOdds(teamOdds?.pct)}
-              </span>
-            </td>
-            <td><Change value={teamOdds?.change} /></td>
-          </tr>
+              </td>
+              <td>{row.games_played}</td>
+              <td className="col-pts">{row.points}</td>
+              <td className="race-col-pace">{Math.round((row.points / Math.max(row.games_played, 1)) * seasonGames(row.season_id))}</td>
+              <td className="race-col-odds">
+                <span className="race-odds">
+                  <span className="race-odds-bar" aria-hidden="true">
+                    <span style={{ width: `${(teamOdds?.pct ?? 0) * 100}%` }} />
+                  </span>
+                  {formatOdds(teamOdds?.pct)}
+                </span>
+              </td>
+              <td><Change value={teamOdds?.change} /></td>
+            </tr>
+            {selected && why && teamOdds && (
+              <tr className="race-why-row">
+                <td colSpan={6}>
+                  <OddsWhy pct={teamOdds.pct} why={why.data.teams[row.team_abbrev]} teams={why.teamCount} status={why.status} />
+                </td>
+              </tr>
+            )}
+          </Fragment>
         );
       })}
     </>
@@ -87,8 +97,15 @@ function PlayoffsPage({ standings }) {
   const [conference, setConference] = useState("Eastern");
   const [chartSeason, setChartSeason] = useState(null); // null = the latest season with odds
   const [highlighted, setHighlighted] = useState(null);
+  // The "why these odds?" breakdown loads the first time a team is opened.
+  const [wantWhy, setWantWhy] = useState(false);
+  const highlight = (team) => {
+    setHighlighted(team);
+    if (team) setWantWhy(true);
+  };
 
   const { data: latest, status } = useFetchWithStatus(`${API_BASE}/playoff-odds/history`, { initialData: EMPTY_HISTORY });
+  const { data: whyData, status: whyStatus } = useFetchWithStatus(wantWhy ? `${API_BASE}/playoff-odds/why` : null, { initialData: EMPTY_WHY });
   const otherSeasonUrl = chartSeason && chartSeason !== latest.season_id
     ? `${API_BASE}/playoff-odds/history?season_id=${chartSeason}`
     : null;
@@ -104,6 +121,15 @@ function PlayoffsPage({ standings }) {
     [latest, currentSeason]
   );
 
+  // Same season check as the odds: no breakdown for last season's numbers.
+  const why = Object.keys(odds).length
+    ? {
+        data: whyData.season_id === currentSeason ? whyData : EMPTY_WHY,
+        status: whyStatus,
+        teamCount: standings.length,
+      }
+    : null;
+
   const confRows = useMemo(() => standings.filter((r) => r.conference === conference), [standings, conference]);
   const groups = useMemo(() => raceGroups(confRows), [confRows]);
   const chart = useMemo(
@@ -113,7 +139,7 @@ function PlayoffsPage({ standings }) {
 
   const selectConference = (c) => {
     setConference(c);
-    setHighlighted(null);
+    highlight(null);
   };
 
   const seasons = latest.available_seasons.slice(0, 2);
@@ -176,13 +202,14 @@ function PlayoffsPage({ standings }) {
             )}
           </p>
         ) : (
-          <OddsChart dates={chart.dates} series={chart.series} highlighted={highlighted} onHighlight={setHighlighted} />
+          <OddsChart dates={chart.dates} series={chart.series} highlighted={highlighted} onHighlight={highlight} />
         )}
       </section>
 
       <section className="race-card race-table-card" aria-labelledby="race-table-title">
         <div className="race-card-header">
           <h2 id="race-table-title">Where it stands</h2>
+          {why && <p className="race-hint">Tap a team to see why</p>}
         </div>
         <div className="race-table-scroll">
           <table className="standings-table race-table">
@@ -198,11 +225,11 @@ function PlayoffsPage({ standings }) {
             </thead>
             <tbody>
               {groups.divisions.map((d) => (
-                <RaceRows key={d.name} label={d.name} teams={d.teams} odds={odds} highlighted={highlighted} onHighlight={setHighlighted} />
+                <RaceRows key={d.name} label={d.name} teams={d.teams} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
               ))}
-              <RaceRows label="Wild card" teams={groups.wildcards} odds={odds} highlighted={highlighted} onHighlight={setHighlighted} />
+              <RaceRows label="Wild card" teams={groups.wildcards} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
               <tr className="race-cutline" aria-hidden="true"><td colSpan={6} /></tr>
-              <RaceRows label="Chasing" teams={groups.chasing} odds={odds} highlighted={highlighted} onHighlight={setHighlighted} />
+              <RaceRows label="Chasing" teams={groups.chasing} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
             </tbody>
           </table>
         </div>

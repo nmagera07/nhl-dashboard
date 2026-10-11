@@ -163,6 +163,28 @@ class TestSeasonSim:
         assert response.status_code == 404
 
 
+class TestPlayoffOddsWhy:
+    def test_returns_each_teams_breakdown_from_the_latest_run(self, client, db_router):
+        why = {"PIT": {"goals": 0.06, "xg": 0.0, "last_season": 0.1, "rating": 0.16}}
+        payload = {"season_id": 20262027, "as_of_date": "2026-10-11", "model": {"version": "v2.1"}, "why": why}
+        db_router.when("from season_sim_inputs", [{"payload": payload}])
+
+        response = client.get("/playoff-odds/why")
+
+        assert response.status_code == 200
+        assert response.json() == {"season_id": 20262027, "as_of_date": "2026-10-11", "model_version": "v2.1", "teams": why}
+
+    def test_an_older_run_without_a_breakdown_returns_no_teams(self, client, db_router):
+        db_router.when("from season_sim_inputs", [{"payload": {"season_id": 20262027, "as_of_date": "2026-10-11", "model": {}}}])
+
+        assert client.get("/playoff-odds/why").json()["teams"] == {}
+
+    def test_404_before_the_first_run(self, client, db_router):
+        db_router.when("from season_sim_inputs", [])
+
+        assert client.get("/playoff-odds/why").status_code == 404
+
+
 class TestPredictionTrackRecord:
     def test_scores_this_seasons_graded_predictions_and_counts_pending(self, client, db_router):
         db_router.when("WHERE home_won IS NULL", {"n": 3})

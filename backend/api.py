@@ -413,6 +413,23 @@ def season_sim_inputs(request: Request):
     return row["payload"]
 
 
+@app.get("/playoff-odds/why")
+def playoff_odds_why():
+    """
+    "Why these odds?": each team's rating split into this season's goals,
+    this season's xG, and last season's carryover (all in goals/game, adding
+    up to the rating), plus how its remaining schedule helps or hurts. From
+    the latest daily run; see simulate_playoff_odds.odds_explanations().
+    """
+    payload = _latest_sim_inputs()
+    return {
+        "season_id": payload["season_id"],
+        "as_of_date": payload["as_of_date"],
+        "model_version": payload.get("model", {}).get("version"),
+        "teams": payload.get("why", {}),
+    }
+
+
 @app.get("/digest/latest")
 def latest_digest():
     """

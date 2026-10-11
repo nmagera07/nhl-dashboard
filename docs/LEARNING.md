@@ -40,6 +40,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   puck drop with its model version and inputs, graded automatically after the final, and
   scored by favorite win rate, Brier score vs. a coin flip, and calibration, served by a
   public API.
+- Added an explanation tool to an LLM agent ("why is X favored over Y?") and used evals to find
+  how models misread tool output (flipped directions, ambiguous field names, guessed team names);
+  fixed it with pre-interpreted, self-describing results, raising the fallback model's pass rate
+  from 50% to 83%.
 - Fixed stale answers from an AI agent by moving its schedule tool from a daily snapshot to
   live data and giving the model today's date and Eastern start times.
 - Shipped a daily AI-written digest as a batch job (one LLM call a day, shared by all users),
@@ -90,6 +94,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Built a per-team "why these odds?" explanation for a Monte Carlo model: each rating split
   into additive parts (goals, xG, last season) that sum to it exactly, plus schedule strength
   in the same units, computed daily and loaded on demand behind one tap.
+- Built a trade simulator for a Monte Carlo playoff model: player values in goals/game over
+  replacement from a box-score composite calibrated against 96 team-seasons (r = 0.86), with
+  shrinkage for small samples, exposed to an LLM agent as a "what if they traded X?" tool.
 - Tested three more model ideas (adjusted xG, strength of schedule,
   goaltending) with held-out backtests and shipped none after showing the
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
@@ -125,6 +132,101 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — A trade simulator: putting a player and a team on the same scale
+
+**What I built:** PuckPulse AI can now answer "what if Detroit traded Larkin?". Each skater
+gets a value in **goals per game over a replacement-level player**. That's the same unit as
+the playoff model's team ratings, so a trade is just arithmetic: the team losing the player
+drops by his value, the team getting him gains it, and the season simulation re-runs both
+ways. A new agent tool (`simulate_roster_change`) handles:
+- "traded for an unknown return" (his minutes go to a replacement-level player)
+- "traded to Toronto"
+- "Larkin for Matthews"
+- "out for the season"
+
+**First numbers (2026-10-11):**
+- Larkin gone: Detroit drops from 38% to 29%.
+- McDavid to Detroit: Detroit goes from 38% to 60%, and Edmonton drops from 83% to 67%.
+- Larkin for Matthews: about a wash.
+
+**The dead end first:** I started with *relative 5-on-5 xG* (on-ice minus off-ice expected
+goal differential). It's a respected stat, but used alone it rated Crosby, Makar and Larkin
+*below average* and put third-pair defensemen in the league's top 12. It misses finishing,
+the power play, and deployment (stars play against other stars). I caught it with an eye test
+on known players before building anything.
+
+**What worked:** Game Score, a public box-score composite (goals, assists, shots, blocks,
+penalties, faceoffs, on-ice shots and goals), then:
+- **Calibrated to our units:** across 96 team-seasons, team Game Score per game predicts goal
+  differential per game at r = 0.86, and the slope (0.194) converts Game Score to goals.
+- **Replacement level from data:** the Game Score of fringe players (5–29 games), separately
+  for forwards and defensemen.
+- **Shrinkage:** this season and last are blended and pulled toward replacement level by 10
+  pseudo-games, so a hot week doesn't create a star (the same idea as the team ratings).
+- The result passes the eye test (MacKinnon +0.29, McDavid +0.27, Larkin +0.12) and matches
+  the scale of public WAR models (roughly 20–25 goals a season for the very best).
+
+**Limits I put in the tool's own output:** skaters only (no goalies), line-mates and team
+quality leak into on-ice numbers, an incoming player is assumed to replace a replacement-level
+one, and it ignores chemistry and the salary cap. The AI is told to call it a rough estimate.
+
+**What I learned:**
+- A model gets much easier to extend when everything shares one unit. Picking "goals/game" for
+  team ratings months ago is what made player values plug in cleanly.
+- Sanity-check a metric against things you already know before you build on it. A respected
+  stat can still be the wrong tool for a specific question.
+- Calibrate borrowed formulas to your own target instead of trusting their scale.
+
+**Interview angle:** "How would you estimate the impact of a trade?" Put players and teams in
+the same unit (goals over replacement), calibrate that against real team results, shrink small
+samples, re-run the simulation, and be upfront about what it ignores.
+
+---
+
+## 2026-10-11 — PuckPulse AI learns "why": shaping tool output so models can't misread it
+
+**What I built:** A new agent tool, `explain_odds`, so PuckPulse AI can answer "why are
+Pittsburgh's odds so high?" and "why is Carolina favored over the Rangers?". It returns the
+same breakdown as the Playoffs page (goals, xG, last season, schedule). With two teams, it
+also compares them and gives the model's win probability for their next meeting. Two new
+eval cases check these answers against live data.
+
+**What the evals caught**, even though the first version picked the right tool and the
+right team every time:
+- **A backwards read.** One model said PIT's +5 goals on even xG meant "the scoring isn't a
+  fluke." It means the opposite: scoring above your chances usually cools off.
+- **Misread fields.** `easiest_rank: 16 of 32` became "the easiest schedule in the league."
+  `per_game: 0.799` became "0.799 points per game." `share_of_rating_pct: 83` became "last
+  season is most of the reason," when it's actually how much the model *trusts* last season,
+  not how much it *moves* the rating.
+- **Wrong team names.** With only abbreviations, Groq called the Penguins "the Panthers" and
+  the Sabres.
+- **Truncation.** A table-heavy answer hit the token cap mid-sentence.
+
+**The fixes were all in the tool's output, not the prompt:**
+- Every factor carries a spelled-out `push` ("pushes up" / "pulls down" / "negligible"), so
+  the model never has to interpret a sign or decide what's small.
+- The goals-vs-xG reading is computed in code and stated in a sentence.
+- Fields describe themselves: `rank: "16th easiest of 32"`, `xg_diff_per_game`,
+  `weight_vs_this_season_pct`, and full team names.
+- One instruction line: answer in 3 to 5 bullets, no tables.
+
+Groq went from 1 of 2 to 5 of 6 passing runs, and Gemini passed every run.
+
+**What I learned:**
+- Tool output is a user interface whose user is a language model. Ambiguous field names get
+  misread the same way a confusing UI label does.
+- Do interpretation in code wherever you can (directions, thresholds, what a gap means). The
+  model's job is the wording.
+- An LLM judge is only as good as its rubric. Twice it failed correct answers because the
+  rubric didn't say a point was allowed. Read the failing answers before "fixing" anything.
+
+**Interview angle:** "How do you reduce hallucination in a tool-using agent?" Make the tools
+return pre-interpreted, self-describing facts, then measure with evals that read the
+answers, not just the tool calls.
 
 ---
 

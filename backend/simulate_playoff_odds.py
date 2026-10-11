@@ -460,15 +460,17 @@ def simulate(standings, schedule, trials, ratings, rng=random):
     return {team: made_playoffs[team] / trials for team in standings}
 
 
-def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None):
+def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, players=None):
     """
     Everything the in-browser season simulator needs to play out the rest
     of the season exactly like simulate() does: the game model's constants,
     each team's record and strength rating, and the remaining schedule.
-    `why` (odds_explanations()) rides along for GET /playoff-odds/why.
+    `why` (odds_explanations()) rides along for GET /playoff-odds/why, and
+    `players` (player_values.player_values()) for roster-change scenarios.
     """
     return {
         "why": why or {},
+        "players": {str(pid): v for pid, v in (players or {}).items()},
         "season_id": season_id,
         "as_of_date": str(as_of_date),
         "model": {
@@ -495,6 +497,36 @@ def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None):
         },
         "games": [[g["date"], g["home"], g["away"]] for g in remaining_games(games, as_of_date)],
     }
+
+
+def load_rosters():
+    """{player_id: team} for skaters on an NHL roster now (from the players table)."""
+    with psycopg2.connect(DATABASE_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT player_id, team_abbrev FROM players WHERE on_roster AND position_code <> 'G'")
+            return dict(cur.fetchall())
+
+
+def compute_player_values(season_id):
+    """
+    Skater values for roster-change scenarios. Best effort: the odds don't
+    depend on them, so a MoneyPuck or roster hiccup only costs the trade
+    simulator a day.
+    """
+    import player_values as pv
+
+    start = season_id // 10000
+    try:
+        values = pv.player_values(
+            pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start)),
+            pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 1)),
+            rosters=load_rosters(),
+        )
+    except Exception as exc:  # network, parse, or DB
+        logger.warning(f"Couldn't compute player values ({exc}); roster-change scenarios unavailable today")
+        return {}
+    logger.info(f"Player values for {len(values)} skaters")
+    return values
 
 
 def save_sim_inputs(payload):
@@ -582,7 +614,8 @@ def main():
     if not args.no_save:
         save_odds(odds, args.season, args.as_of, args.trials)
         why = odds_explanations(ratings, parts, games, args.as_of)
-        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why))
+        players = compute_player_values(args.season)
+        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why, players=players))
 
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
         mean, _ = ratings[team]

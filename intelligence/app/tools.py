@@ -12,7 +12,10 @@ import asyncio
 import inspect
 import json
 import logging
+import math
 from typing import Any
+
+import httpx
 
 from . import compact
 from .dashboard import DashboardClient, DashboardUnavailable
@@ -44,6 +47,13 @@ TOOLS = [
     _fn("get_schedule", "A team's next games, each opponent's strength rank (1 = strongest), and games left.",
         {"team": TEAM, "games": {"type": "integer", "minimum": 1, "maximum": 20, "description": "How many upcoming games. Default 5."}},
         ["team"]),
+    _fn("explain_odds",
+        "Why the playoff-odds model rates a team the way it does: its rating split into this season's goals, this season's "
+        "expected goals (xG), and last season's carryover, plus how its remaining schedule helps or hurts. With an opponent, "
+        "also compares the two and gives the model's win probability for their next meeting. Use for any 'why are their odds "
+        "X', 'why is the model high/low on them', or 'why is X favored over Y' question.",
+        {"team": TEAM, "opponent": {"type": "string", "description": "Optional second team to compare, e.g. NYR."}},
+        ["team"]),
     _fn("rank_schedule_strength", "Every team ranked from easiest to hardest remaining schedule, by average opponent strength.",
         {"conference": {"type": "string", "enum": ["Eastern", "Western"], "description": "Optional: only one conference."}}),
     _fn("simulate_scenario",
@@ -54,6 +64,14 @@ TOOLS = [
          "wins": {"type": "integer", "minimum": 0, "maximum": 30},
          "ot_losses": {"type": "integer", "minimum": 0, "maximum": 30, "description": "Losses in overtime/shootout (still a point). Default 0."}},
         ["team", "games", "wins"]),
+    _fn("simulate_roster_change",
+        "Simulate a hypothetical trade or a player missing the rest of the season with the playoff-odds model: each "
+        "affected team's playoff odds with and without the move, from the player's value in goals/game. Use for "
+        "'what if they traded X', 'what if X goes to Y', 'X for Y', or 'what if X is out for the season'. Skaters only.",
+        {"player": {"type": "string", "description": "The player who moves, e.g. 'Dylan Larkin'."},
+         "to_team": {"type": "string", "description": "Optional team he goes to. Leave out if unknown or he's just out."},
+         "player_back": {"type": "string", "description": "Optional player coming back in the trade (he joins the first player's team)."}},
+        ["player"]),
     _fn("playoff_path",
         "What a team needs: its playoff odds for every possible record over its next games (e.g. 0-10 up to 10-0), from the model.",
         {"team": TEAM, "games": {"type": "integer", "minimum": 1, "maximum": 15, "description": "Default 10."}},
@@ -79,8 +97,10 @@ LABELS = {
     "get_team": ("Looking up the team", "Team season and roster"),
     "get_playoff_odds": ("Checking playoff odds history", "Playoff odds history"),
     "get_schedule": ("Checking the schedule", "Remaining schedule"),
+    "explain_odds": ("Breaking down the odds", "Playoff-odds model breakdown"),
     "rank_schedule_strength": ("Ranking remaining schedules", "Strength of remaining schedules"),
     "simulate_scenario": ("Simulating 2,000 seasons", "Season simulation (playoff-odds model)"),
+    "simulate_roster_change": ("Simulating the trade", "Season simulation with the roster change (playoff-odds model)"),
     "playoff_path": ("Simulating every record", "Season simulation (playoff-odds model)"),
     "get_recent_results": ("Checking recent results", "Recent results"),
     "get_game": ("Pulling up the box score", "NHL game box score"),
@@ -215,6 +235,56 @@ class ToolRunner:
             "strength_rank_note": "1 = strongest team by the playoff-odds model's rating.",
         })
 
+    async def _tool_explain_odds(self, team: str, opponent: str | None = None):
+        abbrev = await self._team(team)
+        opp = await self._team(opponent) if opponent else None
+        if opp == abbrev:
+            raise ToolError("Pick two different teams to compare.")
+        standings, odds, why = await asyncio.gather(self._standings(), self._get("/playoff-odds"), self._get("/playoff-odds/why"))
+        teams = why.get("teams") or {}
+        if abbrev not in teams or (opp and opp not in teams):
+            return {"error": "The odds breakdown isn't available yet; it's computed each morning."}
+        pct, _ = compact.odds_by_team(standings, odds)
+        names = {r["team_abbrev"]: r.get("team_name") for r in standings}
+        result = {
+            "as_of": why.get("as_of_date"),
+            "teams": [_breakdown(t, names.get(t), teams[t], pct.get(t), len(teams)) for t in (abbrev, opp) if t],
+            "how_to_read": "Rating = goals + xg + last_season (goals/game vs. an average team). 'push' says which way each "
+                           "factor moves the rating; use it as given, and say 'negligible' factors barely matter. Compare factors by "
+                           "'effect', not weight: last_season.weight_vs_this_season_pct is how much the model still trusts "
+                           "last season over this season's few games (it fades as games are played). Playoff "
+                           "odds also depend on points already banked, not just the rating.",
+        }
+        if opp:
+            result["matchup"] = await self._matchup(abbrev, opp)
+        return compact._clean(result)
+
+    async def _matchup(self, team: str, opp: str) -> dict:
+        """The two teams' next meeting with the model's win probability."""
+        inputs, schedule = await asyncio.gather(self._sim_inputs(), self._get(f"/teams/{team}/schedule"))
+        upcoming = schedule.get("upcoming", [])
+        game = next((g for g in upcoming if g["opponent"] == opp), None)
+        if game:
+            date, home = game["date"], team if game["home"] else opp
+        else:
+            # Beyond the live feed's window: the model's remaining schedule.
+            after = upcoming[-1]["date"] if upcoming else inputs.get("as_of_date", "")
+            later = next((g for g in inputs.get("games", []) if g[0] > after and {g[1], g[2]} == {team, opp}), None)
+            date, home = (later[0], later[1]) if later else (None, None)
+        ratings = {t: inputs["teams"][t]["rating"] for t in (team, opp) if t in inputs.get("teams", {})}
+        out = {"rating_gap": round(ratings[team] - ratings[opp], 3) if len(ratings) == 2 else None}
+        if date and len(ratings) == 2:
+            model = inputs.get("model", {})
+            away = opp if home == team else team
+            p_home = 1 / (1 + math.exp(-(ratings[home] - ratings[away] + model.get("home_edge", 0.264)) / model.get("scale", 1.47)))
+            p_team = p_home if home == team else 1 - p_home
+            out["next_meeting"] = {
+                "date": date, "home_team": home,
+                f"{team}_win_pct": round(p_team * 100, 1), f"{opp}_win_pct": round((1 - p_team) * 100, 1),
+                "note": f"{home} is at home (worth about 0.26 goals/game). Single games are close to coin flips.",
+            }
+        return compact._clean(out)
+
     async def _tool_rank_schedule_strength(self, conference: str | None = None):
         inputs = await self._sim_inputs()
         teams = inputs["teams"]
@@ -283,26 +353,118 @@ class ToolRunner:
             game_id = match["id"]
         return compact.game_facts(await self._get(f"/games/{game_id}/boxscore"))
 
-    async def _tool_find_player(self, name: str):
+    async def _match_players(self, name: str) -> list[dict]:
         query = (name or "").strip().lower()
         if len(query) < 2:
             raise ToolError("Give at least part of the player's name.")
         players = await self._get("/players/leaders")
-        matches = [p for p in players if query in f"{p.get('first_name', '')} {p.get('last_name', '')}".lower()]
+        full = lambda p: f"{p.get('first_name', '')} {p.get('last_name', '')}".lower()  # noqa: E731
+        matches = [p for p in players if query in full(p)]
         if not matches:
             raise ToolError(f"No current player matches '{name}'.")
-        if len(matches) > 1 and not any(query == f"{p['first_name']} {p['last_name']}".lower() for p in matches):
-            exact_last = [p for p in matches if (p.get("last_name") or "").lower() == query]
-            matches = exact_last or matches
+        exact = [p for p in matches if full(p) == query] or [p for p in matches if (p.get("last_name") or "").lower() == query]
+        return exact or matches
+
+    @staticmethod
+    def _ambiguous(matches: list[dict]) -> dict:
+        return {"multiple_matches": [compact._name(p) + f" ({p.get('team_abbrev')})" for p in matches[:8]],
+                "hint": "Ask again with the full name."}
+
+    async def _tool_find_player(self, name: str):
+        matches = await self._match_players(name)
         if len(matches) > 1:
-            return {"multiple_matches": [compact._name(p) + f" ({p.get('team_abbrev')})" for p in matches[:8]],
-                    "hint": "Ask again with the full name."}
+            return self._ambiguous(matches)
         player = await self._get(f"/players/{matches[0]['player_id']}")
         return compact.player_facts(player)
+
+    async def _tool_simulate_roster_change(self, player: str, to_team: str | None = None, player_back: str | None = None):
+        out = await self._match_players(player)
+        if len(out) > 1:
+            return self._ambiguous(out)
+        out = out[0]
+        back = None
+        if player_back:
+            back = await self._match_players(player_back)
+            if len(back) > 1:
+                return self._ambiguous(back)
+            back = back[0]
+        to = await self._team(to_team) if to_team else (back["team_abbrev"] if back else None)
+        moves = [f"{out['player_id']}:{to or 'NONE'}"]
+        if back:
+            moves.append(f"{back['player_id']}:{out['team_abbrev']}")
+        try:
+            result = await self.dashboard._get("/season-sim/roster-change?" + "&".join(f"move={m}" for m in moves))
+        except DashboardUnavailable as exc:
+            cause = exc.__cause__
+            if isinstance(cause, httpx.HTTPStatusError) and cause.response.status_code < 500:
+                # The API's reason: a goalie, same team, or values not computed yet.
+                raise ToolError(cause.response.json().get("detail", "That move can't be simulated.")) from exc
+            raise
+        return {
+            **result,
+            "how_to_read": "value_goals_per_game = the player's worth over a replacement-level player, in the same "
+                           "goals/game units as team ratings (about 0.3 for the very best skaters). Compare each team's "
+                           "with_change to its own baseline. With no destination or return, his minutes go to a "
+                           "replacement-level player; a player who arrives is assumed to replace one. It's the rest "
+                           "of the season, a rough estimate that ignores line chemistry and the salary cap: say so.",
+        }
 
     async def _tool_get_leaders(self, category: str | None = None):
         leaders = compact.leaders(await self._get("/players/leaders"))
         return {category: leaders[category]} if category in leaders else leaders
+
+
+NEGLIGIBLE = 0.03  # goals/game; matches the app's "little effect"
+
+
+def _push(effect: float | None) -> str | None:
+    """Spelled out, so the model can't flip a sign or oversell a rounding error."""
+    if effect is None:
+        return None
+    if abs(effect) < NEGLIGIBLE:
+        return "negligible"
+    return "pushes up" if effect > 0 else "pulls down"
+
+
+def _finishing(w: dict) -> str | None:
+    """Goals vs. xG: the read models (and fans) care about most."""
+    gd, xgd, gp = w.get("goal_diff"), w.get("xg_diff"), w.get("games_played") or 0
+    if xgd is None or not gp:
+        return None
+    gap = (gd - xgd) / gp
+    if gap > 0.4:
+        return "Scoring well above its chance quality (goals > xG): finishing or goaltending running hot, which usually cools off."
+    if gap < -0.4:
+        return "Scoring well below its chance quality (goals < xG): finishing or goaltending running cold, which usually improves."
+    return "Goals and xG roughly agree: results match the chances."
+
+
+def _breakdown(team: str, name: str | None, w: dict, playoff_pct: float | None, league_size: int) -> dict:
+    """One team's "why these odds?" in the shape the model reads best."""
+    sched = w.get("schedule") or {}
+    return compact._clean({
+        "team": team,
+        "name": name,
+        "playoff_pct": round(playoff_pct * 100, 1) if playoff_pct is not None else None,
+        "rating": w.get("rating"),
+        "rating_rank": f"{w.get('rating_rank')} of {league_size}",
+        "goals": {"goal_diff": w.get("goal_diff"), "games_played": w.get("games_played"), "effect": w.get("goals"),
+                  "push": _push(w.get("goals"))},
+        "xg": {"xg_diff": w.get("xg_diff"), "effect": w.get("xg"), "push": _push(w.get("xg"))} if w.get("xg") is not None else None,
+        "goals_vs_xg": _finishing(w),
+        "last_season": {("xg_diff_per_game" if w.get("xg") is not None else "goal_diff_per_game"): w.get("last_season_per_game"),
+                        "weight_vs_this_season_pct": round((w.get("last_season_share") or 0) * 100),
+                        "effect": w.get("last_season"), "push": _push(w.get("last_season"))},
+        "schedule": {"games_left": sched.get("games_left"), "rank": f"{_ordinal(sched.get('rank'))} easiest of {league_size}",
+                     "effect": sched.get("effect"), "push": _push(sched.get("effect"))} if sched.get("games_left") else None,
+    })
+
+
+def _ordinal(n: int | None) -> str | None:
+    if n is None:
+        return None
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
 
 
 def _eastern_time(utc_iso: str | None) -> str | None:

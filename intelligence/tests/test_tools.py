@@ -25,6 +25,7 @@ STANDINGS = [
 ]
 SIM_INPUTS = {
     "as_of_date": "2026-10-10",
+    "model": {"home_edge": 0.264, "scale": 1.47},
     "teams": {"PIT": {"rating": 0.2, "conference": "Eastern"}, "COL": {"rating": 0.6, "conference": "Western"},
               "CBJ": {"rating": -0.4, "conference": "Eastern"}},
     "games": [["2026-10-11", "PIT", "COL"], ["2026-10-12", "CBJ", "PIT"], ["2026-10-13", "COL", "CBJ"]],
@@ -42,10 +43,20 @@ TEAM_SCHEDULE = {"team": "PIT", "live": None, "regular_season_games_left": 79, "
     {"id": 68, "date": "2026-10-09", "opponent": "CBJ", "home": False, "team_score": 2, "opponent_score": 3, "result": "OTL", "last_period_type": "SO"},
     {"id": 53, "date": "2026-10-07", "opponent": "WSH", "home": False, "team_score": 3, "opponent_score": 5, "result": "L", "last_period_type": "REG"},
 ]}
+WHY_TEAM = lambda rating, rank: {  # noqa: E731
+    "games_played": 5, "goal_diff": 4, "xg_diff": 0.2, "goals": 0.057, "xg": 0.003, "last_season": rating - 0.06,
+    "last_season_per_game": 0.3, "last_season_share": 0.857, "rating": rating, "rating_rank": rank,
+    "schedule": {"games_left": 79, "home_games": 40, "effect": 0.01, "rank": 12},
+}
+WHY = {"season_id": 20262027, "as_of_date": "2026-10-10", "teams": {"PIT": WHY_TEAM(0.2, 9), "COL": WHY_TEAM(0.6, 1), "CBJ": WHY_TEAM(-0.4, 30)}}
+ODDS = [{"season_id": 20262027, "as_of_date": "2026-10-10", "team_abbrev": "PIT", "playoff_pct": 0.61},
+        {"season_id": 20262027, "as_of_date": "2026-10-10", "team_abbrev": "COL", "playoff_pct": 0.93}]
 PLAYERS = [
     {"player_id": 87, "first_name": "Sidney", "last_name": "Crosby", "team_abbrev": "PIT", "position_code": "C", "points": 5, "goals": 2},
     {"player_id": 71, "first_name": "Evgeni", "last_name": "Malkin", "team_abbrev": "PIT", "position_code": "C", "points": 4, "goals": 1},
     {"player_id": 9, "first_name": "Sidney", "last_name": "Smith", "team_abbrev": "BOS", "position_code": "D", "points": 1, "goals": 0},
+    {"player_id": 8477946, "first_name": "Dylan", "last_name": "Larkin", "team_abbrev": "COL", "position_code": "C", "points": 6, "goals": 3},
+    {"player_id": 8471000, "first_name": "Tristan", "last_name": "Jarry", "team_abbrev": "PIT", "position_code": "G", "points": 0, "goals": 0},
 ]
 
 
@@ -55,10 +66,15 @@ def dashboard(seen=None):
         if seen is not None:
             seen.append(path)
         routes = {
-            "/standings/latest": STANDINGS, "/playoff-odds": [], "/season-sim": SIM_INPUTS,
+            "/standings/latest": STANDINGS, "/playoff-odds": ODDS, "/season-sim": SIM_INPUTS, "/playoff-odds/why": WHY,
             "/playoff-odds/history": HISTORY, "/players/leaders": PLAYERS,
             "/players/87": {"first_name": "Sidney", "last_name": "Crosby", "position_code": "C"},
         }
+        if request.url.path == "/season-sim/roster-change":
+            moves = request.url.params.get_list("move")
+            if moves[0].startswith("8471000"):
+                return httpx.Response(404, json={"detail": "No value for player 8471000 (goalie, or not on a roster)."})
+            return httpx.Response(200, json={"moves": moves, "teams": []})
         if request.url.path == "/season-sim/scenario":
             return httpx.Response(200, json=SCENARIO)
         if request.url.path == "/teams/PIT/schedule":
@@ -119,6 +135,59 @@ class TestTools:
         result = await self.call("rank_schedule_strength", {})
         # PIT faces COL (0.6) and CBJ (-0.4): 0.1. CBJ faces PIT and COL: 0.4. COL faces PIT and CBJ: -0.1.
         assert [r["team"] for r in result["easiest_first"]] == ["COL", "PIT", "CBJ"]
+
+    async def test_explain_odds_breaks_down_one_team(self):
+        result = await self.call("explain_odds", {"team": "Penguins"})
+
+        pit = result["teams"][0]
+        assert pit["team"] == "PIT" and pit["name"] == "Pittsburgh Penguins" and pit["playoff_pct"] == 61.0 and pit["rating_rank"] == "9 of 3"
+        assert pit["goals"] == {"goal_diff": 4, "games_played": 5, "effect": 0.057, "push": "pushes up"}
+        assert pit["xg"]["push"] == "negligible" and pit["schedule"]["push"] == "negligible"
+        assert pit["schedule"]["rank"] == "12th easiest of 3" and pit["last_season"]["xg_diff_per_game"] == 0.3
+        assert "above its chance quality" in pit["goals_vs_xg"]  # +4 goals on +0.2 xG in 5 games
+        assert pit["last_season"]["weight_vs_this_season_pct"] == 86
+        assert "matchup" not in result and "negligible" in result["how_to_read"]
+
+    async def test_explain_odds_compares_two_teams_and_their_next_meeting(self):
+        result = await self.call("explain_odds", {"team": "PIT", "opponent": "COL"})
+
+        assert [t["team"] for t in result["teams"]] == ["PIT", "COL"]
+        meeting = result["matchup"]["next_meeting"]
+        # The live schedule has PIT hosting COL on 10-10: (0.2 - 0.6 + 0.264) / 1.47 -> 47.7%.
+        assert meeting["date"] == "2026-10-10" and meeting["home_team"] == "PIT"
+        assert meeting["PIT_win_pct"] == 47.7 and meeting["COL_win_pct"] == 52.3
+        assert result["matchup"]["rating_gap"] == -0.4
+
+    async def test_explain_odds_finds_a_later_meeting_in_the_models_schedule(self):
+        # No live schedule for COL in the fake, so it falls back to the model's.
+        result = await self.call("explain_odds", {"team": "COL", "opponent": "CBJ"})
+
+        meeting = result["matchup"]["next_meeting"]
+        assert meeting["date"] == "2026-10-13" and meeting["home_team"] == "COL"
+        assert meeting["COL_win_pct"] > 70
+
+    async def test_explain_odds_rejects_the_same_team_twice(self):
+        assert "error" in await self.call("explain_odds", {"team": "PIT", "opponent": "Penguins"})
+
+    async def test_roster_change_with_no_destination(self):
+        result = await self.call("simulate_roster_change", {"player": "Larkin"})
+
+        assert result["moves"] == ["8477946:NONE"] and "replacement-level" in result["how_to_read"]
+
+    async def test_roster_change_trade_for_a_named_return(self):
+        result = await self.call("simulate_roster_change", {"player": "Dylan Larkin", "player_back": "Sidney Crosby"})
+
+        # Larkin goes to Crosby's team; Crosby comes to Larkin's.
+        assert result["moves"] == ["8477946:PIT", "87:COL"]
+
+    async def test_roster_change_to_a_named_team(self):
+        result = await self.call("simulate_roster_change", {"player": "Larkin", "to_team": "Penguins"})
+
+        assert result["moves"] == ["8477946:PIT"]
+
+    async def test_roster_change_errors_reach_the_model(self):
+        assert "goalie" in (await self.call("simulate_roster_change", {"player": "Jarry"}))["error"]
+        assert "multiple_matches" in await self.call("simulate_roster_change", {"player": "Sidney"})
 
     async def test_playoff_odds_history(self):
         result = await self.call("get_playoff_odds", {"team": "PIT"})

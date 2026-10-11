@@ -82,4 +82,4 @@ def test_lines_spell_out_names_winner_first():
 
     assert finals[0]["line"] == "Blue Jackets 3, Penguins 2 (SO)"
     assert movers["falling"][0]["line"] == "Jets: 54% to 44%"
-    assert featured["line"] == "Blue Jackets at Blues, 7:00 PM ET; the model gives the Blues 50%"
+    assert featured["line"] == "Blue Jackets at Blues, 7:00 PM ET; the model gives the Blues a 50% chance to win"

@@ -16,7 +16,7 @@ export function factsAsMarkdown(facts) {
   const game = facts.game_of_the_night;
   if (game) {
     lines.push("### Tonight");
-    lines.push(`- Game of the night: ${name(game.away)} at ${name(game.home)}, ${game.time} (model: ${name(game.home)} ${game.model_home_win_pct}%)`);
+    lines.push(`- Game of the night: ${name(game.away)} at ${name(game.home)}, ${game.time} (the model gives the ${name(game.home)} a ${game.model_home_win_pct}% chance to win)`);
   }
   return lines.join("\n");
 }

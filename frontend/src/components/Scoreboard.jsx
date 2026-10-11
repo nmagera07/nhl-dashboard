@@ -4,6 +4,9 @@ import { API_BASE } from "../config.js";
 import { phase, sortGames, statusLabel } from "./gameStatus.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { todayISO } from "../utils/dates.js";
+import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
+
+const scoresUrl = (date) => `${API_BASE}/games/date/${date || todayISO()}`;
 
 function networks(game) {
   const names = (game.tvBroadcasts || []).filter((b) => b.market === "N").map((b) => b.network);
@@ -56,22 +59,28 @@ function GameCard({ game, onOpen }) {
 export default function Scoreboard({ date = null }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [games, setGames] = useState([]);
-  const [status, setStatus] = useState("loading");
+  // Coming back from a box score: show the scores we just had, then refresh.
+  const [games, setGames] = useState(() => cachedResponse(scoresUrl(date)) ?? []);
+  const [status, setStatus] = useState(() => (cachedResponse(scoresUrl(date)) ? "ready" : "loading"));
   useEffect(() => {
     let active = true;
     // Re-read "today" on each refresh, so a page left open past midnight moves on.
-    const load = () => fetch(`${API_BASE}/games/date/${date || todayISO()}`)
-      .then((response) => {
-        if (!response.ok) throw new Error("scoreboard unavailable");
-        return response.json();
-      })
-      .then((data) => {
-        if (!active) return;
-        setGames(Array.isArray(data.games) ? data.games : []);
-        setStatus("ready");
-      })
-      .catch(() => active && setStatus("error"));
+    const load = () => {
+      const url = scoresUrl(date);
+      return fetch(url)
+        .then((response) => {
+          if (!response.ok) throw new Error("scoreboard unavailable");
+          return response.json();
+        })
+        .then((data) => {
+          if (!active) return;
+          const fresh = Array.isArray(data.games) ? data.games : [];
+          rememberResponse(url, fresh);
+          setGames(fresh);
+          setStatus("ready");
+        })
+        .catch(() => active && setStatus("error"));
+    };
     load();
     const timer = date ? null : window.setInterval(load, 60_000);
     return () => { active = false; if (timer) window.clearInterval(timer); };

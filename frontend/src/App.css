@@ -313,6 +313,7 @@
 .game-team-logo { width: 64px; height: 64px; object-fit: contain; }
 .game-team-abbrev { font-size: 20px; font-weight: 700; }
 .game-team-name { max-width: 100%; overflow: hidden; color: var(--text-dim); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.game-team-record { color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
 .game-score { display: flex; align-items: center; gap: 12px; font-size: clamp(36px, 7vw, 52px); font-variant-numeric: tabular-nums; }
 .game-score strong { font-weight: 800; }
 .game-score-separator { color: var(--text-dim); font-size: 0.6em; }
@@ -1049,6 +1050,28 @@ a.my-team-game:hover { border-color: #2c3a58; }
 .app-footer { margin: 32px var(--gutter) 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
 .app-footer a { color: var(--text-dim); }
 
+/* Game preview (before puck drop). */
+.preview-odds-teams { display: flex; justify-content: space-between; font-size: 14px; }
+.preview-odds-teams strong { font-size: 20px; }
+.preview-odds-bar { height: 8px; margin: 8px 0 4px; border-radius: 4px; background: var(--accent); overflow: hidden; }
+.preview-odds-bar span { display: block; height: 100%; background: var(--text-dim); }
+.preview-note { margin: 10px 0 0; color: var(--text-dim); font-size: 11px; line-height: 1.45; }
+.preview-better { color: #4ade80; font-weight: 700; }
+/* Text values (division, players, goalies) need wider side columns than numbers. */
+.preview-compare .team-stats-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.preview-compare .team-stats-label { text-align: center; color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.preview-form { display: grid; gap: 4px; }
+.team-stats-row > .preview-form:last-child { justify-items: end; }
+.preview-form-record { font-size: 12px; }
+.preview-form ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.preview-result { width: 20px; padding: 2px 0; border-radius: 4px; background: rgba(139, 147, 163, 0.12); font-size: 10px; font-weight: 800; text-align: center; }
+.preview-result-w { color: #4ade80; }
+.preview-result-l { color: #f87171; }
+.preview-result-ot, .preview-result-so { color: #fbbf24; }
+.preview-series-score { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+.preview-series { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.preview-series li { display: flex; justify-content: space-between; gap: 10px; }
+
 @media (max-width: 640px) {
   .dashboard {
     --gutter: 12px;
@@ -1196,6 +1219,7 @@ a.my-team-game:hover { border-color: #2c3a58; }
   .goal-row { grid-template-columns: 40px 36px minmax(0, 1fr); gap: 8px; }
   .goal-score { grid-column: 3; }
   .team-stats-row { grid-template-columns: 52px minmax(0, 1fr) 52px; gap: 8px; }
+
   .intelligence-toggle {
     right: 8px;
     bottom: calc(var(--tabbar-height) + 10px + env(safe-area-inset-bottom, 0px));

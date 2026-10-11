@@ -35,9 +35,10 @@ Last updated: 2026-10-09
 ---
 
 ## Up Next
-- **Game predictions** — the model's win probability on every game card and
-  game page, a pregame preview, and a public track record (accuracy +
-  calibration). Percentages only, no betting formats.
+- **Game predictions, part 2** — the model's win probability on scoreboard
+  game cards, and a public track record (accuracy + calibration). The pregame
+  preview (win probability, matchup, players to watch, season series) shipped.
+  Maybe a win-probability tool for PuckPulse AI ("who's favored tonight?").
 - **Custom domain** — puckpulse.io on Static Web Apps (free managed TLS).
 - **Head-to-head / rivalry view** — season series between two teams, a
   side-by-side stat comparison, and chat context for "who wins tonight?"

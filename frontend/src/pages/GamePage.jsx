@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
+import GamePreview from "../components/GamePreview.jsx";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
 const LIVE_REFRESH_MS = 30000;
@@ -71,12 +72,19 @@ function savePct(goalie) {
   return (goalie.saves / goalie.shotsAgainst).toFixed(3).replace(/^0/, "");
 }
 
-function TeamHeader({ team, side }) {
+// Record under the team: the NHL's (upcoming games only) or the standings'.
+function teamRecord(team, standingsRow) {
+  if (team?.record) return team.record;
+  return standingsRow ? `${standingsRow.wins}-${standingsRow.losses}-${standingsRow.ot_losses}` : null;
+}
+
+function TeamHeader({ team, side, record }) {
   return (
     <div className={`game-team game-team-${side}`}>
       {team?.darkLogo && <img className="game-team-logo" src={team.darkLogo} alt="" />}
       <span className="game-team-abbrev">{team?.abbrev}</span>
       <span className="game-team-name">{teamName(team)}</span>
+      {record && <span className="game-team-record">{record}</span>}
     </div>
   );
 }
@@ -308,7 +316,7 @@ function PlayerStats({ playerStats, away, home }) {
   );
 }
 
-export default function GamePage() {
+export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
   const { gameId } = useParams();
   const location = useLocation();
   // Back to the scoreboard day this game was opened from (defaults to today).
@@ -342,6 +350,7 @@ export default function GamePage() {
 
   const away = game.awayTeam;
   const home = game.homeTeam;
+  const standingsByTeam = Object.fromEntries(standings.map((r) => [r.team_abbrev, r]));
   const started = isLive || FINAL_STATES.has(game.gameState);
   const linescore = game.linescore?.byPeriod || [];
   const shotsByPeriod = game.shotsByPeriod || [];
@@ -365,7 +374,7 @@ export default function GamePage() {
           {gameStatus(game)}
         </span>
         <div className="game-scoreboard">
-          <TeamHeader team={away} side="away" />
+          <TeamHeader team={away} side="away" record={teamRecord(away, standingsByTeam[away?.abbrev])} />
           <div className="game-score">
             {started ? (
               <>
@@ -377,16 +386,12 @@ export default function GamePage() {
               <span className="game-score-separator">vs</span>
             )}
           </div>
-          <TeamHeader team={home} side="home" />
+          <TeamHeader team={home} side="home" record={teamRecord(home, standingsByTeam[home?.abbrev])} />
         </div>
         <p>{game.venue?.default ? `${game.venue.default} · ` : ""}{game.gameDate}</p>
       </div>
 
-      {!started && (
-        <section className="boxscore-card">
-          <p className="muted">This game hasn&apos;t started yet. The box score fills in once the puck drops.</p>
-        </section>
-      )}
+      {!started && <GamePreview game={game} standingsByTeam={standingsByTeam} playoffOddsByTeam={playoffOddsByTeam} />}
 
       {linescore.length > 0 && (
         <section className="boxscore-card">

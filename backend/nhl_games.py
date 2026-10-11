@@ -167,6 +167,10 @@ def _fetch_game_boxscore(game_id: int) -> dict[str, Any]:
     parallel and merged. Only /boxscore is required -- if either of the
     others is down (or a scheduled game has no summary yet), the page
     still gets the core box score.
+
+    Before a game, the same feeds carry the preview: each team's record
+    (landing, upcoming games only), the matchup (skater and goalie leaders),
+    team season stats with league ranks, last-10 form, and the season series.
     """
     with ThreadPoolExecutor(max_workers=3) as pool:
         boxscore = pool.submit(_get, f"/gamecenter/{game_id}/boxscore")
@@ -176,8 +180,19 @@ def _fetch_game_boxscore(game_id: int) -> dict[str, Any]:
         landing_data = landing.result()
         right_rail_data = right_rail.result()
 
+    # Records only come with upcoming games; the page falls back to standings.
+    for side in ("awayTeam", "homeTeam"):
+        record = (landing_data.get(side) or {}).get("record")
+        if record and isinstance(game.get(side), dict):
+            game[side] = {**game[side], "record": record}
+
     return {
         **game,
+        "matchup": landing_data.get("matchup") or {},
+        "teamSeasonStats": right_rail_data.get("teamSeasonStats") or {},
+        "last10Record": right_rail_data.get("last10Record") or {},
+        "seasonSeries": right_rail_data.get("seasonSeries") or [],
+        "seasonSeriesWins": right_rail_data.get("seasonSeriesWins") or {},
         "summary": landing_data.get("summary") or {},
         "linescore": right_rail_data.get("linescore") or {},
         "shotsByPeriod": right_rail_data.get("shotsByPeriod") or [],

@@ -138,7 +138,7 @@ def add_lines(finals: list[dict], movers: dict, featured: dict | None, names: di
     if featured:
         pct = featured.get("model_home_win_pct")
         featured["line"] = (f"{name(featured['away'])} at {name(featured['home'])}, {featured['time']}"
-                            + (f"; the model gives the {name(featured['home'])} {pct}%" if pct is not None else ""))
+                            + (f"; the model gives the {name(featured['home'])} a {pct}% chance to win" if pct is not None else ""))
 
 
 def build_facts(day: date, cur) -> dict | None:

@@ -82,7 +82,7 @@ Format (Markdown):
 - Then sections with these headings, skipping any with no facts: "### Last night", "### Playoff race", "### Tonight".
 - 2 to 4 short bullets per section. Each game, odds move, and the game of the night has a ready-made "line": use those lines (you may rephrase them) rather than translating abbreviations yourself.
 - In "Playoff race", give the odds moves with both numbers (e.g. "from 54% to 44%"); they come from the app's playoff-odds model.
-- In "Tonight", mention only the game of the night and the model's win probability for it. Do not list the other games.
+- In "Tonight", mention only the game of the night and the model's win probability for it, worded as a chance to win (e.g. "a 58% chance to win"). Do not list the other games.
 Last night's games and tonight's games are different games: never mix them up.
 Use only the facts. No invented stats, injuries, streaks, or storylines. Keep it under 170 words."""
 MAX_DIGEST_FACTS_CHARS = 12000

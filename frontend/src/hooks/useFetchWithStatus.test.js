@@ -85,4 +85,19 @@ describe("useFetchWithStatus", () => {
     expect(globalThis.fetch).toHaveBeenCalledWith("http://api.test/standings/BOS");
     await waitFor(() => expect(result.current.data).toEqual({ team: "BOS" }));
   });
+
+  it("shows the last response instantly on a return visit, then refreshes it", async () => {
+    mockFetchOnce({ score: "1-0" });
+    const first = renderHook(() => useFetchWithStatus("http://api.test/game"));
+    await waitFor(() => expect(first.result.current.status).toBe("ready"));
+    first.unmount();
+
+    mockFetchOnce({ score: "2-0" });
+    const second = renderHook(() => useFetchWithStatus("http://api.test/game"));
+
+    // No loading flash: the cached copy is there on the first render...
+    expect(second.result.current).toEqual({ data: { score: "1-0" }, status: "ready" });
+    // ...and the fresh copy replaces it when it arrives.
+    await waitFor(() => expect(second.result.current.data).toEqual({ score: "2-0" }));
+  });
 });

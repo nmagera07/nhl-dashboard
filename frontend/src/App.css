@@ -986,15 +986,25 @@ a.my-team-game:hover { border-color: #2c3a58; }
 
 /* Morning digest (Scores page). */
 .daily-digest {
-  margin: 0 0 18px;
-  padding: 12px 16px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
 }
-.daily-digest summary { display: flex; align-items: baseline; gap: 10px; cursor: pointer; list-style: none; }
+.daily-digest summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; cursor: pointer; list-style: none; }
+.daily-digest-teaser {
+  order: 3;
+  flex-basis: 100%;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.daily-digest[open] .daily-digest-teaser { display: none; }
 .daily-digest summary::-webkit-details-marker { display: none; }
-.daily-digest summary::after { content: "▾"; margin-left: auto; color: var(--text-dim); font-size: 12px; transition: transform 0.15s; }
+.daily-digest summary::after { content: "▾"; order: 2; margin-left: auto; color: var(--text-dim); font-size: 12px; transition: transform 0.15s; }
 .daily-digest:not([open]) summary::after { transform: rotate(-90deg); }
 .daily-digest-title { font-size: 14px; font-weight: 700; }
 .daily-digest-date { color: var(--text-dim); font-size: 12px; }

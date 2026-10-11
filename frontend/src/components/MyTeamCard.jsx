@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { darkLogo } from "../utils/darkLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { gameTimeLabel } from "../utils/dates.js";
+import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import GoalAlerts from "./GoalAlerts.jsx";
 
 const LIVE_REFRESH_MS = 30_000;
@@ -17,16 +18,21 @@ const versus = (game) => `${game.home ? "vs" : "@"} ${game.opponent}`;
 
 // Loads the team's schedule summary; refreshes every 30s while a game is live.
 function useTeamSchedule(abbrev) {
-  const [state, setState] = useState({ abbrev: null, data: null, error: false });
+  const url = `${API_BASE}/teams/${abbrev}/schedule`;
+  const [state, setState] = useState(() => {
+    const cached = cachedResponse(url);
+    return cached ? { abbrev, data: cached, error: false } : { abbrev: null, data: null, error: false };
+  });
 
   useEffect(() => {
     let cancelled = false;
     let timer = null;
     const load = () =>
-      fetch(`${API_BASE}/teams/${abbrev}/schedule`)
+      fetch(url)
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.status))))
         .then((data) => {
           if (cancelled) return;
+          rememberResponse(url, data);
           setState({ abbrev, data, error: false });
           if (data.live) timer = setTimeout(load, LIVE_REFRESH_MS);
         })
@@ -36,7 +42,7 @@ function useTeamSchedule(abbrev) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [abbrev]);
+  }, [abbrev, url]);
 
   // Ignore a previous team's data while the new team's loads.
   return state.abbrev === abbrev ? state : { data: null, error: false };

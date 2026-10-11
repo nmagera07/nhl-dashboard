@@ -249,6 +249,11 @@ app.add_middleware(
 # than most queries, so connections are reused. Neon drops idle ones after
 # about 5 minutes (and suspends the database), so anything idle longer than
 # POOL_IDLE_SECONDS is thrown away instead of reused.
+#
+# Connections are autocommit: the database is in AWS us-east-1 and the API
+# in Azure West US 2, so every round trip crosses the country, and a
+# transaction's separate BEGIN and ROLLBACK tripled them. The API only
+# reads, plus single-statement push-subscription writes.
 POOL_MAX_IDLE = 8
 POOL_IDLE_SECONDS = 240
 _pool: list = []          # (connection, returned_at), most recent last
@@ -275,10 +280,8 @@ class PooledConnection:
         conn, self._conn = self._conn, None
         if conn is None or conn.closed:
             return
-        try:
-            conn.rollback()  # end the read transaction so it isn't left idle-in-transaction
-        except psycopg2.Error:
-            conn.close()
+        if conn.info.transaction_status != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+            conn.close()  # broken (UNKNOWN), or mid-transaction: don't hand it to the next request
             return
         with _pool_lock:
             if len(_pool) < POOL_MAX_IDLE:
@@ -307,7 +310,9 @@ def get_connection():
     if conn is not None:
         return PooledConnection(conn)
     try:
-        return PooledConnection(psycopg2.connect(API_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor))
+        conn = psycopg2.connect(API_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        conn.autocommit = True
+        return PooledConnection(conn)
     except Exception:
         logger.error("Failed to connect to the database", exc_info=True)
         raise

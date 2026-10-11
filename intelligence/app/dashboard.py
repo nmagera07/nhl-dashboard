@@ -1,6 +1,8 @@
 """A narrow, read-only client for the NHL dashboard public API."""
 
 import asyncio
+import re
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,21 +21,50 @@ class ContextBundle:
     evidence: list[dict[str, str]]
 
 
+# Data the dashboard recomputes once a day (2 AM ET). Cached across
+# questions for CACHE_SECONDS, so most tool calls skip the network. Live
+# data (games, schedules) and the API's own what-if simulations are not.
+CACHE_SECONDS = 600
+CACHEABLE = re.compile(
+    r"^/(standings/latest|playoff-odds(/history|/why)?|season-sim|players/leaders|players/\d+"
+    r"|teams/[A-Z]{3}/roster|predictions/track-record|digest/latest)$"
+)
+
+
 class DashboardClient:
     def __init__(self, base_url: str, client: httpx.AsyncClient | None = None):
         self.base_url = base_url.rstrip("/")
         self.client = client
+        self._shared: httpx.AsyncClient | None = None  # one keep-alive connection pool, made on first use
+        self._cache: dict[str, tuple[float, Any]] = {}
+
+    def _http(self) -> httpx.AsyncClient:
+        if self.client:
+            return self.client
+        if self._shared is None:
+            self._shared = httpx.AsyncClient(base_url=self.base_url, timeout=httpx.Timeout(25.0, connect=10.0))
+        return self._shared
+
+    async def aclose(self):
+        if self._shared is not None:
+            await self._shared.aclose()
 
     async def _get(self, path: str) -> Any:
+        cacheable = bool(CACHEABLE.match(path))
+        if cacheable:
+            hit = self._cache.get(path)
+            if hit and time.monotonic() < hit[0]:
+                return hit[1]
+        value = await self._fetch(path)
+        if cacheable:
+            self._cache[path] = (time.monotonic() + CACHE_SECONDS, value)
+        return value
+
+    async def _fetch(self, path: str) -> Any:
         last_error: Exception | None = None
         for attempt in range(3):
             try:
-                if self.client:
-                    response = await self.client.get(path)
-                else:
-                    timeout = httpx.Timeout(25.0, connect=10.0)
-                    async with httpx.AsyncClient(base_url=self.base_url, timeout=timeout) as client:
-                        response = await client.get(path)
+                response = await self._http().get(path)
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as exc:

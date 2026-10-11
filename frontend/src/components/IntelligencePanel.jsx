@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { INTELLIGENCE_BASE } from "../config.js";
 import ChatMarkdown from "./ChatMarkdown.jsx";
 import { SUGGESTIONS } from "./chatSuggestions.js";
+import { warmUpChat } from "../utils/warmUp.js";
 
 // Follow-ups: send the last 2 exchanges so "what about their power play?"
 // makes sense. The service enforces the same cap.
@@ -66,6 +67,7 @@ export default function IntelligencePanel({ context, label }) {
 
   useEffect(() => {
     if (!open) return undefined;
+    warmUpChat();
     inputRef.current?.focus();
     const onKey = (e) => e.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", onKey);

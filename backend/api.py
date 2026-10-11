@@ -18,6 +18,8 @@ import asyncio
 from collections import OrderedDict
 import os
 import re
+import threading
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from typing import List, Optional
@@ -28,6 +30,7 @@ import sentry_sdk
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -203,6 +206,31 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # failure instead of a readable rate-limit response.
 app.add_middleware(SlowAPIMiddleware)
 
+# /players/leaders is ~1.1 MB of JSON and ~90 KB gzipped.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Data that changes once a day (after the 2 AM run) can be cached by the
+# browser for a few minutes, and served stale while it refreshes. Live data
+# (games, schedules, scenarios) is left alone.
+DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/players", "/teams", "/season-sim", "/predictions", "/digest")
+DAILY_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600"
+
+
+def _daily_cacheable(path):
+    if path.startswith("/teams/") and not path.endswith("/roster"):
+        return False  # /teams/{abbrev}/schedule is live
+    if path.startswith("/season-sim/"):
+        return False
+    return path.startswith(DAILY_DATA_PREFIXES)
+
+
+@app.middleware("http")
+async def daily_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.method == "GET" and response.status_code == 200 and _daily_cacheable(request.url.path):
+        response.headers.setdefault("Cache-Control", DAILY_CACHE_CONTROL)
+    return response
+
 # Only the deployed frontend (and local dev) can call this API.
 app.add_middleware(
     CORSMiddleware,
@@ -217,9 +245,69 @@ app.add_middleware(
 )
 
 
+# Connection pool. Opening a Neon connection costs ~0.5s (TLS + auth), more
+# than most queries, so connections are reused. Neon drops idle ones after
+# about 5 minutes (and suspends the database), so anything idle longer than
+# POOL_IDLE_SECONDS is thrown away instead of reused.
+POOL_MAX_IDLE = 8
+POOL_IDLE_SECONDS = 240
+_pool: list = []          # (connection, returned_at), most recent last
+_pool_lock = threading.Lock()
+
+
+class PooledConnection:
+    """A psycopg2 connection whose close() returns it to the pool."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        return self._conn.__exit__(*exc)
+
+    def close(self):
+        conn, self._conn = self._conn, None
+        if conn is None or conn.closed:
+            return
+        try:
+            conn.rollback()  # end the read transaction so it isn't left idle-in-transaction
+        except psycopg2.Error:
+            conn.close()
+            return
+        with _pool_lock:
+            if len(_pool) < POOL_MAX_IDLE:
+                _pool.append((conn, time.monotonic()))
+                return
+        conn.close()
+
+
+def _checkout():
+    """A pooled connection fresh enough to trust, or None."""
+    now = time.monotonic()
+    with _pool_lock:
+        while _pool:
+            conn, returned_at = _pool.pop()
+            if not conn.closed and now - returned_at < POOL_IDLE_SECONDS:
+                return conn
+            try:
+                conn.close()
+            except psycopg2.Error:
+                pass
+    return None
+
+
 def get_connection():
+    conn = _checkout()
+    if conn is not None:
+        return PooledConnection(conn)
     try:
-        return psycopg2.connect(API_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        return PooledConnection(psycopg2.connect(API_DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor))
     except Exception:
         logger.error("Failed to connect to the database", exc_info=True)
         raise

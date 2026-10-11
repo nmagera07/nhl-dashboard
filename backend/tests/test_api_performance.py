@@ -6,13 +6,15 @@ import pytest
 import api
 
 
+class FakeInfo:
+    transaction_status = psycopg2.extensions.TRANSACTION_STATUS_IDLE
+
+
 class FakePgConnection:
     def __init__(self):
         self.closed = 0
-        self.rollbacks = 0
-
-    def rollback(self):
-        self.rollbacks += 1
+        self.autocommit = False
+        self.info = FakeInfo()
 
     def close(self):
         self.closed = 1
@@ -38,7 +40,7 @@ class TestConnectionPool:
         second = api.get_connection()
 
         assert len(pool) == 1 and second._conn is pool[0]
-        assert pool[0].rollbacks == 1  # the read transaction was ended before reuse
+        assert pool[0].autocommit  # one round trip per query: no BEGIN/ROLLBACK
 
     def test_concurrent_requests_get_their_own_connections(self, pool):
         a, b = api.get_connection(), api.get_connection()
@@ -55,11 +57,7 @@ class TestConnectionPool:
 
     def test_a_broken_connection_is_dropped_not_pooled(self, pool):
         conn = api.get_connection()
-
-        def broken():
-            raise psycopg2.OperationalError("server closed the connection")
-
-        conn._conn.rollback = broken
+        conn._conn.info.transaction_status = psycopg2.extensions.TRANSACTION_STATUS_UNKNOWN  # server went away
         conn.close()
 
         assert api._pool == [] and pool[0].closed

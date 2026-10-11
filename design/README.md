@@ -12,4 +12,8 @@
   round of directions.
 
 To regenerate the PNG icons after editing `icon.svg`, render it at 512, 192, and 180 px
-(e.g. with a headless browser); the exact sizes are listed in `frontend/vite.config.js`.
+(e.g. with a headless browser) and save them under **new names** in `frontend/public/icons/`
+(then update `vite.config.js` and `index.html`). Phones cache an installed app's icon by URL,
+so overwriting the same file name can keep showing the old icon. The old root-level
+`pwa-*.png` / `apple-touch-icon.png` / `icon.svg` hold the current art too, for installs that
+still point at them.

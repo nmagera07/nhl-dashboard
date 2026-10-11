@@ -15,7 +15,10 @@ export default defineConfig({
       // tap Refresh in UpdateBanner, instead of appearing only after the
       // installed app is closed and reopened.
       registerType: 'prompt',
-      includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      // Icons live under versioned names (icons/puckpulse-*): phones cache an
+      // installed app's icon by URL, so reusing pwa-512x512.png kept showing
+      // the old logo after the rebrand. Bump the names when the art changes.
+      includeAssets: ['icons/puckpulse.svg', 'icons/puckpulse-apple-180.png'],
       manifest: {
         name: 'PuckPulse',
         short_name: 'PuckPulse',
@@ -27,11 +30,11 @@ export default defineConfig({
         background_color: '#0a0b0f',
         theme_color: '#0a0b0f',
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'icons/puckpulse-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'icons/puckpulse-512.png', sizes: '512x512', type: 'image/png' },
           // Same art; the glyph sits inside the safe zone, so it survives
           // Android's circle/squircle masks.
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icons/puckpulse-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {

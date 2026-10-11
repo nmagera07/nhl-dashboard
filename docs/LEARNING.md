@@ -85,6 +85,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Designed and shipped the PuckPulse brand: explored logo directions as SVG at real sizes and
+  in Android icon crops, built a full PWA icon set from one master SVG with a dark-mode variant,
+  and fixed stale home-screen icons by cache-busting icon URLs.
 - Rebranded the product (NHL Dashboard → PuckPulse) to avoid league trademark issues: vetted
   names for existing apps and open domains, changed every user-facing surface, and kept storage
   keys stable so users' saved settings survived.
@@ -107,6 +110,45 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — A logo, and why the old icon wouldn't go away
+
+**What I made:** The PuckPulse logo, a hockey puck with a heartbeat line across it and a
+white rim. I explored four directions first (drawn as SVG and reviewed at real sizes, in
+Android's icon crops, and in the header), then picked a ChatGPT concept and rebuilt it as
+vector with a dark-mode version, since the original was designed for white and would
+vanish on the app's near-black background.
+
+**How:** One master SVG generates everything: the 512 and 192 app icons (sized for
+Android's "maskable" circle and rounded-square crops), Apple's 180px home-screen icon, the
+browser-tab icon, and the header mark next to a "Puck/Pulse" wordmark. Light and dark logo
+PNGs for my resume and LinkedIn live in `design/`. I rendered the PNGs with headless
+Chromium (the same engine phones use) because there was no image tool installed.
+
+**The bug after shipping:** my phone still showed the old graph icon, even after
+reinstalling. The server was fine (new icons, 30-second cache). Two caches on the device
+held the old one:
+- **The service worker's offline cache:** the old version keeps serving its saved
+  icon and manifest until the new version takes over, which waits for the user to
+  tap Refresh.
+- **Android's installed-app copy:** the icon is baked in at install and refreshed only
+  occasionally, keyed by the icon's URL.
+
+**The fix:** new file names (`icons/puckpulse-512.png`, etc.) that no cache has ever seen,
+while the old names also carry the new art for installs that still point at them. It's the
+same idea as the content-hashed filenames bundlers use for JS and CSS, applied to icons.
+
+**What I learned:**
+- Design at the real sizes: a logo that looks great big can turn to mush at 16px, and
+  Android crops icons into circles.
+- Design for the background it'll actually sit on (dark mode).
+- "Deployed" isn't "on the user's device": caches keyed by URL keep serving the old file,
+  and a new filename is the reliable way to bust them.
+
+**Interview angle:** "A user still sees the old version after your deploy. Why?" Caching
+layers (CDN, browser, service worker, the OS), and cache-busting by changing the URL.
 
 ---
 

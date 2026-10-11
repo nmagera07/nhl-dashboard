@@ -124,6 +124,47 @@ async def pdo_reading(api) -> Truth:
                       "fail if it calls it average when it isn't, or reads the direction backwards."}
 
 
+def _factor_lines(team, w) -> str:
+    parts = [("goals", w["goals"]), ("expected goals (xG)", w.get("xg")), ("last season", w["last_season"]),
+             ("schedule", (w.get("schedule") or {}).get("effect"))]
+    return f"{team}: " + ", ".join(f"{name} {v:+.3f}" for name, v in parts if v is not None)
+
+
+async def why_odds(api) -> Truth:
+    pit = (await api("/playoff-odds/why"))["teams"].get("PIT")
+    if not pit:
+        return {"skip": "no odds breakdown yet"}
+    return {
+        "tool": ("explain_odds", {"team": "PIT"}),
+        "rubric": "The model's rating breakdown, in goals/game (positive pushes the odds up; under 0.03 is negligible): "
+                  + _factor_lines("PIT", pit) + f". Last season is still {round(pit['last_season_share'] * 100)}% of the "
+                  "rating. Pass only if the answer names the factors that actually push PIT up or down, in the right "
+                  "direction, and doesn't credit a negligible factor as a big reason. Fail if it gets any factor's "
+                  "direction backwards (e.g. calls a negative schedule a boost), if it reads goals well above xG as "
+                  "proof the scoring is sustainable (it means the opposite), or on invented reasons (injuries, "
+                  "roster moves) that aren't in the breakdown. Saying PIT is scoring above its xG, i.e. running hot "
+                  "on finishing or goaltending that may cool off, is correct (the tool reports it).",
+    }
+
+
+async def why_favored(api) -> Truth:
+    why = (await api("/playoff-odds/why"))["teams"]
+    if "CAR" not in why or "NYR" not in why:
+        return {"skip": "no odds breakdown yet"}
+    standings = await api("/standings/latest")
+    fav = "CAR" if why["CAR"]["rating"] >= why["NYR"]["rating"] else "NYR"
+    row = next((r for r in standings if r["team_abbrev"] == fav), {"team_abbrev": fav})
+    return {
+        "tool": ("explain_odds", None),
+        "facts": _names(row),
+        "rubric": f"The model rates {fav} higher. Breakdown (goals/game): " + _factor_lines("CAR", why["CAR"]) + "; "
+                  + _factor_lines("NYR", why["NYR"]) + ". Pass only if the answer says the model favors " + fav
+                  + " and explains it with the factors where the two teams differ most, without invented reasons or a factor's "
+                  "direction backwards. Rounded numbers, or citing the raw goal/xG differentials instead of the effects, "
+                  "are fine; so is noting which team is scoring above or below its xG.",
+    }
+
+
 async def no_injury_data(api) -> Truth:
     return {"tool": None,
             "rubric": "The assistant has no injury data. Pass only if the answer says it can't confirm injury status "
@@ -165,6 +206,8 @@ CASES = [
     Case("points_leader", "Who leads the NHL in points right now?", points_leader),
     Case("easiest_schedule", "Who has the easiest remaining schedule in the Western Conference?", easiest_schedule),
     Case("pdo_reading", "What does Sidney Crosby's PDO say about his start?", pdo_reading),
+    Case("why_odds", "Why are Pittsburgh's playoff odds so high?", why_odds),
+    Case("why_favored", "Who does the model like more between Carolina and the Rangers, and why?", why_favored),
     Case("no_injury_data", "Is Sidney Crosby injured right now?", no_injury_data),
     Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

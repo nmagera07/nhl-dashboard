@@ -54,6 +54,22 @@ class TestGameBoxscore:
         assert game["shotsByPeriod"] == RIGHT_RAIL["shotsByPeriod"]
         assert game["teamGameStats"] == RIGHT_RAIL["teamGameStats"]
 
+    def test_an_upcoming_game_carries_the_preview(self, monkeypatch):
+        boxscore = {"id": 84, "gameState": "FUT", "awayTeam": {"abbrev": "SEA"}, "homeTeam": {"abbrev": "WSH"}}
+        landing = {"awayTeam": {"abbrev": "SEA", "record": "3-2-0"}, "homeTeam": {"abbrev": "WSH", "record": "3-1-0"},
+                   "matchup": {"skaterComparison": {"leaders": []}, "goalieComparison": {}}}
+        right_rail = {"teamSeasonStats": {"awayTeam": {"ppPctg": 0.27}}, "last10Record": {"awayTeam": {"record": "3-2-0"}},
+                      "seasonSeries": [{"id": 84}], "seasonSeriesWins": {"awayTeamWins": 0, "homeTeamWins": 0}}
+        monkeypatch.setattr(nhl_games, "_get", _fake_get({"/boxscore": boxscore, "/landing": landing, "/right-rail": right_rail}))
+
+        game = game_boxscore(84)
+
+        assert (game["awayTeam"]["record"], game["homeTeam"]["record"]) == ("3-2-0", "3-1-0")
+        assert game["matchup"] == landing["matchup"]
+        assert game["teamSeasonStats"]["awayTeam"]["ppPctg"] == 0.27
+        assert game["last10Record"]["awayTeam"]["record"] == "3-2-0"
+        assert game["seasonSeries"] == [{"id": 84}]
+
     def test_landing_and_right_rail_outages_still_return_the_core_box_score(self, monkeypatch):
         down = NHLGamesUnavailable("down")
         monkeypatch.setattr(

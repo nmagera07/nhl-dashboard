@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
@@ -41,7 +42,8 @@ function WinProbability({ away, home }) {
       </div>
       <p className="preview-note">
         PuckPulse&apos;s model: each team&apos;s goals and expected-goals rating, plus home ice. Single games are
-        close to coin flips, so treat it as a lean, not a lock. For fun and insight, not betting advice.
+        close to coin flips, so treat it as a lean, not a lock. For fun and insight, not betting advice.{" "}
+        <Link className="accent-link" to="/track-record">See how the model has done.</Link>
       </p>
     </section>
   );

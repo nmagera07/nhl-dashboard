@@ -161,3 +161,16 @@ class TestSeasonSim:
         response = client.get("/season-sim")
 
         assert response.status_code == 404
+
+
+class TestPredictionTrackRecord:
+    def test_scores_this_seasons_graded_predictions_and_counts_pending(self, client, db_router):
+        db_router.when("WHERE home_won IS NULL", {"n": 3})
+        db_router.when("FROM game_predictions", [
+            {"game_id": 1, "game_date": "2026-10-10", "home_abbrev": "PIT", "away_abbrev": "DAL",
+             "home_win_prob": 0.55, "home_score": 2, "away_score": 1, "ended": "SO", "home_won": True,
+             "model_version": "v2.1", "source": "digest"},
+        ])
+        body = client.get("/predictions/track-record").json()
+        assert body["games"] == 1 and body["favorite_won"] == 1.0 and body["pending"] == 3
+        assert body["recent"][0]["home"] == "PIT"

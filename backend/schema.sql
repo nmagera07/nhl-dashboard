@@ -366,3 +366,30 @@ CREATE TABLE IF NOT EXISTS daily_digest (
     model                   TEXT,
     created_at              TIMESTAMP DEFAULT NOW()
 );
+
+-- Every game the model predicted, logged before puck drop and graded after
+-- (game_predictions.py, in the daily job). A prediction is never changed
+-- once logged, so the track record can't be quietly improved after the fact.
+-- source: 'daily' (logged by the job) or 'digest' (backfilled from the
+-- morning digest's rounded pre-game odds, before this table existed).
+CREATE TABLE IF NOT EXISTS game_predictions (
+    game_id                 BIGINT PRIMARY KEY,
+    season_id               INTEGER NOT NULL,
+    game_date               DATE NOT NULL,
+    home_abbrev             VARCHAR(3) NOT NULL,
+    away_abbrev             VARCHAR(3) NOT NULL,
+    home_win_prob           NUMERIC(5,4) NOT NULL,
+    home_rating             NUMERIC(7,4),
+    away_rating             NUMERIC(7,4),
+    model_version           VARCHAR(20) NOT NULL,
+    source                  VARCHAR(10) NOT NULL DEFAULT 'daily',
+    predicted_at            TIMESTAMP NOT NULL DEFAULT NOW(),
+    home_score              SMALLINT,
+    away_score              SMALLINT,
+    ended                   VARCHAR(3),      -- REG, OT, or SO
+    home_won                BOOLEAN,         -- NULL until graded
+    graded_at               TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_predictions_ungraded
+    ON game_predictions (game_date) WHERE home_won IS NULL;

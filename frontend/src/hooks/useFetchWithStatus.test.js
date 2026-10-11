@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { useFetchWithStatus } from "./useFetchWithStatus.js";
+import { rememberResponse } from "../utils/responseCache.js";
 
 function mockFetchOnce(body) {
   globalThis.fetch = vi.fn().mockResolvedValue({
@@ -40,6 +41,18 @@ describe("useFetchWithStatus", () => {
 
     await waitFor(() => expect(result.current.status).toBe("error"));
     expect(result.current.data).toEqual([]);
+  });
+
+  it("keeps showing a saved copy when the refresh fails (API asleep or down)", async () => {
+    rememberResponse("http://api.test/standings/latest", [{ team_abbrev: "PIT" }]);
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("cold start timeout"));
+
+    const { result } = renderHook(() => useFetchWithStatus("http://api.test/standings/latest", { initialData: [] }));
+
+    expect(result.current).toEqual({ data: [{ team_abbrev: "PIT" }], status: "ready" });
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(result.current.status).toBe("ready");
   });
 
   it("runs transform on the raw response before storing it", async () => {

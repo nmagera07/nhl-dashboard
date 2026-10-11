@@ -5,6 +5,7 @@ import { API_BASE, DIVISION_ORDER } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
+import { cachedResponse } from "./utils/responseCache.js";
 import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
 import UpdateBanner from "./components/UpdateBanner.jsx";
@@ -19,12 +20,17 @@ import TrackRecordPage from "./pages/TrackRecordPage.jsx";
 
 export default function NHLDashboard() {
   const [standingsView, setStandingsView] = useState("standard"); // standard | advanced
-  const [activeDivision, setActiveDivision] = useState(null);
+  const [favoriteTeam] = useFavoriteTeam();
+  // Seeded from a saved copy of the standings when there is one, so a
+  // returning visitor lands on their division tab instead of seeing all 32
+  // teams until the fresh standings arrive.
+  const [activeDivision, setActiveDivision] = useState(() =>
+    defaultDivision(cachedResponse(`${API_BASE}/standings/latest`), favoriteTeam)
+  );
   const [search, setSearch] = useState("");
   const [standingsSortBy, setStandingsSortBy] = useState(null);
   const [standingsSortDir, setStandingsSortDir] = useState("desc");
 
-  const [favoriteTeam] = useFavoriteTeam();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,9 +45,8 @@ export default function NHLDashboard() {
       // triggered by clicking a sortable column reorder the same teams,
       // they don't mean "switch the user's selected division tab."
       if (activeDivision != null) return;
-      const myDivision = data.find((d) => d.team_abbrev === favoriteTeam)?.division;
-      const firstDivision = myDivision || data.find((d) => d.division)?.division;
-      if (firstDivision) setActiveDivision(firstDivision);
+      const division = defaultDivision(data, favoriteTeam);
+      if (division) setActiveDivision(division);
     },
   });
 
@@ -164,7 +169,8 @@ export default function NHLDashboard() {
               />
             )}
           />
-          <Route path="/playoffs" element={standingsGate || <PlayoffsPage standings={standings} />} />
+          {/* No standings gate: the odds chart doesn't need standings, so it can show while they load. */}
+          <Route path="/playoffs" element={<PlayoffsPage standings={standings} standingsStatus={status} />} />
           <Route
             path="/teams/:teamAbbrev"
             element={<RosterPage key={location.pathname} standings={standings} />}
@@ -187,4 +193,11 @@ export default function NHLDashboard() {
       <TabBar />
     </div>
   );
+}
+
+// The favorite team's division, or else the first one in the standings.
+function defaultDivision(standings, favoriteTeam) {
+  if (!Array.isArray(standings)) return null;
+  const mine = standings.find((d) => d.team_abbrev === favoriteTeam)?.division;
+  return mine || standings.find((d) => d.division)?.division || null;
 }

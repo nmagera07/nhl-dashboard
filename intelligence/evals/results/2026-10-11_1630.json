@@ -1,0 +1,140 @@
+{
+  "started": "2026-10-11T20:29:51+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model, Pittsburgh's playoff odds are strong (sitting at 60.1%) for a few key reasons:\n\n* **Strong Goal Differential:** Their early-season goal difference (+5 over 6 games) pushes their rating up.\n* **Last Season's Carryover:** The model still weights last season's strong per-game performance (accounting for an 83% weight against this season's small sample), which also pushes their rating up.\n* **Hot Finishing/Goaltending:** They are currently scoring well above their expected goals (goals > xG), indicating hot finishing or goaltending\u2014though the model notes this usually cools off.\n* **Negligible Factors:** Their expected goals differential and remaining schedule strength currently have a negligible effect on their rating. \n\n*(Note: Playoff odds also factor in the points Pittsburgh has already banked this season.)*",
+          "seconds": 4.8,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Correctly identifies and directions the factors per the breakdown without mischaracterizing negligible ones"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "Based on the playoff-odds model, Carolina is favored significantly more than the Rangers:\n\n* **Overall Standing:** Carolina holds a 91.0% playoff probability with a top-ranked rating, compared to the Rangers at 50.4%.\n* **Last Season Carryover:** Carolina's strong performance from last season pushes their rating up significantly (+0.33), while the Rangers' negative carryover pulls theirs down (-0.16).\n* **Expected Goals:** Both teams are being pushed up by their expected goal differentials, but Carolina's chance creation advantage (+0.14 effect) outweighs the Rangers' (+0.04).\n* **Finishing / Goaltending:** Carolina is currently scoring below their chance quality (running cold), whereas the Rangers are scoring above theirs (running hot).",
+          "seconds": 5.5,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'opponent': 'NYR', 'team': 'CAR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Answer omits the key factors (goals/game, schedule) and adds unrelated reasons, not matching the rubric."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "**Why Pittsburgh\u2019s playoff odds are high (\u2248\u202f60\u202f% right now):**\n\n- **Goal differential is a big boost** \u2013 In the six games played, Pittsburgh is +5 on goals, which the model rates as a **+0.069** push. Scoring well above its expected\u2011goals (xG) signal hot offense or strong goaltending, and that lifts the rating.  \n- **Last\u2011season performance still matters** \u2013 Because the season is just starting, the model still leans heavily (\u2248\u202f83\u202f%) on last year\u2019s per\u2011game strength, giving Pittsburgh another **+0.067** push.  \n- **xG is neutral** \u2013 The team\u2019s xG differential is essentially zero, so the expected\u2011goals factor is negligible and doesn\u2019t change the odds.  \n- **Schedule isn\u2019t a big factor yet** \u2013 Pittsburgh\u2019s remaining schedule is ranked 22nd out of 32 (mid\u2011range), producing a tiny **\u20110.006** effect\u2014basically negligible at this point.  \n\nTogether, the strong early goal differential and the carry\u2011over from a solid previous season push Pittsburgh\u2019s rating up, which translates into the current 60\u202f% playoff\u2011odds figure. The model also factors in the points already earned, but the rating drivers above are why the odds look especially high early in the season.",
+          "seconds": 4.6,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies the rating drivers and their directions without crediting negligible factors as major reasons."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "**The model favors Carolina (CAR) over the New\u202fYork Rangers (NYR).**  \n\n- **Playoff odds:**\u202fCAR has a 91\u202f% chance to make the postseason, while NYR sits at about 50\u202f% (the model\u2019s current snapshot).  \n- **Scoring edge:**\u202fCAR\u2019s goal\u2011differential (+7) and expected\u2011goals differential (+9.7) both \u201cpush up\u201d its rating, contributing the biggest boosts (effect\u202f\u2248\u202f0.10\u202f\u2013\u202f0.14).  \n- **Recent form vs. last season:**\u202fCAR\u2019s strong 2025\u201126 start (0.799 goals per game) still leans heavily on last season\u2019s success (\u2248\u202f83\u202f% weight), adding a sizable lift (effect\u202f\u2248\u202f0.33).  \n- **Schedule:**\u202fWith 78 games left, CAR\u2019s remaining slate is rated the easiest in the league (rank\u202f16 of\u202f32), but the impact is negligible (effect\u202f\u2248\u202f0.0015).  \n\nTogether, these factors drive a very high playoff\u2011percentage for Carolina, whereas the Rangers lack comparable boosts and sit near the middle of the pack.",
+          "seconds": 6.4,
+          "model_calls": 4,
+          "tools": [
+            "get_playoff_odds({\"team\":\"CAR\"})",
+            "get_playoff_odds({\"team\":\"NYR\"})",
+            "explain_odds({\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'CAR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "gemini: The answer cites incorrect specific metric breakdown values compared to the rubric."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    }
+  }
+}

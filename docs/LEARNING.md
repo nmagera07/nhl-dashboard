@@ -40,6 +40,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   puck drop with its model version and inputs, graded automatically after the final, and
   scored by favorite win rate, Brier score vs. a coin flip, and calibration, served by a
   public API.
+- Added an explanation tool to an LLM agent ("why is X favored over Y?") and used evals to find
+  how models misread tool output (flipped directions, ambiguous field names, guessed team names);
+  fixed it with pre-interpreted, self-describing results, raising the fallback model's pass rate
+  from 50% to 83%.
 - Fixed stale answers from an AI agent by moving its schedule tool from a daily snapshot to
   live data and giving the model today's date and Eastern start times.
 - Shipped a daily AI-written digest as a batch job (one LLM call a day, shared by all users),
@@ -125,6 +129,50 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — PuckPulse AI learns "why": shaping tool output so models can't misread it
+
+**What I built:** A new agent tool, `explain_odds`, so PuckPulse AI can answer "why are
+Pittsburgh's odds so high?" and "why is Carolina favored over the Rangers?". It returns the
+same breakdown as the Playoffs page (goals, xG, last season, schedule). With two teams, it
+also compares them and gives the model's win probability for their next meeting. Two new
+eval cases check these answers against live data.
+
+**What the evals caught**, even though the first version picked the right tool and the
+right team every time:
+- **A backwards read.** One model said PIT's +5 goals on even xG meant "the scoring isn't a
+  fluke." It means the opposite: scoring above your chances usually cools off.
+- **Misread fields.** `easiest_rank: 16 of 32` became "the easiest schedule in the league."
+  `per_game: 0.799` became "0.799 points per game." `share_of_rating_pct: 83` became "last
+  season is most of the reason," when it's actually how much the model *trusts* last season,
+  not how much it *moves* the rating.
+- **Wrong team names.** With only abbreviations, Groq called the Penguins "the Panthers" and
+  the Sabres.
+- **Truncation.** A table-heavy answer hit the token cap mid-sentence.
+
+**The fixes were all in the tool's output, not the prompt:**
+- Every factor carries a spelled-out `push` ("pushes up" / "pulls down" / "negligible"), so
+  the model never has to interpret a sign or decide what's small.
+- The goals-vs-xG reading is computed in code and stated in a sentence.
+- Fields describe themselves: `rank: "16th easiest of 32"`, `xg_diff_per_game`,
+  `weight_vs_this_season_pct`, and full team names.
+- One instruction line: answer in 3 to 5 bullets, no tables.
+
+Groq went from 1 of 2 to 5 of 6 passing runs, and Gemini passed every run.
+
+**What I learned:**
+- Tool output is a user interface whose user is a language model. Ambiguous field names get
+  misread the same way a confusing UI label does.
+- Do interpretation in code wherever you can (directions, thresholds, what a gap means). The
+  model's job is the wording.
+- An LLM judge is only as good as its rubric. Twice it failed correct answers because the
+  rubric didn't say a point was allowed. Read the failing answers before "fixing" anything.
+
+**Interview angle:** "How do you reduce hallucination in a tool-using agent?" Make the tools
+return pre-interpreted, self-describing facts, then measure with evals that read the
+answers, not just the tool calls.
 
 ---
 

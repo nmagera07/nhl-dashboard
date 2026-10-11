@@ -1,0 +1,138 @@
+{
+  "started": "2026-10-11T20:27:30+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "Based on the schedule strength rankings, the **Anaheim Ducks (ANA)** have the easiest remaining schedule in the Western Conference, with an average opponent rating of -0.019 over their 79 remaining games. \n\nHowever, keep in mind that early in the season, gaps under about 0.05 goals per game between teams are negligible.",
+          "seconds": 3.6,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'ANA'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer notes the schedule gap is under 0.05 and calls it negligible"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model, Pittsburgh's playoff odds are strong (60.1%) due to a few key factors:\n\n* **Last season's carryover:** Their strong performance from last season continues to heavily influence the model, pushing their overall rating up (effect: +0.0672).\n* **Early goal differential:** They have a positive goal differential through their first six games, which also pushes their rating up (effect: +0.0694).\n* **Finishing and goaltending:** The team is currently scoring well above its chance quality (goals greater than expected goals), meaning they are running hot on finishing or goaltending.\n\nOther factors like expected goals and their remaining schedule have a negligible effect on their current rating.",
+          "seconds": 4.4,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Credits non\u2011listed factor (goals > xG) as a major boost, contrary to rubric"
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "The Western Conference team with the easiest remaining schedule is **ANA** (Anaheim). Their average opponent rating for the rest of the season is \u20130.019, the lowest (easiest) among all Western teams.",
+          "seconds": 2.9,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'ANA'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "gemini: The answer does not mention that the schedule difference is small, marginal, or negligible."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "**Why Pittsburgh\u2019s playoff odds are high right now**\n\n- **Goal production is outpacing expectations** \u2013 In the six games played they\u2019re +5 in goal\u2011difference, giving a 0.069\u202fpush to the rating. Scoring well above their xG suggests the forwards (and/or goaltending) are hot early.  \n- **Last\u2011season performance still carries weight** \u2013 The model still trusts 83\u202f% of last season\u2019s per\u2011game rating, adding another 0.067\u202fpush. Pittsburgh\u2019s strong finish last year lifts their current outlook.  \n- **Expected\u2011goals (xG) impact is negligible** \u2013 Their xG is essentially even with the league, so it isn\u2019t dragging the rating down.  \n- **Schedule isn\u2019t a drag** \u2013 Their remaining schedule is about average (easiest rank\u202f22/32) and only nudges the rating down a tiny 0.006\u202f\u2013 essentially negligible.  \n\nThese combined \u201cpushes\u201d give Pittsburgh a rating of\u202f0.1369 (11th\u2011best in the league) and a **60\u202f% chance** of making the playoffs at this early stage.",
+          "seconds": 4.7,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately lists the rating factors, their correct directions, and does not misinterpret negligible or negative impacts."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

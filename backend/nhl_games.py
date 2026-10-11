@@ -33,6 +33,7 @@ LIVE_TTL = 15            # live / pre-game box score
 SCOREBOARD_LIVE_TTL = 20  # a day with live (or about-to-start) games
 SCHEDULED_TTL = 60       # upcoming games: catch the switch to live quickly
 FINAL_TTL = 3600         # finished games don't change
+RECAP_PENDING_TTL = 300  # a recent final whose recap video isn't posted yet
 MAX_STALE_SECONDS = 6 * 3600
 MAX_ENTRIES = 500
 
@@ -97,11 +98,28 @@ def _now() -> float:
 _cache = _ResponseCache()
 
 
+def _awaiting_recap(game: dict[str, Any], recap: Any) -> bool:
+    """
+    A game that ended in the last day or so but has no recap video yet.
+    The NHL posts recaps a while after the final horn, so these are cached
+    briefly instead of for the full hour, or the link wouldn't show up.
+    """
+    if game.get("gameState") not in FINAL_STATES or recap:
+        return False
+    try:
+        played = date.fromisoformat(str(game.get("gameDate")))
+    except ValueError:
+        return False
+    return (date.today() - played).days <= 1
+
+
 def _scoreboard_ttl(games: list[dict[str, Any]]) -> int:
     states = {g.get("gameState") for g in games}
     if states & LIVE_STATES:
         return SCOREBOARD_LIVE_TTL
     if games and states <= FINAL_STATES:
+        if any(_awaiting_recap(g, g.get("threeMinRecap")) for g in games):
+            return RECAP_PENDING_TTL
         return FINAL_TTL
     return SCHEDULED_TTL
 
@@ -111,6 +129,8 @@ def _boxscore_ttl(game: dict[str, Any]) -> int:
     if state in LIVE_STATES:
         return LIVE_TTL
     if state in FINAL_STATES:
+        if _awaiting_recap(game, (game.get("gameVideo") or {}).get("threeMinRecap")):
+            return RECAP_PENDING_TTL
         return FINAL_TTL
     return SCHEDULED_TTL
 
@@ -156,6 +176,23 @@ def game_boxscore(game_id: int) -> dict[str, Any]:
     return _cache.get(f"boxscore/{game_id}", lambda: _fetch_game_boxscore(game_id), _boxscore_ttl)
 
 
+def _game_video(game: dict[str, Any]) -> dict[str, str]:
+    """
+    A finished game's recap and condensed-game links (nhl.com paths). The
+    gamecenter feeds only carry bare video IDs, which nhl.com can't open,
+    so the paths come from that day's score feed. Missing until the NHL
+    posts them; an outage just means no links.
+    """
+    if game.get("gameState") not in FINAL_STATES or not game.get("gameDate"):
+        return {}
+    try:
+        day = games_on_date(date.fromisoformat(game["gameDate"]))
+    except (NHLGamesUnavailable, ValueError):
+        return {}
+    match = next((g for g in day if g.get("id") == game.get("id")), {})
+    return {key: match[key] for key in ("threeMinRecap", "condensedGame") if match.get(key)}
+
+
 def _fetch_game_boxscore(game_id: int) -> dict[str, Any]:
     """
     Return one game's full box score.
@@ -197,6 +234,7 @@ def _fetch_game_boxscore(game_id: int) -> dict[str, Any]:
         "linescore": right_rail_data.get("linescore") or {},
         "shotsByPeriod": right_rail_data.get("shotsByPeriod") or [],
         "teamGameStats": right_rail_data.get("teamGameStats") or [],
+        "gameVideo": _game_video(game),
     }
 
 

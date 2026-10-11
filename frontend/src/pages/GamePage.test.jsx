@@ -122,6 +122,26 @@ describe("GamePage", () => {
     expect(within(awayRow).getAllByRole("cell").at(-1)).toHaveTextContent("18");
   });
 
+  it("links the recap, condensed game, and each goal's clip on NHL.com", async () => {
+    const game = finalGame({ gameVideo: { threeMinRecap: "/video/nsh-at-tor-recap-1", condensedGame: "/video/nsh-at-tor-condensed-game-2" } });
+    game.summary.scoring[0].goals[0].highlightClipSharingUrl = "https://nhl.com/video/nsh-tor-stamkos-scores-3";
+    renderGame(game);
+    await loaded();
+
+    expect(screen.getByRole("link", { name: /3-minute recap/ })).toHaveAttribute("href", "https://www.nhl.com/video/nsh-at-tor-recap-1");
+    expect(screen.getByRole("link", { name: /Condensed game/ })).toHaveAttribute("href", "https://www.nhl.com/video/nsh-at-tor-condensed-game-2");
+    expect(screen.getByRole("link", { name: "Watch S. Stamkos's goal on NHL.com" }))
+      .toHaveAttribute("href", "https://nhl.com/video/nsh-tor-stamkos-scores-3");
+  });
+
+  it("hides the highlights card until the NHL posts videos", async () => {
+    renderGame(finalGame());
+    await loaded();
+
+    expect(screen.queryByText("Highlights")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Watch/ })).toBeNull();
+  });
+
   it("lists goals with scorer, assists, strength, and running score, skipping empty periods", async () => {
     renderGame(finalGame());
     await loaded();

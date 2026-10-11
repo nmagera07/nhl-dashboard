@@ -89,6 +89,16 @@ describe("Scoreboard", () => {
     expect(home).toHaveClass("is-winner");
   });
 
+  it("links a final's recap on NHL.com, and only once it's posted", async () => {
+    const withRecap = { ...finalOT, threeMinRecap: "/video/nsh-at-tor-recap-6406612944112" };
+    await renderWith([withRecap, upcoming]);
+
+    const links = screen.getAllByRole("link", { name: /recap on NHL.com/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "https://www.nhl.com/video/nsh-at-tor-recap-6406612944112");
+    expect(links[0]).toHaveAttribute("target", "_blank");
+  });
+
   it("says when there are no games today", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ games: [] }) });
     render(<MemoryRouter><Scoreboard /></MemoryRouter>);

@@ -78,12 +78,14 @@ function finalGame(overrides = {}) {
   };
 }
 
-function renderGame(game) {
-  globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(game) });
+function renderGame(game, props = {}, simInputs = null) {
+  globalThis.fetch = vi.fn().mockImplementation((url) =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve(url.includes("/season-sim") ? simInputs : game) })
+  );
   return render(
     <MemoryRouter initialEntries={["/games/2026020044"]}>
       <Routes>
-        <Route path="/games/:gameId" element={<GamePage />} />
+        <Route path="/games/:gameId" element={<GamePage {...props} />} />
       </Routes>
     </MemoryRouter>
   );
@@ -158,12 +160,47 @@ describe("GamePage", () => {
     expect(panel().queryByText("S. Stamkos")).not.toBeInTheDocument();
   });
 
-  it("shows a pre-game message and no box score for a game that hasn't started", async () => {
-    renderGame(finalGame({ gameState: "FUT", linescore: {}, shotsByPeriod: [], summary: {}, teamGameStats: [] }));
+  it("previews a game that hasn't started: win probability, matchup, players to watch", async () => {
+    const upcoming = finalGame({
+      gameState: "FUT", linescore: {}, shotsByPeriod: [], summary: {}, teamGameStats: [],
+      awayTeam: { abbrev: "NSH", record: "2-3-0" }, homeTeam: { abbrev: "TOR", record: "4-1-0" },
+      teamSeasonStats: {
+        awayTeam: { goalsForPerGamePlayed: 2.4, goalsForPerGamePlayedRank: 25, ppPctg: 0.2 },
+        homeTeam: { goalsForPerGamePlayed: 4.0, goalsForPerGamePlayedRank: 2, ppPctg: 0.3 },
+      },
+      last10Record: {
+        awayTeam: { record: "2-3-0", streakType: "L", streak: 2, pastGameResults: [{ opponentAbbrev: "BOS", gameResult: "L" }] },
+        homeTeam: { record: "4-1-0", streakType: "W", streak: 3, pastGameResults: [{ opponentAbbrev: "MTL", gameResult: "SOL" }] },
+      },
+      matchup: {
+        skaterComparison: { leaders: [{ category: "points", awayLeader: { name: { default: "F. Forsberg" }, value: 5 }, homeLeader: { name: { default: "W. Nylander" }, value: 9 } }] },
+        goalieComparison: { awayTeam: { leaders: [{ name: { default: "J. Saros" }, record: "2-2-0", gaa: 3.1, savePctg: 0.899 }] }, homeTeam: { leaders: [] } },
+      },
+    });
+    const sim = { model: { home_edge: 0.264, scale: 1.47 }, teams: { NSH: { rating: -0.2 }, TOR: { rating: 0.3 } } };
+    renderGame(upcoming, { standings: [], playoffOddsByTeam: { NSH: 0.31, TOR: 0.82 } }, sim);
 
-    expect(await screen.findByText(/hasn't started yet/i)).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /NSH \d+% chance to win, TOR \d+%/ })).toBeInTheDocument();
+    expect(screen.getByText(/not betting advice/i)).toBeInTheDocument();
+    expect(screen.getByText("2-3-0", { selector: ".game-team-record" })).toBeInTheDocument();  // record under the logo
+    expect(screen.getByText("4.00 (2nd)")).toHaveClass("preview-better");                  // better stat highlighted
+    expect(screen.getByText("82%")).toBeInTheDocument();                                     // playoff odds
+    expect(screen.getByText("W. Nylander · 9")).toBeInTheDocument();
+    expect(screen.getByText(/J\. Saros · 2-2-0 · 3\.10 GAA · 0\.899/)).toBeInTheDocument();
+    expect(screen.getByTitle("SOL vs MTL")).toHaveTextContent("SO");
     expect(screen.queryByText("Box score")).not.toBeInTheDocument();
-    expect(screen.queryByText("Player stats")).not.toBeInTheDocument();
+  });
+
+  it("shows each team's record from the standings once the game has started", async () => {
+    const standings = [
+      { team_abbrev: "NSH", wins: 3, losses: 2, ot_losses: 1 },
+      { team_abbrev: "TOR", wins: 4, losses: 1, ot_losses: 0 },
+    ];
+    renderGame(finalGame(), { standings });
+    await loaded();
+
+    expect(screen.getByText("3-2-1", { selector: ".game-team-record" })).toBeInTheDocument();
+    expect(screen.getByText("4-1-0", { selector: ".game-team-record" })).toBeInTheDocument();
   });
 
   it("shows the period and clock for a live game and refreshes it", async () => {

@@ -170,7 +170,7 @@ export default function NHLDashboard() {
           />
           <Route path="/players" element={<LeaderboardPage />} />
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
-          <Route path="/games/:gameId" element={<GamePage />} />
+          <Route path="/games/:gameId" element={<GamePage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

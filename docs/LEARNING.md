@@ -87,6 +87,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Diagnosed why our playoff odds differed from MoneyPuck's by 16 points for one team (a goals
   vs. expected-goals blend and different priors) and turned the question into a measurable
   head-to-head through prediction logging.
+- Built a per-team "why these odds?" explanation for a Monte Carlo model: each rating split
+  into additive parts (goals, xG, last season) that sum to it exactly, plus schedule strength
+  in the same units, computed daily and loaded on demand behind one tap.
 - Tested three more model ideas (adjusted xG, strength of schedule,
   goaltending) with held-out backtests and shipped none after showing the
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
@@ -122,6 +125,48 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — "Why these odds?": explaining a model in four lines
+
+**What I built:** On the Playoffs page, tapping a team now opens a short breakdown under its
+row: why its odds are where they are. Each of four lines says which way it pushes (▲ pushes
+up / ▼ pulls down / – little effect):
+- **Goals:** this season's goal differential.
+- **Expected goals:** this season's xG differential (shot quality).
+- **Last season:** last year's strength and how much of the rating it still is (83% six
+  games in; it fades as games are played).
+- **Schedule:** how strong the remaining opponents are, plus the home/away balance.
+
+**Why:** The MoneyPuck question (entry below) took me a manual deep dive to answer. Now the
+app answers it for anyone: the Penguins' +5 goals push them up, their xG is dead even, and
+last season still carries most of the rating.
+
+**Design decisions:**
+- **An explanation that adds up.** The rating is a weighted average, so I split it into
+  three parts (goals, xG, last season) that sum to the rating exactly, with a test that
+  checks it. There's no approximate "feature importance" here.
+- **Same units everywhere.** All four factors are in goals/game, including the schedule
+  (opponents' strength vs. a typical schedule, plus home ice), so they can be compared
+  directly.
+- **Computed once a day, not per request.** The daily job saves the breakdown with the
+  simulator inputs. The endpoint just reads it.
+- **Hidden by default.** The page looks the same for people who just want standings. The
+  breakdown only downloads the first time someone opens a team.
+- **Honest wording.** My first version called a schedule "one of the tougher ones" because it
+  ranked 22nd. In October, though, every schedule is within 0.03 goals/game of average. I
+  switched the wording to the size of the effect, not the rank.
+
+**What I learned:**
+- Explainability is easiest when it's designed into the model's math. A simple, additive
+  model can explain itself exactly, while a black box needs approximations (like SHAP).
+- A rank always sounds meaningful, even when the gaps behind it are tiny. Check the
+  magnitude before writing the words.
+
+**Interview angle:** "How would you explain a model's prediction to a non-technical user?"
+Break it into parts that add up to the answer, in one unit, with plain-English direction
+words, and keep it one tap away instead of on every screen.
 
 ---
 

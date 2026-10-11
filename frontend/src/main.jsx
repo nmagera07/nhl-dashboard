@@ -16,7 +16,13 @@ if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || (import.meta.env.PROD ? 'production' : 'development'),
-    tracesSampleRate: 0.1,
+    // Real-user performance: Core Web Vitals, page loads, and every API
+    // call's timing. Traffic is small enough to keep every trace for now.
+    integrations: [Sentry.browserTracingIntegration()],
+    tracesSampleRate: 1.0,
+    // No sentry-trace/baggage headers on API calls: custom headers make
+    // every cross-origin GET pay for a CORS preflight round trip first.
+    tracePropagationTargets: [],
   });
 }
 

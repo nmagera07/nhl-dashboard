@@ -3,6 +3,7 @@ import { INTELLIGENCE_BASE } from "../config.js";
 import ChatMarkdown from "./ChatMarkdown.jsx";
 import { SUGGESTIONS } from "./chatSuggestions.js";
 import { warmUpChat } from "../utils/warmUp.js";
+import { startChatTimer } from "../utils/chatTiming.js";
 
 // Follow-ups: send the last 2 exchanges so "what about their power play?"
 // makes sense. The service enforces the same cap.
@@ -98,18 +99,27 @@ export default function IntelligencePanel({ context, label }) {
       { id: newId(), role: "user", content: question },
       { id: newId(), role: "assistant", content: "", pending: true },
     ]);
+    const timer = startChatTimer();
     try {
       await streamAnswer({
         message: question,
         context,
         history,
-        onStatus: (status) => updateLast(() => ({ status })),
-        onDelta: (delta) => updateLast((m) => ({ content: m.content + delta })),
+        onStatus: (status) => {
+          timer.status();
+          updateLast(() => ({ status }));
+        },
+        onDelta: (delta) => {
+          timer.text();
+          updateLast((m) => ({ content: m.content + delta }));
+        },
         onDone: (payload) => updateLast(() => ({ pending: false, model: payload.model, evidence: payload.evidence || [] })),
       });
       updateLast(() => ({ pending: false }));
+      timer.finish();
     } catch (error) {
       updateLast(() => ({ pending: false, error: error.message || FALLBACK_ERROR }));
+      timer.finish({ error: true });
     } finally {
       setLoading(false);
     }

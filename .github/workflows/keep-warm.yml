@@ -1,0 +1,53 @@
+name: Keep API Warm
+#
+# The API's Container App scales to zero when idle and Neon suspends the
+# database after ~5 minutes, so the first visit after a quiet spell waits
+# ~25-30s for a cold start. Pinging /health (which runs SELECT 1) every
+# ~4 minutes during active hours keeps both the container and the
+# database awake, for free.
+#
+# Schedule (cron is UTC): every 4 minutes, 13:00-05:59 UTC.
+#   EDT (UTC-4, Mar-Nov): 9:00am - 1:59am Eastern
+#   EST (UTC-5, Nov-Mar): 8:00am - 12:59am Eastern
+# GitHub's scheduler can run late or skip runs under load, so this keeps
+# things warm most of the time, not always. A visit outside these hours
+# still cold starts.
+#
+# Never noisy: a failed ping is logged as a warning and the job still
+# exits 0, so a sleeping or broken API doesn't send an email every 4
+# minutes. Deploy Drift Check and the deploy workflows own real alerting.
+
+on:
+  schedule:
+    - cron: "*/4 13-23,0-5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: false
+
+env:
+  # Same production URL as backend-deploy.yml and deploy-drift-check.yml.
+  HEALTH_URL: https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /health
+        run: |
+          # 45s covers a full cold start (~29s measured); one retry after 10s.
+          for attempt in 1 2; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 45 "$HEALTH_URL" || true)
+            if [ "$code" = "200" ]; then
+              echo "attempt $attempt: /health 200"
+              exit 0
+            fi
+            echo "attempt $attempt: /health returned $code"
+            [ "$attempt" = 1 ] && sleep 10
+          done
+          echo "::warning::Keep-warm ping failed twice (last status $code); not failing the job."
+          exit 0

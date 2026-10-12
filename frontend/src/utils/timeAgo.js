@@ -9,11 +9,3 @@ export function timeAgo(iso, now = Date.now()) {
   if (hours < 48) return "Yesterday";
   return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
-
-// "2026-10-16" -> "Oct 16", for expected return dates.
-export function shortDate(isoDate) {
-  if (!isoDate) return null;
-  const [y, m, d] = isoDate.slice(0, 10).split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}

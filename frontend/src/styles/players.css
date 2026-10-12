@@ -1,0 +1,111 @@
+/* The player column absorbs spare width so stats sit together on the right. */
+.roster-table .col-team { width: 40%; }
+.roster-player { display: inline-flex; align-items: center; }
+.player-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  margin-right: 10px;
+  background: var(--bg);
+  vertical-align: middle;
+}
+.player-name-cell {
+  display: inline-block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.player-hero {
+  margin: 0 var(--gutter) 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.player-hero-identity { display: flex; align-items: center; gap: 18px; }
+.player-headshot {
+  width: 88px;
+  height: 88px;
+  flex: 0 0 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.player-hero-title { min-width: 0; }
+.player-hero-title h1 { margin: 0; font-size: 26px; line-height: 1.15; }
+.player-hero-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 6px 0 0; color: var(--text-dim); font-size: 14px; }
+.player-team-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-weight: 700; text-decoration: none; }
+.player-team-link:hover { color: var(--accent); }
+.player-team-logo { width: 20px; height: 20px; object-fit: contain; }
+.player-hero-bio { margin: 6px 0 0; color: var(--text-dim); font-size: 12px; }
+.player-hero-season { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.player-hero-season-label { margin-bottom: 10px; color: var(--text-dim); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.player-hero-season .muted { margin: 0; font-size: 13px; }
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 12px; margin: 0; }
+.stat-strip-item dt { color: var(--text-dim); font-size: 11px; letter-spacing: 0.04em; }
+.stat-strip-item dd { margin: 4px 0 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat-strip-item dd.is-highlight { color: var(--accent); }
+.player-section { margin: 0 0 24px; }
+.player-section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 var(--gutter) 10px; }
+.player-section-header h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.player-card { margin: 0 var(--gutter); padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.player-card-note { margin: 12px 0 0; color: var(--text-dim); font-size: 11px; }
+.player-stats-table tbody tr { cursor: default; }
+.player-stats-table tbody tr:hover { background: none; }
+.player-stats-table .col-team { width: 30%; color: var(--text-dim); }
+.show-more-btn {
+  display: block;
+  margin: 10px var(--gutter) 0;
+  padding: 8px 0;
+  width: calc(100% - 2 * var(--gutter));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.show-more-btn:hover { border-color: var(--accent); }
+.leaderboard-panel { padding-top: 0; }
+.leaderboard-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 var(--gutter);
+  margin-bottom: 16px;
+}
+.leaderboard-search { width: 220px; }
+.leaderboard-group-tabs { display: flex; gap: 8px; }
+.leaderboard-table-card { margin: 0 var(--gutter); }
+.leaderboard-table-card .standings-table { min-width: 760px; }
+.leaderboard-table-card .col-team { min-width: 230px; white-space: nowrap; }
+.leaderboard-table-card .team-name {
+  display: inline-block;
+  max-width: 145px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.leaderboard-mobile-list { display: none; }
+.sortable-col { cursor: pointer; user-select: none; }
+.sortable-col:hover { color: var(--text); }
+.sortable-col-active { color: var(--accent); }
+.leaderboard-team-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.col-po { width: 48px; font-weight: 700; }
+.po-in { color: #22c55e; }
+.po-out { color: var(--text-dim); }

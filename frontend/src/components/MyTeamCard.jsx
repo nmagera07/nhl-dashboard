@@ -1,3 +1,4 @@
+import { ordinal } from "../utils/ordinal.js";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
@@ -8,11 +9,6 @@ import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import GoalAlerts from "./GoalAlerts.jsx";
 
 const LIVE_REFRESH_MS = 30_000;
-function ordinal(n) {
-  const suffixes = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
-}
 
 const versus = (game) => `${game.home ? "vs" : "@"} ${game.opponent}`;
 

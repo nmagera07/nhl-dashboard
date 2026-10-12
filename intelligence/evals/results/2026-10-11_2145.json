@@ -1,0 +1,109 @@
+{
+  "started": "2026-10-12T01:44:30+00:00",
+  "api": "http://127.0.0.1:8010",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "Yes, as of the latest ESPN report, Drew Helleson is on Injured Reserve with a lower body injury and is hoping to return around October 13, 2026.",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Drew Helleson'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides correct status, injury type, return date, and attribution without incorrect details"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "no_lineup_data",
+          "question": "Who's on the Penguins' first line tonight?",
+          "answer": "I don't have lineup or line-combination data, so I can't tell you who is on the Penguins' first line tonight.",
+          "seconds": 0.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer correctly states inability to provide line information."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "",
+          "seconds": 0.4,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "no_lineup_data",
+          "question": "Who's on the Penguins' first line tonight?",
+          "answer": "I\u2019m sorry\u2014I don\u2019t have line\u2011combination or scratch data, so I can\u2019t tell you who\u2019s slated for the Penguins\u2019 first line tonight.",
+          "seconds": 2.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The assistant correctly stated it cannot provide line or scratch data."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

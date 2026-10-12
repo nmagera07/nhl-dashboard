@@ -1,3 +1,4 @@
+import TeamNews from "./TeamNews.jsx";
 import TeamSummary from "./TeamSummary.jsx";
 import SeasonSimulator from "./SeasonSimulator.jsx";
 import StatAbbr from "./StatAbbr.jsx";
@@ -116,6 +117,7 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
     <main className="roster-panel">
       <button className="back-link" onClick={onBack}>&larr; Standings</button>
       <TeamSummary team={team} />
+      {team && <TeamNews abbrev={team.team_abbrev} />}
       {team && <SeasonSimulator team={team} />}
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
       <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />

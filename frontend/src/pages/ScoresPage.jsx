@@ -4,6 +4,7 @@ import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
 import DailyDigest from "../components/DailyDigest.jsx";
+import TopHeadlines from "../components/TopHeadlines.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
 
@@ -62,6 +63,7 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
         </div>
       ) : null}
       {isToday && <DailyDigest />}
+      {isToday && <TopHeadlines />}
       <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
       <Scoreboard key={date} date={isToday ? null : date} />
     </main>

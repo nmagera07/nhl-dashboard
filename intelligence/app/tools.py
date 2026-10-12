@@ -87,6 +87,16 @@ TOOLS = [
         ["team"]),
     _fn("find_player", "Look up a player by name: season stats, career, and 5-on-5 advanced stats.",
         {"name": {"type": "string", "description": "Full or last name, e.g. 'Crosby'."}}, ["name"]),
+    _fn("get_injuries",
+        "The current injury report (ESPN): each injured player's status (injured reserve, out, day-to-day), injury, "
+        "expected return, and a short note. Ask about one player by name (searches every team, so no need to know his "
+        "team), one team, or the whole league.",
+        {"player": {"type": "string", "description": "Optional player name, e.g. 'Drew Helleson'."},
+         "team": {"type": "string", "description": "Optional team abbreviation, e.g. PIT."}}),
+    _fn("get_news",
+        "Recent NHL headlines (NHL.com, ESPN, Sportsnet) with short summaries, plus recent transactions (signings, "
+        "trades, recalls, IR moves). For one team, or the whole league if none is given.",
+        {"team": {"type": "string", "description": "Optional team abbreviation, e.g. PIT."}}),
     _fn("get_leaders", "League leaders: points, goals, or goalie wins.",
         {"category": {"type": "string", "enum": ["points", "goals", "goalie_wins"], "description": "Default: all three."}}),
 ]
@@ -106,6 +116,8 @@ LABELS = {
     "get_game": ("Pulling up the box score", "NHL game box score"),
     "find_player": ("Looking up the player", "Player profile and stats"),
     "get_leaders": ("Checking the league leaders", "League leaders"),
+    "get_injuries": ("Checking the injury report", "Injury report (ESPN)"),
+    "get_news": ("Checking the latest news", "Headlines and transactions"),
 }
 
 MAX_RESULT_CHARS = 6000
@@ -408,6 +420,36 @@ class ToolRunner:
                            "replacement-level player; a player who arrives is assumed to replace one. It's the rest "
                            "of the season, a rough estimate that ignores line chemistry and the salary cap: say so.",
         }
+
+    async def _tool_get_injuries(self, player: str | None = None, team: str | None = None):
+        if player:
+            # The whole league's report, searched by name: a model asked about a
+            # player tends to guess his team, and a wrong guess read as "healthy".
+            query = player.strip().lower()
+            report = await self._get("/injuries")
+            found = [{"team": t, **compact._clean(i)} for t, rows in (report.get("teams") or {}).items()
+                     for i in rows if query in (i.get("player") or "").lower()]
+            if found:
+                return {"source": "ESPN injury report", "matches": found}
+            return {"source": "ESPN injury report", "matches": [],
+                    "note": f"No one matching '{player}' is on the injury report (that doesn't guarantee he's playing)."}
+        abbrev = await self._team(team) if team else None
+        report = await self._get(f"/injuries?team={abbrev}" if abbrev else "/injuries")
+        teams = {t: [compact._clean(i) for i in rows] for t, rows in (report.get("teams") or {}).items() if rows or abbrev}
+        return {"source": "ESPN injury report", "teams": teams,
+                "note": "Players not listed aren't on the report; that doesn't guarantee they're playing."}
+
+    async def _tool_get_news(self, team: str | None = None):
+        abbrev = await self._team(team) if team else None
+        query = f"?team={abbrev}" if abbrev else ""
+        headlines, moves = await asyncio.gather(
+            self._get(f"/news{query}{'&' if query else '?'}limit=8"), self._get(f"/transactions{query}{'&' if query else '?'}limit=10"))
+        return compact._clean({
+            "team": abbrev,
+            "headlines": [compact._clean({"title": h["title"], "source": h["source"], "published": h["published"][:16],
+                                          "summary": h.get("summary")}) for h in headlines.get("headlines", [])],
+            "transactions": moves.get("transactions", []),
+        })
 
     async def _tool_get_leaders(self, category: str | None = None):
         leaders = compact.leaders(await self._get("/players/leaders"))

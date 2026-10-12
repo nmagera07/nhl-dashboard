@@ -258,3 +258,42 @@ class TestAgentLoop:
         assert response.answer == "Here's what I found."
         assert len(calls) == MAX_TOOL_ROUNDS + 1
         assert "tools" not in calls[-1][1]  # the last round has to answer
+
+
+@pytest.mark.asyncio
+class TestNewsTools:
+    async def call(self, name, args):
+        def handler(request):
+            path = request.url.path
+            if path == "/standings/latest":
+                return httpx.Response(200, json=STANDINGS)
+            if path == "/injuries":
+                team = request.url.params.get("team")
+                teams = {"PIT": [{"player": "Justin Brazeau", "status": "Injured Reserve", "injury": "Lower Body", "note": None}], "COL": []}
+                return httpx.Response(200, json={"source": "ESPN", "teams": {team: teams.get(team, [])} if team else teams})
+            if path == "/news":
+                return httpx.Response(200, json={"headlines": [{"title": "Penguins respond", "source": "NHL.com", "published": "2026-10-11T12:00:00Z", "summary": ""}]})
+            if path == "/transactions":
+                return httpx.Response(200, json={"transactions": [{"date": "2026-10-11", "team": "PIT", "description": "Recalled F X."}]})
+            return httpx.Response(404, json={})
+        async with httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler)) as client:
+            return json.loads(await ToolRunner(DashboardClient("https://dashboard.test", client)).run(name, json.dumps(args)))
+
+    async def test_injuries_for_a_team_by_name(self):
+        result = await self.call("get_injuries", {"team": "Penguins"})
+        assert result["teams"] == {"PIT": [{"player": "Justin Brazeau", "status": "Injured Reserve", "injury": "Lower Body"}]}
+        assert "aren't on the report" in result["note"]
+
+    async def test_a_player_is_found_on_any_team_by_name(self):
+        result = await self.call("get_injuries", {"player": "brazeau"})
+        assert result["matches"] == [{"team": "PIT", "player": "Justin Brazeau", "status": "Injured Reserve", "injury": "Lower Body"}]
+        missing = await self.call("get_injuries", {"player": "Sidney Crosby"})
+        assert missing["matches"] == [] and "isn't" not in missing["note"] and "doesn't guarantee" in missing["note"]
+
+    async def test_league_injuries_skip_teams_with_nobody_hurt(self):
+        assert list((await self.call("get_injuries", {}))["teams"]) == ["PIT"]
+
+    async def test_news_brings_headlines_and_transactions(self):
+        result = await self.call("get_news", {"team": "PIT"})
+        assert result["headlines"][0] == {"title": "Penguins respond", "source": "NHL.com", "published": "2026-10-11T12:00"}
+        assert result["transactions"][0]["description"] == "Recalled F X."

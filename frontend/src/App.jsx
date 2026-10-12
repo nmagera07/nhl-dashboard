@@ -17,6 +17,7 @@ import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";
+import NewsPage from "./pages/NewsPage.jsx";
 
 export default function NHLDashboard() {
   const [standingsView, setStandingsView] = useState("standard"); // standard | advanced
@@ -169,6 +170,7 @@ export default function NHLDashboard() {
               />
             )}
           />
+          <Route path="/news" element={<NewsPage standings={standings} />} />
           {/* No standings gate: the odds chart doesn't need standings, so it can show while they load. */}
           <Route path="/playoffs" element={<PlayoffsPage standings={standings} standingsStatus={status} />} />
           <Route

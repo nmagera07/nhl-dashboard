@@ -48,6 +48,31 @@ describe("IntelligencePanel", () => {
     expect(within(drawer).getByRole("button", { name: "What was the turning point?" })).toBeInTheDocument();
   });
 
+  it("builds the answer from streamed pieces, dropping text the model took back", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
+      Promise.resolve(String(url).endsWith("/chat/stream")
+        ? {
+            ok: true,
+            body: sseStream(
+              { type: "delta", text: "Let me check." },
+              { type: "reset" },
+              { type: "status", text: "Checking the league leaders…" },
+              { type: "delta", text: "Crosby leads " },
+              { type: "delta", text: "with 9 points." },
+              { type: "done", evidence: [], model: "Google Gemini" }
+            ),
+          }
+        : { ok: true, json: async () => ({}) })
+    );
+    render(<IntelligencePanel context={{ page: "standings" }} label="the standings" />);
+    await open();
+
+    await ask("Who leads in points?");
+
+    expect(await screen.findByText("Crosby leads with 9 points.")).toBeInTheDocument();
+    expect(screen.queryByText(/let me check/i)).not.toBeInTheDocument();
+  });
+
   it("sends the page context and shows the answer with its evidence and provider", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(answer("Chicago's record trails the leaders."));
     render(<IntelligencePanel context={{ page: "team", team_abbrev: "CHI" }} label="Chicago Blackhawks" />);

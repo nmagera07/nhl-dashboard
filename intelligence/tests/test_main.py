@@ -1,3 +1,4 @@
+import json
 import httpx
 import pytest
 from fastapi import HTTPException
@@ -68,7 +69,8 @@ async def test_stream_reports_which_provider_answered():
         service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client), chain=chain("Fine season."))
         events = [e async for e in service.answer_stream(ChatRequest(message="?", context=ChatContext(page="player", player_id=7)))]
 
-    assert '"text": "Fine season."' in events[0]
+    deltas = [json.loads(e[6:]) for e in events if '"type": "delta"' in e]
+    assert len(deltas) == 2 and "".join(d["text"] for d in deltas) == "Fine season."  # streamed in pieces
     assert '"type": "done"' in events[-1] and '"model": "Groq"' in events[-1]
 
 

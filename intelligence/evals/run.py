@@ -45,13 +45,21 @@ JUDGES = ("gemini", "groq")
 async def run_case(service, case, truth, judge_chain):
     calls = 0
     real = service.chain.complete_with_tools
+    real_stream = service.chain.stream_with_tools
 
     async def counted(*args, **kwargs):
         nonlocal calls
         calls += 1
         return await real(*args, **kwargs)
 
+    async def counted_stream(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        async for event in real_stream(*args, **kwargs):
+            yield event
+
     service.chain.complete_with_tools = counted
+    service.chain.stream_with_tools = counted_stream
     trace, answer, error = [], "", None
     started = time.monotonic()
     try:
@@ -69,6 +77,7 @@ async def run_case(service, case, truth, judge_chain):
         error = f"{type(exc).__name__}: {exc}"
     finally:
         service.chain.complete_with_tools = real
+        service.chain.stream_with_tools = real_stream
     seconds = time.monotonic() - started
 
     checks = []

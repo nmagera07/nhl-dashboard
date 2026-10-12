@@ -32,7 +32,21 @@ class _Completions:
             message = SimpleNamespace(content=None, tool_calls=turn)
         else:
             message = SimpleNamespace(content=turn, tool_calls=None)
+        if kwargs.get("stream"):
+            return _stream(message)
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+async def _stream(message):
+    """The turn as stream chunks: text in two pieces, tool calls in one chunk."""
+    def chunk(**delta):
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(**{"content": None, "tool_calls": None, **delta}))])
+    if message.content:
+        half = len(message.content) // 2
+        for piece in (message.content[:half], message.content[half:]):
+            yield chunk(content=piece)
+    if message.tool_calls:
+        yield chunk(tool_calls=message.tool_calls)
 
 
 def fake_factory(behaviors, calls):

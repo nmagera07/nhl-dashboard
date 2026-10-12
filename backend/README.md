@@ -233,3 +233,11 @@ password.
 - `standings_snapshots` is unique per `(snapshot_date, team_abbrev)`.
   Re-running the ingestion the same day overwrites that day's rows, so the
   latest run wins (an early or mid-game run can't freeze the day).
+
+## Server-side response cache
+
+`daily_cache.py` keeps an in-memory TTL cache (per replica) for read endpoints whose data only changes with the daily ingest: `/teams`, `/teams/{abbrev}/roster`, `/players/leaders` (keyed on the full query string, so `?view=table` is a separate entry), `/playoff-odds`, `/playoff-odds/history`, `/playoff-odds/why`, `/season-sim`, `/standings/latest`, `/standings/{abbrev}`, `/standings/{abbrev}/seasons`, `/digest/latest`, `/predictions/track-record`. Live endpoints (games, schedules, news, scenarios, `/players/{id}`), `/health` and push POST/DELETE are not cached. Errors are never cached.
+
+- `DAILY_CACHE_TTL_SECONDS` (default 600), `DAILY_CACHE_MAX_ENTRIES` (default 256, LRU).
+- `DAILY_CACHE_DISABLED=1` turns it off.
+- The hourly ingestion freshness loop clears it when `MAX(created_at)` on `standings_snapshots` changes.

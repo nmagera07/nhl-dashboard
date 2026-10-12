@@ -52,6 +52,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import push
+from daily_cache import cache as daily_cache
 import season_scenarios
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
@@ -141,6 +142,7 @@ def compute_staleness(last_updated, now, threshold_hours):
 
 
 async def check_ingestion_freshness_loop():
+    last_seen = None
     while True:
         try:
             conn = get_connection()
@@ -150,6 +152,13 @@ async def check_ingestion_freshness_loop():
                     last_updated = as_utc(cur.fetchone()["last_updated"])
             finally:
                 conn.close()
+
+            # New standings rows mean the daily ingest has run: drop cached
+            # responses now rather than waiting out their TTL.
+            if last_seen is not None and last_updated != last_seen:
+                daily_cache.clear()
+                logger.info("New ingest detected -- cleared the daily response cache")
+            last_seen = last_updated
 
             is_stale, hours_old = compute_staleness(
                 last_updated, datetime.now(timezone.utc), INGESTION_STALE_THRESHOLD_HOURS
@@ -413,16 +422,19 @@ def team_schedule_summary(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")
 @app.get("/teams", response_model=List[Team])
 def list_teams():
     """List all teams we have data for."""
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM teams ORDER BY team_name")
-            return cur.fetchall()
-    except Exception:
-        logger.error("Failed to fetch teams", exc_info=True)
-        raise
-    finally:
-        conn.close()
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM teams ORDER BY team_name")
+                return cur.fetchall()
+        except Exception:
+            logger.error("Failed to fetch teams", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("teams",), _compute)
 
 
 @app.get("/playoff-odds", response_model=List[PlayoffOdds])
@@ -432,25 +444,28 @@ def playoff_odds(request: Request):
     Monte Carlo playoff-odds simulation results for every team, as of the
     most recently computed snapshot. See simulate_playoff_odds.py.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT po.*, t.team_name, t.division, t.conference, t.logo_url
-                FROM playoff_odds po
-                JOIN teams t ON t.team_abbrev = po.team_abbrev
-                WHERE po.as_of_date = (SELECT MAX(as_of_date) FROM playoff_odds WHERE season_id = po.season_id)
-                  AND po.season_id = (SELECT MAX(season_id) FROM playoff_odds)
-                ORDER BY po.playoff_pct DESC
-                """
-            )
-            return cur.fetchall()
-    except Exception:
-        logger.error("Failed to fetch playoff odds", exc_info=True)
-        raise
-    finally:
-        conn.close()
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT po.*, t.team_name, t.division, t.conference, t.logo_url
+                    FROM playoff_odds po
+                    JOIN teams t ON t.team_abbrev = po.team_abbrev
+                    WHERE po.as_of_date = (SELECT MAX(as_of_date) FROM playoff_odds WHERE season_id = po.season_id)
+                      AND po.season_id = (SELECT MAX(season_id) FROM playoff_odds)
+                    ORDER BY po.playoff_pct DESC
+                    """
+                )
+                return cur.fetchall()
+        except Exception:
+            logger.error("Failed to fetch playoff odds", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("playoff-odds",), _compute)
 
 
 @app.get("/playoff-odds/history", response_model=PlayoffOddsHistory)
@@ -461,31 +476,35 @@ def playoff_odds_history(request: Request, season_id: Optional[int] = Query(None
     odds), oldest first -- one point per team per simulated day. Also lists
     which seasons have odds, so the page can offer a season switch.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT season_id FROM playoff_odds ORDER BY season_id DESC")
-            seasons = [row["season_id"] for row in cur.fetchall()]
-            if season_id is None:
-                season_id = seasons[0] if seasons else None
-            points = []
-            if season_id in seasons:
-                cur.execute(
-                    """
-                    SELECT as_of_date, team_abbrev, playoff_pct
-                    FROM playoff_odds
-                    WHERE season_id = %s
-                    ORDER BY as_of_date, team_abbrev
-                    """,
-                    (season_id,),
-                )
-                points = cur.fetchall()
-            return {"season_id": season_id, "available_seasons": seasons, "points": points}
-    except Exception:
-        logger.error("Failed to fetch playoff odds history", exc_info=True)
-        raise
-    finally:
-        conn.close()
+    def _compute():
+        nonlocal season_id
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT season_id FROM playoff_odds ORDER BY season_id DESC")
+                seasons = [row["season_id"] for row in cur.fetchall()]
+                if season_id is None:
+                    season_id = seasons[0] if seasons else None
+                points = []
+                if season_id in seasons:
+                    cur.execute(
+                        """
+                        SELECT as_of_date, team_abbrev, playoff_pct
+                        FROM playoff_odds
+                        WHERE season_id = %s
+                        ORDER BY as_of_date, team_abbrev
+                        """,
+                        (season_id,),
+                    )
+                    points = cur.fetchall()
+                return {"season_id": season_id, "available_seasons": seasons, "points": points}
+        except Exception:
+            logger.error("Failed to fetch playoff odds history", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("playoff-odds/history", season_id), _compute)
 
 
 @app.get("/season-sim")
@@ -496,20 +515,23 @@ def season_sim_inputs(request: Request):
     game model's constants, each team's record and strength rating, and the
     remaining schedule. Written by the daily simulate_playoff_odds.py run.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT payload FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
-            row = cur.fetchone()
-    except Exception:
-        logger.error("Failed to fetch season simulator inputs", exc_info=True)
-        raise
-    finally:
-        conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
-    # Player values are for the roster-change endpoint; the browser doesn't need them.
-    return {k: v for k, v in row["payload"].items() if k != "players"}
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT payload FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
+                row = cur.fetchone()
+        except Exception:
+            logger.error("Failed to fetch season simulator inputs", exc_info=True)
+            raise
+        finally:
+            conn.close()
+        if row is None:
+            raise HTTPException(status_code=404, detail="The season simulator hasn't run yet.")
+        # Player values are for the roster-change endpoint; the browser doesn't need them.
+        return {k: v for k, v in row["payload"].items() if k != "players"}
+
+    return daily_cache.get_or_compute(("season-sim",), _compute)
 
 
 @app.get("/playoff-odds/why")
@@ -520,13 +542,16 @@ def playoff_odds_why():
     up to the rating), plus how its remaining schedule helps or hurts. From
     the latest daily run; see simulate_playoff_odds.odds_explanations().
     """
-    payload = _latest_sim_inputs()
-    return {
-        "season_id": payload["season_id"],
-        "as_of_date": payload["as_of_date"],
-        "model_version": payload.get("model", {}).get("version"),
-        "teams": payload.get("why", {}),
-    }
+    def _compute():
+        payload = _latest_sim_inputs()
+        return {
+            "season_id": payload["season_id"],
+            "as_of_date": payload["as_of_date"],
+            "model_version": payload.get("model", {}).get("version"),
+            "teams": payload.get("why", {}),
+        }
+
+    return daily_cache.get_or_compute(("playoff-odds/why",), _compute)
 
 
 @app.get("/digest/latest")
@@ -535,19 +560,22 @@ def latest_digest():
     The most recent morning digest: AI-written text (or null if the AI was
     unavailable), the facts it was written from, and which model wrote it.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT digest_date, text, model, facts, created_at FROM daily_digest ORDER BY digest_date DESC LIMIT 1")
-            row = cur.fetchone()
-    except Exception:
-        logger.error("Failed to fetch the digest", exc_info=True)
-        raise
-    finally:
-        conn.close()
-    if row is None:
-        raise HTTPException(status_code=404, detail="No digest yet.")
-    return row
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT digest_date, text, model, facts, created_at FROM daily_digest ORDER BY digest_date DESC LIMIT 1")
+                row = cur.fetchone()
+        except Exception:
+            logger.error("Failed to fetch the digest", exc_info=True)
+            raise
+        finally:
+            conn.close()
+        if row is None:
+            raise HTTPException(status_code=404, detail="No digest yet.")
+        return row
+
+    return daily_cache.get_or_compute(("digest/latest",), _compute)
 
 
 @app.get("/predictions/track-record")
@@ -557,24 +585,27 @@ def prediction_track_record():
     favorite won, its Brier score against a coin flip, calibration buckets,
     and the most recent graded games. See game_predictions.py.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT game_id, game_date, home_abbrev, away_abbrev, home_win_prob, home_score, away_score, "
-                "ended, home_won, model_version, source FROM game_predictions "
-                "WHERE season_id = (SELECT MAX(season_id) FROM game_predictions)"
-            )
-            rows = cur.fetchall()
-            cur.execute("SELECT COUNT(*) AS n FROM game_predictions WHERE home_won IS NULL "
-                        "AND season_id = (SELECT MAX(season_id) FROM game_predictions)")
-            pending = cur.fetchone()["n"]
-    except Exception:
-        logger.error("Failed to fetch the prediction track record", exc_info=True)
-        raise
-    finally:
-        conn.close()
-    return {**track_record(rows), "pending": pending}
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT game_id, game_date, home_abbrev, away_abbrev, home_win_prob, home_score, away_score, "
+                    "ended, home_won, model_version, source FROM game_predictions "
+                    "WHERE season_id = (SELECT MAX(season_id) FROM game_predictions)"
+                )
+                rows = cur.fetchall()
+                cur.execute("SELECT COUNT(*) AS n FROM game_predictions WHERE home_won IS NULL "
+                            "AND season_id = (SELECT MAX(season_id) FROM game_predictions)")
+                pending = cur.fetchone()["n"]
+        except Exception:
+            logger.error("Failed to fetch the prediction track record", exc_info=True)
+            raise
+        finally:
+            conn.close()
+        return {**track_record(rows), "pending": pending}
+
+    return daily_cache.get_or_compute(("predictions/track-record",), _compute)
 
 
 # "What if" simulations (NHL Intelligence's scenario tools). A few seconds of
@@ -835,45 +866,48 @@ def team_roster(team_abbrev: str = Path(..., max_length=3)):
     404s if team_abbrev isn't a real team. Returns an empty 200 list (not
     a 404) for a real team that simply has no roster rows loaded yet.
     """
-    abbrev = team_abbrev.upper()
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+    def _compute():
+        abbrev = team_abbrev.upper()
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+                if not cur.fetchone():
+                    raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
 
-            cur.execute(
-                """
-                SELECT p.*, s.season_id, s.games_played, s.goals, s.assists, s.points,
-                       s.plus_minus, s.pim, s.shots, s.shooting_pctg,
-                       s.power_play_goals, s.power_play_points,
-                       s.shorthanded_goals, s.shorthanded_points,
-                       s.game_winning_goals, s.ot_goals,
-                       s.wins, s.losses, s.ot_losses, s.goals_against_avg,
-                       s.save_pctg, s.shutouts
-                FROM players p
-                LEFT JOIN LATERAL (
-                    SELECT * FROM player_season_stats pss
-                    WHERE pss.player_id = p.player_id
-                      AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
-                    ORDER BY pss.season_id DESC
-                    LIMIT 1
-                ) s ON true
-                WHERE p.team_abbrev = %s
-                  AND p.on_roster
-                ORDER BY COALESCE(s.points, 0) DESC, COALESCE(s.wins, 0) DESC
-                """,
-                (abbrev,),
-            )
-            return cur.fetchall()
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error(f"Failed to fetch roster for team '{team_abbrev}'", exc_info=True)
-        raise
-    finally:
-        conn.close()
+                cur.execute(
+                    """
+                    SELECT p.*, s.season_id, s.games_played, s.goals, s.assists, s.points,
+                           s.plus_minus, s.pim, s.shots, s.shooting_pctg,
+                           s.power_play_goals, s.power_play_points,
+                           s.shorthanded_goals, s.shorthanded_points,
+                           s.game_winning_goals, s.ot_goals,
+                           s.wins, s.losses, s.ot_losses, s.goals_against_avg,
+                           s.save_pctg, s.shutouts
+                    FROM players p
+                    LEFT JOIN LATERAL (
+                        SELECT * FROM player_season_stats pss
+                        WHERE pss.player_id = p.player_id
+                          AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                        ORDER BY pss.season_id DESC
+                        LIMIT 1
+                    ) s ON true
+                    WHERE p.team_abbrev = %s
+                      AND p.on_roster
+                    ORDER BY COALESCE(s.points, 0) DESC, COALESCE(s.wins, 0) DESC
+                    """,
+                    (abbrev,),
+                )
+                return cur.fetchall()
+        except HTTPException:
+            raise
+        except Exception:
+            logger.error(f"Failed to fetch roster for team '{team_abbrev}'", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("teams/roster", team_abbrev.upper()), _compute)
 
 
 @app.get("/players/leaders", response_model=List[PlayerLeader])
@@ -884,37 +918,40 @@ def player_leaders(request: Request):
     leaderboard. Must be registered before /players/{player_id} so this
     literal path wins the match instead of being parsed as a player id.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT p.*, t.team_name, t.logo_url AS team_logo_url,
-                       s.season_id, s.games_played, s.goals, s.assists, s.points,
-                       s.plus_minus, s.pim, s.shots, s.shooting_pctg,
-                       s.power_play_goals, s.power_play_points,
-                       s.shorthanded_goals, s.shorthanded_points,
-                       s.game_winning_goals, s.ot_goals,
-                       s.wins, s.losses, s.ot_losses, s.goals_against_avg,
-                       s.save_pctg, s.shutouts
-                FROM players p
-                JOIN teams t ON t.team_abbrev = p.team_abbrev
-                LEFT JOIN LATERAL (
-                    SELECT * FROM player_season_stats pss
-                    WHERE pss.player_id = p.player_id
-                      AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
-                    ORDER BY pss.season_id DESC
-                    LIMIT 1
-                ) s ON true
-                ORDER BY COALESCE(s.points, 0) DESC
-                """
-            )
-            return cur.fetchall()
-    except Exception:
-        logger.error("Failed to fetch player leaders", exc_info=True)
-        raise
-    finally:
-        conn.close()
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT p.*, t.team_name, t.logo_url AS team_logo_url,
+                           s.season_id, s.games_played, s.goals, s.assists, s.points,
+                           s.plus_minus, s.pim, s.shots, s.shooting_pctg,
+                           s.power_play_goals, s.power_play_points,
+                           s.shorthanded_goals, s.shorthanded_points,
+                           s.game_winning_goals, s.ot_goals,
+                           s.wins, s.losses, s.ot_losses, s.goals_against_avg,
+                           s.save_pctg, s.shutouts
+                    FROM players p
+                    JOIN teams t ON t.team_abbrev = p.team_abbrev
+                    LEFT JOIN LATERAL (
+                        SELECT * FROM player_season_stats pss
+                        WHERE pss.player_id = p.player_id
+                          AND pss.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                        ORDER BY pss.season_id DESC
+                        LIMIT 1
+                    ) s ON true
+                    ORDER BY COALESCE(s.points, 0) DESC
+                    """
+                )
+                return cur.fetchall()
+        except Exception:
+            logger.error("Failed to fetch player leaders", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("players/leaders", request.url.query), _compute)
 
 
 def _goalie_advanced(cur, player_id):
@@ -1059,45 +1096,48 @@ def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
     back to the default, since a typo'd field name silently doing nothing
     would be a confusing way to fail.
     """
-    if sort_by is not None and sort_by not in STANDINGS_SORT_FIELDS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid sort_by '{sort_by}'. Must be one of: {', '.join(sorted(STANDINGS_SORT_FIELDS))}",
-        )
-    if sort_dir not in ("asc", "desc"):
-        raise HTTPException(status_code=400, detail="Invalid sort_dir. Must be 'asc' or 'desc'.")
-
-    order_clause = (
-        f"{STANDINGS_SORT_FIELDS[sort_by]} {sort_dir.upper()} NULLS LAST"
-        if sort_by
-        else "s.league_sequence ASC"
-    )
-
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url,
-                       ta.corsi_for_pct, ta.fenwick_for_pct, ta.xgoals_for_pct,
-                       ta.xgoals_for, ta.xgoals_against,
-                       ta.shots_on_goal_for, ta.shots_on_goal_against, ta.pdo
-                FROM standings_snapshots s
-                JOIN teams t ON t.team_abbrev = s.team_abbrev
-                LEFT JOIN team_advanced_stats ta
-                    ON ta.team_abbrev = s.team_abbrev AND ta.season_id = s.season_id
-                WHERE s.snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)
-                ORDER BY {order_clause}
-                """
+    def _compute():
+        if sort_by is not None and sort_by not in STANDINGS_SORT_FIELDS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid sort_by '{sort_by}'. Must be one of: {', '.join(sorted(STANDINGS_SORT_FIELDS))}",
             )
-            return cur.fetchall()
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error("Failed to fetch latest standings", exc_info=True)
-        raise
-    finally:
-        conn.close()
+        if sort_dir not in ("asc", "desc"):
+            raise HTTPException(status_code=400, detail="Invalid sort_dir. Must be 'asc' or 'desc'.")
+
+        order_clause = (
+            f"{STANDINGS_SORT_FIELDS[sort_by]} {sort_dir.upper()} NULLS LAST"
+            if sort_by
+            else "s.league_sequence ASC"
+        )
+
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT s.*, t.team_name, t.common_name, t.division, t.conference, t.logo_url,
+                           ta.corsi_for_pct, ta.fenwick_for_pct, ta.xgoals_for_pct,
+                           ta.xgoals_for, ta.xgoals_against,
+                           ta.shots_on_goal_for, ta.shots_on_goal_against, ta.pdo
+                    FROM standings_snapshots s
+                    JOIN teams t ON t.team_abbrev = s.team_abbrev
+                    LEFT JOIN team_advanced_stats ta
+                        ON ta.team_abbrev = s.team_abbrev AND ta.season_id = s.season_id
+                    WHERE s.snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)
+                    ORDER BY {order_clause}
+                    """
+                )
+                return cur.fetchall()
+        except HTTPException:
+            raise
+        except Exception:
+            logger.error("Failed to fetch latest standings", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("standings/latest", sort_by, sort_dir), _compute)
 
 
 @app.get("/standings/{team_abbrev}/seasons", response_model=List[SeasonFinalStanding])
@@ -1114,24 +1154,27 @@ def team_season_history(team_abbrev: str = Path(..., max_length=3)):
     team_abbrev -- see SeasonFinalStanding's docstring for the cross-endpoint
     404-vs-empty-list inconsistency.
     """
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT *
-                FROM season_final_standings
-                WHERE team_abbrev = %s
-                ORDER BY season_id ASC
-                """,
-                (team_abbrev.upper(),),
-            )
-            return cur.fetchall()
-    except Exception:
-        logger.error(f"Failed to fetch season history for team '{team_abbrev}'", exc_info=True)
-        raise
-    finally:
-        conn.close()
+    def _compute():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT *
+                    FROM season_final_standings
+                    WHERE team_abbrev = %s
+                    ORDER BY season_id ASC
+                    """,
+                    (team_abbrev.upper(),),
+                )
+                return cur.fetchall()
+        except Exception:
+            logger.error(f"Failed to fetch season history for team '{team_abbrev}'", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("standings/seasons", team_abbrev.upper()), _compute)
 
 
 @app.get("/standings/{team_abbrev}", response_model=List[StandingsHistoryRow])
@@ -1146,37 +1189,40 @@ def team_history(
     a 404) for a real team that simply has no snapshot rows yet (or none
     in the given start/end range).
     """
-    abbrev = team_abbrev.upper()
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
-            if not cur.fetchone():
-                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+    def _compute():
+        abbrev = team_abbrev.upper()
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+                if not cur.fetchone():
+                    raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
 
-            query = """
-                SELECT s.*, t.team_name
-                FROM standings_snapshots s
-                JOIN teams t ON t.team_abbrev = s.team_abbrev
-                WHERE s.team_abbrev = %s
-            """
-            params = [abbrev]
+                query = """
+                    SELECT s.*, t.team_name
+                    FROM standings_snapshots s
+                    JOIN teams t ON t.team_abbrev = s.team_abbrev
+                    WHERE s.team_abbrev = %s
+                """
+                params = [abbrev]
 
-            if start:
-                query += " AND s.snapshot_date >= %s"
-                params.append(start)
-            if end:
-                query += " AND s.snapshot_date <= %s"
-                params.append(end)
+                if start:
+                    query += " AND s.snapshot_date >= %s"
+                    params.append(start)
+                if end:
+                    query += " AND s.snapshot_date <= %s"
+                    params.append(end)
 
-            query += " ORDER BY s.snapshot_date ASC"
+                query += " ORDER BY s.snapshot_date ASC"
 
-            cur.execute(query, params)
-            return cur.fetchall()
-    except HTTPException:
-        raise
-    except Exception:
-        logger.error(f"Failed to fetch standings history for team '{team_abbrev}'", exc_info=True)
-        raise
-    finally:
-        conn.close()
+                cur.execute(query, params)
+                return cur.fetchall()
+        except HTTPException:
+            raise
+        except Exception:
+            logger.error(f"Failed to fetch standings history for team '{team_abbrev}'", exc_info=True)
+            raise
+        finally:
+            conn.close()
+
+    return daily_cache.get_or_compute(("standings/history", team_abbrev.upper(), start, end), _compute)

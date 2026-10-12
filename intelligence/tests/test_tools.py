@@ -223,6 +223,20 @@ class TestTools:
         assert ambiguous["multiple_matches"] == ["Sidney Crosby (PIT)", "Sidney Smith (BOS)"]
         assert "at least part" in (await self.call("find_player", {"name": "S"}))["error"]
 
+    # The Players page moved to /players/leaders?view=table (19 fields). These
+    # tools need the full 38-field default, so they must never add a query.
+    async def test_find_player_requests_the_full_leaders_view(self):
+        seen = []
+        await self.call("find_player", {"name": "crosby"}, seen)
+        leaders = [p for p in seen if p.startswith("/players/leaders")]
+        assert leaders and set(leaders) == {"/players/leaders"}
+
+    async def test_get_leaders_requests_the_full_leaders_view(self):
+        seen = []
+        await self.call("get_leaders", {"category": "goals"}, seen)
+        leaders = [p for p in seen if p.startswith("/players/leaders")]
+        assert leaders and set(leaders) == {"/players/leaders"}
+
 
 def service(turns, calls):
     providers = [Provider("groq", "Groq", None, "k", "m")]

@@ -75,6 +75,43 @@ class PlayerLeader(PlayerBio, LatestSeasonStatsFields):
     team_logo_url: Optional[str] = None
 
 
+class PlayerLeaderTableRow(BaseModel):
+    """
+    One row of GET /players/leaders?view=table -- only the fields the
+    Players page table (LeaderboardPage.jsx SKATER_COLUMNS/GOALIE_COLUMNS,
+    search and mobile cards) actually reads. Cuts the payload from ~1.18 MB
+    raw / ~91 KB gzip to ~0.5 MB / ~34 KB. The default (full) view is still
+    PlayerLeader, which the intelligence service and evals depend on.
+
+    If you add a column to the Players table, add its field here too.
+    """
+
+    player_id: int
+    first_name: str
+    last_name: str
+    position_code: str
+    team_abbrev: str
+    team_logo_url: Optional[str] = None
+    # skater stats
+    points: Optional[int] = None
+    goals: Optional[int] = None
+    assists: Optional[int] = None
+    plus_minus: Optional[int] = None
+    pim: Optional[int] = None
+    shots: Optional[int] = None
+    games_played: Optional[int] = None
+    # goalie stats
+    wins: Optional[int] = None
+    losses: Optional[int] = None
+    ot_losses: Optional[int] = None
+    goals_against_avg: Optional[float] = None
+    save_pctg: Optional[float] = None
+    shutouts: Optional[int] = None
+
+
+LEADER_TABLE_FIELDS = tuple(PlayerLeaderTableRow.model_fields)
+
+
 class PlayerSeasonStat(BaseModel):
     """One row of `player_season_stats`, as nested under GET /players/{player_id}."""
 

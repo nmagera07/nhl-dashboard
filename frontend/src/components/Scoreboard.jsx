@@ -6,6 +6,7 @@ import { darkLogo } from "../utils/darkLogo.js";
 import { todayISO } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import { nhlVideoUrl } from "../utils/highlights.js";
+import FavoriteStar from "./FavoriteStar.jsx";
 
 const scoresUrl = (date) => `${API_BASE}/games/date/${date || todayISO()}`;
 
@@ -26,7 +27,7 @@ function TeamLine({ team, phase: gamePhase, isWinner, isLoser }) {
   );
 }
 
-function GameCard({ game, onOpen }) {
+function GameCard({ game, onOpen, mine }) {
   const p = phase(game);
   const away = game.awayTeam;
   const home = game.homeTeam;
@@ -38,7 +39,7 @@ function GameCard({ game, onOpen }) {
   return (
     <div className="game-card-wrap">
       <button
-        className={`scoreboard-game game-card-${p}`}
+        className={`scoreboard-game game-card-${p}${mine ? " game-card-mine" : ""}`}
         type="button"
         onClick={onOpen}
         aria-label={`${away?.abbrev} at ${home?.abbrev}, ${statusLabel(game)}`}
@@ -47,6 +48,7 @@ function GameCard({ game, onOpen }) {
           {p === "live" && <span className="live-dot" />}
           {statusLabel(game)}
           {tv && <span className="game-card-tv">{tv}</span>}
+          {mine && <FavoriteStar />}
         </span>
         <TeamLine team={away} phase={p} isWinner={decided && awayWon} isLoser={decided && !awayWon} />
         <TeamLine team={home} phase={p} isWinner={decided && !awayWon} isLoser={decided && awayWon} />
@@ -62,12 +64,20 @@ function GameCard({ game, onOpen }) {
   );
 }
 
+// Your team's game goes first, then the usual order (live, upcoming, final).
+function orderGames(games, pinTeam) {
+  const sorted = sortGames(games);
+  if (!pinTeam) return sorted;
+  const isMine = (g) => g.awayTeam?.abbrev === pinTeam || g.homeTeam?.abbrev === pinTeam;
+  return [...sorted.filter(isMine), ...sorted.filter((g) => !isMine(g))];
+}
+
 // date: "YYYY-MM-DD" for another day, or null for today (which also
 // refreshes every minute; other days don't change often enough to poll).
 // Today is fetched by its date, not the NHL's "score/now" feed: that feed
 // keeps showing last night's games until late morning, which put
 // yesterday's finals under today's date.
-export default function Scoreboard({ date = null }) {
+export default function Scoreboard({ date = null, pinTeam = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   // Coming back from a box score: show the scores we just had, then refresh.
@@ -108,8 +118,9 @@ export default function Scoreboard({ date = null }) {
         <p className="scoreboard-empty">{date ? "No games on this day." : "No games scheduled today."}</p>
       )}
       <div className="scoreboard-games">
-        {sortGames(games).map((game) => (
-          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)} />
+        {orderGames(games, pinTeam).map((game) => (
+          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)}
+            mine={!!pinTeam && (game.awayTeam?.abbrev === pinTeam || game.homeTeam?.abbrev === pinTeam)} />
         ))}
       </div>
     </section>

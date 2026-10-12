@@ -1,0 +1,73 @@
+.team-summary {
+  margin: 0 var(--gutter) 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.team-summary-identity { display: flex; align-items: center; gap: 16px; }
+.team-summary-logo { width: 64px; height: 64px; flex: 0 0 64px; object-fit: contain; }
+.team-summary-title { flex: 1; min-width: 0; }
+.team-summary-title h1 { margin: 0; font-size: 24px; line-height: 1.2; }
+.team-summary-title p { margin: 4px 0 0; color: var(--text-dim); font-size: 13px; }
+.team-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.team-summary-stat dt { color: var(--text-dim); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.team-summary-stat dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.team-summary-stat dd.is-highlight { color: var(--accent); font-size: 20px; line-height: 1; }
+.team-summary-stat dd.is-pos { color: #22c55e; }
+.team-summary-stat dd.is-neg { color: #ef4444; }
+.trend-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+.years-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+.legend-dot-playoff { background: #3b82f6; }
+.legend-dot-missed { background: #4b5563; }
+.status-line {
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 0 var(--gutter);
+}
+.status-error { color: #ef4444; }
+.back-link {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 0 var(--gutter);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+.back-link:hover { color: var(--text); }
+.roster-panel, .player-panel { padding-top: 4px; }
+.roster-section-label {
+  margin: 0 0 8px;
+  padding: 0 var(--gutter);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.roster-section-count { margin-left: 4px; color: var(--text-dim); font-weight: 500; }
+.roster-section { margin-bottom: 24px; }

@@ -47,7 +47,6 @@ Usage:
 """
 
 import argparse
-from datetime import date
 import csv
 import io
 import os
@@ -57,6 +56,7 @@ import requests
 from dotenv import load_dotenv
 
 from logging_config import setup_logging
+from seasons import current_season_id
 
 load_dotenv()
 
@@ -69,11 +69,6 @@ SITUATION = "5on5"
 REQUEST_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 
 
-def current_season_id(today=None):
-    """Jul-Dec -> season starts this year; Jan-Jun -> it started last year."""
-    today = today or date.today()
-    start_year = today.year if today.month >= 7 else today.year - 1
-    return int(f"{start_year}{start_year + 1}")
 
 logger = setup_logging("ingest_advanced_stats")
 

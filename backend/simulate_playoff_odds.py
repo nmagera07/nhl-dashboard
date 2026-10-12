@@ -52,6 +52,7 @@ import requests
 from dotenv import load_dotenv
 
 from logging_config import setup_logging
+from seasons import current_season_id, previous_season_id  # noqa: F401 (re-exported for the model scripts)
 
 load_dotenv()
 
@@ -89,18 +90,6 @@ XG_WEIGHT = 0.5
 PRIOR_GAMES_XG = 30
 
 DEFAULT_TRIALS = 10000
-
-
-def current_season_id(today=None):
-    """Jul-Dec -> season starts this year; Jan-Jun -> it started last year."""
-    today = today or date.today()
-    start_year = today.year if today.month >= 7 else today.year - 1
-    return int(f"{start_year}{start_year + 1}")
-
-
-def previous_season_id(season_id):
-    start = season_id // 10000
-    return int(f"{start - 1}{start}")
 
 
 def nhl_get(url, retries=6):

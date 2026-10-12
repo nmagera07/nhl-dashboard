@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 
 // Shared fetch-and-status pattern used across pages: loading -> ready/error.
@@ -24,8 +24,17 @@ export function useFetchWithStatus(url, { initialData = null, transform, onSucce
   const [data, setData] = useState(() => cachedResponse(url) ?? initialData);
   const [status, setStatus] = useState(() => (cachedResponse(url) !== undefined ? "ready" : url ? "loading" : "idle"));
 
+  // The latest transform/onSuccess, without making them effect dependencies:
+  // callers pass fresh inline functions every render, and refetching on each
+  // render would loop. Only a new url triggers a fetch.
+  const callbacks = useRef({ transform, onSuccess });
+  useEffect(() => {
+    callbacks.current = { transform, onSuccess };
+  });
+
   useEffect(() => {
     if (!url) return;
+    const { transform, onSuccess } = callbacks.current;
     fetch(url)
       .then((res) => res.json())
       .then((raw) => {

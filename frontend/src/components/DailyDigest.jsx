@@ -5,7 +5,7 @@ import { todayISO } from "../utils/dates.js";
 import ChatMarkdown from "./ChatMarkdown.jsx";
 import { factsAsMarkdown } from "../utils/digest.js";
 
-function shortDate(iso) {
+function weekdayDateLabel(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 }
@@ -55,7 +55,7 @@ function DailyDigest() {
     <details className="daily-digest" open={open} onToggle={toggle}>
       <summary>
         <span className="daily-digest-title">☀️ Morning digest</span>
-        <span className="daily-digest-date">{shortDate(date)}</span>
+        <span className="daily-digest-date">{weekdayDateLabel(date)}</span>
         <span className="daily-digest-teaser">{headline(data)}</span>
       </summary>
       <div className="daily-digest-body">

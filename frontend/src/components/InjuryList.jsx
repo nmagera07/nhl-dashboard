@@ -1,4 +1,4 @@
-import { shortDate } from "../utils/timeAgo.js";
+import { shortDateLabel } from "../utils/dates.js";
 
 const STATUS_TONE = { "injured reserve": "ir", out: "out", "day-to-day": "dtd" };
 
@@ -14,7 +14,7 @@ function InjuryList({ injuries }) {
             <span className={`injury-status injury-status-${STATUS_TONE[(i.status || "").toLowerCase()] || "other"}`}>{i.status}</span>
           </div>
           <div className="injury-detail">
-            {[i.injury, i.expected_return && `expected back ${shortDate(i.expected_return)}`].filter(Boolean).join(" · ")}
+            {[i.injury, i.expected_return && `expected back ${shortDateLabel(i.expected_return)}`].filter(Boolean).join(" · ")}
           </div>
           {i.note && <p className="injury-note">{i.note}</p>}
         </li>

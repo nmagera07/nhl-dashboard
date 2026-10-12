@@ -76,3 +76,13 @@ export function monthGrid(ym) {
     ...Array.from({ length: count }, (_, i) => `${ym}-${pad(i + 1)}`),
   ];
 }
+
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// "2026-10-09" (or a full ISO timestamp) -> "Oct 9". Read straight from the
+// string, so it never shifts a day across time zones. null for no date.
+export function shortDateLabel(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!match) return null;
+  return `${MONTHS[Number(match[2]) - 1]} ${Number(match[3])}`;
+}

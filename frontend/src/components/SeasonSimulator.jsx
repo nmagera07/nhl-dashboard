@@ -1,3 +1,5 @@
+import { shortDateLabel } from "../utils/dates.js";
+import { ordinal } from "../utils/ordinal.js";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { API_BASE } from "../config.js";
@@ -6,14 +8,6 @@ import { formatOdds } from "../utils/playoffRace.js";
 
 const SPREAD_RUNS = 3000;
 const CHUNK = 150; // seasons per slice, so the page stays responsive while the spread builds
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const shortDate = (iso) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
-
-function ordinal(n) {
-  const suffixes = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
-}
 
 const possessive = (name) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
 
@@ -187,7 +181,7 @@ function SeasonSimulator({ team }) {
               <li
                 key={`${g.date}-${i}`}
                 className={`sim-game sim-game-${g.result.toLowerCase()}`}
-                title={`${shortDate(g.date)} ${g.home ? "vs" : "@"} ${g.opponent}: ${g.result === "OTL" ? `L (${g.decided})` : g.decided === "REG" ? g.result : `${g.result} (${g.decided})`}`}
+                title={`${shortDateLabel(g.date)} ${g.home ? "vs" : "@"} ${g.opponent}: ${g.result === "OTL" ? `L (${g.decided})` : g.decided === "REG" ? g.result : `${g.result} (${g.decided})`}`}
               />
             ))}
           </ol>

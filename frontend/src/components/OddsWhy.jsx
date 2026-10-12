@@ -1,14 +1,10 @@
 import { formatOdds } from "../utils/playoffRace.js";
 import { ordinal } from "../utils/ordinal.js";
+import { formatSigned as signed } from "../utils/format.js";
 
 // Below this many goals/game, a factor barely moves the rating.
 const NEUTRAL = 0.03;
 
-function signed(value, digits) {
-  const text = Math.abs(value).toFixed(digits);
-  if (Number(text) === 0) return (0).toFixed(digits);
-  return `${value > 0 ? "+" : "−"}${text}`;
-}
 
 function Effect({ value }) {
   const title = `${signed(value, 2)} goals/game`;

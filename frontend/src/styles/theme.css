@@ -1,0 +1,24 @@
+.dashboard {
+  --accent: #3b82f6;
+  --bg: #0a0b0f;
+  --card: #12141a;
+  --border: #1f2430;
+  --text: #e5e7eb;
+  --text-dim: #8b93a3;
+  --gutter: 24px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  /* Installed as a full-screen app (black-translucent status bar), the page
+     runs under the iPhone notch/status bar and home indicator -- the
+     safe-area insets keep content clear of them. They're 0 in a browser. */
+  padding:
+    0
+    env(safe-area-inset-right, 0px)
+    calc(32px + env(safe-area-inset-bottom, 0px))
+    env(safe-area-inset-left, 0px);
+  /* clip, not hidden: hidden also makes this a vertical clipping box, which
+     cut off popups (the date calendar) at the end of short pages. */
+  overflow-x: clip;
+  min-height: 100dvh;
+}

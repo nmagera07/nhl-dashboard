@@ -1,9 +1,9 @@
+import { MONTHS, shortDateLabel } from "../utils/dates.js";
 import { useEffect, useRef, useState } from "react";
 import { formatOdds } from "../utils/playoffRace.js";
 
 const HEIGHT = 260;
 const PAD = { top: 12, right: 14, bottom: 24, left: 40 };
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Tracks the rendered width, so the SVG draws at real pixels and its text
 // stays readable on phones (a scaled viewBox would shrink the labels).
@@ -42,10 +42,6 @@ function monthTicks(dates) {
     lastMonth = month;
   });
   return ticks;
-}
-
-function shortDate(iso) {
-  return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
 }
 
 // Playoff odds over the season, one line per team. Every line stays dim
@@ -94,7 +90,7 @@ function OddsChart({ dates, series, highlighted, onHighlight }) {
         {focus ? (
           <>
             <strong>{focus.team}</strong> {formatOdds(readout)}
-            <span> on {shortDate(dates[readoutIndex])}</span>
+            <span> on {shortDateLabel(dates[readoutIndex])}</span>
           </>
         ) : (
           <span>Tap a line or a team to follow its race</span>
@@ -104,7 +100,7 @@ function OddsChart({ dates, series, highlighted, onHighlight }) {
         width={width}
         height={HEIGHT}
         role="img"
-        aria-label={`Playoff odds from ${shortDate(dates[0])} to ${shortDate(dates[lastIndex])}`}
+        aria-label={`Playoff odds from ${shortDateLabel(dates[0])} to ${shortDateLabel(dates[lastIndex])}`}
         onPointerMove={(e) => setHoverIndex(indexAt(e))}
         onPointerLeave={() => setHoverIndex(null)}
         onClick={handleClick}

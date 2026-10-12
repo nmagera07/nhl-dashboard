@@ -1396,3 +1396,7 @@ a.my-team-game:hover { border-color: #2c3a58; }
 .injury-team-count { margin-left: auto; padding: 1px 8px; border-radius: 10px; background: rgba(139, 147, 163, 0.15); color: var(--text-dim); font-size: 12px; }
 .injury-team .injury-list { padding-left: 2px; }
 .injury-team-link { display: inline-block; margin: 2px 0 12px; }
+.game-card-mine { border-color: rgba(59, 130, 246, 0.55); }
+.game-card-status .favorite-star { margin-left: auto; }
+.scoreboard + .my-team-card, .scoreboard + .my-team-prompt { margin-top: 16px; }
+.scoreboard ~ .top-headlines { margin-top: 16px; }

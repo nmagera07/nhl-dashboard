@@ -1,3 +1,4 @@
+import { formatToi } from "../utils/format.js";
 import TeamNews from "./TeamNews.jsx";
 import TeamSummary from "./TeamSummary.jsx";
 import SeasonSimulator from "./SeasonSimulator.jsx";
@@ -41,7 +42,9 @@ function SkaterTable({ label, players, onSelectPlayer }) {
               <th><StatAbbr term="G" /></th>
               <th><StatAbbr term="A" /></th>
               <th className="col-pts"><StatAbbr term="PTS" /></th>
-              <th><StatAbbr term="+/-" /></th>
+              {/* On phones TOI stays and +/- hides (with SOG and PIM): TOI says more. */}
+              <th className="col-optional"><StatAbbr term="+/-" /></th>
+              <th><StatAbbr term="ATOI">TOI</StatAbbr></th>
               <th className="col-optional"><StatAbbr term="SOG" /></th>
               <th className="col-optional"><StatAbbr term="PIM" /></th>
             </tr>
@@ -55,7 +58,8 @@ function SkaterTable({ label, players, onSelectPlayer }) {
                 <td>{p.goals ?? "—"}</td>
                 <td>{p.assists ?? "—"}</td>
                 <td className="col-pts">{p.points ?? "—"}</td>
-                <td>{p.plus_minus == null ? "—" : `${p.plus_minus > 0 ? "+" : ""}${p.plus_minus}`}</td>
+                <td className="col-optional">{p.plus_minus == null ? "—" : `${p.plus_minus > 0 ? "+" : ""}${p.plus_minus}`}</td>
+                <td>{formatToi(p.avg_toi_seconds)}</td>
                 <td className="col-optional">{p.shots ?? "—"}</td>
                 <td className="col-optional">{p.pim ?? "—"}</td>
               </tr>
@@ -122,7 +126,7 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
       <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />
       <GoalieTable players={goalies} onSelectPlayer={onSelectPlayer} />
-      <StatGlossary terms={["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "W", "L", "OTL", "GAA", "SV%", "SO"]} />
+      <StatGlossary labels={{ ATOI: "TOI" }} terms={["GP", "G", "A", "PTS", "+/-", "ATOI", "SOG", "PIM", "W", "L", "OTL", "GAA", "SV%", "SO"]} />
     </main>
   );
 }

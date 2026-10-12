@@ -177,3 +177,10 @@ def test_goalies_get_gsax_with_a_plain_reading():
     g = facts["goaltending_all_situations"]
     assert g["goals_saved_above_expected"] == -3.2 and g["expected_goals_against"] == 11.8
     assert g["reading"].startswith("worse than an average goalie")
+
+
+def test_skaters_carry_average_time_on_ice_as_minutes():
+    from app.compact import skater_line
+
+    assert skater_line({"first_name": "Sidney", "last_name": "Crosby", "avg_toi_seconds": 1190})["avg_toi"] == "19:50"
+    assert "avg_toi" not in skater_line({"first_name": "No", "last_name": "Toi"})

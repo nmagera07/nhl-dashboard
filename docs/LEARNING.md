@@ -69,6 +69,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   free tiers became viable.
 
 **Security**
+- Ran a full security audit (gitleaks over history, pip-audit/npm audit, Semgrep/Bandit, manual
+  review): shipped a strict browser-tested Content-Security-Policy, pinned all CI actions to commit SHAs
+  with least-privilege tokens, pinned dependencies, and added prompt-injection guards for the LLM agent.
 - Designed push notifications with SSRF protection (only real push-service
   endpoints accepted) and least-privilege database access (the API can write
   one table; the signing key lives only in the notifier's secrets).
@@ -139,6 +142,57 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — A security audit: scanners first, then the parts scanners can't see
+
+**What I ran:**
+- **gitleaks** over all 171 commits of history. No secrets were ever committed, and the local `.env` files
+  are git-ignored.
+- **pip-audit** and **npm audit** on every service's dependencies.
+- **Semgrep** (Python, JavaScript, React, secrets, GitHub Actions) and **Bandit**.
+- A manual review of what scanners can't judge: write endpoints, auth, CORS, the AI's inputs, and the
+  headers the site sends.
+
+**What was actually wrong (and fixed):**
+- **No Content-Security-Policy and no frame protection** on puckpulse.io. I crawled every page type in a real
+  browser to list the outside hosts the app really uses (the NHL image server, our two APIs, Sentry).
+  Then I wrote a strict policy and **tested it enforced against the live site** before shipping it:
+  zero violations, with the chat, charts, and logos all working. Added `X-Frame-Options: DENY`, a
+  Permissions-Policy, and COOP.
+- **GitHub Actions referenced by movable tags** (`actions/checkout@v4`). A compromised or re-tagged action
+  would run inside the deploy jobs that can sign in to Azure. I pinned all 28 references to commit SHAs
+  and added GitHub Actions to Dependabot so the pins stay current.
+- **Four workflows had no `permissions:` block**, so they got the default token rights. They now get
+  read-only access (plus PR comments for the preview deploy).
+- **The AI service's dependencies were version ranges**, so each Docker build could pick up an untested
+  release. They're pinned like the backend's now. That also moved pytest past PYSEC-2026-1845, and the
+  newer pytest-asyncio cut test warnings from 475 to 6.
+- **Dev-tool advisories** (brace-expansion, source-map-js, both build-time only) were fixed with
+  `npm audit fix`.
+- **Defense in depth:** news links must be `https://`. The AI is told that tool results (outside headlines,
+  injury notes) are data, never instructions, which is a prompt-injection guard now that outside text
+  reaches it. The API sends `nosniff`.
+
+**What the scanners flagged that was fine** (and why that matters):
+- Two "SQL built from strings" warnings: both only use values from fixed allow-lists.
+- "curl piped to shell": it's piped to a JSON parser, not a shell.
+- "Untrusted XML": Python's Expat (2.7) blocks entity-expansion bombs.
+- gitleaks "5 leaks" in a full-disk scan: the git-ignored local `.env` files, never committed.
+
+Triage is the skill. A scanner's output is a to-do list, not a verdict.
+
+**What I learned:**
+- Test a security control the way you'd test a feature. A CSP that breaks the site gets turned off, so
+  enforcing it in a browser before shipping is what makes it stick.
+- The biggest risks were in configuration (headers, CI permissions, action pinning), not in the code.
+- Untrusted text reaching an LLM is an input-validation problem. Label it as data, and keep the tools
+  read-only so even a successful injection can't do much.
+
+**Interview angle:** "How would you security-review an app?" Automate the cheap scans (secrets, dependencies,
+SAST), triage every finding, then review by hand what tools miss: auth, data flow into the LLM,
+headers, and the CI/CD supply chain. Verify each fix doesn't break the product.
 
 ---
 

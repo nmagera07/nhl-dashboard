@@ -96,3 +96,7 @@ class TestResponseHeaders:
 
         assert client.get("/season-sim").headers["cache-control"] == api.DAILY_CACHE_CONTROL
         assert "cache-control" not in client.get("/").headers
+
+
+def test_every_response_says_nosniff(client):
+    assert client.get("/").headers["x-content-type-options"] == "nosniff"

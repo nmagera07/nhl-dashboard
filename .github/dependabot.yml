@@ -22,3 +22,25 @@ updates:
       backend-deps:
         patterns:
           - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/intelligence"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    groups:
+      intelligence-deps:
+        patterns:
+          - "*"
+
+  # Workflow actions are pinned to commit SHAs (supply-chain safety);
+  # this keeps the pins current, one grouped PR a week.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"

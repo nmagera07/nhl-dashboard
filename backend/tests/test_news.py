@@ -79,23 +79,30 @@ class TestParsing:
 
 class TestMerge:
     def test_newest_first_last_week_only_and_no_duplicate_titles(self):
-        a = [{"title": "Big Trade!", "published": "2026-10-12T10:00:00Z"}, {"title": "Old news", "published": "2026-09-01T00:00:00Z"}]
-        b = [{"title": "big trade", "published": "2026-10-12T09:00:00Z"}, {"title": "Newer", "published": "2026-10-12T11:00:00Z"}]
+        a = [{"title": "Big Trade!", "url": "https://a", "published": "2026-10-12T10:00:00Z"}, {"title": "Old news", "url": "https://b", "published": "2026-09-01T00:00:00Z"}]
+        b = [{"title": "big trade", "url": "https://c", "published": "2026-10-12T09:00:00Z"}, {"title": "Newer", "url": "https://d", "published": "2026-10-12T11:00:00Z"}]
 
         assert [i["title"] for i in news.merge_headlines([a, b, None], now=NOW)] == ["Newer", "Big Trade!"]
 
 
     def test_one_recap_per_game_across_outlets_but_different_angles_stay(self):
         items = [[
-            {"title": "Kraken overcome Ovechkin’s first goal of season, edge Capitals", "published": "2026-10-12T01:21:00Z"},
-            {"title": "Kraken overcome Alex Ovechkin's first goal of the season to beat the Capitals 5-3", "published": "2026-10-12T00:09:00Z"},
-            {"title": "Kraken overcome Alex Ovechkin’s first goal of season to beat Capitals", "published": "2026-10-12T00:07:00Z"},
-            {"title": "Garand makes 19 saves, Rangers defeat Canucks", "published": "2026-10-12T00:47:00Z"},
-            {"title": "Without Shesterkin, Rangers lean on Garand in win", "published": "2026-10-12T01:24:00Z"},
+            {"title": "Kraken overcome Ovechkin’s first goal of season, edge Capitals", "url": "https://e", "published": "2026-10-12T01:21:00Z"},
+            {"title": "Kraken overcome Alex Ovechkin's first goal of the season to beat the Capitals 5-3", "url": "https://e", "published": "2026-10-12T00:09:00Z"},
+            {"title": "Kraken overcome Alex Ovechkin’s first goal of season to beat Capitals", "url": "https://e", "published": "2026-10-12T00:07:00Z"},
+            {"title": "Garand makes 19 saves, Rangers defeat Canucks", "url": "https://e", "published": "2026-10-12T00:47:00Z"},
+            {"title": "Without Shesterkin, Rangers lean on Garand in win", "url": "https://e", "published": "2026-10-12T01:24:00Z"},
         ]]
         titles = [i["title"] for i in news.merge_headlines(items, now=NOW)]
         assert titles == ["Without Shesterkin, Rangers lean on Garand in win", "Kraken overcome Ovechkin’s first goal of season, edge Capitals",
                           "Garand makes 19 saves, Rangers defeat Canucks"]
+
+
+    def test_only_https_links_get_through(self):
+        items = [[{"title": "Fine", "url": "https://x.test/a", "published": "2026-10-12T10:00:00Z"},
+                  {"title": "Sneaky", "url": "javascript:alert(1)", "published": "2026-10-12T11:00:00Z"},
+                  {"title": "Plain", "url": "http://x.test/b", "published": "2026-10-12T11:30:00Z"}]]
+        assert [i["title"] for i in news.merge_headlines(items, now=NOW)] == ["Fine"]
 
 
 class TestInjuriesAndTransactions:

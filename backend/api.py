@@ -230,6 +230,7 @@ def _daily_cacheable(path):
 @app.middleware("http")
 async def daily_cache_headers(request: Request, call_next):
     response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")  # JSON is never sniffed as HTML
     if request.method == "GET" and response.status_code == 200 and _daily_cacheable(request.url.path):
         response.headers.setdefault("Cache-Control", DAILY_CACHE_CONTROL)
     return response

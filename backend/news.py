@@ -232,6 +232,11 @@ def _words(title):
     return {w for w in words if w not in _FILLER and not w.isdigit()}
 
 
+def _safe_link(item):
+    """Only https links reach the page (no javascript:, data:, or plain http)."""
+    return str(item.get("url", "")).startswith("https://")
+
+
 def merge_headlines(lists, now=None):
     """
     Newest first, last week only, and one copy of a story several outlets
@@ -241,7 +246,7 @@ def merge_headlines(lists, now=None):
     """
     now = now or datetime.now(timezone.utc)
     kept, out = [], []
-    items = sorted((i for items in lists for i in items or []), key=lambda i: i["published"], reverse=True)
+    items = sorted((i for items in lists for i in items or [] if _safe_link(i)), key=lambda i: i["published"], reverse=True)
     for item in items:
         published = datetime.fromisoformat(item["published"].replace("Z", "+00:00"))
         if now - published > MAX_HEADLINE_AGE:

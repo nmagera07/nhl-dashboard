@@ -30,5 +30,11 @@
   ],
   "mimeTypes": {
     ".webmanifest": "application/manifest+json"
+  },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://assets.nhle.com; font-src 'self'; connect-src 'self' https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io https://*.ingest.us.sentry.io; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy": "same-origin"
   }
 }

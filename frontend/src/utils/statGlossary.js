@@ -27,7 +27,6 @@ export const GLOSSARY = {
   SA: { name: "Shots against", detail: "Shots on goal faced." },
   PDO: { name: "PDO (luck meter)", detail: "Shooting % + save % at 5-on-5. About 100 is average; far above or below usually evens out." },
   "CORSI%": { name: "Corsi %", detail: "Share of all shot attempts (on goal, missed, or blocked) while on the ice, 5-on-5. A puck-possession stat." },
-  "FENWICK%": { name: "Fenwick %", detail: "Like Corsi %, but leaving out blocked shots." },
   "IND_XG": { name: "Individual expected goals", detail: "Expected goals from the player's own shots." },
   "ONICE_XG": { name: "On-ice expected goals", detail: "Expected goals for and against while the player was on the ice, 5-on-5." },
 

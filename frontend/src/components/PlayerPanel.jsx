@@ -194,9 +194,10 @@ function PlayerPanel({ player, onBack, backLabel }) {
           <div className="player-card">
             <dl className="stat-strip">
               {[
-                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
-                ["Fenwick %", formatPct(advancedStats.fenwick_for_pct), "FENWICK%"],
+                // xG % first: it's the one people quote now. Fenwick % (Corsi
+                // minus blocked shots) was dropped as near-duplicate noise.
                 ["xG %", formatPct(advancedStats.xgoals_for_pct), "xG%"],
+                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
                 ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`, "ONICE_XG"],
                 ["Ind. xG", formatDecimal(advancedStats.individual_xgoals), "IND_XG"],
                 ["PDO", formatDecimal(advancedStats.pdo, 1), "PDO"],
@@ -258,8 +259,8 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </Section>
       )}
       <StatGlossary
-        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "CORSI%", "FENWICK%", "xG%", "ONICE_XG", "IND_XG", "PDO"]}
-        labels={{ "CORSI%": "Corsi %", "FENWICK%": "Fenwick %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG" }}
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "xG%", "CORSI%", "ONICE_XG", "IND_XG", "PDO"]}
+        labels={{ "CORSI%": "Corsi %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG" }}
       />
     </main>
   );

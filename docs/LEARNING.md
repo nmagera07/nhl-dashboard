@@ -18,6 +18,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Added post-deploy verification (the new revision must be healthy *and* report
   the exact commit just deployed) plus a daily deploy-drift check, after finding
   production had silently run three-month-old code.
+- Cut API database latency ~9x (0.53s → 0.06s per request) by finding a per-request connection,
+  3 cross-country round trips per query, and uncompressed 1.15 MB responses; fixed with pooling,
+  autocommit and gzip, plus a cross-request cache, cold-start warm-ups, offline-capable saved
+  data, streamed AI answers, and Sentry real-user monitoring.
 - Introduced a `dev` → `main` promotion workflow with branch protection and
   required frontend and backend test checks on every PR.
 
@@ -132,6 +136,58 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — Making it fast: measure, find the real bottleneck, repeat
+
+**Why:** People leave if an app makes them wait. I asked Grok to review the app's speed, then
+checked every claim against the code and the live API before changing anything.
+
+**What the measurements found (in the order I found them):**
+1. **A new database connection on every request.** Opening a Neon connection costs ~0.5s (TLS +
+   auth). `/health`, just `SELECT 1`, took 0.78s against 0.25s for a route with no database.
+   Fix: a small connection pool behind the one `get_connection()` function, so none of the 19
+   call sites changed. It throws away connections idle over 4 minutes, because Neon drops them
+   at ~5.
+2. **No compression.** `/players/leaders` was 1.15 MB of JSON. With gzip it's 83 KB.
+3. **The database and the API are on opposite coasts.** The DB is in AWS us-east-1 (Virginia)
+   and the API in Azure West US 2 (Washington), so every round trip crosses the country. On top
+   of that, psycopg2's implicit `BEGIN` plus the pool's `ROLLBACK` meant **3 round trips per
+   query**. Switching to autocommit (safe for a read-only API) made it one.
+   Result: `/health` went from 0.78s to 0.30s, and the database part from 0.53s to ~0.06s.
+4. **The AI service opened a new HTTPS connection for every API call** and re-downloaded
+   once-a-day data on every question. Fix: one keep-alive client plus a 10-minute cache.
+5. **Cold starts (~20–30s) are the real worst case.** Three cheap fixes: opening the chat
+   wakes both services in the background; once-a-day data is saved in the browser, so return
+   visits render in ~0.1s even with the API down (tested by blocking every API request); and
+   the Playoffs chart no longer waits on the standings.
+6. **Streaming answers.** It now works end to end, and it taught me something. Timing each
+   phase showed Gemini starts writing ~0.6s into the answer round and finishes ~0.3s later, so
+   streaming only saves ~0.3s here. Its bigger payoff is with slower models and longer answers.
+   The phase timing also showed the slow runs I'd seen (5–6s) came from Gemini's free-tier rate
+   limit pushing questions to the slower fallback model, not from the code.
+
+**Chat today (warm):** "Who leads in points?" went from 3.3s to ~2.1s. "Why are PIT's odds so
+high?" went from 5.3s to ~1.8s, with the first words at ~1.4s.
+
+**Real-user monitoring:** Sentry was installed on the frontend but never turned on in
+production (no DSN at build time). It's now on, with Web Vitals, API timings, and a custom
+span per chat answer (time to first status, first text, total). Next decisions (static
+data files, moving the database west, paying for always-on) will use real numbers.
+
+**What I learned:**
+- Measure each phase, not just the total. "The chat is slow" was really four separate costs:
+  connection setup, cross-country round trips, cold starts, and provider rate limits.
+- The biggest wins were boring: a pool, gzip, one autocommit flag. None needed a redesign.
+- Know your infrastructure's geography. One cross-country round trip is ~70 ms; three per
+  query, on every request, adds up.
+- Free tiers have two hidden costs: cold starts and rate limits. Both show up as "slow".
+
+**Interview angle:** "How would you speed up a slow app?" Measure first and break the time down
+by phase, fix the cheapest big costs (connections, compression, round trips, caching), hide
+the costs you can't remove (warm-ups, saved data), and add real-user monitoring so the next
+call is based on data.
 
 ---
 

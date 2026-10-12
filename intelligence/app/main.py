@@ -176,7 +176,9 @@ class IntelligenceService:
         it either answers or asks for tools, which run here (in parallel) and
         go back to it as results. Yields ("tool", label) while working,
         ("tool_result", name, arguments, result) as each finishes (for evals
-        and tracing), then ("answer", text, provider, evidence).
+        and tracing), ("text", piece) as the answer streams in, ("reset",)
+        if a turn that streamed text turns out to call tools after all, then
+        ("answer", text, provider, evidence).
         """
         context = await self._context(request)
         runner = ToolRunner(self.dashboard)
@@ -191,10 +193,18 @@ class IntelligenceService:
             last_round = round_number == MAX_TOOL_ROUNDS
             if last_round:
                 messages.append({"role": "user", "content": "Answer now using the results you have; no more tools."})
-            message, provider, start = await self.chain.complete_with_tools(
+            streamed = False
+            async for event in self.chain.stream_with_tools(
                 messages, None if last_round else TOOLS, self.settings.max_output_tokens, start=start,
-            )
+            ):
+                if event[0] == "text":
+                    streamed = True
+                    yield event
+                else:
+                    _, message, provider, start = event
             calls = [] if last_round else list(message.tool_calls or [])
+            if calls and streamed:
+                yield ("reset",)  # it "thought out loud" before calling a tool
             if not calls:
                 yield ("answer", (message.content or "").strip(), provider, evidence)
                 return
@@ -222,13 +232,21 @@ class IntelligenceService:
     async def answer_stream(self, request: ChatRequest):
         """Server-sent events: a status line per tool while the agent works, then the answer."""
         error = None
+        sent = False
         try:
             async for event in self.run_agent(request):
                 if event[0] == "tool":
                     yield f"data: {json.dumps({'type': 'status', 'text': event[1] + '…'})}\n\n"
+                elif event[0] == "text":
+                    sent = True
+                    yield f"data: {json.dumps({'type': 'delta', 'text': event[1]})}\n\n"
+                elif event[0] == "reset":
+                    sent = False
+                    yield f"data: {json.dumps({'type': 'reset'})}\n\n"
                 elif event[0] == "answer":
                     _, text, provider, evidence = event
-                    yield f"data: {json.dumps({'type': 'delta', 'text': text})}\n\n"
+                    if not sent:  # nothing streamed (shouldn't happen, but never lose an answer)
+                        yield f"data: {json.dumps({'type': 'delta', 'text': text})}\n\n"
                     yield f"data: {json.dumps({'type': 'done', 'evidence': evidence, 'model': provider.label})}\n\n"
         except HTTPException as exc:  # not configured, or the dashboard is down
             error = exc.detail

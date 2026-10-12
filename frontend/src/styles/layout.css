@@ -1,0 +1,26 @@
+/* App shell: sticky header, centered content column, mobile tab bar. */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 calc(-1 * env(safe-area-inset-right, 0px)) 20px calc(-1 * env(safe-area-inset-left, 0px));
+  /* The header itself covers the status-bar/notch area (safe-area top),
+     so scrolled content never shows through behind it. */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  border-bottom: 1px solid var(--border);
+  background: rgba(10, 11, 15, 0.92);
+  backdrop-filter: blur(8px);
+}
+.topnav-inner {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 12px var(--gutter);
+}
+.app-content { max-width: 1120px; margin: 0 auto; }
+.page { padding: 0 var(--gutter); }
+.page-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 16px; }
+.page-header h1 { margin: 0; font-size: 24px; }
+.page-subtitle { color: var(--text-dim); font-size: 13px; }

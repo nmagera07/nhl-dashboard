@@ -142,6 +142,37 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-11 — A cleanup pass you can prove changed nothing
+
+**What I did:** Paid down the duplication that piled up during a fast day of features:
+- Split the 1,400-line `App.css` into 21 files by area (`src/styles/`).
+- Replaced several copies of the same small helpers with one shared version each: 3 copies of
+  `ordinal()` ("22nd"), 4 date formatters ("Oct 9"), and 2 signed-number formatters ("+1.5" / "−0.3").
+- Fixed the last lint warning in the fetch hook.
+- Moved the season-id helpers the backend scripts shared into one `seasons.py`.
+
+**The interesting part, proving "no visible change":**
+- **CSS order is behavior.** Later rules win ties, so splitting a stylesheet can quietly change how
+  the page looks. I kept each file a contiguous range of the original, imported in the original order.
+- **I compared the built output, not the source.** I captured the production CSS bundle before
+  and after and diffed it rule by rule. The only difference was 4 rules I deliberately moved into the
+  scores file, after checking that nothing they could collide with comes later. Everything else was
+  byte-identical.
+- **The lint fix kept the same behavior.** The hook's effect must only refetch when the URL changes,
+  but it read callbacks that change on every render. Keeping the latest callbacks in a ref satisfies
+  the rule without refetching on every render.
+
+**What I learned:**
+- Behavior-preserving refactors need an oracle. For CSS, the built bundle is a good one. For code,
+  it's the test suite (all 571 tests passed before and after).
+- One shared formatter is also a consistency fix. Two copies of "signed number" had already drifted
+  (one handled missing values, one didn't).
+
+**Interview angle:** "How do you refactor safely?" Pick something you can compare before and after
+(built output, tests, screenshots), keep the steps mechanical, and explain any intended difference.
+
+---
+
 ## 2026-10-11 — News: aggregating sources you don't control
 
 **What I built:** A News tab with headlines (NHL.com, ESPN, Sportsnet), injuries, and transactions. The

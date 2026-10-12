@@ -1,0 +1,34 @@
+/* "A new version is ready" (UpdateBanner): above the tab bar on phones. */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 10px 10px 10px 16px;
+  border: 1px solid #2c3a58;
+  border-radius: 12px;
+  background: #111a2e;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.update-banner-refresh {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.update-banner-dismiss { padding: 4px 6px; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
+
+.app-footer { margin: 32px var(--gutter) 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
+.app-footer a { color: var(--text-dim); }

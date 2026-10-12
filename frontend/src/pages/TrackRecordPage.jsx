@@ -1,3 +1,4 @@
+import { shortDateLabel } from "../utils/dates.js";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
@@ -6,11 +7,6 @@ import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 const SMALL_SAMPLE = 100;
 
 const pct = (v) => `${Math.round(v * 100)}%`;
-
-function shortDate(iso) {
-  // Noon local time, so the date never shifts across a timezone boundary.
-  return new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function Tile({ label, value, detail }) {
   return (
@@ -67,7 +63,7 @@ function RecentPicks({ games }) {
           return (
             <li key={g.game_id}>
               <Link className="pick-row" to={`/games/${g.game_id}`}>
-                <span className="pick-date">{shortDate(g.game_date)}</span>
+                <span className="pick-date">{shortDateLabel(g.game_date)}</span>
                 <span className="pick-game">
                   {g.away} {g.away_score}, {g.home} {g.home_score}{g.ended && g.ended !== "REG" ? ` (${g.ended})` : ""}
                 </span>

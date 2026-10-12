@@ -1,3 +1,4 @@
+import { formatSigned } from "../utils/format.js";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
@@ -45,13 +46,6 @@ function formatStat(key, value) {
 
 function formatPct(value) {
   return value != null ? `${(Number(value) * 100).toFixed(1)}%` : "—";
-}
-
-function formatSigned(value, digits = 1) {
-  if (value == null) return "—";
-  const text = Math.abs(value).toFixed(digits);
-  if (Number(text) === 0) return (0).toFixed(digits);
-  return `${value > 0 ? "+" : "−"}${text}`;
 }
 
 function formatDecimal(value, digits = 2) {

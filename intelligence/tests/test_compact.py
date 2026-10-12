@@ -165,3 +165,15 @@ def test_pdo_comes_with_its_meaning():
     assert compact.pdo_reading(103.5).startswith("above")
     assert compact.pdo_reading(100.4).startswith("about average")
     assert compact.pdo_reading(None) is None
+
+
+def test_goalies_get_gsax_with_a_plain_reading():
+    from app.compact import player_facts
+
+    facts = player_facts({"first_name": "Tristan", "last_name": "Jarry", "position_code": "G",
+                          "goalie_advanced_stats": {"gsax": -3.24, "gsax_per_60": -0.65, "high_danger_gsax": -1.0,
+                                                    "goals_allowed": 15, "xgoals_against": 11.76}})
+
+    g = facts["goaltending_all_situations"]
+    assert g["goals_saved_above_expected"] == -3.2 and g["expected_goals_against"] == 11.8
+    assert g["reading"].startswith("worse than an average goalie")

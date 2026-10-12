@@ -306,6 +306,28 @@ CREATE TABLE IF NOT EXISTS player_advanced_stats (
 CREATE INDEX IF NOT EXISTS idx_player_advanced_player
     ON player_advanced_stats (player_id, season_id);
 
+-- Goalie advanced stats from MoneyPuck's goalies CSV, all situations (the
+-- standard frame for goaltending). GSAx -- goals saved above expected --
+-- is xgoals_against - goals_allowed: how many more goals an average goalie
+-- would have allowed on the same shots. The high-danger columns split out
+-- shots from the slot/crease. The API reads it, so:
+--   GRANT SELECT ON goalie_advanced_stats TO nhl_api_readonly;
+CREATE TABLE IF NOT EXISTS goalie_advanced_stats (
+    id                      SERIAL PRIMARY KEY,
+    player_id               INTEGER NOT NULL REFERENCES players(player_id),
+    season_id               INTEGER NOT NULL,
+    games_played            INTEGER,
+    icetime_seconds         INTEGER,
+    shots_faced             INTEGER,
+    goals_allowed           INTEGER,
+    xgoals_against          NUMERIC(8,3),
+    high_danger_shots       INTEGER,
+    high_danger_goals       INTEGER,
+    high_danger_xgoals      NUMERIC(8,3),
+    updated_at              TIMESTAMP DEFAULT NOW(),
+    UNIQUE (season_id, player_id)
+);
+
 -- Monte Carlo playoff-odds simulation. Multiple as_of_date rows per season
 -- are expected -- a "live" row updated as the season progresses, plus any
 -- backtest snapshots used to validate the model against a completed season.

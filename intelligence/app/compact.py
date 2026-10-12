@@ -222,6 +222,7 @@ def player_facts(player: dict[str, Any]) -> dict[str, Any]:
     playoffs = [h for h in history if h.get("season_type") == "playoffs"][:3]
     career = player.get("career_totals") or {}
     advanced = player.get("advanced_stats") or {}
+    goalie = player.get("goalie_advanced_stats") or {}
     inches = player.get("height_in_inches")
 
     return _clean({
@@ -242,11 +243,30 @@ def player_facts(player: dict[str, Any]) -> dict[str, Any]:
             "pdo": _num(advanced.get("pdo"), 1),
             "pdo_reading": pdo_reading(advanced.get("pdo")),
         }) if advanced else None,
+        "goaltending_all_situations": _clean({
+            "goals_saved_above_expected": _num(goalie.get("gsax"), 1),
+            "gsax_per_60": _num(goalie.get("gsax_per_60")),
+            "high_danger_gsax": _num(goalie.get("high_danger_gsax"), 1),
+            "goals_allowed": goalie.get("goals_allowed"),
+            "expected_goals_against": _num(goalie.get("xgoals_against"), 1),
+            "reading": gsax_reading(goalie.get("gsax")),
+        }) if goalie else None,
         "career_regular_season": stats(career["regular_season"]) if career.get("regular_season") else None,
         "career_playoffs": stats(career["playoffs"]) if career.get("playoffs") else None,
         "recent_seasons": [_clean({"season": _season_label(h.get("season_id")), **stats(h)}) for h in regular],
         "recent_playoffs": [_clean({"season": _season_label(h.get("season_id")), **stats(h)}) for h in playoffs],
     })
+
+
+def gsax_reading(gsax: float | None) -> str | None:
+    """Spelled out like pdo_reading, so the model can't read the sign backwards."""
+    if gsax is None:
+        return None
+    if gsax > 1:
+        return "better than an average goalie on the same shots (saved more than expected)"
+    if gsax < -1:
+        return "worse than an average goalie on the same shots (allowed more than expected)"
+    return "about what an average goalie would do on the same shots"
 
 
 def _period(pd: dict[str, Any] | None) -> str:

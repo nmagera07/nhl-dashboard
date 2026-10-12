@@ -1,0 +1,82 @@
+{
+  "started": "2026-10-12T01:44:04+00:00",
+  "api": "http://127.0.0.1:8010",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "Yes, as of the latest report, Drew Helleson is on Injured Reserve due to a lower body injury, with an expected return around October 13, 2026.",
+          "seconds": 1.5,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Drew Helleson'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Answer lacks required attribution to the injury report source"
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "As of the latest ESPN injury report (updated\u202fOct\u202f7), Drew\u202fHelleson is listed on the Anaheim Ducks\u2019 **Injured Reserve** with a lower\u2011body issue. The team expects him back around\u202fOct\u202f13, after the Ducks finish their road trip. He is not currently available for games.",
+          "seconds": 0.9,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Drew Helleson'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "gemini: The expected return date in the answer does not match the rubric year (2026)."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    }
+  }
+}

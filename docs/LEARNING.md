@@ -106,6 +106,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Built a news aggregator (NHL.com, ESPN, Sportsnet headlines, injuries, transactions) with
+  per-source caching and failure isolation, similarity-based dedupe of cross-outlet recaps, and
+  LLM agent tools for injuries and news, caught and fixed a wrong-team lookup bug via evals.
 - Added game highlights (recaps, condensed games, per-goal clips) by mining feeds the app
   already loaded, with link allowlisting and cache timing tuned to when the NHL posts videos.
 - Built pregame previews (model win probability, form, ranked team stats, top goalies, season
@@ -136,6 +139,53 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-11 — News: aggregating sources you don't control
+
+**What I built:** A News tab with headlines (NHL.com, ESPN, Sportsnet), injuries, and transactions. The
+three freshest headlines also show on Scores, and each team page gets its own headlines and injury
+report. PuckPulse AI got `get_injuries` and `get_news` tools, so "is he injured?" finally has a real
+answer instead of "I don't have that information."
+
+**What I checked before building:**
+- **An X (Twitter) feed:** X's official embed loaded in a real browser but showed "Rate limit
+  exceeded" to logged-out visitors and pulled 420 KB of scripts. The API has had no free tier for new
+  developers since February 2026; reading posts is pay-per-use. Parked, and social media is a later
+  decision.
+- **Feeds:** I probed eight candidates. NHL.com's own RSS returns 403. The feeds nhl.com and ESPN's
+  apps use internally work, but they're undocumented, so the code assumes they can break.
+
+**Problems the real data exposed:**
+- **RSS timestamps can lie.** ESPN's RSS feed stamps every item with the feed's build time, so all
+  its headlines read "1m ago" and sorted to the top. I switched to ESPN's JSON feed, which has a real
+  publish time per article (and flags ESPN+ paywalled stories, which I skip).
+- **The same game recap three times.** On game nights NHL.com, ESPN, and Sportsnet all run
+  near-identical recaps ("Kraken overcome Ovechkin's first goal of season, edge Capitals" / "...to beat
+  the Capitals 5-3"). Exact-title matching missed them. Word overlap (Jaccard) on content words
+  (filler and scores removed) separates them cleanly: the same story scores ~0.7, different angles on
+  the same game score ~0.4 or less, with the cutoff at 0.6.
+- **The AI guessed teams.** Asked "Is Drew Helleson injured?", the fallback model looked up the wrong
+  team's injury report and answered "not listed", which reads as "healthy". The eval caught it. The
+  tool now searches the whole league by player name, and "not on the report" never means "healthy".
+
+**Design decisions:**
+- **Each source fails on its own.** Each one is cached separately (about 15 minutes) and keeps its last
+  good copy for up to a day, so one feed breaking never breaks the page.
+- **Headlines and facts only, always linking out**, with the source named. We never copy the article.
+- **Kept the page uncluttered:** injuries collapse to one row per team ("Anaheim Ducks · 5"), with
+  your team open.
+
+**What I learned:**
+- With data you don't own, verify every field against reality. A timestamp field existing doesn't mean
+  it's correct.
+- Deduplication is a similarity problem, not an equality problem.
+- "Not found" and "no" are different answers. Tools should say which one they mean.
+
+**Interview angle:** "How would you build a news aggregator on sources you don't control?" Isolate each
+source (its own cache, timeout, and stale fallback), normalize timestamps and teams, dedupe by
+similarity, attribute and link out, and test against live data, because that's where the surprises are.
 
 ---
 

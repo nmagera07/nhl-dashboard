@@ -7,11 +7,13 @@ export const SECTIONS = [
   { key: "standings", label: "Standings", to: "/standings" },
   { key: "playoffs", label: "Playoffs", to: "/playoffs" },
   { key: "players", label: "Players", to: "/players" },
+  { key: "news", label: "News", to: "/news" },
 ];
 
 export function sectionFor(pathname) {
   if (pathname.startsWith("/standings") || pathname.startsWith("/teams")) return "standings";
   if (pathname.startsWith("/playoffs") || pathname.startsWith("/track-record")) return "playoffs";
   if (pathname.startsWith("/players") || pathname.startsWith("/leaderboard")) return "players";
+  if (pathname.startsWith("/news")) return "news";
   return "scores";
 }

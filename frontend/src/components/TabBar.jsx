@@ -24,6 +24,14 @@ const ICONS = {
       <path d="M12 13v4M8.5 20h7M10 17h4" />
     </>
   ),
+  // Newspaper
+  news: (
+    <>
+      <path d="M5 5h11v14H6a1 1 0 0 1-1-1V5z" />
+      <path d="M16 9h3v9a1 1 0 0 1-1 1h-2" />
+      <path d="M8 9h5M8 12h5M8 15h3" />
+    </>
+  ),
   // Person
   players: (
     <>

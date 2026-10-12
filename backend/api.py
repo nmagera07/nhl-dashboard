@@ -55,6 +55,7 @@ import push
 import season_scenarios
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
+import news
 from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
 
 load_dotenv()
@@ -213,7 +214,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Data that changes once a day (after the 2 AM run) can be cached by the
 # browser for a few minutes, and served stale while it refreshes. Live data
 # (games, schedules, scenarios) is left alone.
-DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/players", "/teams", "/season-sim", "/predictions", "/digest")
+DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/players", "/teams", "/season-sim", "/predictions", "/digest",
+                       "/news", "/injuries", "/transactions")  # news is cached ~15 min upstream anyway
 DAILY_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600"
 
 
@@ -704,6 +706,50 @@ def season_sim_roster_change(
     _SCENARIO_CACHE[key] = result
     while len(_SCENARIO_CACHE) > _SCENARIO_CACHE_SIZE:
         _SCENARIO_CACHE.popitem(last=False)
+    return result
+
+
+# --- News ------------------------------------------------------------------
+#
+# Headlines (NHL.com, ESPN, Sportsnet), injuries, and transactions (ESPN),
+# fetched live and cached per source in news.py. Headlines link out.
+
+TEAM_FILTER = Query(None, pattern=r"^[A-Za-z]{3}$", description="Team abbreviation, e.g. PIT")
+
+
+def _team_param(team):
+    if team is None:
+        return None
+    team = team.upper()
+    if team not in news.TEAMS:
+        raise HTTPException(status_code=404, detail=f"Unknown team '{team}'.")
+    return team
+
+
+@app.get("/news")
+def news_headlines(team: Optional[str] = TEAM_FILTER, limit: int = Query(20, ge=1, le=60)):
+    """Recent NHL headlines, newest first, each with its source and a link to the original."""
+    result = news.headlines(_team_param(team), limit)
+    if not result["sources"]:
+        raise HTTPException(status_code=503, detail="News sources are unavailable right now.")
+    return result
+
+
+@app.get("/injuries")
+def news_injuries(team: Optional[str] = TEAM_FILTER):
+    """Injured players by team (ESPN): status, injury, expected return, and a short note."""
+    result = news.injuries(_team_param(team))
+    if result is None:
+        raise HTTPException(status_code=503, detail="Injury data is unavailable right now.")
+    return result
+
+
+@app.get("/transactions")
+def news_transactions(team: Optional[str] = TEAM_FILTER, limit: int = Query(25, ge=1, le=100)):
+    """Recent signings, trades, recalls, and IR moves (ESPN), newest first."""
+    result = news.transactions(_team_param(team), limit)
+    if result is None:
+        raise HTTPException(status_code=503, detail="Transaction data is unavailable right now.")
     return result
 
 

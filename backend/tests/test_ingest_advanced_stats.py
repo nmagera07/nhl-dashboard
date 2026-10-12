@@ -117,3 +117,26 @@ class TestCurrentSeasonId:
 
     def test_spring_is_the_season_that_started_last_year(self):
         assert current_season_id(date(2027, 3, 1)) == 20262027
+
+
+class TestGoalies:
+    def test_parses_the_all_situations_goalie_row(self):
+        import ingest_advanced_stats as ias
+
+        row = {"playerId": "8478406", "games_played": "5", "icetime": "18000.0", "ongoal": "150", "goals": "10",
+               "xGoals": "13.5", "highDangerShots": "30", "highDangerGoals": "5", "highDangerxGoals": "6.2"}
+        assert ias.parse_goalie_row(row) == {
+            "player_id": 8478406, "games_played": 5, "icetime_seconds": 18000, "shots_faced": 150,
+            "goals_allowed": 10, "xgoals_against": 13.5, "high_danger_shots": 30, "high_danger_goals": 5,
+            "high_danger_xgoals": 6.2,
+        }
+
+    def test_a_failure_is_logged_not_raised(self, monkeypatch):
+        import ingest_advanced_stats as ias
+        import requests
+
+        def down(year, kind):
+            raise requests.ConnectionError("moneypuck down")
+
+        monkeypatch.setattr(ias, "fetch_csv_rows", down)
+        assert ias.ingest_goalies(20262027, 2026) == 0

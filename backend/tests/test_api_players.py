@@ -213,3 +213,42 @@ class TestPlayerDetail:
 
         assert response.status_code == 422
         assert db_router.calls == []
+
+
+class TestGoalieAdvancedStats:
+    def _routes(self, db_router, bio, goalie_rows):
+        db_router.when("where p.player_id = %s", bio)
+        db_router.when("from player_season_stats where player_id", [])
+        db_router.when("from player_advanced_stats where player_id", None)
+        db_router.when("from goalie_advanced_stats", goalie_rows)
+        db_router.when("from player_career_totals where player_id", [])
+        db_router.when("from player_season_history where player_id", [])
+
+    def test_goalies_get_gsax_worked_out(self, client, db_router, player_bio_row):
+        row = {"season_id": 20262027, "games_played": 5, "icetime_seconds": 18000, "shots_faced": 150,
+               "goals_allowed": 10, "xgoals_against": 13.5, "high_danger_shots": 30, "high_danger_goals": 5,
+               "high_danger_xgoals": 6.2}
+        self._routes(db_router, dict(player_bio_row, position_code="G"), row)
+
+        stats = client.get("/players/8477492").json()["goalie_advanced_stats"]
+
+        assert stats["gsax"] == 3.5 and stats["gsax_per_60"] == 0.7  # 3.5 over 5 hours
+        assert stats["high_danger_gsax"] == 1.2
+
+    def test_before_the_table_exists_goalies_just_get_none(self, client, db_router, player_bio_row):
+        import psycopg2.errors
+
+        def missing(params):
+            raise psycopg2.errors.UndefinedTable("relation \"goalie_advanced_stats\" does not exist")
+
+        self._routes(db_router, dict(player_bio_row, position_code="G"), missing)
+
+        response = client.get("/players/8477492")
+
+        assert response.status_code == 200 and response.json()["goalie_advanced_stats"] is None
+
+    def test_skaters_never_query_it(self, client, db_router, player_bio_row):
+        self._routes(db_router, dict(player_bio_row, position_code="C"), None)
+
+        assert client.get("/players/8477492").json()["goalie_advanced_stats"] is None
+        assert not any("goalie_advanced_stats" in sql for sql, _ in db_router.calls)

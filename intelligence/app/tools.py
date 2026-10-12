@@ -320,12 +320,12 @@ class ToolRunner:
 
     async def _tool_simulate_scenario(self, team: str, games: int, wins: int, ot_losses: int = 0):
         abbrev = await self._team(team)
-        return await self.dashboard._get(
-            f"/season-sim/scenario?team={abbrev}&games={int(games)}&wins={int(wins)}&ot_losses={int(ot_losses)}")
+        return _odds_as_percent(await self.dashboard._get(
+            f"/season-sim/scenario?team={abbrev}&games={int(games)}&wins={int(wins)}&ot_losses={int(ot_losses)}"))
 
     async def _tool_playoff_path(self, team: str, games: int = 10):
         abbrev = await self._team(team)
-        return await self.dashboard._get(f"/season-sim/path?team={abbrev}&games={int(games)}")
+        return _odds_as_percent(await self.dashboard._get(f"/season-sim/path?team={abbrev}&games={int(games)}"))
 
     async def _tool_get_recent_results(self, team: str):
         abbrev = await self._team(team)
@@ -413,7 +413,7 @@ class ToolRunner:
                 raise ToolError(cause.response.json().get("detail", "That move can't be simulated.")) from exc
             raise
         return {
-            **result,
+            **_odds_as_percent(result),
             "how_to_read": "value_goals_per_game = the player's worth over a replacement-level player, in the same "
                            "goals/game units as team ratings (about 0.3 for the very best skaters). Compare each team's "
                            "with_change to its own baseline. With no destination or return, his minutes go to a "
@@ -500,6 +500,20 @@ def _breakdown(team: str, name: str | None, w: dict, playoff_pct: float | None, 
         "schedule": {"games_left": sched.get("games_left"), "rank": f"{_ordinal(sched.get('rank'))} easiest of {league_size}",
                      "effect": sched.get("effect"), "push": _push(sched.get("effect"))} if sched.get("games_left") else None,
     })
+
+
+def _odds_as_percent(value):
+    """
+    The simulation endpoints return playoff odds as fractions (0.376); the
+    model once read that as "3.76%". Every *_pct here becomes a percentage
+    (37.6), the same as the other tools.
+    """
+    if isinstance(value, dict):
+        return {k: (round(v * 100, 1) if k.endswith("_pct") and isinstance(v, (int, float)) and 0 <= v <= 1
+                    else _odds_as_percent(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_odds_as_percent(v) for v in value]
+    return value
 
 
 def _ordinal(n: int | None) -> str | None:

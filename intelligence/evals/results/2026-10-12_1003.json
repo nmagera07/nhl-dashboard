@@ -1,0 +1,128 @@
+{
+  "started": "2026-10-12T14:03:15+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If Pittsburgh goes 4-0 over their next 4 games, the playoff-odds model's simulations show their playoff chances rise from 61.6% to 73.3%, and their projected points increase from 96.8 to 100.8.",
+          "seconds": 4.4,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"wins\":4,\"team\":\"PIT\",\"games\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'wins': 4, 'team': 'PIT', 'games': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~73.3%, answer has [61.6, 73.3]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "According to the playoff-odds model's simulations, Detroit needs an **8\u20132** record over its next 10 games to reach **54.8%** playoff odds, giving them a better-than-even (over 50%) chance at the postseason.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"games\":10,\"team\":\"DET\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'games': 10, 'team': 'DET'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '8-2'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "According to the playoff-odds model's simulations, if the Red Wings traded away Dylan Larkin without receiving a player in return:\n\n* Their playoff odds would drop from **37.6%** to **29.3%**.\n* Their projected average points would decrease from **90.1** to **87.3**.\n\n*(Note: This is a rough estimate for the rest of the season that ignores line chemistry and the salary cap.)*",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~29.3%, answer has [37.6, 29.3]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides the exact odds change, frames it as a rough model estimate, and avoids claiming certainty or real trade knowledge."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "According to the playoff-odds model's simulations (which are rough estimates ignoring line chemistry and the salary cap), a hypothetical trade of Dylan Larkin to Toronto for Auston Matthews would impact the teams as follows:\n\n* **Detroit (getting Auston Matthews):** Their playoff odds would increase slightly from 37.6% to 38.3% (projected points rising from 90.1 to 90.3).\n* **Toronto (getting Dylan Larkin):** Their playoff odds would dip slightly from 26.4% to 25.6% (projected points dropping from 86.6 to 86.4).",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\",\"player_back\":\"Auston Matthews\",\"to_team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin', 'player_back': 'Auston Matthews', 'to_team': 'TOR'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Reports both teams' playoff odds changes matching rubric"
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

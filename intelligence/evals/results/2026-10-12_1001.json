@@ -1,0 +1,363 @@
+{
+  "started": "2026-10-12T13:57:56+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Pittsburgh Penguins play next against the Chicago Blackhawks on Tuesday, October 13, 2026, at 8:00 PM ET (away).",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":1,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'games': 1, 'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CHI'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "According to the playoff-odds model's simulations, if Pittsburgh wins their next 4 games (4-0-0):\n\n* Their playoff odds increase from **61.6%** to **73.3%** (+11.7%).\n* Their projected average points rise from **96.8** to **100.8**.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"games\":4,\"team\":\"PIT\",\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'team': 'PIT', 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~73.3%, answer has [61.6, 73.3, 11.7]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 2 points (0 goals, 2 assists) in 6 games played this season.",
+          "seconds": 2.9,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model's simulations, the Pittsburgh Penguins hold a 60.4% chance to make the playoffs, powered by a few key factors:\n\n* **Last season's carryover:** Strong performance from last year carries heavy weight early on (the model still gives it 83% trust against a small sample of games this season), which pushes their rating up.\n* **Early goal differential:** They are +5 in goal differential through 6 games, giving their rating an immediate boost.\n* **Hot finishing or goaltending:** They are scoring well above their expected goals (goals > xG), a hot streak that usually cools off over a full season.\n* **Remaining schedule and expected goals:** Their expected goals difference and remaining schedule (ranked 21st easiest) have a negligible impact on their rating.",
+          "seconds": 2.8,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Correctly lists and orients all rating factors without overstating negligible ones"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "According to the playoff-odds model's simulations, if the Red Wings traded away Dylan Larkin without receiving a roster player back, their playoff odds would drop from 3.76% to 2.93% (a decrease of 8.3 percentage points), and their projected points would fall from 90.1 to 87.3. \n\nThis is a rough estimate for the rest of the season that assumes his minutes go to a replacement-level player and ignores line chemistry and the salary cap.",
+          "seconds": 2.2,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": false,
+              "detail": "expected ~29.3%, answer has [3.76, 2.93]"
+            },
+            {
+              "name": "grounded",
+              "passed": false,
+              "detail": "unsourced: [3.76]"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: The answer gives 3.76% to 2.93% instead of the required 37.6% to 29.3%"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "As of the latest report, yes. Drew Helleson is listed on Injured Reserve with a lower-body injury, with an expected return date of October 13, 2026.",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Drew Helleson'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides correct IR status, injury type, and return date without incorrect details"
+            }
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins\u2019 next game is **Tuesday,\u202fOct\u202f13\u202f2026 at 8:00\u202fPM\u202fET** versus the Chicago Blackhawks on the road.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":5,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'games': 5, 'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CHI'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If Pittsburgh goes 4\u20110\u20110 in its next four games, the playoff\u2011odds model shows its chance of making the postseason jumps from about **61.6\u202f%** (the current baseline) to **73.3\u202f%**. The model also projects the team will finish with roughly **101 points** instead of about **97**. These figures come from the playoff\u2011odds simulations as of October\u202f12,\u202f2026.",
+          "seconds": 2.7,
+          "model_calls": 3,
+          "tools": [
+            "get_playoff_odds({\"team\":\"PIT\"})",
+            "simulate_scenario({\"games\":4,\"ot_losses\":0,\"team\":\"PIT\",\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'ot_losses': 0, 'team': 'PIT', 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~73.3%, answer has [61.6, 73.3]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "**Why the Penguins\u2019 playoff odds are high right now (\u2248\u202f60\u202f%):**\n\n- **Goal production is a big boost** \u2013 In the first six games Pittsburgh is +5 in goal\u2011difference, giving a\u202f+0.069 rating \u201cpush.\u201d Scoring well above what the model expects (goals\u202f>\u202fxG) lifts their odds.  \n- **Last\u2011season carryover still helps** \u2013 The model still weights the 2025\u201126 season (about\u202f83\u202f% of its influence) and the Penguins\u2019 prior\u2011year goal differential adds another\u202f+0.067 rating \u201cpush.\u201d  \n- **Expected\u2011goals (xG) is neutral** \u2013 Their xG versus opponents is essentially flat, so the xG factor contributes only a negligible\u202f+0.0003.  \n- **Schedule isn\u2019t a major factor yet** \u2013 Their remaining 78 games rank 21st\u2011easiest of the league, but the schedule effect is tiny (\u20110.008) and barely moves the odds.  \n\nTogether, strong early scoring and a favorable carry\u2011over from last season give Pittsburgh a solid rating (0.1369, 11th of 32), which translates into the current 60.4\u202f% chance of making the playoffs. The model also accounts for points already earned, so the early win\u2011rate reinforces the high odds.",
+          "seconds": 2.9,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately lists the model factors in the correct directions without treating negligible ones as major reasons."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "**What\u2011if the Red Wings traded away Dylan\u202fLarkin?**\n\n- **Baseline odds (as of Oct\u202f12,\u202f2026):**\u202fDetroit\u2019s chance of making the playoffs is **37.6\u202f%** (about a 3\u2011in\u20118 shot).  \n- **After losing Larkin:**\u202fWith Larkin gone and no immediate replacement, the model drops Detroit\u2019s playoff probability to **29.3\u202f%** (roughly a 1\u2011in\u20113 chance).  \n\nSo, the trade would shave **about 8.3 percentage points** off the Red Wings\u2019 odds, moving them from a modest chance to a lower\u2011tier outlook. The simulation treats Larkin\u2019s contribution as roughly **0.12\u202fgoals per game**, which the model translates into a modest rating dip (\u20110.123). That dip reduces both projected points (from ~90.1 to ~87.3) and the overall playoff likelihood.\n\n*Note: these figures come from the playoff\u2011odds model\u2019s season\u2011long simulations and assume no replacement player is added. Real\u2011world factors like line chemistry, cap space, or a new acquisition could shift the outcome.*",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~29.3%, answer has [37.6, 29.3]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer provides the exact odds change, presents it as a model estimate, and does not claim to know of any real trade."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "Drew\u202fHelleson is listed on the current injury report as **Injured Reserve** with a lower\u2011body issue. The report notes an expected return on **2026\u201110\u201113**. So, as of today (Oct\u202f12,\u202f2026) he is still considered injured.",
+          "seconds": 1.4,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Drew Helleson\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Drew Helleson'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately reflects the injury report status, team, injury type, and expected return date without inventing details."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

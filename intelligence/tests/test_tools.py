@@ -31,6 +31,8 @@ SIM_INPUTS = {
     "games": [["2026-10-11", "PIT", "COL"], ["2026-10-12", "CBJ", "PIT"], ["2026-10-13", "COL", "CBJ"]],
 }
 SCENARIO = {"team": "PIT", "scenario": "4-0-0 over the next 4 games", "baseline": {"playoff_pct": 0.6}, "with_scenario": {"playoff_pct": 0.73}}
+# What the model sees: the same, with odds as percentages.
+SCENARIO_FOR_MODEL = {**SCENARIO, "baseline": {"playoff_pct": 60.0}, "with_scenario": {"playoff_pct": 73.0}}
 HISTORY = {"season_id": 20262027, "available_seasons": [20262027], "points": [
     {"as_of_date": "2026-10-01", "team_abbrev": "PIT", "playoff_pct": 0.5},
     {"as_of_date": "2026-10-03", "team_abbrev": "PIT", "playoff_pct": 0.4},
@@ -102,7 +104,7 @@ class TestTools:
         seen = []
         result = await self.call("simulate_scenario", {"team": "Penguins", "games": 4, "wins": 4}, seen)
 
-        assert result == SCENARIO
+        assert result == SCENARIO_FOR_MODEL
         assert "/season-sim/scenario?team=PIT&games=4&wins=4&ot_losses=0" in seen
 
     async def test_unknown_teams_come_back_as_errors_the_model_can_read(self):
@@ -168,6 +170,10 @@ class TestTools:
 
     async def test_explain_odds_rejects_the_same_team_twice(self):
         assert "error" in await self.call("explain_odds", {"team": "PIT", "opponent": "Penguins"})
+
+    async def test_simulated_odds_come_back_as_percentages(self):
+        result = await self.call("simulate_scenario", {"team": "PIT", "games": 4, "wins": 4})
+        assert result["baseline"]["playoff_pct"] == 60.0 and result["with_scenario"]["playoff_pct"] == 73.0
 
     async def test_roster_change_with_no_destination(self):
         result = await self.call("simulate_roster_change", {"player": "Larkin"})
@@ -244,7 +250,7 @@ class TestAgentLoop:
         # The second request carried the tool call and its result back to the model.
         second = calls[1][1]["messages"]
         assert second[-2]["tool_calls"][0]["function"]["name"] == "simulate_scenario"
-        assert second[-1]["role"] == "tool" and json.loads(second[-1]["content"]) == SCENARIO
+        assert second[-1]["role"] == "tool" and json.loads(second[-1]["content"]) == SCENARIO_FOR_MODEL
 
     async def test_stops_calling_tools_after_the_round_limit(self):
         calls = []

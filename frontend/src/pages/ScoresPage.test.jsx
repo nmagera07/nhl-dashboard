@@ -25,7 +25,8 @@ function renderAt(path, props = {}) {
   );
 }
 
-const fetchedUrl = () => globalThis.fetch.mock.calls.at(-1)[0];
+// The latest scoreboard request (headlines and other cards fetch too).
+const fetchedUrl = () => globalThis.fetch.mock.calls.map(([url]) => String(url)).filter((u) => u.includes("/games/date/")).at(-1);
 
 describe("ScoresPage", () => {
   it("shows today's games by default", async () => {

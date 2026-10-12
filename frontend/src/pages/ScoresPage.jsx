@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
-import DailyDigest from "../components/DailyDigest.jsx";
 import TopHeadlines from "../components/TopHeadlines.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
@@ -54,6 +53,10 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
           )}
         </div>
       </div>
+      {/* Scores first: the games lead, with your team's game pinned to the top.
+          Your team's card and the headlines follow; the morning digest lives on News. */}
+      <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
+      <Scoreboard key={date} date={isToday ? null : date} pinTeam={favorite || null} />
       {myTeam ? (
         <MyTeamCard team={myTeam} odds={playoffOddsByTeam[myTeam.team_abbrev]} teams={standings} onChangeTeam={setFavorite} />
       ) : standings.length > 0 && !favorite ? (
@@ -62,10 +65,7 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
           <span>Pin your team's next game, results, and playoff odds here.</span>
         </div>
       ) : null}
-      {isToday && <DailyDigest />}
       {isToday && <TopHeadlines />}
-      <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
-      <Scoreboard key={date} date={isToday ? null : date} />
     </main>
   );
 }

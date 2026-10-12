@@ -122,3 +122,24 @@ describe("Scoreboard", () => {
     await waitFor(() => expect(screen.getAllByRole("button", { name: / at / })).toHaveLength(2));
   });
 });
+
+describe("Scoreboard with a favorite team", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("pins your team's game first and stars it", async () => {
+    const { render, screen } = await import("@testing-library/react");
+    const { MemoryRouter } = await import("react-router-dom");
+    const game = (id, away, home, start) => ({ id, gameState: "FUT", startTimeUTC: start, awayTeam: { abbrev: away }, homeTeam: { abbrev: home } });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json: async () => ({ games: [
+      game(1, "BOS", "TOR", "2026-10-12T23:00:00Z"), game(2, "PIT", "CBJ", "2026-10-13T00:00:00Z"),
+    ] }) });
+    const { default: Scoreboard } = await import("./Scoreboard.jsx");
+
+    render(<MemoryRouter><Scoreboard date="2026-10-12" pinTeam="PIT" /></MemoryRouter>);
+
+    const cards = await screen.findAllByRole("button", { name: / at / });
+    expect(cards[0]).toHaveAccessibleName(/PIT at CBJ/);
+    expect(cards[0]).toHaveClass("game-card-mine");
+    expect(cards[1]).not.toHaveClass("game-card-mine");
+  });
+});

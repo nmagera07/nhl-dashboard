@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import HeadlineList from "../components/HeadlineList.jsx";
+import DailyDigest from "../components/DailyDigest.jsx";
 import InjuryList from "../components/InjuryList.jsx";
 
 const VIEWS = ["Headlines", "Injuries", "Transactions"];
@@ -52,6 +53,9 @@ function NewsPage({ standings }) {
           </label>
         )}
       </div>
+
+      {/* The morning digest: our own take on last night, tied to the model's odds. */}
+      {view === "Headlines" && <DailyDigest />}
 
       {view === "Headlines" && (
         <section className="news-card" aria-label="Headlines">

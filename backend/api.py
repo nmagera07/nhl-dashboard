@@ -25,6 +25,7 @@ from datetime import date, datetime, timezone
 from typing import List, Optional
 
 import psycopg2
+import psycopg2.errors
 import psycopg2.extras
 import sentry_sdk
 from dotenv import load_dotenv
@@ -869,6 +870,37 @@ def player_leaders(request: Request):
         conn.close()
 
 
+def _goalie_advanced(cur, player_id):
+    """
+    This season's goalie_advanced_stats row with GSAx worked out, or None.
+    Tolerates the table not existing yet (schema.sql not applied): the
+    connection is autocommit, so a failed query doesn't poison it.
+    """
+    try:
+        cur.execute(
+            """
+            SELECT * FROM goalie_advanced_stats
+            WHERE player_id = %s AND season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+            """,
+            (player_id,),
+        )
+        row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        return None
+    if not row:
+        return None
+    row = dict(row)
+    xga, ga = row.get("xgoals_against"), row.get("goals_allowed")
+    if xga is not None and ga is not None:
+        row["gsax"] = round(float(xga) - ga, 2)
+        hours = (row.get("icetime_seconds") or 0) / 3600
+        row["gsax_per_60"] = round(row["gsax"] / hours, 2) if hours else None
+    hd_x, hd_g = row.get("high_danger_xgoals"), row.get("high_danger_goals")
+    if hd_x is not None and hd_g is not None:
+        row["high_danger_gsax"] = round(float(hd_x) - hd_g, 2)
+    return row
+
+
 @app.get("/players/{player_id}", response_model=PlayerDetail)
 def player_detail(player_id: int):
     """
@@ -914,6 +946,7 @@ def player_detail(player_id: int):
                 (player_id,),
             )
             player["advanced_stats"] = cur.fetchone()
+            player["goalie_advanced_stats"] = _goalie_advanced(cur, player_id) if player.get("position_code") == "G" else None
 
             cur.execute(
                 "SELECT * FROM player_career_totals WHERE player_id = %s",

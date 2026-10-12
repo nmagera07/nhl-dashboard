@@ -27,9 +27,13 @@ export const GLOSSARY = {
   SA: { name: "Shots against", detail: "Shots on goal faced." },
   PDO: { name: "PDO (luck meter)", detail: "Shooting % + save % at 5-on-5. About 100 is average; far above or below usually evens out." },
   "CORSI%": { name: "Corsi %", detail: "Share of all shot attempts (on goal, missed, or blocked) while on the ice, 5-on-5. A puck-possession stat." },
-  "FENWICK%": { name: "Fenwick %", detail: "Like Corsi %, but leaving out blocked shots." },
   "IND_XG": { name: "Individual expected goals", detail: "Expected goals from the player's own shots." },
   "ONICE_XG": { name: "On-ice expected goals", detail: "Expected goals for and against while the player was on the ice, 5-on-5." },
+
+  // Goalies (MoneyPuck, all situations)
+  GSAX: { name: "Goals saved above expected", detail: "Expected goals against minus goals allowed: how many more goals an average goalie would have given up on the same shots. Above 0 is better than average." },
+  GSAX60: { name: "GSAx per 60", detail: "Goals saved above expected per 60 minutes, so goalies with different workloads compare fairly." },
+  HD_GSAX: { name: "High-danger GSAx", detail: "GSAx on shots from the slot and crease, the hardest saves." },
 
   // Skaters
   G: { name: "Goals" },

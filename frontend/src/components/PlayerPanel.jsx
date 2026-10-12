@@ -47,6 +47,13 @@ function formatPct(value) {
   return value != null ? `${(Number(value) * 100).toFixed(1)}%` : "—";
 }
 
+function formatSigned(value, digits = 1) {
+  if (value == null) return "—";
+  const text = Math.abs(value).toFixed(digits);
+  if (Number(text) === 0) return (0).toFixed(digits);
+  return `${value > 0 ? "+" : "−"}${text}`;
+}
+
 function formatDecimal(value, digits = 2) {
   return value != null ? Number(value).toFixed(digits) : "—";
 }
@@ -126,6 +133,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
   const columns = isGoalie ? GOALIE_COLUMNS : SKATER_COLUMNS;
   const seasonStats = player.season_stats?.[0];
   const advancedStats = player.advanced_stats;
+  const goalieAdvanced = player.goalie_advanced_stats;
 
   const careerRows = [
     player.career_totals?.regular_season && { key: "rs", label: "Regular season", stats: player.career_totals.regular_season },
@@ -189,14 +197,41 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </div>
       </section>
 
+      {isGoalie && goalieAdvanced && (
+        <Section title="Advanced (all situations)">
+          <div className="player-card">
+            <dl className="stat-strip">
+              {[
+                ["GSAx", formatSigned(goalieAdvanced.gsax), "GSAX"],
+                ["GSAx/60", formatSigned(goalieAdvanced.gsax_per_60, 2), "GSAX60"],
+                ["High-danger GSAx", formatSigned(goalieAdvanced.high_danger_gsax), "HD_GSAX"],
+              ].map(([label, value, term]) => (
+                <div key={label} className="stat-strip-item">
+                  <dt><StatAbbr term={term}>{label}</StatAbbr></dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="player-card-note">
+              {goalieAdvanced.goals_allowed != null && goalieAdvanced.xgoals_against != null
+                ? `${goalieAdvanced.goals_allowed} goals allowed on shots worth ${formatDecimal(goalieAdvanced.xgoals_against, 1)} expected. `
+                : ""}
+              MoneyPuck.com, {formatSeasonLabel(goalieAdvanced.season_id)} season
+              {goalieAdvanced.games_played != null ? ` (${goalieAdvanced.games_played} GP)` : ""}.
+            </p>
+          </div>
+        </Section>
+      )}
+
       {!isGoalie && advancedStats && (
         <Section title="Advanced (5-on-5)">
           <div className="player-card">
             <dl className="stat-strip">
               {[
-                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
-                ["Fenwick %", formatPct(advancedStats.fenwick_for_pct), "FENWICK%"],
+                // xG % first: it's the one people quote now. Fenwick % (Corsi
+                // minus blocked shots) was dropped as near-duplicate noise.
                 ["xG %", formatPct(advancedStats.xgoals_for_pct), "xG%"],
+                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
                 ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`, "ONICE_XG"],
                 ["Ind. xG", formatDecimal(advancedStats.individual_xgoals), "IND_XG"],
                 ["PDO", formatDecimal(advancedStats.pdo, 1), "PDO"],
@@ -258,8 +293,8 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </Section>
       )}
       <StatGlossary
-        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "CORSI%", "FENWICK%", "xG%", "ONICE_XG", "IND_XG", "PDO"]}
-        labels={{ "CORSI%": "Corsi %", "FENWICK%": "Fenwick %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG" }}
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "xG%", "CORSI%", "ONICE_XG", "IND_XG", "PDO"]}
+        labels={{ "CORSI%": "Corsi %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
       />
     </main>
   );

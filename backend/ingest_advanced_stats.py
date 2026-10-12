@@ -150,6 +150,75 @@ def parse_skater_row(row):
     }
 
 
+GOALIE_SITUATION = "all"  # goaltending is judged on every shot faced, not just 5-on-5
+
+
+def parse_goalie_row(row):
+    return {
+        "player_id": int(row["playerId"]),
+        "games_played": _int(row["games_played"]),
+        "icetime_seconds": _int(row["icetime"]),
+        "shots_faced": _int(row["ongoal"]),
+        "goals_allowed": _int(row["goals"]),
+        "xgoals_against": _float(row["xGoals"]),
+        "high_danger_shots": _int(row["highDangerShots"]),
+        "high_danger_goals": _int(row["highDangerGoals"]),
+        "high_danger_xgoals": _float(row["highDangerxGoals"]),
+    }
+
+
+def save_goalie_stats(cur, season_id, stats, valid_player_ids):
+    saved = 0
+    for stat in stats:
+        if stat["player_id"] not in valid_player_ids:
+            continue  # same FK reasoning as save_player_stats
+        cur.execute(
+            """
+            INSERT INTO goalie_advanced_stats (
+                player_id, season_id, games_played, icetime_seconds, shots_faced, goals_allowed,
+                xgoals_against, high_danger_shots, high_danger_goals, high_danger_xgoals, updated_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (season_id, player_id) DO UPDATE SET
+                games_played = EXCLUDED.games_played,
+                icetime_seconds = EXCLUDED.icetime_seconds,
+                shots_faced = EXCLUDED.shots_faced,
+                goals_allowed = EXCLUDED.goals_allowed,
+                xgoals_against = EXCLUDED.xgoals_against,
+                high_danger_shots = EXCLUDED.high_danger_shots,
+                high_danger_goals = EXCLUDED.high_danger_goals,
+                high_danger_xgoals = EXCLUDED.high_danger_xgoals,
+                updated_at = NOW()
+            """,
+            (
+                stat["player_id"], season_id, stat["games_played"], stat["icetime_seconds"], stat["shots_faced"],
+                stat["goals_allowed"], stat["xgoals_against"], stat["high_danger_shots"],
+                stat["high_danger_goals"], stat["high_danger_xgoals"],
+            ),
+        )
+        saved += 1
+    return saved
+
+
+def ingest_goalies(season_id, year):
+    """
+    Goalie stats in their own transaction, best effort: a MoneyPuck hiccup
+    or the table not existing yet (schema.sql not applied) mustn't undo the
+    team and skater stats already saved.
+    """
+    try:
+        rows = fetch_csv_rows(year, "goalies")
+        stats = [parse_goalie_row(r) for r in rows if r["situation"] == GOALIE_SITUATION]
+        with psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                saved = save_goalie_stats(cur, season_id, stats, fetch_valid_player_ids(cur))
+            conn.commit()
+    except (requests.RequestException, psycopg2.Error, KeyError, ValueError) as exc:
+        logger.warning(f"Goalie advanced stats skipped ({type(exc).__name__}: {exc})")
+        return 0
+    logger.info(f"{saved} goalies saved.")
+    return saved
+
+
 def fetch_valid_team_abbrevs(cur):
     cur.execute("SELECT team_abbrev FROM teams")
     return {r[0] for r in cur.fetchall()}
@@ -267,6 +336,7 @@ def main():
         conn.commit()
 
     logger.info(f"Done. {teams_saved} teams, {players_saved} players saved.")
+    ingest_goalies(args.season, year)
 
 
 if __name__ == "__main__":

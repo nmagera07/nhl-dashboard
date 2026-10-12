@@ -127,6 +127,29 @@ class PlayerAdvancedStat(BaseModel):
     pdo: Optional[float] = None
 
 
+class GoalieAdvancedStat(BaseModel):
+    """
+    The current season's row of `goalie_advanced_stats` (MoneyPuck, all
+    situations), nested under GET /players/{player_id} for goalies.
+    gsax (goals saved above expected) = xgoals_against - goals_allowed:
+    positive means he stopped more than an average goalie would have on
+    the same shots. Derived here, not stored, so it can't drift.
+    """
+
+    season_id: int
+    games_played: Optional[int] = None
+    icetime_seconds: Optional[int] = None
+    shots_faced: Optional[int] = None
+    goals_allowed: Optional[int] = None
+    xgoals_against: Optional[float] = None
+    high_danger_shots: Optional[int] = None
+    high_danger_goals: Optional[int] = None
+    high_danger_xgoals: Optional[float] = None
+    gsax: Optional[float] = None
+    gsax_per_60: Optional[float] = None
+    high_danger_gsax: Optional[float] = None
+
+
 class CareerTotalsStats(BaseModel):
     """
     One season-type slice (regular season OR playoffs) of a player's
@@ -247,5 +270,6 @@ class PlayerDetail(PlayerBio):
     team_logo_url: Optional[str] = None
     season_stats: List[PlayerSeasonStat]
     advanced_stats: Optional[PlayerAdvancedStat] = None
+    goalie_advanced_stats: Optional[GoalieAdvancedStat] = None
     career_totals: CareerTotals
     season_history: List[SeasonHistoryEntry]

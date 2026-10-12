@@ -112,4 +112,19 @@ describe("PlayerPanel", () => {
     expect(strip.getByText("GAA").nextSibling).toHaveTextContent("3.38");
     expect(strip.queryByText("PTS")).not.toBeInTheDocument();
   });
+
+  it("shows goalies' goals saved above expected", () => {
+    renderPanel(skater({
+      position_code: "G", shoots_catches: "L",
+      season_stats: [], career_totals: null, season_history: [],
+      goalie_advanced_stats: { season_id: 20262027, games_played: 5, goals_allowed: 10, xgoals_against: 13.5,
+                               gsax: 3.5, gsax_per_60: 0.7, high_danger_gsax: -1.2 },
+    }));
+
+    const card = within(screen.getByText("Advanced (all situations)").closest("section"));
+    expect(card.getByText("GSAx").closest("div")).toHaveTextContent("+3.5");
+    expect(card.getByText("GSAx/60").closest("div")).toHaveTextContent("+0.70");
+    expect(card.getByText("High-danger GSAx").closest("div")).toHaveTextContent("−1.2");
+    expect(card.getByText(/10 goals allowed on shots worth 13.5 expected/)).toBeInTheDocument();
+  });
 });

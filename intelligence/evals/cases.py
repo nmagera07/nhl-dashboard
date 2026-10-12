@@ -4,7 +4,8 @@ that works out today's correct answer from the dashboard API. Standings and
 schedules change daily, so hardcoded answers would rot; computing the truth
 at eval time keeps every case checkable.
 
-Each truth function returns the checks to run on the answer:
+Each truth function returns the checks to run on the answer (and may set
+"question" when the question itself depends on today's data):
     tool:     (names, args) the agent should have called (None = any/none)
     facts:    strings, at least one of which the answer must mention
     percent:  a percentage the answer must state (within 1 point)
@@ -200,10 +201,27 @@ async def trade_swap(api) -> Truth:
     }
 
 
-async def no_injury_data(api) -> Truth:
+async def injury_status(api) -> Truth:
+    report = (await api("/injuries"))["teams"]
+    hurt = next(((team, rows[0]) for team, rows in sorted(report.items()) if rows and rows[0].get("status")), None)
+    if not hurt:
+        return {"skip": "nobody on the injury report"}
+    team, row = hurt
+    return {"question": f"Is {row['player']} injured right now?", "tool": ("get_injuries", None), "facts": [row["status"], row["status"].lower()],
+            "rubric": f"The injury report lists {row['player']} ({team}) as {row['status']}"
+                      + (f" with a {row['injury']} injury" if row.get("injury") else "")
+                      + (f", expected back {row['expected_return']}" if row.get("expected_return") else "")
+                      + (f". The report's note: \"{row['note']}\"" if row.get("note") else "")
+                      + ". Details from the note are fine, dates may be written without the year, and \"as of the latest "
+                        "report\" counts as attributing it. Pass only if the answer gives that status (and the right team, "
+                        "if it names one) without inventing details. Fail if it says he isn't injured or isn't listed."}
+
+
+
+async def no_lineup_data(api) -> Truth:
     return {"tool": None,
-            "rubric": "The assistant has no injury data. Pass only if the answer says it can't confirm injury status "
-                      "(or that it lacks that information). Fail if it states he is injured or healthy as a fact."}
+            "rubric": "The assistant has no lineup or line-combination data. Pass only if the answer says it can't "
+                      "confirm lines or scratches. Fail if it states line combinations as fact."}
 
 
 DIGEST_FACTS_FILE = None  # set by --digest-facts: judge a digest written from these facts
@@ -245,6 +263,7 @@ CASES = [
     Case("why_favored", "Who does the model like more between Carolina and the Rangers, and why?", why_favored),
     Case("trade_away", "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?", trade_away),
     Case("trade_swap", "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?", trade_swap),
-    Case("no_injury_data", "Is Sidney Crosby injured right now?", no_injury_data),
+    Case("injury_status", "(a player on today's injury report)", injury_status),
+    Case("no_lineup_data", "Who's on the Penguins' first line tonight?", no_lineup_data),
     Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

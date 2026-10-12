@@ -12,7 +12,8 @@ const entries = new Map();
 
 const STORAGE_PREFIX = "puckpulse:response:v1:";
 const STORAGE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-const PERSISTED = /\/(standings\/latest|playoff-odds(\/history|\/why)?|players\/leaders|teams\/[A-Z]{3}\/roster|predictions\/track-record|digest\/latest)(\?season_id=\d+)?$/;
+// News too: last visit's headlines show at once and are replaced within a second or two.
+const PERSISTED = /\/(standings\/latest|playoff-odds(\/history|\/why)?|players\/leaders|teams\/[A-Z]{3}\/roster|predictions\/track-record|digest\/latest|news|injuries|transactions)(\?[^/]*)?$/;
 
 export function isPersisted(url) {
   return !!url && PERSISTED.test(url);

@@ -1,0 +1,236 @@
+{
+  "started": "2026-10-12T01:41:01+00:00",
+  "api": "http://127.0.0.1:8010",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins play next on Tuesday, October 13, 2026, at 8:00 PM ET against the Chicago Blackhawks (CHI) on the road.",
+          "seconds": 1.9,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CHI'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 2 points (0 goals, 2 assists) in 6 games played this season for the Pittsburgh Penguins.",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "Yes, as of the latest report, Drew Helleson is currently on Injured Reserve due to a lower-body injury. He hopes to return at the end of Anaheim's upcoming road trip.",
+          "seconds": 1.4,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Adds invented detail about return timing not in the injury report"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "no_lineup_data",
+          "question": "Who's on the Penguins' first line tonight?",
+          "answer": "I don't have lineup or line-combination data, so I can't tell you who is on the Penguins' first line tonight.",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: The answer correctly states it cannot provide lineup data."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Pittsburgh\u202fPenguins\u2019 next game is **Tuesday, October\u202f13,\u202f2026 at 8:00\u202fPM\u202fET** against the Chicago\u202fBlackhawks on the road.",
+          "seconds": 1.0,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CHI'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney\u202fCrosby has **2 points** on the season so far (0\u202fgoals\u202f+\u202f2\u202fassists in 6 games).",
+          "seconds": 1.4,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Drew Helleson injured right now?",
+          "answer": "As of the latest ESPN injury report (dated\u202fOctober\u202f11,\u202f2026), Drew\u202fHelleson does\u202fnot appear on the Washington Capitals\u2019 injury list. He isn\u2019t listed as injured, out, or day\u2011to\u2011day.",
+          "seconds": 1.3,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"team\":\"WSH\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'team': 'WSH'})"
+            },
+            {
+              "name": "facts",
+              "passed": false,
+              "detail": "expected one of ['Injured Reserve', 'injured reserve']"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "gemini: The answer falsely claims Helleson is not injured and plays for the Capitals."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "no_lineup_data",
+          "question": "Who's on the Penguins' first line tonight?",
+          "answer": "I\u2019m sorry\u2014I don\u2019t have line\u2011combination or scratch information, so I can\u2019t tell you who\u2019s slated to start on the Penguins\u2019 first line tonight.",
+          "seconds": 0.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The assistant correctly stated it does not have line-combination information."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

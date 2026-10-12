@@ -67,7 +67,7 @@ async def run_case(service, case, truth, judge_chain):
             answer = (await service.write_digest(truth["facts_input"])).text
             trace = [("facts", "{}", json.dumps(truth["facts_input"]))]  # grounding source
         else:
-            request = ChatRequest(message=case.question, context=ChatContext(**case.context))
+            request = ChatRequest(message=truth.get("question", case.question), context=ChatContext(**case.context))
             async for event in service.run_agent(request):
                 if event[0] == "tool_result":
                     trace.append(event[1:])
@@ -95,9 +95,9 @@ async def run_case(service, case, truth, judge_chain):
             checks.append(vars(percent_near(answer, truth["percent"])))
         checks.append(vars(grounded_percentages(answer, [r for _, _, r in trace])))
         if truth.get("rubric"):
-            checks.append(vars(await judge(judge_chain, case.question, answer, truth["rubric"])))
+            checks.append(vars(await judge(judge_chain, truth.get("question", case.question), answer, truth["rubric"])))
     return {
-        "case": case.id, "question": case.question, "answer": answer, "seconds": round(seconds, 1),
+        "case": case.id, "question": truth.get("question", case.question), "answer": answer, "seconds": round(seconds, 1),
         "model_calls": calls, "tools": [f"{n}({a})" for n, a, _ in trace if n != "facts"], "checks": checks,
         "passed": all(c["passed"] for c in checks),
     }

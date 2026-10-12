@@ -1,0 +1,123 @@
+{
+  "started": "2026-10-12T00:06:38+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "groq": {
+      "model": "openai/gpt-oss-120b",
+      "results": [
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins\u2019 next game is **Tuesday, Oct\u202f13\u202f2026** at\u202f8:00\u202fPM\u202fET. They\u2019ll travel to Chicago to face the **CHI** Blackhawks.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":5,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'games': 5, 'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CHI'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If the Penguins win all four of their upcoming games, the playoff\u2011odds model projects their chances of making the postseason to rise from **about\u202f60\u202f% to roughly\u202f73\u202f%**. Their expected point total would also climb from the mid\u201190s (\u2248\u202f96.8 points) to just over 100 points (\u2248\u202f100.7). These figures come directly from the model\u2019s season\u2011simulation tool.",
+          "seconds": 1.8,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"games\":4,\"ot_losses\":0,\"team\":\"PIT\",\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'ot_losses': 0, 'team': 'PIT', 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~72.6%, answer has [60.0, 73.0]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney\u202fCrosby has recorded **2 points** this season (0 goals and 2 assists in 6 games).",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '2 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "**Why the Penguins\u2019 playoff odds are high (\u2248\u202f60\u202f% chance):**\n\n- **Strong early scoring** \u2013 In 6 games Pittsburgh is +5 in goal\u2011difference, which adds a **+0.0694** boost to its rating. Scoring well above its expected\u2011goals (xG) suggests a hot offense or hot goaltending.  \n- **Last\u2011season carry\u2011over** \u2013 The model still trusts last year\u2019s performance (\u2248\u202f83\u202f% weight) because the season is just beginning. That season\u2019s positive goal\u2011per\u2011game edge contributes another **+0.0672** to the rating.  \n- **xG is neutral** \u2013 Their actual goal\u2011differential matches expected\u2011goals (xG effect\u202f+\u202f0.0003), so this factor is essentially negligible.  \n- **Schedule isn\u2019t a drag** \u2013 With 78 games left, Pittsburgh\u2019s remaining schedule ranks 22nd easiest of 32, giving a tiny **\u20110.0062** (negligible) impact.  \n\nTogether, the scoring edge and strong carry\u2011over from last season lift the rating to the 11th\u2011best in the league, translating to a 60\u202f% playoff\u2011probability at this early stage.",
+          "seconds": 2.6,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies the rating factors and directions without treating negligible items as major reasons."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

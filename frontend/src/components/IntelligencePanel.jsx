@@ -13,7 +13,7 @@ const FALLBACK_ERROR = "PuckPulse AI could not answer right now.";
 let nextId = 0;
 const newId = () => ++nextId;
 
-async function streamAnswer({ message, context, history, onStatus, onDelta, onDone }) {
+async function streamAnswer({ message, context, history, onStatus, onDelta, onReset, onDone }) {
   const response = await fetch(`${INTELLIGENCE_BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -38,6 +38,8 @@ async function streamAnswer({ message, context, history, onStatus, onDelta, onDo
       const payload = JSON.parse(line.slice(6));
       if (payload.type === "status") onStatus?.(payload.text);
       else if (payload.type === "delta") onDelta(payload.text);
+      // The model wrote a little, then decided to look something up: drop that text.
+      else if (payload.type === "reset") onReset?.();
       else if (payload.type === "done") onDone(payload);
       else if (payload.type === "error") throw new Error(payload.message);
     });
@@ -113,6 +115,7 @@ export default function IntelligencePanel({ context, label }) {
           timer.text();
           updateLast((m) => ({ content: m.content + delta }));
         },
+        onReset: () => updateLast(() => ({ content: "" })),
         onDone: (payload) => updateLast(() => ({ pending: false, model: payload.model, evidence: payload.evidence || [] })),
       });
       updateLast(() => ({ pending: false }));

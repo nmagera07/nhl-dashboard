@@ -237,8 +237,9 @@ class TestAgentLoop:
             events = [e async for e in svc.answer_stream(ChatRequest(message="What if PIT wins 4?", context=ChatContext(page="standings")))]
 
         assert json.loads(events[0][6:]) == {"type": "status", "text": "Simulating 2,000 seasons…"}
-        assert "60% to 73%" in events[1]
-        done = json.loads(events[2][6:])
+        answer = "".join(json.loads(e[6:])["text"] for e in events if '"type": "delta"' in e)
+        assert "60% to 73%" in answer
+        done = json.loads(events[-1][6:])
         assert {"label": "Season simulation (playoff-odds model)", "endpoint": "tool:simulate_scenario"} in done["evidence"]
         # The second request carried the tool call and its result back to the model.
         second = calls[1][1]["messages"]

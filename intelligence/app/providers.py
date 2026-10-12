@@ -22,6 +22,7 @@ every default can be overridden with its *_MODEL variable.
 import logging
 import os
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Mapping
 
 from openai import AsyncOpenAI, OpenAIError
@@ -133,6 +134,94 @@ class ProviderChain:
                     break
         raise AllProvidersFailed()
 
+    async def stream_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0):
+        """
+        complete_with_tools(), streamed: yields ("text", piece) as the
+        answer is written, then ("done", message, provider, index). Falls
+        back to the next provider like complete_with_tools() as long as no
+        text has gone out yet; a failure after that is re-raised (the
+        caller reports a mid-answer failure).
+        """
+        for index in range(start, len(self.providers)):
+            provider = self.providers[index]
+            for attempt in (1, 2):
+                emitted = False
+                try:
+                    extra = {"tools": tools} if tools else {}
+                    stream = await self._client(provider).chat.completions.create(
+                        model=provider.model, messages=messages, max_tokens=max_tokens, stream=True, **extra,
+                    )
+                    text, calls = [], {}
+                    async for chunk in stream:
+                        delta = chunk.choices[0].delta if chunk.choices else None
+                        if delta is None:
+                            continue
+                        piece = getattr(delta, "content", None)
+                        if piece:
+                            text.append(piece)
+                            emitted = True
+                            yield ("text", piece)
+                        for call in getattr(delta, "tool_calls", None) or []:
+                            _merge_tool_call(calls, call)
+                    message = StreamedMessage("".join(text) or None, [StreamedToolCall(c) for c in calls.values()] or None)
+                    if message.tool_calls or (message.content or "").strip():
+                        yield ("done", message, provider, index)
+                        return
+                    logger.warning("%s returned an empty turn; trying the next provider", provider.name)
+                    break
+                except OpenAIError as exc:
+                    if emitted:
+                        raise
+                    if attempt == 1 and self._malformed_tool_call(exc):
+                        logger.info("%s wrote a malformed tool call; retrying once", provider.name)
+                        continue
+                    logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
+                    break
+        raise AllProvidersFailed()
+
     @staticmethod
     def _malformed_tool_call(exc: Exception) -> bool:
         return getattr(exc, "status_code", None) == 400 and "tool_use_failed" in str(exc)
+
+
+@dataclass
+class StreamedMessage:
+    """The pieces of a streamed turn, shaped like a non-streamed message."""
+    content: str | None
+    tool_calls: list | None
+
+
+class StreamedToolCall:
+    """A tool call rebuilt from stream chunks. model_dump() keeps every field
+    the provider sent (Gemini's thought signature must be echoed back)."""
+
+    def __init__(self, data: dict):
+        self._data = data
+        self.id = data.get("id")
+        self.function = SimpleNamespace(name=data["function"]["name"], arguments=data["function"]["arguments"] or "{}")
+
+    def model_dump(self, exclude_none: bool = True) -> dict:
+        return {k: v for k, v in self._data.items() if not (exclude_none and v is None)}
+
+
+def _merge_tool_call(calls: dict, call) -> None:
+    """
+    Fold one streamed tool-call fragment into `calls`. Groq numbers
+    fragments with `index` and may split the arguments across chunks;
+    Gemini sends each call whole, with no index but an extra_content field.
+    """
+    if hasattr(call, "model_dump"):
+        part = call.model_dump(exclude_none=True)
+    else:  # test fakes
+        part = {"id": call.id, "type": getattr(call, "type", "function"),
+                "function": {"name": call.function.name, "arguments": call.function.arguments}}
+    key = part.pop("index", None)
+    if key is None:
+        key = part.get("id") or len(calls)
+    merged = calls.setdefault(key, {"id": None, "type": "function", "function": {"name": "", "arguments": ""}})
+    function = part.pop("function", {}) or {}
+    merged["function"]["name"] += function.get("name") or ""
+    merged["function"]["arguments"] += function.get("arguments") or ""
+    for field, value in part.items():  # id, type, and anything provider-specific
+        if value is not None:
+            merged[field] = value

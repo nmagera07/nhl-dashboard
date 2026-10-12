@@ -1,4 +1,4 @@
-import { formatSigned } from "./format.js";
+import { formatSigned, formatToi } from "./format.js";
 import { shortDateLabel } from "./dates.js";
 
 describe("formatSigned", () => {
@@ -17,5 +17,13 @@ describe("shortDateLabel", () => {
     expect(shortDateLabel("2026-12-31T23:30:00Z")).toBe("Dec 31");
     expect(shortDateLabel(null)).toBeNull();
     expect(shortDateLabel("soon")).toBeNull();
+  });
+});
+
+describe("formatToi", () => {
+  it("shows minutes:seconds", () => {
+    expect(formatToi(1190)).toBe("19:50");
+    expect(formatToi(605)).toBe("10:05");
+    expect(formatToi(null)).toBe("—");
   });
 });

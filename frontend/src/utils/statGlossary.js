@@ -47,6 +47,7 @@ export const GLOSSARY = {
   HIT: { name: "Hits" },
   BLK: { name: "Blocked shots" },
   TOI: { name: "Time on ice" },
+  ATOI: { name: "Average time on ice", detail: "Minutes per game, all situations. How much the coach plays him." },
 
   // Goalies
   SV: { name: "Saves" },

@@ -437,3 +437,34 @@ class TestMarkOffRoster:
         cur = _RowcountCursor()
         assert mark_off_roster(cur, "TOR", (pid for pid in [])) == 0
         assert cur.calls == []
+
+
+class TestSeasonAvgToi:
+    def _landing(self, *entries, position="C"):
+        return {"position": position, "seasonTotals": list(entries)}
+
+    def test_reads_this_seasons_nhl_regular_season_average(self):
+        from ingest_player_stats import season_avg_toi_seconds
+
+        landing = self._landing(
+            {"season": 20262027, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 6, "avgToi": "19:50"},
+            {"season": 20252026, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 68, "avgToi": "19:14"},
+            {"season": 20262027, "gameTypeId": 3, "leagueAbbrev": "NHL", "gamesPlayed": 2, "avgToi": "25:00"},
+        )
+        assert season_avg_toi_seconds(landing, 20262027) == 19 * 60 + 50
+
+    def test_a_mid_season_trade_is_averaged_by_games_played(self):
+        from ingest_player_stats import season_avg_toi_seconds
+
+        landing = self._landing(
+            {"season": 20262027, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 30, "avgToi": "20:00"},
+            {"season": 20262027, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 10, "avgToi": "16:00"},
+        )
+        assert season_avg_toi_seconds(landing, 20262027) == 19 * 60  # (30*1200 + 10*960) / 40
+
+    def test_goalies_and_players_without_games_get_none(self):
+        from ingest_player_stats import season_avg_toi_seconds
+
+        goalie = self._landing({"season": 20262027, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 5, "avgToi": "60:00"}, position="G")
+        assert season_avg_toi_seconds(goalie, 20262027) is None
+        assert season_avg_toi_seconds(self._landing(), 20262027) is None

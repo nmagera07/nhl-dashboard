@@ -123,7 +123,12 @@ def skater_line(p: dict[str, Any]) -> dict[str, Any]:
         "shots": p.get("shots"),
         "pp_pts": p.get("power_play_points"),
         "pim": p.get("pim"),
+        "avg_toi": _toi(p.get("avg_toi_seconds")),  # "19:50" per game; how much he plays
     })
+
+
+def _toi(seconds) -> str | None:
+    return None if seconds is None else f"{int(seconds) // 60}:{int(seconds) % 60:02d}"
 
 
 def goalie_line(p: dict[str, Any]) -> dict[str, Any]:

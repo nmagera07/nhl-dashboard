@@ -113,6 +113,13 @@ describe("PlayerPanel", () => {
     expect(strip.queryByText("PTS")).not.toBeInTheDocument();
   });
 
+  it("shows a skater's average time on ice this season", () => {
+    renderPanel(skater({ season_stats: [{ season_id: 20262027, games_played: 6, goals: 1, assists: 2, points: 3, avg_toi_seconds: 1190 }] }));
+
+    const strip = within(screen.getByLabelText("This season"));
+    expect(strip.getByText("TOI").nextSibling).toHaveTextContent("19:50");
+  });
+
   it("shows goalies' goals saved above expected", () => {
     renderPanel(skater({
       position_code: "G", shoots_catches: "L",

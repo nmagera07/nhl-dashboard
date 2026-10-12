@@ -141,6 +141,25 @@ def mark_off_roster(cur, team_abbrev, roster_player_ids):
     return cur.rowcount
 
 
+def season_avg_toi_seconds(landing, season):
+    """
+    A skater's average time on ice per game this regular season, in
+    seconds. featuredStats doesn't carry it, but seasonTotals does
+    ("avgToi": "19:50"), one entry per team, so a mid-season trade is
+    averaged by games played. None for goalies or no games yet.
+    """
+    if landing.get("position") == "G":
+        return None
+    entries = [e for e in landing.get("seasonTotals", [])
+               if e.get("season") == season and e.get("gameTypeId") == 2 and e.get("leagueAbbrev") == "NHL"
+               and e.get("avgToi") and e.get("gamesPlayed")]
+    games = sum(e["gamesPlayed"] for e in entries)
+    if not games:
+        return None
+    total = sum(_parse_time_on_ice_to_seconds(e["avgToi"]) * e["gamesPlayed"] for e in entries)
+    return round(total / games)
+
+
 def upsert_season_stats(cur, player_id, landing):
     featured = landing.get("featuredStats")
     if not featured or featured.get("season") is None:
@@ -158,14 +177,14 @@ def upsert_season_stats(cur, player_id, landing):
             power_play_goals, power_play_points, shorthanded_goals,
             shorthanded_points, game_winning_goals, ot_goals,
             wins, losses, ot_losses, goals_against_avg, save_pctg, shutouts,
-            updated_at
+            avg_toi_seconds, updated_at
         ) VALUES (
             %s, %s, %s,
             %s, %s, %s, %s, %s, %s, %s,
             %s, %s, %s,
             %s, %s, %s,
             %s, %s, %s, %s, %s, %s,
-            NOW()
+            %s, NOW()
         )
         ON CONFLICT (season_id, player_id) DO UPDATE SET
             games_played = EXCLUDED.games_played,
@@ -188,6 +207,7 @@ def upsert_season_stats(cur, player_id, landing):
             goals_against_avg = EXCLUDED.goals_against_avg,
             save_pctg = EXCLUDED.save_pctg,
             shutouts = EXCLUDED.shutouts,
+            avg_toi_seconds = EXCLUDED.avg_toi_seconds,
             updated_at = NOW()
         """,
         (
@@ -213,9 +233,15 @@ def upsert_season_stats(cur, player_id, landing):
             sub_season.get("goalsAgainstAvg"),
             sub_season.get("savePctg"),
             sub_season.get("shutouts"),
+            season_avg_toi_seconds(landing, featured["season"]),
         ),
     )
     return True
+
+
+def ensure_toi_column(cur):
+    """Added after the table shipped; a no-op once it exists (see schema.sql)."""
+    cur.execute("ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS avg_toi_seconds INTEGER")
 
 
 def upsert_career_totals(cur, player_id, landing):
@@ -458,6 +484,7 @@ def main():
     # not the whole run (re-running is safe either way, it's all upserts).
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
+            ensure_toi_column(cur)
             team_abbrevs = fetch_team_abbrevs(cur)
 
     total_players = 0

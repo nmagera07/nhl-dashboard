@@ -1,4 +1,4 @@
-import { formatSigned } from "../utils/format.js";
+import { formatSigned, formatToi } from "../utils/format.js";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
@@ -19,6 +19,9 @@ const SKATER_COLUMNS = [
   { key: "shots", label: "SOG", optional: true },
   { key: "pim", label: "PIM", optional: true },
 ];
+
+// This season only: the career and season-by-season rows don't carry TOI.
+const SEASON_TOI = { key: "avg_toi_seconds", label: "TOI", term: "ATOI" };
 
 const GOALIE_COLUMNS = [
   { key: "games_played", label: "GP" },
@@ -41,6 +44,7 @@ function formatStat(key, value) {
   if (key === "goals_against_avg") return Number(value).toFixed(2);
   if (key === "save_pctg") return Number(value).toFixed(3).replace(/^0/, "");
   if (key === "plus_minus") return value > 0 ? `+${value}` : String(value);
+  if (key === "avg_toi_seconds") return formatToi(value);
   return value;
 }
 
@@ -125,6 +129,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
   const isGoalie = player.position_code === "G";
   const columns = isGoalie ? GOALIE_COLUMNS : SKATER_COLUMNS;
+  const seasonColumns = isGoalie ? GOALIE_COLUMNS : [...SKATER_COLUMNS, SEASON_TOI];
   const seasonStats = player.season_stats?.[0];
   const advancedStats = player.advanced_stats;
   const goalieAdvanced = player.goalie_advanced_stats;
@@ -184,7 +189,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
             {seasonStats ? `${formatSeasonLabel(seasonStats.season_id)} season` : "This season"}
           </div>
           {seasonStats ? (
-            <StatStrip stats={seasonStats} columns={columns} label="This season" />
+            <StatStrip stats={seasonStats} columns={seasonColumns} label="This season" />
           ) : (
             <p className="muted">No current-season stats are available yet.</p>
           )}
@@ -287,8 +292,8 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </Section>
       )}
       <StatGlossary
-        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "xG%", "CORSI%", "ONICE_XG", "IND_XG", "PDO"]}
-        labels={{ "CORSI%": "Corsi %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "ATOI", "xG%", "CORSI%", "ONICE_XG", "IND_XG", "PDO"]}
+        labels={{ ATOI: "TOI", "CORSI%": "Corsi %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
       />
     </main>
   );

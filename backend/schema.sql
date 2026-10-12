@@ -149,6 +149,10 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
     UNIQUE (season_id, player_id)
 );
 
+-- Average time on ice per game (skaters), from the landing feed's
+-- seasonTotals. Added 2026-10; ingest_player_stats.py adds it if missing.
+ALTER TABLE player_season_stats ADD COLUMN IF NOT EXISTS avg_toi_seconds INTEGER;
+
 CREATE INDEX IF NOT EXISTS idx_player_season_player
     ON player_season_stats (player_id, season_id);
 

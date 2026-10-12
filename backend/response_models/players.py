@@ -58,6 +58,7 @@ class LatestSeasonStatsFields(BaseModel):
     goals_against_avg: Optional[float] = None
     save_pctg: Optional[float] = None
     shutouts: Optional[int] = None
+    avg_toi_seconds: Optional[int] = None  # skaters: average time on ice per game
 
 
 class RosterPlayer(PlayerBio, LatestSeasonStatsFields):
@@ -100,6 +101,7 @@ class PlayerSeasonStat(BaseModel):
     goals_against_avg: Optional[float] = None
     save_pctg: Optional[float] = None
     shutouts: Optional[int] = None
+    avg_toi_seconds: Optional[int] = None  # skaters: average time on ice per game
     updated_at: datetime
 
 

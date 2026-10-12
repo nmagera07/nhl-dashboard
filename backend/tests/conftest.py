@@ -315,6 +315,7 @@ def player_season_stat_row():
         "goals_against_avg": None,
         "save_pctg": None,
         "shutouts": None,
+        "avg_toi_seconds": 1290,  # 21:30
         "updated_at": "2026-07-08T23:56:05.982947",
     }
 

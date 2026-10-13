@@ -22,16 +22,18 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 import psycopg2
 import psycopg2.errors
 import psycopg2.extras
 import sentry_sdk
 from dotenv import load_dotenv
+from pydantic import TypeAdapter
 from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -46,6 +48,7 @@ from response_models import (
     PlayoffOddsHistory,
     RosterPlayer,
     PlayerLeader,
+    PlayerLeaderTableRow,
     PlayerDetail,
     StandingsLatestRow,
     StandingsHistoryRow,
@@ -208,7 +211,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # failure instead of a readable rate-limit response.
 app.add_middleware(SlowAPIMiddleware)
 
-# /players/leaders is ~1.1 MB of JSON and ~90 KB gzipped.
+# /players/leaders is ~1.18 MB of JSON and ~91 KB gzipped (full view);
+# ?view=table (the Players page) is ~0.5 MB raw / ~34 KB gzipped.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Data that changes once a day (after the 2 AM run) can be cached by the
@@ -876,13 +880,21 @@ def team_roster(team_abbrev: str = Path(..., max_length=3)):
         conn.close()
 
 
+_LEADER_TABLE_ADAPTER = TypeAdapter(List[PlayerLeaderTableRow])
+
+
 @app.get("/players/leaders", response_model=List[PlayerLeader])
 @limiter.limit(EXPENSIVE_RATE_LIMIT)
-def player_leaders(request: Request):
+def player_leaders(request: Request, view: Literal["full", "table"] = Query("full")):
     """
     Every rostered player with their latest season stats, for the league
     leaderboard. Must be registered before /players/{player_id} so this
     literal path wins the match instead of being parsed as a player id.
+
+    view=full (default) returns every PlayerLeader field; the intelligence
+    service and evals rely on that, so the default must not change.
+    view=table returns only the PlayerLeaderTableRow fields the Players page
+    renders (same rows, same order). Any other value is a 422.
     """
     conn = get_connection()
     try:
@@ -909,7 +921,12 @@ def player_leaders(request: Request):
                 ORDER BY COALESCE(s.points, 0) DESC
                 """
             )
-            return cur.fetchall()
+            rows = cur.fetchall()
+        if view == "table":
+            return JSONResponse(
+                _LEADER_TABLE_ADAPTER.dump_python(_LEADER_TABLE_ADAPTER.validate_python(rows), mode="json")
+            )
+        return rows
     except Exception:
         logger.error("Failed to fetch player leaders", exc_info=True)
         raise

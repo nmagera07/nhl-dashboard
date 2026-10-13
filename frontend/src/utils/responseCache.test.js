@@ -1,3 +1,4 @@
+import { API_BASE } from "../config.js";
 import { cachedResponse, clearResponseCache, isPersisted, rememberResponse } from "./responseCache.js";
 
 describe("responseCache", () => {
@@ -63,5 +64,34 @@ describe("responseCache across visits", () => {
     expect(isPersisted(`${API}/playoff-odds/history?season_id=20252026`)).toBe(true);
     expect(isPersisted(`${API}/teams/PIT/roster`)).toBe(true);
     expect(isPersisted(`${API}/season-sim/scenario?team=PIT`)).toBe(false);
+  });
+});
+
+describe("responseCache and the Players table view", () => {
+  const LEGACY = `puckpulse:response:v1:${API_BASE}/players/leaders`;
+  const TABLE_URL = `${API_BASE}/players/leaders?view=table`;
+
+  it("persists the ?view=table URL under its own v1 key", () => {
+    expect(isPersisted(TABLE_URL)).toBe(true);
+    rememberResponse(TABLE_URL, [{ player_id: 1 }], 1000);
+    expect(JSON.parse(localStorage.getItem(`puckpulse:response:v1:${TABLE_URL}`)).data).toEqual([{ player_id: 1 }]);
+  });
+
+  it("removes the legacy full /players/leaders copy on load, and keeps the rest", async () => {
+    localStorage.setItem(LEGACY, JSON.stringify({ savedAt: Date.now(), data: [1] }));
+    localStorage.setItem(`puckpulse:response:v1:${API_BASE}/standings/latest`, JSON.stringify({ savedAt: Date.now(), data: [2] }));
+    vi.resetModules();
+    await import("./responseCache.js");
+    expect(localStorage.getItem(LEGACY)).toBeNull();
+    expect(localStorage.getItem(`puckpulse:response:v1:${API_BASE}/standings/latest`)).not.toBeNull();
+  });
+
+  it("loads without localStorage", async () => {
+    const spy = vi.spyOn(globalThis, "localStorage", "get").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    vi.resetModules();
+    await expect(import("./responseCache.js")).resolves.toBeDefined();
+    spy.mockRestore();
   });
 });

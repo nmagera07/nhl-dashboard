@@ -1,6 +1,7 @@
 // Web Push in the browser: whether it's possible here, and subscribing or
 // unsubscribing this device for a team's goal and final-score alerts.
 import { API_BASE } from "../config.js";
+import { track } from "./analytics.js";
 
 export function isStandalone() {
   return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
@@ -55,6 +56,7 @@ export async function enableAlerts(teams) {
     (await reg.pushManager.getSubscription()) ||
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(config.vapid_public_key) }));
   await save(subscription, teams);
+  track("goal-alerts-on", { team: teams?.[0] });
   return permission;
 }
 

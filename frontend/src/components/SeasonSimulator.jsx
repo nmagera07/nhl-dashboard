@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { cutLine, makeRng, simulateSeason } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
+import { track } from "../utils/analytics.js";
 
 const SPREAD_RUNS = 3000;
 const CHUNK = 150; // seasons per slice, so the page stays responsive while the spread builds
@@ -123,6 +124,7 @@ function SeasonSimulator({ team }) {
   const gamesLeft = inputs ? inputs.games.filter(([, h, a]) => h === abbrev || a === abbrev).length : 0;
 
   const simulate = () => {
+    track("season-sim", { team: abbrev });
     rngRef.current ||= makeRng();
     const result = simulateSeason(inputs, rngRef.current, abbrev);
     const record = result.records[abbrev];

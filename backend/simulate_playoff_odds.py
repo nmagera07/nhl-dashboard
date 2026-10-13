@@ -1,5 +1,5 @@
 """
-Playoff Odds Simulator (v2.2: goals + MoneyPuck xG + roster moves)
+Playoff Odds Simulator (v2.3: goals + MoneyPuck xG + roster moves + goalies)
 
 Monte Carlo simulation of the rest of the regular season to estimate each
 team's probability of making the playoffs.
@@ -12,7 +12,8 @@ How it works:
      this season's results take over. If MoneyPuck is unreachable, it falls
      back to goals only (prior = last season's GD/game, PRIOR_GAMES).
      v2.2 adds roster moves to the prior: the value of skaters who
-     arrived minus those who left (player_values.py).
+     arrived minus those who left (player_values.py). v2.3 adds each
+     team's goaltending (GSAx), which xG leaves out.
      v1 used raw point %, which after a 4-0 start rated a team as
      near-unbeatable.
   2. Pull the remaining regular-season schedule from the NHL API.
@@ -70,7 +71,7 @@ MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
-MODEL_VERSION = "v2.2"       # logged with every game prediction (game_predictions.py)
+MODEL_VERSION = "v2.3"       # logged with every game prediction (game_predictions.py)
 
 # Game model -- fit by calibrate_playoff_model.py.
 HOME_EDGE = 0.264            # goals/game of home-ice advantage
@@ -98,6 +99,15 @@ PRIOR_GAMES_XG = 30
 # of 4 held-out seasons. Weight 1.0 (player values at face value) scored
 # best of 0 to 1.5.
 ROSTER_WEIGHT = 1.0
+
+# Goaltending in the prior (v2.3) -- backtested 2026-10 like the roster
+# prior. xG measures shots, not saves, so the xG prior had no goaltending
+# in it at all: each team's current goalies' GSAx per 60 (shrunk hard, see
+# player_values.goalie_rates), weighted by starts, is added in full. Adding
+# only the *change* in goalies did nothing. 1.9% better Brier than v2.2,
+# better than v2.1 in all 4 seasons and than v2.2 in 3 of 4.
+GOALIE_WEIGHT = 1.0
+GOALIE_LOOKUP_MIN_GP = 10   # last season's goalies worth a landing-page lookup if off the roster feed
 
 DEFAULT_TRIALS = 10000
 
@@ -238,15 +248,17 @@ def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
     return team_ratings(blend_xg(standings, current), priors, prior_games=PRIOR_GAMES_XG)
 
 
-def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight, roster_change=None):
+def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight, roster_change=None, goalies=None):
     """
     Each team's rating split into what pushed it there, in goals/game:
-    this season's goals, this season's xG, last season's prior, and roster
-    moves since (already folded into `priors`; `roster_change` says how
-    much). The four add up to the team_ratings() mean exactly. For the
-    goals-only fallback, pass xg_weight=0 (the xG part is then None).
+    this season's goals, this season's xG, last season's prior, roster
+    moves since, and goaltending (the last two already folded into
+    `priors`; `roster_change` and `goalies` say how much). The parts add up
+    to the team_ratings() mean exactly. For the goals-only fallback, pass
+    xg_weight=0 (the xG part is then None).
     """
     roster_change = roster_change or {}
+    goalies = goalies or {}
     parts = {}
     for abbrev, s in standings.items():
         gp = s["games_played"]
@@ -254,7 +266,8 @@ def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight, roster_c
         xgd = xgd_totals.get(abbrev, (gd, None))[0] if xg_weight else None
         denom = gp + prior_games
         moves = roster_change.get(abbrev, 0.0)
-        prior = priors.get(abbrev, 0.0) - moves
+        goaltending = goalies.get(abbrev, 0.0)
+        prior = priors.get(abbrev, 0.0) - moves - goaltending
         parts[abbrev] = {
             "games_played": gp,
             "goal_diff": gd,
@@ -267,6 +280,8 @@ def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight, roster_c
             "last_season_share": round(prior_games / denom, 3),
             "roster": round(prior_games * moves / denom, 4),
             "roster_change_per_game": round(moves, 3),
+            "goalies": round(prior_games * goaltending / denom, 4),
+            "goalies_per_game": round(goaltending, 3),
         }
     return parts
 
@@ -554,11 +569,14 @@ def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, playe
     }
 
 
-def load_rosters():
-    """{player_id: team} for skaters on an NHL roster now (from the players table)."""
+def load_rosters(goalies=False):
+    """{player_id: team} for skaters (or goalies) on an NHL roster now (from the players table)."""
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT player_id, team_abbrev FROM players WHERE on_roster AND position_code <> 'G'")
+            cur.execute(
+                "SELECT player_id, team_abbrev FROM players WHERE on_roster AND (position_code = 'G') = %s",
+                (goalies,),
+            )
             return dict(cur.fetchall())
 
 
@@ -587,6 +605,30 @@ PLAYER_LANDING_URL = "https://api-web.nhle.com/v1/player/{player_id}/landing"
 MISSING_LOOKUP_MIN = 0.01  # goals/game: smaller departures aren't worth an API call
 
 
+def goalie_prior(season_id):
+    """
+    {team: goals/game its current goalies save vs. a league-average
+    tandem}, times GOALIE_WEIGHT, for the prior. Best effort: without it
+    the prior has no goaltending (the v2.2 model).
+    """
+    import player_values as pv
+
+    start = season_id // 10000
+    try:
+        last = pv.season_goalies(pv.fetch_csv(pv.MONEYPUCK_GOALIES_URL, start - 1))
+        before_last = pv.season_goalies(pv.fetch_csv(pv.MONEYPUCK_GOALIES_URL, start - 2))
+        rosters = load_rosters(goalies=True)
+        # Same injured-reserve gap as skaters. A flat value makes every goalie
+        # with GOALIE_LOOKUP_MIN_GP+ starts last season worth a lookup.
+        regulars = {pid: {"name": g["name"], "value": 1.0} for pid, g in last.items() if g["gp"] >= GOALIE_LOOKUP_MIN_GP}
+        rosters.update(missing_player_teams(regulars, last, rosters))
+        strength = pv.team_goalie_strength(pv.goalie_rates(last, before_last), last, rosters)
+    except Exception as exc:  # network, parse, or DB
+        logger.warning(f"Couldn't compute goaltending ({exc}); prior has no goalie part today")
+        return {}
+    return {t: round(GOALIE_WEIGHT * v, 4) for t, v in strength.items()}
+
+
 def missing_player_teams(values, last, rosters, get=nhl_get):
     """
     {player_id: team} for last season's regulars missing from today's
@@ -608,7 +650,7 @@ def missing_player_teams(values, last, rosters, get=nhl_get):
         if team:
             found[pid] = team
     if found:
-        logger.info(f"{len(found)} skaters off the current-roster feed but still signed (injured reserve, etc.)")
+        logger.info(f"{len(found)} players off the current-roster feed but still signed (injured reserve, etc.)")
     return found
 
 
@@ -707,12 +749,14 @@ def main():
         logger.info("Using the goals + MoneyPuck xG model")
         current_xgd, priors = xg_inputs
         moves = roster_prior_change(args.season)
-        priors = with_roster_change(priors, moves)
+        goalies = goalie_prior(args.season)
+        priors = with_roster_change(with_roster_change(priors, moves), goalies)
         ratings = team_ratings(blend_xg(standings, current_xgd), priors, prior_games=PRIOR_GAMES_XG)
-        parts = rating_parts(standings, current_xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT, moves)
-        if moves:
-            biggest = sorted(moves.items(), key=lambda kv: -abs(kv[1]))[:5]
-            logger.info("Roster changes (goals/game): " + ", ".join(f"{t} {v:+.2f}" for t, v in biggest))
+        parts = rating_parts(standings, current_xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT, moves, goalies)
+        for label, extra in (("Roster changes", moves), ("Goaltending", goalies)):
+            if extra:
+                biggest = sorted(extra.items(), key=lambda kv: -abs(kv[1]))[:5]
+                logger.info(f"{label} (goals/game): " + ", ".join(f"{t} {v:+.2f}" for t, v in biggest))
     else:
         priors = load_priors(args.season)
         logger.info(f"Goals-only model: {len(priors)} prior ratings from season {previous_season_id(args.season)}")

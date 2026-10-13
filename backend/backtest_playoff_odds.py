@@ -168,7 +168,7 @@ def blended_standings(standings, xgd_totals, weight):
     return out
 
 
-ROSTER_BETAS = (0.0, 0.5, 1.0, 1.25, 1.5)
+ROSTER_BETAS = (1.0,)
 _roster_change = {}
 
 
@@ -185,6 +185,34 @@ def roster_change(skaters_dir, start):
         rosters = {pid: p["team"] for pid, p in load(start).items()}
         _roster_change[start] = player_values_mod.roster_strength_change(load(start - 1), load(start - 2), rosters)
     return _roster_change[start]
+
+
+GOALIE_WEIGHTS = (1.0,)
+GOALIE_SHRINKS = (50, 100, 250)
+_goalies = {}
+
+
+def goalie_strength(skaters_dir, start, shrink, mode):
+    """Team goalie strength before season `start` (goals/game vs. average):
+    "level" is the current tandem in full; "change" is the current tandem
+    minus last season's. Rates use only the two seasons before; the roster
+    is each goalie's team that season (MoneyPuck goalies_{year}.csv)."""
+    key = (start, shrink, mode)
+    if key not in _goalies:
+        def load(year):
+            with open(os.path.join(skaters_dir, f"goalies_{year}.csv")) as f:
+                return player_values_mod.season_goalies(f.read())
+        last, before = load(start - 1), load(start - 2)
+        rates = player_values_mod.goalie_rates(last, before, shrink)
+        now = player_values_mod.team_goalie_strength(rates, last, {pid: g["team"] for pid, g in load(start).items()})
+        if mode == "level":
+            _goalies[key] = now
+        else:
+            moves = player_values_mod.FRANCHISE_MOVES
+            old = player_values_mod.team_goalie_strength(
+                rates, last, {pid: (g["team"] if g["team"] in now else moves.get(g["team"], g["team"])) for pid, g in last.items()})
+            _goalies[key] = {t: now[t] - old.get(t, 0.0) for t in now}
+    return _goalies[key]
 
 
 def calibration_table(pairs, buckets=10):
@@ -250,6 +278,13 @@ def main():
                     xgd_now = xg_diff_as_of(games_by_season[start], cp["date"])
                     change = roster_change(args.skaters_dir, start)
                     c, _, sd = PRODUCTION
+                    for gw in GOALIE_WEIGHTS:
+                        for shrink in GOALIE_SHRINKS:
+                            for mode in ("level",):
+                                goalies = goalie_strength(args.skaters_dir, start, shrink, mode)
+                                priors = {t: c * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + gw * goalies.get(t, 0.0) for t in standings}
+                                ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
+                                runs[f"roster+goalies {mode} g={gw} K={shrink}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
                     for beta in ROSTER_BETAS:
                         for k in (30, 45):
                             priors = {t: c * prior_xgd.get(t, 0.0) + beta * change.get(t, 0.0) for t in standings}
@@ -284,7 +319,7 @@ def main():
         return sum(vals) / len(vals)
 
     v2_models = [v2_name(*g) for g in grid]
-    xg_models = sorted(m for m in brier_by if m.startswith(("xg ", "xg[", "split ", "roster ")))
+    xg_models = sorted(m for m in brier_by if m.startswith(("xg ", "xg[", "split ", "roster")))
     sos_models = ["sos " + m for m in v2_models] if args.sos else []
     prod = v2_name(*PRODUCTION)
 
@@ -309,6 +344,13 @@ def main():
         print("\nWith strength of schedule (top settings):")
         for name in sorted(sos_models, key=mean)[:5]:
             print(f"  {name:<30} {mean(name):.4f}")
+
+    if any(m.startswith("roster") for m in brier_by):
+        print("\nBy season (roster-aware variants vs the live v2.1 model):")
+        named = sorted(m for m in brier_by if m.startswith("roster")) + ["xg w=0.5 K=30 prior=xgd"]
+        print("  " + " " * 34 + "".join(f"{s_:>10}" for s_ in args.seasons))
+        for name in named:
+            print(f"  {name:<34}" + "".join(f"{mean(name, [s_]):>10.4f}" for s_ in args.seasons))
 
     print("\nLeave-one-season-out (tune on the other seasons, score the held-out one):")
     avg = lambda xs: sum(xs) / len(xs)

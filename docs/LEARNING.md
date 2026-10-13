@@ -91,6 +91,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   players gained minus players lost), backtested over 4 seasons: 2.6% lower Brier overall,
   4.9% on Nov 1, never worse at any checkpoint; caught and fixed a data gap where the NHL's
   roster feed dropped injured players, which had counted a team's best forward as departed.
+- Found that the model's expected-goals prior contained no goaltending at all (xG measures
+  shots, not saves) and added each team's goalie strength (GSAx, shrunk for its 0.16
+  year-to-year repeatability): 1.9% lower Brier again, better than the previous model in
+  every backtested season.
 
 - Built an in-browser season simulator by porting the Monte Carlo model to
   JavaScript, validated against the Python original over 10,000 simulated
@@ -148,6 +152,51 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   parallel, with graceful degradation when the optional feeds fail.
 
 ---
+
+## 2026-10-13 — Goalies: the prior had no goaltending in it at all
+
+**The insight:** the prior is last season's *xG* differential. xG is built from shots (where
+they're from, what kind), so it describes the skaters. It says nothing about whether the
+goalie stopped them. A team with Hellebuyck and a team with a replacement goalie got the same
+prior. Before writing code, the question was what was missing, not what had changed.
+
+**So I tested two versions:**
+- *Change*: count goalie moves like skater moves (new tandem minus last season's).
+- *Level*: add each team's current goalie strength in full, since none of it was in there.
+
+The backtest settled it: *change* did nothing (0.1137 → 0.1137), and *level* helped
+(0.1137 → 0.1115). The *change* version assumed the prior already had last year's goalie in
+it. It didn't, so subtracting him was subtracting nothing.
+
+**Goalie numbers are noisy, so measure that first:** GSAx per 60 has a year-to-year
+correlation of just **0.16** (194 goalie pairs with 25+ games in both seasons). Most of a
+great season is luck. Each goalie is pulled toward the regular-goalie average by 100
+pseudo-games; a goalie with no NHL history counts as replacement level (fringe goalies run
+−0.217 GSAx/60, a real gap).
+
+**Picking the setting without fooling myself:** the top of the grid kept moving (weight 2.0,
+shrink 25 scored best on average), and leave-one-season-out showed those picks overfitting:
+0.1631 on a held-out season vs. 0.1424 for skaters alone. So I fixed the weight at 1.0,
+because GSAx is already in goals, and chose the shrink by season-by-season table, not the
+average. Shrink 100 beats v2.1 in **all 4 seasons** and v2.2 in 3 of 4, and it fixes the
+one season (2023-24) where roster moves alone made things worse.
+
+**Today's effect:** Tampa +8 (Vasilevskiy), Washington +8 (Logan Thompson), Pittsburgh −14
+(Silovs plus a rookie), Ottawa −8.
+
+**Lessons:**
+- *Ask what a number contains.* "Last season's strength" sounded complete; xG made it
+  skaters-only. The fix came from reading the definition, not from more data.
+- *When the best setting is the most extreme one, check whether it holds up on new seasons.*
+  A flat surface plus moving picks means noise, so pick the principled value.
+- *Per-season tables catch what averages hide.* The 2025-26 regression was invisible in the
+  overall mean.
+
+**Interview framing:** "My preseason prior was built on expected goals, which only measure
+shots, so goaltending wasn't in the model at all. I measured how repeatable goalie numbers
+are (barely: r = 0.16), shrank them to match, and backtested 'goalie changes' against 'goalie
+level'. Only level helped, which confirmed the diagnosis. Then I chose the setting from a
+per-season table rather than the overfit top of the grid."
 
 ## 2026-10-13 — Scoring against the best: logging MoneyPuck's odds next to ours
 

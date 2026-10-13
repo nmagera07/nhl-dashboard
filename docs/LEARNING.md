@@ -149,6 +149,30 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Scoring against the best: logging MoneyPuck's odds next to ours
+
+**Why:** every backtest so far compared the model with older versions of itself. The real
+question is whether it beats MoneyPuck, the public model most fans trust. The only honest way
+to know is to log both *before* the results are known and score them at the end, the same
+write-it-down-first rule as the game prediction log.
+
+**What:** a daily job step pulls MoneyPuck's published simulation CSV (one row per team per
+next-game scenario; "ALL" is the unconditional odds) and stores it in `moneypuck_odds`.
+`moneypuck_odds.py --report` prints how far apart the models are now, and Brier scores for
+both once the season is decided.
+
+**The detail that matters: line dates up by information, not by clock.** MoneyPuck updates at
+~4:30 AM ET, and our job runs at 2 AM ET. Both have seen the games through yesterday, so
+MoneyPuck's update on day D is stored as day D. Our 2 AM job picks it up the next night,
+since theirs comes out after ours. If I'd stamped it with the fetch date, every comparison
+would give MoneyPuck's odds one extra day of results.
+
+**Small call:** a MoneyPuck outage logs a warning and skips the day instead of failing the
+job. A failed run retries every step and pages me, too much for one missing data point.
+
+**Day 1:** the models differ by 8 points per team on average. MoneyPuck is more spread out
+(Dallas 87% vs our 63%). In April we'll know which spread is right.
+
 ## 2026-10-13 — Roster-aware priors: last season's team isn't this season's team
 
 **The problem:** in October the model leans on last season. With 3 games played, about 90%

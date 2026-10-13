@@ -96,6 +96,7 @@ Azure Static      Azure Container
 |---|---|---|
 | `ingest_standings.py` | Daily standings snapshot, all 32 teams | Daily |
 | `simulate_playoff_odds.py` | Monte Carlo playoff odds (v2.2: goals + MoneyPuck xG ratings regressed to last season plus roster moves, calibrated game model, NHL tiebreakers; falls back to goals only) | Daily |
+| `moneypuck_odds.py` | MoneyPuck's playoff odds logged next to ours for a head-to-head score (`--report` compares them) | Daily |
 | `ingest_player_stats.py` | Full roster + season stats, all 32 teams; marks cut/released players off-roster | Daily |
 | `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team + skater, from MoneyPuck (free for non-commercial use with credit) | Daily |
 | `backfill_season_history.py` | Last 5 completed seasons' final standings | One-time |

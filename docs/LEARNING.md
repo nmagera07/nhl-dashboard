@@ -153,6 +153,46 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Who's in net: a second null result, and a feature that didn't need a model
+
+**The model question:** the goalie part of the prior weights each goalie by *last* season's
+games, so a team whose starter got hurt still counts him all season. The fix seemed
+obvious: blend in this season's starts. I pulled every goalie's game log for 4 seasons
+(406 NHL API calls, cached) so the backtest could count starts *as of* each checkpoint.
+
+**Result: worse, monotonically.** The more weight on this season's starts, the worse the
+Brier (5 → 0.1127, 20 → 0.1122, 80 → 0.1117, never → 0.1114). Half of each rating is this
+season's actual goals, and goals against already show who's been in net. A backup who has
+been starting is already in the rating, so moving the prior too counts it twice. That's
+two null results in a row (aging, then this), and both times the model was already right
+for a reason I hadn't spelled out.
+
+**The feature Nate wanted is about the game, not the model:** "show the lines for each
+game".
+- *Tonight's* projected lines and starting goalies come from sites like DailyFaceoff. That
+  means scraping, which their terms don't allow and which breaks when their pages change.
+  The NHL API only flags the starting goalie once the game begins.
+- *Most-used* lines are open data: MoneyPuck's `lines.csv` has every 5-on-5 combination
+  with ice time. Its `lineId` is the players' 7-digit NHL ids joined together, so the API
+  keeps only combinations whose players are all on today's active roster.
+- *Games in net so far* was already in the NHL's pregame feed (`goalieSeasonStats`).
+
+**What looking at real data caught:** the first version worked in tests and read wrong on
+a real game. MoneyPuck drops accents ("Slafkovsk"), Washington has two Protases
+("Protas – Protas – Kyrou"), and the top 4 combinations by ice time repeated players
+(Suzuki and Caufield with two different left wings). The fixes: names from our own players
+table by id (first initial only when teammates share a last name), and a greedy pick that
+uses each player once, most-used first, so it reads like a lineup. The UI is collapsed
+under the preview and fetches only when opened.
+
+**Lessons:**
+- *Before changing a model input, ask what already carries that information.* This
+  season's goals already knew who was in net.
+- *Separate "what the user wants to see" from "what the model needs".* The lines were a
+  display feature; they didn't need to move the odds to be useful.
+- *Check on real data before shipping a UI that shows names.* Fixtures don't have accents
+  or brothers.
+
 ## 2026-10-13 — Aging curves: a real effect, the wrong direction (a null result)
 
 **The idea:** a 24-year-old usually improves and a 34-year-old declines, but the prior

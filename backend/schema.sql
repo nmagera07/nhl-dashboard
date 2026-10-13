@@ -349,6 +349,24 @@ CREATE TABLE IF NOT EXISTS playoff_odds (
 
 CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
     ON playoff_odds (season_id, as_of_date);
+-- Most-used 5-on-5 forward lines and defense pairs this season, from
+-- MoneyPuck's lines.csv. Replaced each daily run; created (and granted to
+-- the API role) by the job itself. See team_lines.py.
+CREATE TABLE IF NOT EXISTS team_lines (
+    season_id               INTEGER NOT NULL,
+    team_abbrev             VARCHAR(3) NOT NULL,
+    kind                    VARCHAR(4) NOT NULL,
+    player_ids              INTEGER[] NOT NULL,
+    names                   TEXT NOT NULL,
+    games_played            INTEGER NOT NULL,
+    icetime_seconds         INTEGER NOT NULL,
+    xg_pct                  NUMERIC(5,4),
+    goals_for               INTEGER,
+    goals_against           INTEGER,
+    updated_at              TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (season_id, team_abbrev, kind, player_ids)
+);
+
 -- MoneyPuck's playoff odds, logged daily next to playoff_odds (same
 -- as_of_date = same games seen) for a head-to-head score. Created by the
 -- daily job itself; see moneypuck_odds.py.

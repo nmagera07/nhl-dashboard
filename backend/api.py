@@ -919,6 +919,49 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
         conn.close()
 
 
+@app.get("/teams/{team_abbrev}/lines")
+@daily_cached
+def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
+    """
+    The team's most-used 5-on-5 forward lines and defense pairs this season
+    (MoneyPuck), limited to combinations whose players are all on today's
+    active roster. Most-used so far, not tonight's confirmed lineup.
+    Empty lists before the season's first games or the first daily run.
+    """
+    import team_lines
+
+    abbrev = team_abbrev.upper()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+            cur.execute("SELECT player_id, first_name, last_name FROM players WHERE team_abbrev = %s AND on_roster", (abbrev,))
+            roster = {r["player_id"]: (r["first_name"], r["last_name"]) for r in cur.fetchall()}
+            try:
+                cur.execute(
+                    """
+                    SELECT kind, player_ids, names, games_played, icetime_seconds, xg_pct, goals_for, goals_against
+                    FROM team_lines
+                    WHERE team_abbrev = %s AND season_id = (SELECT MAX(season_id) FROM team_lines)
+                    """,
+                    (abbrev,),
+                )
+                rows = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()  # the daily job hasn't created the table yet
+                rows = []
+        return {"team": abbrev, **team_lines.top_lines(rows, roster)}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error(f"Failed to fetch lines for {abbrev}", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
 @app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])
 @daily_cached
 def team_roster(team_abbrev: str = Path(..., max_length=3)):

@@ -105,6 +105,26 @@ class TestGoalies:
         assert strength == pytest.approx({"WPG": round(wpg - mean, 4), "PHI": round(phi - mean, 4)})
 
 
+class TestGoalieStarts:
+    rates = {1: 0.2, 2: -0.1}
+    last = {1: {"gp": 60}, 2: {"gp": 20}}
+    rosters = {1: "WPG", 2: "WPG", 3: "PHI"}
+
+    def test_no_starts_yet_matches_last_seasons_split(self):
+        without = pv.team_goalie_strength(self.rates, self.last, self.rosters)
+        preseason = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={}, prior_starts=20)
+        assert preseason == pytest.approx(without)
+
+    def test_this_seasons_starts_take_over_as_games_are_played(self):
+        # The starter is hurt: the backup has started all 30 games.
+        early = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={2: 3}, prior_starts=20)
+        late = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={2: 30}, prior_starts=20)
+        assert late["WPG"] < early["WPG"]
+        wpg = (15 * 0.2 + (5 + 30) * -0.1) / 50  # 20 * 3/4 for the starter, 20 * 1/4 + 30 for the backup
+        phi = pv.GOALIE_REPLACEMENT
+        assert late["WPG"] == pytest.approx(round(wpg - (wpg + phi) / 2, 4))
+
+
 class TestAging:
     def test_age_is_taken_on_feb_1_of_the_season(self):
         assert pv.age_on_feb1("2000-02-01", 2026) == 27  # birthday on Feb 1 counts

@@ -78,10 +78,12 @@ function finalGame(overrides = {}) {
   };
 }
 
-function renderGame(game, props = {}, simInputs = null) {
-  globalThis.fetch = vi.fn().mockImplementation((url) =>
-    Promise.resolve({ ok: true, json: () => Promise.resolve(url.includes("/season-sim") ? simInputs : game) })
-  );
+function renderGame(game, props = {}, simInputs = null, routes = {}) {
+  globalThis.fetch = vi.fn().mockImplementation((url) => {
+    const extra = Object.keys(routes).find((path) => url.includes(path));
+    const body = extra ? routes[extra] : url.includes("/season-sim") ? simInputs : game;
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
+  });
   return render(
     <MemoryRouter initialEntries={["/games/2026020044"]}>
       <Routes>
@@ -209,6 +211,38 @@ describe("GamePage", () => {
     expect(screen.getByText(/J\. Saros · 2-2-0 · 3\.10 GAA · 0\.899/)).toBeInTheDocument();
     expect(screen.getByTitle("SOL vs MTL")).toHaveTextContent("SO");
     expect(screen.queryByText("Box score")).not.toBeInTheDocument();
+  });
+
+  it("shows games in net, and loads each team's lines only when opened", async () => {
+    const upcoming = finalGame({
+      gameState: "FUT", linescore: {}, shotsByPeriod: [], summary: {}, teamGameStats: [],
+      awayTeam: { id: 18, abbrev: "NSH" }, homeTeam: { id: 10, abbrev: "TOR" },
+      matchup: {
+        goalieComparison: { awayTeam: { leaders: [] }, homeTeam: { leaders: [] } },
+        goalieSeasonStats: { goalies: [
+          { teamId: 18, name: { default: "J. Saros" }, gamesPlayed: 4 },
+          { teamId: 18, name: { default: "J. Annunen" }, gamesPlayed: 1 },
+          { teamId: 10, name: { default: "A. Stolarz" }, gamesPlayed: 5 },
+          { teamId: 10, name: { default: "D. Hildeby" } },
+        ] },
+      },
+    });
+    const lines = (abbrev) => ({
+      team: abbrev,
+      lines: [{ players: ["Knies", "Matthews", "Marner"], player_ids: [1, 2, 3], minutes: 41 }],
+      pairs: [{ players: ["Rielly", "McCabe"], player_ids: [4, 5], minutes: 55 }],
+    });
+    renderGame(upcoming, { standings: [] }, null, { "/teams/NSH/lines": lines("NSH"), "/teams/TOR/lines": lines("TOR") });
+
+    expect(await screen.findByText("Saros 4 · Annunen 1")).toBeInTheDocument();
+    expect(screen.getByText("Stolarz 5")).toBeInTheDocument();  // a goalie with no games isn't listed
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/lines"));
+
+    await userEvent.click(screen.getByText("Most-used at 5-on-5 this season"));
+
+    expect(await screen.findByRole("list", { name: "TOR forward lines" })).toHaveTextContent("Knies – Matthews – Marner41 min");
+    expect(screen.getByRole("list", { name: "NSH defense pairs" })).toHaveTextContent("Rielly – McCabe");
+    expect(screen.getByText(/Not tonight's confirmed lineup/)).toBeInTheDocument();
   });
 
   it("shows each team's record from the standings once the game has started", async () => {

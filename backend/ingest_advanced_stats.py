@@ -214,6 +214,28 @@ def ingest_goalies(season_id, year):
     return saved
 
 
+def ingest_lines(season_id, year):
+    """
+    Line combinations (team_lines.py) in their own transaction, best effort
+    like the goalies: the job creates the table itself.
+    """
+    import team_lines
+
+    try:
+        response = requests.get(team_lines.LINES_URL.format(year=year), headers=REQUEST_HEADERS, timeout=60)
+        response.raise_for_status()
+        lines = team_lines.parse_lines(response.text)
+        with psycopg2.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                saved = team_lines.save_lines(cur, season_id, lines)
+            conn.commit()
+    except (requests.RequestException, psycopg2.Error, KeyError, ValueError) as exc:
+        logger.warning(f"Line combinations skipped ({type(exc).__name__}: {exc})")
+        return 0
+    logger.info(f"{saved} line combinations saved.")
+    return saved
+
+
 def fetch_valid_team_abbrevs(cur):
     cur.execute("SELECT team_abbrev FROM teams")
     return {r[0] for r in cur.fetchall()}
@@ -332,6 +354,7 @@ def main():
 
     logger.info(f"Done. {teams_saved} teams, {players_saved} players saved.")
     ingest_goalies(args.season, year)
+    ingest_lines(args.season, year)
 
 
 if __name__ == "__main__":

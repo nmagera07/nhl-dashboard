@@ -78,3 +78,28 @@ class TestRosterStrengthChange:
         assert pv.roster_strength_change(last, {}, rosters={1: "UTA"}) == {}
         # ...but not in a season when the old team still exists
         assert set(pv.roster_strength_change(last, {}, rosters={1: "ARI", 2: "UTA"})) == set()
+
+
+class TestGoalies:
+    def test_parses_gsax_per_60_minute_game(self):
+        text = "\n".join([
+            "playerId,name,team,position,situation,games_played,icetime,xGoals,goals",
+            "1,G A,WPG,G,all,60,216000,170,140",
+            "1,G A,WPG,G,5on5,60,180000,120,100",
+            "2,G B,WPG,G,all,0,0,0,0",
+        ])
+        assert pv.season_goalies(text) == {1: {"name": "G A", "team": "WPG", "gp": 60, "games": 60.0, "gsax": 30.0}}
+
+    def test_rates_are_shrunk_hard_toward_average(self):
+        hot = {1: {"gp": 60, "games": 60.0, "gsax": 30.0}}  # +0.5 per 60 for a season
+        rate = pv.goalie_rates(hot, {})[1]
+        assert 0 < rate < 0.5 * 60 / (60 + pv.GOALIE_SHRINK_GAMES) + 1e-9
+
+    def test_team_strength_weights_starts_and_centers_on_the_league(self):
+        rates = {1: 0.2, 2: 0.0, 3: -0.1}
+        last = {1: {"gp": 60}, 2: {"gp": 20}, 3: {"gp": 40}}
+        strength = pv.team_goalie_strength(rates, last, {1: "WPG", 2: "WPG", 3: "PHI", 4: "PHI"})
+        wpg = (60 * 0.2 + 20 * 0.0) / 80
+        phi = (40 * -0.1 + pv.GOALIE_NEWCOMER_GAMES * pv.GOALIE_REPLACEMENT) / (40 + pv.GOALIE_NEWCOMER_GAMES)
+        mean = (wpg + phi) / 2
+        assert strength == pytest.approx({"WPG": round(wpg - mean, 4), "PHI": round(phi - mean, 4)})

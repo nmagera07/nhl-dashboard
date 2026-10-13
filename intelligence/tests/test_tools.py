@@ -152,10 +152,12 @@ class TestTools:
         assert "roster_moves" not in pit  # no moves in this fixture
 
     async def test_explain_odds_includes_roster_moves(self, monkeypatch):
-        monkeypatch.setitem(WHY["teams"], "PIT", {**WHY_TEAM(0.2, 9), "roster": -0.09, "roster_change_per_game": -0.3})
+        monkeypatch.setitem(WHY["teams"], "PIT", {**WHY_TEAM(0.2, 9), "roster": -0.09, "roster_change_per_game": -0.3,
+                                                  "goalies": 0.05, "goalies_per_game": 0.08})
         pit = (await self.call("explain_odds", {"team": "PIT"}))["teams"][0]
 
         assert pit["roster_moves"] == {"goals_per_game_gained_or_lost": -0.3, "effect": -0.09, "push": "pulls down"}
+        assert pit["goaltending"] == {"goals_per_game_saved_vs_average_tandem": 0.08, "effect": 0.05, "push": "pushes up"}
 
     async def test_explain_odds_compares_two_teams_and_their_next_meeting(self):
         result = await self.call("explain_odds", {"team": "PIT", "opponent": "COL"})

@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act, fireEvent } from "@testing-library/react";
 import IntelligencePanel from "./IntelligencePanel.jsx";
+import { keyboardInsets } from "../hooks/useKeepAboveKeyboard.js";
 
 const URL = "https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io/chat/stream";
 
@@ -192,5 +194,41 @@ describe("IntelligencePanel", () => {
     finish();
     expect(await screen.findByText("Odds rise to 73%.")).toBeInTheDocument();
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("doesn't pull a reader who scrolled up back down while the answer streams", async () => {
+    let more;
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          const send = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+          send({ type: "delta", text: "First part. " });
+          more = () => { send({ type: "delta", text: "Second part." }); send({ type: "done", evidence: [], model: "Gemini" }); controller.close(); };
+        },
+      }),
+    });
+    render(<IntelligencePanel context={{ page: "standings" }} label="Standings" />);
+    const drawer = await open();
+    await ask("Who leads?");
+    await screen.findByText(/First part/);
+
+    const thread = drawer.querySelector(".intelligence-thread");
+    Object.defineProperty(thread, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(thread, "clientHeight", { configurable: true, value: 300 });
+    thread.scrollTop = 100; // the reader scrolls up to re-read
+    fireEvent.scroll(thread);
+    await act(async () => more());
+    await screen.findByText(/Second part/);
+
+    expect(thread.scrollTop).toBe(100);
+  });
+
+  it("the keyboard's covered strip and the visible height come from the visual viewport", () => {
+    expect(keyboardInsets({ height: 330, offsetTop: 0 }, 664)).toEqual({ bottom: "334px", height: "330px" });
+    // iOS also scrolls the page up: the covered strip shrinks by that much.
+    expect(keyboardInsets({ height: 330, offsetTop: 120 }, 664)).toEqual({ bottom: "214px", height: "330px" });
+    expect(keyboardInsets({ height: 664, offsetTop: 0 }, 664)).toEqual({ bottom: "0px", height: "664px" });
   });
 });

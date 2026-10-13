@@ -6,9 +6,9 @@ name: Keep API Warm
 # ~4 minutes during active hours keeps both the container and the
 # database awake, for free.
 #
-# Schedule (cron is UTC): every 4 minutes, 13:00-05:59 UTC.
-#   EDT (UTC-4, Mar-Nov): 9:00am - 1:59am Eastern
-#   EST (UTC-5, Nov-Mar): 8:00am - 12:59am Eastern
+# Schedule (cron is UTC): every 4 minutes, 21:00-04:59 UTC (short evening window to limit Neon/Azure compute).
+#   EDT (UTC-4, Mar-Nov): 5:00pm - 12:59am Eastern
+#   EST (UTC-5, Nov-Mar): 4:00pm - 11:59pm Eastern
 # GitHub's scheduler can run late or skip runs under load, so this keeps
 # things warm most of the time, not always. A visit outside these hours
 # still cold starts.
@@ -19,7 +19,7 @@ name: Keep API Warm
 
 on:
   schedule:
-    - cron: "*/4 13-23,0-5 * * *"
+    - cron: "*/4 21-23,0-4 * * *"
   workflow_dispatch:
 
 permissions: {}

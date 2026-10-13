@@ -150,8 +150,8 @@ See [`backend/README.md`](backend/README.md),
   logs but no longer pages anyone.
 - Cold starts: the API scales to zero and Neon suspends after ~5 min idle,
   so a first visit after a quiet spell waits ~25-30s. `keep-warm.yml` pings
-  `GET /health` every 4 minutes from 13:00-05:59 UTC (9am-1:59am EDT,
-  8am-12:59am EST). GitHub cron can lag or skip runs, so this isn't
+  `GET /health` every 4 minutes from 21:00-04:59 UTC (5pm-12:59am EDT,
+  4pm-11:59pm EST). GitHub cron can lag or skip runs, so this isn't
   guaranteed, and the first visit outside those hours still cold starts.
 - Ingestion runs via an Azure Container Apps Job (`nhl-standings-ingest`) on a daily schedule, with its image kept in sync on each backend deploy — no longer a local Windows Task Scheduler job.
 

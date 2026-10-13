@@ -153,6 +153,50 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Aging curves: a real effect, the wrong direction (a null result)
+
+**The idea:** a 24-year-old usually improves and a 34-year-old declines, but the prior
+treated them the same. Players who stayed on a team cancelled out exactly, so a young core
+and an old one looked identical. The plan was to add each team's expected aging to the prior.
+
+**Measuring the curve:** I used the delta method. For every skater with 20+ games in two
+straight seasons (4,063 pairs, 2018-19 to 2025-26, birth dates from the NHL stats API's bios
+report), I took the change in Game Score per game, grouped it by age, and fit a cubic. It was
+the textbook shape: +0.13 at 19, peaking around 25, −0.05 at 34. The fit is reproducible
+with `player_values.py --calibrate-aging`.
+
+**The backtest said no:** worse at every weight. 0 → 0.1114, 0.5 → 0.1116, 1.0 → 0.1120,
+2.0 → 0.1129. My first theory was double counting: the 0.5 carryover already pulls every
+team toward average, and good teams skew old. So I tested aging with *less* generic
+shrinkage (carryover 0.6 and 0.7). It still lost at both.
+
+**Why:** the effect wasn't small. It was up to ±0.09 goals/game per team, as big as
+goaltending, but it pointed the wrong way. It rated Buffalo the top "aging gainer" in both
+2023 and 2024 (missed the playoffs both times), and Edmonton among the oldest decliners
+(two straight Finals). The likely cause is **survivor bias**: a young player only forms a
+pair if he stayed in the NHL. The ones who had a bad year got sent down and dropped out of
+the data, so the curve overstates young players' gains. That's a known weakness of the
+delta method, and the backtest caught it before the model did.
+
+**What I kept:** the curve, the fitting command, and the backtest variant, clearly marked as
+unused by the model. The model is unchanged (still v2.3). A future fix could count players
+who left the league as declines.
+
+**Lessons:**
+- *A textbook-shaped curve isn't proof.* It looked exactly right and still made predictions
+  worse.
+- *When a hypothesis fails, test the obvious rescue once, then stop.* The carryover test was
+  a fair second chance. A third would have been searching for a win.
+- *Look at the teams it gets wrong.* "Buffalo gains the most two years running" explained
+  the failure faster than any summary statistic.
+- *Null results are results.* The repo now explains why aging isn't in the model.
+
+**Interview framing:** "I built an aging curve with the delta method, and it had the classic
+shape, but adding it made my playoff model worse in a four-season backtest. I tested the
+obvious rescue (less generic shrinkage), it still lost, and the teams it got most wrong
+pointed to survivor bias in how the curve was measured. So I kept it out of the model and
+documented why. Knowing when not to ship is part of the job."
+
 ## 2026-10-13 — Analytics without loosening the security work
 
 **Goal:** see whether anyone uses PuckPulse, and which features. Page views alone can't say

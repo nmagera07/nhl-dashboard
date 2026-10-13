@@ -187,7 +187,7 @@ def roster_change(skaters_dir, start):
     return _roster_change[start]
 
 
-GOALIE_WEIGHTS = (1.0,)
+GOALIE_WEIGHTS = ()
 GOALIE_SHRINKS = (50, 100, 250)
 _goalies = {}
 
@@ -213,6 +213,30 @@ def goalie_strength(skaters_dir, start, shrink, mode):
                 rates, last, {pid: (g["team"] if g["team"] in now else moves.get(g["team"], g["team"])) for pid, g in last.items()})
             _goalies[key] = {t: now[t] - old.get(t, 0.0) for t in now}
     return _goalies[key]
+
+
+# Aging (2026-10): a null result -- worse Brier at every weight (0.5-2.0)
+# and carryover (0.5-0.7); see player_values.AGING_CURVE.
+AGING_WEIGHTS = (0.0, 1.0)
+AGING_CARRYOVERS = (0.5, 0.6, 0.7)
+_aging = {}
+
+
+def team_aging_as_of(skaters_dir, start):
+    """Each team's aging term before season `start`: the roster is each
+    skater's team that season, ages from the NHL bios file for that season
+    (bios_{year}.json, the NHL stats API's skater/bios report), weights
+    from the season before."""
+    if start not in _aging:
+        with open(os.path.join(skaters_dir, f"bios_{start}.json")) as f:
+            ages = {r["playerId"]: player_values_mod.age_on_feb1(r["birthDate"], start)
+                    for r in json.load(f)["data"] if r.get("birthDate")}
+        def load(year):
+            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
+                return player_values_mod.season_game_scores(f.read())
+        rosters = {pid: p["team"] for pid, p in load(start).items()}
+        _aging[start] = player_values_mod.team_aging(load(start - 1), rosters, ages)
+    return _aging[start]
 
 
 def calibration_table(pairs, buckets=10):
@@ -285,6 +309,13 @@ def main():
                                 priors = {t: c * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + gw * goalies.get(t, 0.0) for t in standings}
                                 ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
                                 runs[f"roster+goalies {mode} g={gw} K={shrink}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                    goalies = goalie_strength(args.skaters_dir, start, 100, "level")
+                    aging = team_aging_as_of(args.skaters_dir, start)
+                    for carry in AGING_CARRYOVERS:
+                        for aw in AGING_WEIGHTS:
+                            priors = {t: carry * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + goalies.get(t, 0.0) + aw * aging.get(t, 0.0) for t in standings}
+                            ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
+                            runs[f"roster+goalies+aging c={carry} a={aw}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
                     for beta in ROSTER_BETAS:
                         for k in (30, 45):
                             priors = {t: c * prior_xgd.get(t, 0.0) + beta * change.get(t, 0.0) for t in standings}

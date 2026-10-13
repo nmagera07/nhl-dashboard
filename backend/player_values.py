@@ -204,6 +204,106 @@ def team_goalie_strength(rates, last, rosters):
     return {t: round(v - mean, 4) for t, v in level.items()}
 
 
+# Aging: the change in a skater's Game Score per game from one season to the
+# next, by age on Feb 1 of the new season. Fit by --calibrate-aging (delta
+# method: 4,063 pairs of consecutive 20+ GP seasons, 2018-19 to 2025-26,
+# weighted by the harmonic mean of games played) as a cubic in (age - 27),
+# ages clamped to 19-39. Young players improve (+0.13 at 19), the peak is
+# about 25, and it falls off after 30 (-0.05 at 34).
+#
+# NOT used by the playoff model: backtested 2026-10 (backtest_playoff_odds.py,
+# "roster+goalies+aging"), adding team_aging() to the prior made Brier worse
+# at every weight and carryover tried. Likely survivor bias: a young player
+# only forms a pair if he stayed in the NHL, so young gains are overstated
+# (it rated Buffalo the top "aging gainer" two years running). Kept for a
+# future fix, e.g. counting players who dropped out as declines.
+AGING_CURVE = (-0.00978, -0.00845, 0.00075, -0.00005)
+AGING_PIVOT = 27
+AGING_AGES = (19, 39)
+NHL_BIOS_URL = "https://api.nhle.com/stats/rest/en/skater/bios?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId=2"
+
+
+def age_on_feb1(birth_date, season_start):
+    """Age on Feb 1 of the season starting in `season_start` (e.g. 2026 for 2026-27)."""
+    year, month, day = (int(x) for x in str(birth_date)[:10].split("-"))
+    return season_start + 1 - year - ((month, day) > (2, 1))
+
+
+def aging_change(age, curve=AGING_CURVE):
+    """Expected goals/game change in a skater's value this season, at this age."""
+    x = min(max(age, AGING_AGES[0]), AGING_AGES[1]) - AGING_PIVOT
+    return GS_TO_GOALS * sum(c * x ** k for k, c in enumerate(curve))
+
+
+def team_aging(last, rosters, ages):
+    """
+    {team: goals/game its current skaters should gain or lose to aging},
+    centered on the league. Each skater counts at his share of a full
+    season played last year, like roster_strength_change(); players
+    without a known age or last-season games count for nothing. Without
+    this, a player who stayed cancelled out exactly, so a young core and an
+    old one looked the same.
+    """
+    totals = defaultdict(float)
+    for pid, team in rosters.items():
+        played = min(last.get(pid, {}).get("gp", 0) / FULL_SEASON_GP, 1.0)
+        if played and pid in ages:
+            totals[team] += aging_change(ages[pid]) * played
+    if not totals:
+        return {}
+    mean = sum(totals.values()) / len(totals)
+    return {t: round(v - mean, 4) for t, v in totals.items()}
+
+
+def fit_aging_curve(pairs, degree=3):
+    """Weighted least squares of (age, change in GS/gp, weight) on a
+    polynomial in (age - AGING_PIVOT), ages clamped like aging_change()."""
+    n = degree + 1
+    a = [[0.0] * n for _ in range(n)]
+    b = [0.0] * n
+    for age, change, weight in pairs:
+        x = min(max(age, AGING_AGES[0]), AGING_AGES[1]) - AGING_PIVOT
+        f = [x ** k for k in range(n)]
+        for i in range(n):
+            b[i] += weight * f[i] * change
+            for j in range(n):
+                a[i][j] += weight * f[i] * f[j]
+    for i in range(n):  # Gaussian elimination; the normal equations are well conditioned here
+        for j in range(i + 1, n):
+            r = a[j][i] / a[i][i]
+            a[j] = [aj - r * ai for aj, ai in zip(a[j], a[i])]
+            b[j] -= r * b[i]
+    coef = [0.0] * n
+    for i in reversed(range(n)):
+        coef[i] = (b[i] - sum(a[i][k] * coef[k] for k in range(i + 1, n))) / a[i][i]
+    return coef
+
+
+def aging_pairs(seasons_by_year, ages_by_year, min_gp=20):
+    """(age, change in GS/gp, weight) for each skater's consecutive seasons."""
+    pairs = []
+    for year in sorted(seasons_by_year):
+        before = seasons_by_year.get(year - 1)
+        if not before:
+            continue
+        for pid, p in seasons_by_year[year].items():
+            q = before.get(pid)
+            age = ages_by_year.get(year, {}).get(pid)
+            if q and age is not None and p["gp"] >= min_gp and q["gp"] >= min_gp:
+                weight = 2 / (1 / p["gp"] + 1 / q["gp"])
+                pairs.append((age, p["gs"] / p["gp"] - q["gs"] / q["gp"], weight))
+    return pairs
+
+
+def fetch_ages(season_start):
+    """{player_id: age on Feb 1} for every skater who played that season (NHL stats API)."""
+    season = f"{season_start}{season_start + 1}"
+    response = requests.get(NHL_BIOS_URL.format(season=season), timeout=60)
+    response.raise_for_status()
+    return {r["playerId"]: age_on_feb1(r["birthDate"], season_start)
+            for r in response.json()["data"] if r.get("birthDate")}
+
+
 def calibrate(years):
     """Refit GS_TO_GOALS (team GD/game on team Game Score/game) and the replacement levels."""
     xs, ys, fringe = [], [], defaultdict(lambda: [0.0, 0])
@@ -237,6 +337,7 @@ def calibrate(years):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--calibrate", action="store_true")
+    parser.add_argument("--calibrate-aging", action="store_true", help="Refit AGING_CURVE (8 seasons)")
     parser.add_argument("--top", type=int, default=0)
     parser.add_argument("--season-start", type=int, default=None, help="e.g. 2026 for 2026-27 (default: current)")
     args = parser.parse_args()
@@ -245,6 +346,11 @@ def main():
     start = args.season_start or current_season_id() // 10000
     if args.calibrate:
         print(calibrate([start - 3, start - 2, start - 1]))
+    if args.calibrate_aging:
+        years = range(start - 8, start)
+        seasons = {y: season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, y)) for y in years}
+        pairs = aging_pairs(seasons, {y: fetch_ages(y) for y in years})
+        print({"pairs": len(pairs), "curve": [round(c, 5) for c in fit_aging_curve(pairs)]})
     if args.top:
         values = player_values(season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, start)),
                                season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, start - 1)))

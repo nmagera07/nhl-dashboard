@@ -349,6 +349,21 @@ CREATE TABLE IF NOT EXISTS playoff_odds (
 
 CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
     ON playoff_odds (season_id, as_of_date);
+-- MoneyPuck's playoff odds, logged daily next to playoff_odds (same
+-- as_of_date = same games seen) for a head-to-head score. Created by the
+-- daily job itself; see moneypuck_odds.py.
+CREATE TABLE IF NOT EXISTS moneypuck_odds (
+    season_id               INTEGER NOT NULL,
+    as_of_date              DATE NOT NULL,
+    team_abbrev             VARCHAR(3) NOT NULL,
+    playoff_pct             NUMERIC(6,4) NOT NULL,
+    won_cup_pct             NUMERIC(6,4),
+    projected_points        NUMERIC(5,1),
+    moneypuck_updated_at    TIMESTAMPTZ NOT NULL,
+    fetched_at              TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (season_id, as_of_date, team_abbrev)
+);
+
 -- Inputs for the in-browser season simulator (frontend/src/utils/seasonSim.js):
 -- the game model's constants, each team's record and strength rating, and the
 -- remaining schedule, as one JSON document. One row per season, replaced by

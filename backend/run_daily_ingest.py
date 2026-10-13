@@ -16,7 +16,9 @@ Runs each ingestion script in its own process, in order:
                                  odds and ratings step 3 just saved)
   6. ingest_player_stats.py   -- rosters + season stats, including marking
                                  cut/released players off-roster
-  7. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
+  7. team_lines.py            -- each team's lines from its last game (NHL
+                                 shift charts), after rosters
+  8. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
                                  ours for a head-to-head score
 
 A failure in one script doesn't stop the next, since e.g. a playoff-odds
@@ -49,6 +51,7 @@ SCRIPTS = [
     "game_predictions.py",
     "daily_digest.py",
     "ingest_player_stats.py",
+    "team_lines.py",
     "moneypuck_odds.py",
 ]
 

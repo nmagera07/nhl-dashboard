@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
+import { shortDateLabel } from "../utils/dates.js";
 
 const pct = (v, digits = 1) => (v == null ? "—" : `${(Number(v) * 100).toFixed(digits)}%`);
 const num = (v, digits = 2) => (v == null ? "—" : Number(v).toFixed(digits));
@@ -105,23 +106,25 @@ function TeamLines({ abbrev }) {
         ))}
       </ol>
     );
-  if (!data.lines.length && !data.pairs.length) return <p className="preview-note">No {abbrev} lines yet this season.</p>;
+  if (!data.game) return <p className="preview-note">No {abbrev} lines yet this season.</p>;
+  const { date, opponent, home } = data.game;
   return (
     <div className="preview-lines-team">
-      <h3>{abbrev}</h3>
+      <h3>{abbrev} <span className="muted">· {shortDateLabel(date)} {home ? "vs" : "@"} {opponent}</span></h3>
       {group(data.lines, "forward lines")}
       {group(data.pairs, "defense pairs")}
     </div>
   );
 }
 
+// Each team's lines from its last game (NHL shift charts, at even strength).
 // Collapsed until tapped, and only then fetched: most visitors won't open it.
 function Lines({ away, home }) {
   const [open, setOpen] = useState(false);
   return (
     <section className="boxscore-card">
       <details className="preview-lines" onToggle={(e) => setOpen(e.currentTarget.open)}>
-        <summary><h2>Lines</h2><span className="muted">Most-used at 5-on-5 this season</span></summary>
+        <summary><h2>Lines</h2><span className="muted">From each team&apos;s last game</span></summary>
         {open && (
           <>
             <div className="preview-lines-teams">
@@ -129,8 +132,8 @@ function Lines({ away, home }) {
               <TeamLines abbrev={home.abbrev} />
             </div>
             <p className="preview-note">
-              Combinations that have played the most together so far, with today&apos;s roster. Not tonight&apos;s
-              confirmed lineup. Data: MoneyPuck.com.
+              Who played together most at even strength in each team&apos;s last game, from the NHL&apos;s shift
+              charts. Not tonight&apos;s confirmed lineup.
             </p>
           </>
         )}

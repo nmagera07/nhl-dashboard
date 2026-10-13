@@ -16,6 +16,7 @@ generates this automatically from the code below).
 
 import asyncio
 from collections import OrderedDict
+import json
 import os
 import re
 import threading
@@ -923,13 +924,11 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
 @daily_cached
 def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
     """
-    The team's most-used 5-on-5 forward lines and defense pairs this season
-    (MoneyPuck), limited to combinations whose players are all on today's
-    active roster. Most-used so far, not tonight's confirmed lineup.
-    Empty lists before the season's first games or the first daily run.
+    The team's forward lines and defense pairs from its last completed game
+    (worked out from NHL shift charts by team_lines.py), with which game
+    that was. Not tonight's confirmed lineup. game is null and the lists
+    are empty before the team's first game or the first daily run.
     """
-    import team_lines
-
     abbrev = team_abbrev.upper()
     conn = get_connection()
     try:
@@ -937,22 +936,20 @@ def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
             cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
             if not cur.fetchone():
                 raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
-            cur.execute("SELECT player_id, first_name, last_name FROM players WHERE team_abbrev = %s AND on_roster", (abbrev,))
-            roster = {r["player_id"]: (r["first_name"], r["last_name"]) for r in cur.fetchall()}
             try:
                 cur.execute(
-                    """
-                    SELECT kind, player_ids, names, games_played, icetime_seconds, xg_pct, goals_for, goals_against
-                    FROM team_lines
-                    WHERE team_abbrev = %s AND season_id = (SELECT MAX(season_id) FROM team_lines)
-                    """,
+                    "SELECT game_id, game_date, opponent, home, payload FROM team_lines WHERE team_abbrev = %s",
                     (abbrev,),
                 )
-                rows = cur.fetchall()
+                row = cur.fetchone()
             except psycopg2.errors.UndefinedTable:
                 conn.rollback()  # the daily job hasn't created the table yet
-                rows = []
-        return {"team": abbrev, **team_lines.top_lines(rows, roster)}
+                row = None
+        if not row:
+            return {"team": abbrev, "game": None, "lines": [], "pairs": []}
+        payload = row["payload"] if isinstance(row["payload"], dict) else json.loads(row["payload"])
+        game = {"id": row["game_id"], "date": str(row["game_date"]), "opponent": row["opponent"], "home": row["home"]}
+        return {"team": abbrev, "game": game, "lines": payload.get("lines", []), "pairs": payload.get("pairs", [])}
     except HTTPException:
         raise
     except Exception:

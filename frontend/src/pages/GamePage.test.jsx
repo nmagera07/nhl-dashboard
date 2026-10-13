@@ -229,6 +229,7 @@ describe("GamePage", () => {
     });
     const lines = (abbrev) => ({
       team: abbrev,
+      game: { id: 1, date: "2026-10-12", opponent: "BUF", home: abbrev === "TOR" },
       lines: [{ players: ["Knies", "Matthews", "Marner"], player_ids: [1, 2, 3], minutes: 41 }],
       pairs: [{ players: ["Rielly", "McCabe"], player_ids: [4, 5], minutes: 55 }],
     });
@@ -238,10 +239,12 @@ describe("GamePage", () => {
     expect(screen.getByText("Stolarz 5")).toBeInTheDocument();  // a goalie with no games isn't listed
     expect(globalThis.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/lines"));
 
-    await userEvent.click(screen.getByText("Most-used at 5-on-5 this season"));
+    await userEvent.click(screen.getByText("From each team's last game"));
 
     expect(await screen.findByRole("list", { name: "TOR forward lines" })).toHaveTextContent("Knies – Matthews – Marner41 min");
     expect(screen.getByRole("list", { name: "NSH defense pairs" })).toHaveTextContent("Rielly – McCabe");
+    expect(screen.getByRole("heading", { name: "TOR · Oct 12 vs BUF" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "NSH · Oct 12 @ BUF" })).toBeInTheDocument();
     expect(screen.getByText(/Not tonight's confirmed lineup/)).toBeInTheDocument();
   });
 

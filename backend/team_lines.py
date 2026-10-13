@@ -1,130 +1,232 @@
 """
-Line combinations: each team's forward lines and defense pairs this season,
-from MoneyPuck's lines.csv (5-on-5 only; free for non-commercial use with
-credit). Run by ingest_advanced_stats.py; served by GET /teams/{team}/lines.
+Last game's lines: each team's forward lines and defense pairs from its most
+recent completed game, worked out from the NHL's shift charts. Runs in the
+daily job (after rosters); served by GET /teams/{team}/lines.
 
-MoneyPuck's lineId is the players' 7-digit NHL ids joined together
-("847794684780428482078" = 8477946, 8478042, 8482078), so the API can keep
-only combinations whose players are all on the team's active roster today.
+How: every shift has a player, period, start and end. Keep the seconds when
+both teams had exactly 5 skaters on the ice (even strength, so power-play
+units don't blur the lines), add up how long each pair of teammates was on
+together, then take the trios (forwards) and pairs (defense) with the most
+time together, each player used once. Positions and names come from that
+game's box score.
 
-These are the most-used combinations so far, not tonight's lineup: nobody
-publishes projected lines as open data, and scraping the sites that do
-isn't allowed.
+Why last game: it's the closest open data to tonight's lineup. Projected
+lines are only published by sites that would have to be scraped. Season-long
+totals (MoneyPuck's lines.csv) were tried first, but an early-season line
+that was broken up weeks ago could still top the list.
+
+Usage:
+    python team_lines.py              # update teams whose stored game is stale
+    python team_lines.py --days 30    # look further back for each team's last game
 """
 
-import csv
-import io
+import argparse
+import itertools
+import json
+import os
+import time
+from collections import defaultdict
+from datetime import date, timedelta
 
-LINES_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/lines.csv"
-SITUATION = "5on5"
-KINDS = {"line": "line", "pairing": "pair"}  # MoneyPuck position -> ours
+import psycopg2
+import requests
+from dotenv import load_dotenv
+
+from logging_config import setup_logging
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+logger = setup_logging("team_lines")
+
+SCORE_URL = "https://api-web.nhle.com/v1/score/{date}"
+BOXSCORE_URL = "https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore"
+SHIFTS_URL = "https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId={game_id}"
+HEADERS = {"User-Agent": "nhl-dashboard (personal project)"}  # the stats API 403s a blank one
+FINAL_STATES = {"OFF", "FINAL"}
+PERIOD_SECONDS = 1200
+LOOKBACK_DAYS = 14
+FORWARD_LINES, DEFENSE_PAIRS = 4, 3
 
 TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS team_lines (
-    season_id               INTEGER NOT NULL,
-    team_abbrev             VARCHAR(3) NOT NULL,
-    kind                    VARCHAR(4) NOT NULL,      -- 'line' (forwards) or 'pair' (defense)
-    player_ids              INTEGER[] NOT NULL,
-    names                   TEXT NOT NULL,            -- MoneyPuck's "Last-Last-Last"
-    games_played            INTEGER NOT NULL,
-    icetime_seconds         INTEGER NOT NULL,
-    xg_pct                  NUMERIC(5,4),
-    goals_for               INTEGER,
-    goals_against           INTEGER,
-    updated_at              TIMESTAMPTZ DEFAULT NOW(),
-    PRIMARY KEY (season_id, team_abbrev, kind, player_ids)
+    team_abbrev             VARCHAR(3) PRIMARY KEY,
+    game_id                 BIGINT NOT NULL,
+    game_date               DATE NOT NULL,
+    opponent                VARCHAR(3) NOT NULL,
+    home                    BOOLEAN NOT NULL,
+    payload                 JSONB NOT NULL,           -- {"lines": [...], "pairs": [...]}
+    updated_at              TIMESTAMPTZ DEFAULT NOW()
 )
 """
 
 
-def split_line_id(line_id):
-    """MoneyPuck lineId -> [player ids] (7 digits each)."""
-    text = str(line_id).strip()
-    if not text.isdigit() or len(text) % 7:
-        raise ValueError(f"unexpected lineId {line_id!r}")
-    return [int(text[i:i + 7]) for i in range(0, len(text), 7)]
+def _get(url):
+    for attempt in range(4):
+        response = requests.get(url, headers=HEADERS, timeout=30)
+        if response.status_code != 429:
+            response.raise_for_status()
+            return response.json()
+        time.sleep(5 * (attempt + 1))
+    response.raise_for_status()
 
 
-def parse_lines(csv_text):
-    """5-on-5 rows -> dicts ready to save. Rows with an odd lineId are skipped."""
-    out = []
-    for row in csv.DictReader(io.StringIO(csv_text)):
-        if row.get("situation") != SITUATION or row.get("position") not in KINDS:
-            continue
-        try:
-            ids = split_line_id(row["lineId"])
-        except ValueError:
-            continue
-        xg = row.get("xGoalsPercentage")
-        out.append({
-            "team_abbrev": row["team"],
-            "kind": KINDS[row["position"]],
-            "player_ids": ids,
-            "names": row["name"],
-            "games_played": int(float(row.get("games_played") or 0)),
-            "icetime_seconds": int(float(row.get("icetime") or 0)),
-            "xg_pct": float(xg) if xg not in (None, "") else None,
-            "goals_for": int(float(row.get("goalsFor") or 0)),
-            "goals_against": int(float(row.get("goalsAgainst") or 0)),
-        })
+def _seconds(clock):
+    minutes, seconds = clock.split(":")
+    return int(minutes) * 60 + int(seconds)
+
+
+def roster_from_boxscore(box):
+    """{player_id: {"team", "pos" ("F"/"D"/"G"), "name"}} for everyone who dressed."""
+    out = {}
+    for side in ("awayTeam", "homeTeam"):
+        team = box[side]["abbrev"]
+        stats = box.get("playerByGameStats", {}).get(side, {})
+        for group, pos in (("forwards", "F"), ("defense", "D"), ("goalies", "G")):
+            for p in stats.get(group, []):
+                out[p["playerId"]] = {"team": team, "pos": pos, "name": (p.get("name") or {}).get("default", "")}
     return out
 
 
-def save_lines(cur, season_id, lines):
-    """Replace the season's lines (combinations come and go as lineups change)."""
+def even_strength_time(shifts, roster):
+    """
+    ({(team, a, b): seconds together}, {second: {team: frozenset(ids)}}) over
+    the seconds when both teams had exactly 5 skaters on the ice.
+    """
+    on = defaultdict(lambda: defaultdict(set))
+    for s in shifts:
+        player = roster.get(s.get("playerId"))
+        if not player or player["pos"] == "G" or not s.get("startTime") or not s.get("endTime"):
+            continue
+        base = (s["period"] - 1) * PERIOD_SECONDS
+        for t in range(base + _seconds(s["startTime"]), base + _seconds(s["endTime"])):
+            on[t][player["team"]].add(s["playerId"])
+    teams = {p["team"] for p in roster.values()}
+    pairs, even = defaultdict(int), {}
+    for t, by_team in on.items():
+        if len(by_team) != len(teams) or any(len(ids) != 5 for ids in by_team.values()):
+            continue
+        even[t] = {team: frozenset(ids) for team, ids in by_team.items()}
+        for team, ids in by_team.items():
+            for a, b in itertools.combinations(sorted(ids), 2):
+                pairs[(team, a, b)] += 1
+    return pairs, even
+
+
+def pick_groups(players, size, limit, together):
+    """The `limit` groups of `size` with the most pairwise time together, each player once."""
+    def score(group):
+        return sum(together(a, b) for a, b in itertools.combinations(sorted(group), 2))
+
+    picked, used = [], set()
+    for group in sorted(itertools.combinations(sorted(players), size), key=score, reverse=True):
+        if used & set(group) or score(group) == 0:
+            continue
+        used |= set(group)
+        picked.append(list(group))
+        if len(picked) == limit:
+            break
+    return picked
+
+
+def display_names(names):
+    """{id: name}: last name, keeping the box score's first initial only when
+    teammates share a last name (two Tkachuks, two Protases)."""
+    last = {pid: n.split(". ", 1)[-1] for pid, n in names.items()}
+    counts = defaultdict(int)
+    for n in last.values():
+        counts[n] += 1
+    return {pid: (names[pid] if counts[last[pid]] > 1 else last[pid]) for pid in names}
+
+
+def lines_from_game(box, shifts):
+    """{team: {"lines": [...], "pairs": [...]}} for one completed game."""
+    roster = roster_from_boxscore(box)
+    pairs, even = even_strength_time(shifts, roster)
+    out = {}
+    for team in {p["team"] for p in roster.values()}:
+        mine = {pid: p for pid, p in roster.items() if p["team"] == team}
+        names = display_names({pid: p["name"] for pid, p in mine.items()})
+
+        def together(a, b, team=team):
+            return pairs.get((team, a, b), 0)
+
+        def describe(group):
+            seconds = sum(1 for by_team in even.values() if set(group) <= by_team.get(team, frozenset()))
+            return {"players": [names[i] for i in group], "player_ids": group, "minutes": round(seconds / 60, 1)}
+
+        forwards = [pid for pid, p in mine.items() if p["pos"] == "F"]
+        defense = [pid for pid, p in mine.items() if p["pos"] == "D"]
+        out[team] = {
+            "lines": [describe(g) for g in pick_groups(forwards, 3, FORWARD_LINES, together)],
+            "pairs": [describe(g) for g in pick_groups(defense, 2, DEFENSE_PAIRS, together)],
+        }
+    return out
+
+
+def latest_games(days, today=None, get=_get):
+    """{team: game} for each team's most recent completed game in the last `days` days."""
+    today = today or date.today()
+    latest = {}
+    for back in range(1, days + 1):
+        day = today - timedelta(days=back)
+        for g in get(SCORE_URL.format(date=day)).get("games", []):
+            if g.get("gameState") not in FINAL_STATES or g.get("gameType") not in (2, 3):
+                continue
+            away, home = g["awayTeam"]["abbrev"], g["homeTeam"]["abbrev"]
+            for team, opp, is_home in ((away, home, False), (home, away, True)):
+                latest.setdefault(team, {"game_id": g["id"], "date": str(day), "opponent": opp, "home": is_home})
+    return latest
+
+
+def update(cur, days=LOOKBACK_DAYS, get=_get):
+    """Refresh every team whose stored game isn't its latest. Returns teams updated."""
     cur.execute(TABLE_SQL)
     cur.execute("GRANT SELECT ON team_lines TO nhl_api_readonly")
-    cur.execute("DELETE FROM team_lines WHERE season_id = %s", (season_id,))
-    for line in lines:
-        cur.execute(
-            """
-            INSERT INTO team_lines (season_id, team_abbrev, kind, player_ids, names, games_played,
-                                    icetime_seconds, xg_pct, goals_for, goals_against, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT DO NOTHING
-            """,
-            (season_id, line["team_abbrev"], line["kind"], line["player_ids"], line["names"], line["games_played"],
-             line["icetime_seconds"], line["xg_pct"], line["goals_for"], line["goals_against"]),
-        )
-    return len(lines)
-
-
-def display_names(roster):
-    """{player_id: name to show}: last name, plus a first initial when two
-    teammates share it (Washington has two Protases). roster: {id: (first, last)}."""
-    counts = {}
-    for _, last in roster.values():
-        counts[last] = counts.get(last, 0) + 1
-    return {pid: (f"{first[:1]}. {last}" if counts[last] > 1 else last) for pid, (first, last) in roster.items()}
-
-
-def top_lines(rows, roster, forwards=4, pairs=3):
-    """
-    A lineup built from the most-used combinations: the line with the most
-    ice time first, then the next one that shares no player with those
-    already picked, up to `forwards` lines and `pairs` defense pairs. Only
-    combinations whose players are all on the active roster count.
-    rows: dicts with the team_lines columns. roster: {player_id: (first, last)}.
-    Names come from our players table, not MoneyPuck's (which drops accents).
-    """
-    names = display_names(roster)
-    current = sorted((r for r in rows if set(r["player_ids"]) <= set(roster)), key=lambda r: -r["icetime_seconds"])
-
-    def pick(kind, limit):
-        picked, used = [], set()
-        for r in current:
-            ids = list(r["player_ids"])
-            if r["kind"] != kind or used & set(ids):
+    cur.execute("SELECT team_abbrev, game_id FROM team_lines")
+    stored = dict(cur.fetchall())
+    latest = latest_games(days, get=get)
+    stale = {team: g for team, g in latest.items() if stored.get(team) != g["game_id"]}
+    updated = 0
+    for game_id in sorted({g["game_id"] for g in stale.values()}):
+        try:
+            box = get(BOXSCORE_URL.format(game_id=game_id))
+            shifts = get(SHIFTS_URL.format(game_id=game_id)).get("data", [])
+        except requests.RequestException as exc:
+            logger.warning(f"Game {game_id}: no shift data ({exc}); keeping the previous lines")
+            continue
+        if not shifts:
+            logger.warning(f"Game {game_id}: empty shift chart; keeping the previous lines")
+            continue
+        for team, lines in lines_from_game(box, shifts).items():
+            g = stale.get(team)
+            if not g or g["game_id"] != game_id:
                 continue
-            used |= set(ids)
-            picked.append({
-                "players": [names[i] for i in ids], "player_ids": ids,
-                "minutes": round(r["icetime_seconds"] / 60), "games": r["games_played"],
-                "xg_pct": float(r["xg_pct"]) if r["xg_pct"] is not None else None,
-                "goals_for": r["goals_for"], "goals_against": r["goals_against"],
-            })
-            if len(picked) == limit:
-                break
-        return picked
+            cur.execute(
+                """
+                INSERT INTO team_lines (team_abbrev, game_id, game_date, opponent, home, payload, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (team_abbrev) DO UPDATE SET
+                    game_id = EXCLUDED.game_id, game_date = EXCLUDED.game_date, opponent = EXCLUDED.opponent,
+                    home = EXCLUDED.home, payload = EXCLUDED.payload, updated_at = NOW()
+                """,
+                (team, game_id, g["date"], g["opponent"], g["home"], json.dumps(lines)),
+            )
+            updated += 1
+        time.sleep(0.5)  # polite to the NHL API
+    return updated
 
-    return {"lines": pick("line", forwards), "pairs": pick("pair", pairs)}
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=LOOKBACK_DAYS)
+    args = parser.parse_args()
+    if not DATABASE_URL:
+        raise SystemExit("DATABASE_URL is not set")
+    with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+        updated = update(cur, args.days)
+    logger.info(f"Lines updated for {updated} teams")
+
+
+if __name__ == "__main__":
+    main()

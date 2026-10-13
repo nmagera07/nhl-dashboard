@@ -187,7 +187,7 @@ def roster_change(skaters_dir, start):
     return _roster_change[start]
 
 
-GOALIE_WEIGHTS = (1.0,)
+GOALIE_WEIGHTS = ()
 GOALIE_SHRINKS = (50, 100, 250)
 _goalies = {}
 
@@ -215,6 +215,64 @@ def goalie_strength(skaters_dir, start, shrink, mode):
     return _goalies[key]
 
 
+# Aging (2026-10): a null result -- worse Brier at every weight (0.5-2.0)
+# and carryover (0.5-0.7); see player_values.AGING_CURVE.
+AGING_WEIGHTS = (0.0,)
+AGING_CARRYOVERS = (0.5,)
+GOALIE_START_PRIORS = (5, 10, 20, 40, 80)
+_goalie_logs = {}
+
+
+def goalie_starts_as_of(logs_dir, season_id, as_of):
+    """{(player_id, team): starts on or before as_of} from cached NHL game logs
+    ({player_id}_{season}.json, api-web.nhle.com/v1/player/{id}/game-log/{season}/2)."""
+    if season_id not in _goalie_logs:
+        games = []
+        for name in os.listdir(logs_dir):
+            pid, season = name.removesuffix(".json").split("_")
+            if int(season) == season_id:
+                with open(os.path.join(logs_dir, name)) as f:
+                    games += [(int(pid), g["teamAbbrev"], g["gameDate"], g.get("gamesStarted", 0)) for g in json.load(f).get("gameLog", [])]
+        _goalie_logs[season_id] = games
+    starts = defaultdict(int)
+    for pid, team, day, started in _goalie_logs[season_id]:
+        if day <= as_of:
+            starts[(pid, team)] += started
+    return starts
+
+
+def goalie_strength_as_of(skaters_dir, logs_dir, start, as_of, prior_starts):
+    """Team goalie strength with expected starts as of a checkpoint: last
+    season's split worth `prior_starts` games, plus this season's starts."""
+    def load(year):
+        with open(os.path.join(skaters_dir, f"goalies_{year}.csv")) as f:
+            return player_values_mod.season_goalies(f.read())
+    last, before = load(start - 1), load(start - 2)
+    rosters = {pid: g["team"] for pid, g in load(start).items()}
+    by_team = goalie_starts_as_of(logs_dir, start * 10000 + start + 1, as_of)
+    starts = {pid: by_team.get((pid, team), 0) for pid, team in rosters.items()}
+    rates = player_values_mod.goalie_rates(last, before)
+    return player_values_mod.team_goalie_strength(rates, last, rosters, starts=starts, prior_starts=prior_starts)
+_aging = {}
+
+
+def team_aging_as_of(skaters_dir, start):
+    """Each team's aging term before season `start`: the roster is each
+    skater's team that season, ages from the NHL bios file for that season
+    (bios_{year}.json, the NHL stats API's skater/bios report), weights
+    from the season before."""
+    if start not in _aging:
+        with open(os.path.join(skaters_dir, f"bios_{start}.json")) as f:
+            ages = {r["playerId"]: player_values_mod.age_on_feb1(r["birthDate"], start)
+                    for r in json.load(f)["data"] if r.get("birthDate")}
+        def load(year):
+            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
+                return player_values_mod.season_game_scores(f.read())
+        rosters = {pid: p["team"] for pid, p in load(start).items()}
+        _aging[start] = player_values_mod.team_aging(load(start - 1), rosters, ages)
+    return _aging[start]
+
+
 def calibration_table(pairs, buckets=10):
     """pairs: [(predicted, actual)]. Rows: bucket, n, mean predicted, observed rate."""
     rows = []
@@ -240,6 +298,8 @@ def main():
                         help="Score separate finishing/goaltending weights (needs --xg-file)")
     parser.add_argument("--skaters-dir", default=None,
                         help="Folder of MoneyPuck skaters_{year}.csv files to score roster-aware priors (needs --xg-file)")
+    parser.add_argument("--goalie-logs", default=None,
+                        help="Folder of NHL goalie game logs ({id}_{season}.json) to score start-weighted goalies")
     parser.add_argument("--only-production", action="store_true", help="Skip the v2 grid; score v1, production, and xG variants")
     args = parser.parse_args()
 
@@ -285,6 +345,19 @@ def main():
                                 priors = {t: c * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + gw * goalies.get(t, 0.0) for t in standings}
                                 ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
                                 runs[f"roster+goalies {mode} g={gw} K={shrink}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                    goalies = goalie_strength(args.skaters_dir, start, 100, "level")
+                    aging = team_aging_as_of(args.skaters_dir, start)
+                    if args.goalie_logs:
+                        for k in GOALIE_START_PRIORS:
+                            in_net = goalie_strength_as_of(args.skaters_dir, args.goalie_logs, start, cp["date"], k)
+                            priors = {t: c * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + in_net.get(t, 0.0) for t in standings}
+                            ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
+                            runs[f"roster+goalie-starts K={k}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                    for carry in AGING_CARRYOVERS:
+                        for aw in AGING_WEIGHTS:
+                            priors = {t: carry * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + goalies.get(t, 0.0) + aw * aging.get(t, 0.0) for t in standings}
+                            ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
+                            runs[f"roster+goalies+aging c={carry} a={aw}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
                     for beta in ROSTER_BETAS:
                         for k in (30, 45):
                             priors = {t: c * prior_xgd.get(t, 0.0) + beta * change.get(t, 0.0) for t in standings}

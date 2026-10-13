@@ -103,3 +103,52 @@ class TestGoalies:
         phi = (40 * -0.1 + pv.GOALIE_NEWCOMER_GAMES * pv.GOALIE_REPLACEMENT) / (40 + pv.GOALIE_NEWCOMER_GAMES)
         mean = (wpg + phi) / 2
         assert strength == pytest.approx({"WPG": round(wpg - mean, 4), "PHI": round(phi - mean, 4)})
+
+
+class TestGoalieStarts:
+    rates = {1: 0.2, 2: -0.1}
+    last = {1: {"gp": 60}, 2: {"gp": 20}}
+    rosters = {1: "WPG", 2: "WPG", 3: "PHI"}
+
+    def test_no_starts_yet_matches_last_seasons_split(self):
+        without = pv.team_goalie_strength(self.rates, self.last, self.rosters)
+        preseason = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={}, prior_starts=20)
+        assert preseason == pytest.approx(without)
+
+    def test_this_seasons_starts_take_over_as_games_are_played(self):
+        # The starter is hurt: the backup has started all 30 games.
+        early = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={2: 3}, prior_starts=20)
+        late = pv.team_goalie_strength(self.rates, self.last, self.rosters, starts={2: 30}, prior_starts=20)
+        assert late["WPG"] < early["WPG"]
+        wpg = (15 * 0.2 + (5 + 30) * -0.1) / 50  # 20 * 3/4 for the starter, 20 * 1/4 + 30 for the backup
+        phi = pv.GOALIE_REPLACEMENT
+        assert late["WPG"] == pytest.approx(round(wpg - (wpg + phi) / 2, 4))
+
+
+class TestAging:
+    def test_age_is_taken_on_feb_1_of_the_season(self):
+        assert pv.age_on_feb1("2000-02-01", 2026) == 27  # birthday on Feb 1 counts
+        assert pv.age_on_feb1("2000-02-02", 2026) == 26
+        assert pv.age_on_feb1("1987-08-07", 2026) == 39  # Crosby, 2026-27
+
+    def test_young_players_improve_and_veterans_decline(self):
+        assert pv.aging_change(20) > pv.aging_change(24) > 0
+        assert 0 > pv.aging_change(30) > pv.aging_change(35)
+        assert pv.aging_change(45) == pv.aging_change(39) and pv.aging_change(16) == pv.aging_change(19)  # clamped
+
+    def test_team_aging_weights_by_games_and_centers_on_the_league(self):
+        last = {1: {"gp": 82}, 2: {"gp": 41}, 3: {"gp": 82}}
+        aging = pv.team_aging(last, {1: "YNG", 2: "YNG", 3: "OLD", 4: "OLD"}, {1: 21, 2: 21, 3: 36})
+        young = 1.5 * pv.aging_change(21)
+        old = pv.aging_change(36)  # player 4 has no age: counts for nothing
+        assert aging == pytest.approx({"YNG": round((young - old) / 2, 4), "OLD": round((old - young) / 2, 4)})
+
+    def test_fit_recovers_a_known_curve(self):
+        pairs = [(age, 0.01 - 0.002 * (age - 27), 1.0) for age in range(19, 40)]
+        coef = pv.fit_aging_curve(pairs, degree=1)
+        assert coef == pytest.approx([0.01, -0.002], abs=1e-9)
+
+    def test_pairs_need_both_seasons_and_an_age(self):
+        seasons = {2024: {1: {"gp": 40, "gs": 20.0}, 2: {"gp": 40, "gs": 20.0}},
+                   2025: {1: {"gp": 40, "gs": 30.0}, 2: {"gp": 10, "gs": 9.0}, 3: {"gp": 40, "gs": 9.0}}}
+        assert pv.aging_pairs(seasons, {2025: {1: 24, 2: 24, 3: 24}}) == [(24, 0.25, 40.0)]

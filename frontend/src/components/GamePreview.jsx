@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
+import { shortDateLabel } from "../utils/dates.js";
 
 const pct = (v, digits = 1) => (v == null ? "—" : `${(Number(v) * 100).toFixed(digits)}%`);
 const num = (v, digits = 2) => (v == null ? "—" : Number(v).toFixed(digits));
@@ -77,6 +79,69 @@ function Form({ last10, team }) {
   );
 }
 
+// "Dobes 3 · Montembeault 2": games in net so far for each of a team's
+// goalies, most first. Nobody publishes tonight's starter as open data, so
+// this shows usage, not a projection.
+function inNet(goalies, teamId) {
+  const used = goalies
+    .filter((g) => g.teamId === teamId && (g.gamesPlayed ?? 0) > 0)
+    .sort((a, b) => b.gamesPlayed - a.gamesPlayed)
+    .slice(0, 3);
+  if (!used.length) return "—";
+  return used.map((g) => `${(g.name?.default || "").replace(/^\S+\.\s*/, "")} ${g.gamesPlayed}`).join(" · ");
+}
+
+function TeamLines({ abbrev }) {
+  const { data, status } = useFetchWithStatus(`${API_BASE}/teams/${abbrev}/lines`);
+  if (status === "error") return <p className="preview-note">Couldn&apos;t load {abbrev}&apos;s lines.</p>;
+  if (!data) return <p className="preview-note">Loading…</p>;
+  const group = (items, label) =>
+    items.length > 0 && (
+      <ol className="preview-lines-list" aria-label={`${abbrev} ${label}`}>
+        {items.map((l) => (
+          <li key={l.player_ids.join("-")}>
+            <span>{l.players.join(" – ")}</span>
+            <span className="muted">{l.minutes} min</span>
+          </li>
+        ))}
+      </ol>
+    );
+  if (!data.game) return <p className="preview-note">No {abbrev} lines yet this season.</p>;
+  const { date, opponent, home } = data.game;
+  return (
+    <div className="preview-lines-team">
+      <h3>{abbrev} <span className="muted">· {shortDateLabel(date)} {home ? "vs" : "@"} {opponent}</span></h3>
+      {group(data.lines, "forward lines")}
+      {group(data.pairs, "defense pairs")}
+    </div>
+  );
+}
+
+// Each team's lines from its last game (NHL shift charts, at even strength).
+// Collapsed until tapped, and only then fetched: most visitors won't open it.
+function Lines({ away, home }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="boxscore-card">
+      <details className="preview-lines" onToggle={(e) => setOpen(e.currentTarget.open)}>
+        <summary><h2>Lines</h2><span className="muted">From each team&apos;s last game</span></summary>
+        {open && (
+          <>
+            <div className="preview-lines-teams">
+              <TeamLines abbrev={away.abbrev} />
+              <TeamLines abbrev={home.abbrev} />
+            </div>
+            <p className="preview-note">
+              Who played together most at even strength in each team&apos;s last game, from the NHL&apos;s shift
+              charts. Not tonight&apos;s confirmed lineup.
+            </p>
+          </>
+        )}
+      </details>
+    </section>
+  );
+}
+
 const leaderName = (l) => (l ? `${l.name?.default || ""} · ${l.value}` : "—");
 const goalieLine = (g) => (g ? `${g.name?.default} · ${g.record} · ${num(g.gaa)} GAA · ${num(g.savePctg, 3)}` : "—");
 
@@ -88,6 +153,7 @@ function GamePreview({ game, standingsByTeam = {}, playoffOddsByTeam = {} }) {
   const stats = game.teamSeasonStats || {};
   const leaders = game.matchup?.skaterComparison?.leaders || [];
   const goalies = game.matchup?.goalieComparison || {};
+  const goalieUsage = game.matchup?.goalieSeasonStats?.goalies || [];
   const series = (game.seasonSeries || []).filter((g) => g.id !== game.id);
   const wins = game.seasonSeriesWins || {};
   const row = (t) => standingsByTeam[t.abbrev];
@@ -134,9 +200,14 @@ function GamePreview({ game, standingsByTeam = {}, playoffOddsByTeam = {} }) {
               <CompareRow key={l.category} label={SKATER_LABELS[l.category] || l.category} awayValue={leaderName(l.awayLeader)} homeValue={leaderName(l.homeLeader)} />
             ))}
             <CompareRow label="Goalie" awayValue={goalieLine(goalies.awayTeam?.leaders?.[0])} homeValue={goalieLine(goalies.homeTeam?.leaders?.[0])} />
+            {goalieUsage.length > 0 && (
+              <CompareRow label="Games in net" awayValue={inNet(goalieUsage, away.id)} homeValue={inNet(goalieUsage, home.id)} />
+            )}
           </div>
         </section>
       )}
+
+      <Lines away={away} home={home} />
 
       {series.length > 0 && (
         <section className="boxscore-card">

@@ -153,6 +153,99 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Who's in net: a second null result, and a feature that didn't need a model
+
+**The model question:** the goalie part of the prior weights each goalie by *last* season's
+games, so a team whose starter got hurt still counts him all season. The fix seemed
+obvious: blend in this season's starts. I pulled every goalie's game log for 4 seasons
+(406 NHL API calls, cached) so the backtest could count starts *as of* each checkpoint.
+
+**Result: worse, monotonically.** The more weight on this season's starts, the worse the
+Brier (5 → 0.1127, 20 → 0.1122, 80 → 0.1117, never → 0.1114). Half of each rating is this
+season's actual goals, and goals against already show who's been in net. A backup who has
+been starting is already in the rating, so moving the prior too counts it twice. That's
+two null results in a row (aging, then this), and both times the model was already right
+for a reason I hadn't spelled out.
+
+**The feature Nate wanted is about the game, not the model:** "show the lines for each
+game".
+- *Tonight's* projected lines and starting goalies come from sites like DailyFaceoff. That
+  means scraping, which their terms don't allow and which breaks when their pages change.
+  The NHL API only flags the starting goalie once the game begins.
+- *Games in net so far* was already in the NHL's pregame feed (`goalieSeasonStats`).
+- *Lines, version 1:* MoneyPuck's `lines.csv`, the most-used 5-on-5 combinations this
+  season.
+- *Lines, version 2 (shipped):* Nate asked "how do we know these lines are current?", and
+  the honest answer was that we didn't. Season totals rank by cumulative ice time, so a line
+  broken up after three games could still top the list. The NHL publishes every shift of
+  every game. From the last game's shifts, keep the seconds when both teams had exactly 5
+  skaters (so power-play units don't blur the lines), add up each pair of teammates' time
+  together, and pick the trios and pairs with the most, each player once. On real data it
+  gave four clean lines and three pairs, and it showed Washington's new top line
+  (Ovechkin–A. Protas–I. Protas), which the season view didn't have at all. The card names
+  the game the lines came from.
+
+**What looking at real data caught:** the first version worked in tests and read wrong on
+a real game. MoneyPuck drops accents ("Slafkovsk"), Washington has two Protases
+("Protas – Protas – Kyrou"), and the top combinations repeated players. The fixes, which
+carried into version 2: names from the game's box score (first initial only when
+teammates share a last name), and a greedy pick that uses each player once, so it reads
+like a lineup. The UI is collapsed under the preview and fetches only when opened.
+
+**Lessons:**
+- *Before changing a model input, ask what already carries that information.* This
+  season's goals already knew who was in net.
+- *Separate "what the user wants to see" from "what the model needs".* The lines were a
+  display feature; they didn't need to move the odds to be useful.
+- *Check on real data before shipping a UI that shows names.* Fixtures don't have accents
+  or brothers.
+- *"Is this current?" is a question about the data's definition, not its timestamp.* Data
+  refreshed nightly can still describe the wrong period.
+
+## 2026-10-13 — Aging curves: a real effect, the wrong direction (a null result)
+
+**The idea:** a 24-year-old usually improves and a 34-year-old declines, but the prior
+treated them the same. Players who stayed on a team cancelled out exactly, so a young core
+and an old one looked identical. The plan was to add each team's expected aging to the prior.
+
+**Measuring the curve:** I used the delta method. For every skater with 20+ games in two
+straight seasons (4,063 pairs, 2018-19 to 2025-26, birth dates from the NHL stats API's bios
+report), I took the change in Game Score per game, grouped it by age, and fit a cubic. It was
+the textbook shape: +0.13 at 19, peaking around 25, −0.05 at 34. The fit is reproducible
+with `player_values.py --calibrate-aging`.
+
+**The backtest said no:** worse at every weight. 0 → 0.1114, 0.5 → 0.1116, 1.0 → 0.1120,
+2.0 → 0.1129. My first theory was double counting: the 0.5 carryover already pulls every
+team toward average, and good teams skew old. So I tested aging with *less* generic
+shrinkage (carryover 0.6 and 0.7). It still lost at both.
+
+**Why:** the effect wasn't small. It was up to ±0.09 goals/game per team, as big as
+goaltending, but it pointed the wrong way. It rated Buffalo the top "aging gainer" in both
+2023 and 2024 (missed the playoffs both times), and Edmonton among the oldest decliners
+(two straight Finals). The likely cause is **survivor bias**: a young player only forms a
+pair if he stayed in the NHL. The ones who had a bad year got sent down and dropped out of
+the data, so the curve overstates young players' gains. That's a known weakness of the
+delta method, and the backtest caught it before the model did.
+
+**What I kept:** the curve, the fitting command, and the backtest variant, clearly marked as
+unused by the model. The model is unchanged (still v2.3). A future fix could count players
+who left the league as declines.
+
+**Lessons:**
+- *A textbook-shaped curve isn't proof.* It looked exactly right and still made predictions
+  worse.
+- *When a hypothesis fails, test the obvious rescue once, then stop.* The carryover test was
+  a fair second chance. A third would have been searching for a win.
+- *Look at the teams it gets wrong.* "Buffalo gains the most two years running" explained
+  the failure faster than any summary statistic.
+- *Null results are results.* The repo now explains why aging isn't in the model.
+
+**Interview framing:** "I built an aging curve with the delta method, and it had the classic
+shape, but adding it made my playoff model worse in a four-season backtest. I tested the
+obvious rescue (less generic shrinkage), it still lost, and the teams it got most wrong
+pointed to survivor bias in how the curve was measured. So I kept it out of the model and
+documented why. Knowing when not to ship is part of the job."
+
 ## 2026-10-13 — Analytics without loosening the security work
 
 **Goal:** see whether anyone uses PuckPulse, and which features. Page views alone can't say

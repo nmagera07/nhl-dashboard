@@ -19,3 +19,17 @@
 .preview-series-score { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
 .preview-series { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .preview-series li { display: flex; justify-content: space-between; gap: 10px; }
+/* Lines: collapsed by default. */
+.preview-lines summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; cursor: pointer; list-style: none; }
+.preview-lines summary::-webkit-details-marker { display: none; }
+.preview-lines summary h2 { margin: 0; }
+.preview-lines summary span { font-size: 12px; }
+.preview-lines summary::after { content: "▾"; margin-left: auto; color: var(--text-dim); font-size: 12px; transition: transform 0.15s; }
+.preview-lines:not([open]) summary::after { transform: rotate(-90deg); }
+.preview-lines-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 12px; }
+.preview-lines-team { display: grid; gap: 8px; min-width: 0; }
+.preview-lines-team h3 { margin: 0; font-size: 13px; color: var(--text-dim); }
+.preview-lines-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.preview-lines-list li { display: flex; justify-content: space-between; gap: 10px; }
+.preview-lines-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.preview-lines-list li span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }

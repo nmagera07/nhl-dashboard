@@ -153,6 +153,44 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Analytics without loosening the security work
+
+**Goal:** see whether anyone uses PuckPulse, and which features. Page views alone can't say
+whether the AI chat, the season sim, or "Why these odds?" is worth more work.
+
+**Choice: Umami Cloud** (free Hobby plan) over Cloudflare Web Analytics. Both are cookieless
+(no consent banner), but only Umami has custom events, and feature usage was the point.
+
+**The security tradeoff, and how I avoided it:** Umami's snippet loads a script from
+`cloud.umami.is`. Allowing that domain in `script-src` would undo the strictest line of the
+audit's CSP, since any change to their script would run on my site. Instead I read the
+script first: it's 4.8 KB, MIT-licensed, and only talks to `gateway.umami.is/api/send`. So
+I self-host it as `/stats.js`. `script-src` stays `'self'`, and the only new allowance is
+one `connect-src` origin. The cost is that I re-copy it if Umami changes their API.
+
+**Keeping the data clean:** `data-domains` means only puckpulse.io counts, not localhost
+or PR previews. `data-do-not-track` respects the browser setting. `track()` is a no-op when
+the tracker is blocked, so an ad blocker can't break a feature.
+
+**Events (named for what I'd decide from them):**
+- `ai-question`: never the question text, just a count
+- `follow-team`
+- `goal-alerts-on`
+- `season-sim`
+- `odds-why`
+- `installed-app-open` (PWA vs. browser)
+- `app-installed`
+
+**Verified in a browser before shipping:** a headless browser with the production CSP
+injected and Umami's endpoint intercepted. The page view, the SPA route change, and a
+custom event all fired, with 0 CSP violations from the tracker.
+
+**Interview framing:** "I needed product analytics without weakening a strict CSP. Instead
+of allow-listing a third-party script origin, I audited the tracker, self-hosted it, and
+allowed only its event endpoint, then verified under the production policy in a headless
+browser. Events were chosen for decisions, like whether the AI chat earns more investment,
+not for vanity counts."
+
 ## 2026-10-13 — Goalies: the prior had no goaltending in it at all
 
 **The insight:** the prior is last season's *xG* differential. xG is built from shots (where

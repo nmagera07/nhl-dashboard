@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
+import { track } from "../utils/analytics.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import OddsChart from "../components/OddsChart.jsx";
 import OddsWhy from "../components/OddsWhy.jsx";
@@ -101,7 +102,10 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
   const [wantWhy, setWantWhy] = useState(false);
   const highlight = (team) => {
     setHighlighted(team);
-    if (team) setWantWhy(true);
+    if (team) {
+      setWantWhy(true);
+      track("odds-why", { team });
+    }
   };
 
   const { data: latest, status } = useFetchWithStatus(`${API_BASE}/playoff-odds/history`, { initialData: EMPTY_HISTORY });

@@ -13,7 +13,15 @@ const entries = new Map();
 const STORAGE_PREFIX = "puckpulse:response:v1:";
 const STORAGE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 // News too: last visit's headlines show at once and are replaced within a second or two.
-const PERSISTED = /\/(standings\/latest|playoff-odds(\/history|\/why)?|players\/leaders|teams\/[A-Z]{3}\/roster|predictions\/track-record|digest\/latest|news|injuries|transactions)(\?[^/]*)?$/;
+const PERSISTED = /\/(standings\/latest|playoff-odds(\/history|\/why)?|playoff-line|players\/leaders|teams\/[A-Z]{3}\/roster|predictions\/track-record|digest\/latest|news|injuries|transactions)(\?[^/]*)?$/;
+
+import { API_BASE } from "../config.js";
+
+// Saved copies of URLs the app no longer requests. The Players page used to
+// fetch the full /players/leaders (~1.2 MB, too big for some localStorage
+// quotas); it now fetches ?view=table, so drop the old copy once per load.
+// The v1 prefix stays so every other page keeps its saved copy.
+const LEGACY_KEYS = [`${STORAGE_PREFIX}${API_BASE}/players/leaders`];
 
 export function isPersisted(url) {
   return !!url && PERSISTED.test(url);
@@ -26,6 +34,18 @@ function storage() {
     return null; // blocked (privacy mode, sandboxed iframe)
   }
 }
+
+function removeLegacyKeys() {
+  try {
+    const store = storage();
+    if (!store) return;
+    LEGACY_KEYS.forEach((k) => store.removeItem(k));
+  } catch {
+    // storage blocked: nothing to clean up
+  }
+}
+
+removeLegacyKeys();
 
 function loadStored(url, now) {
   try {

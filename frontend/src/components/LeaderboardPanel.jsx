@@ -3,6 +3,10 @@ import { useState, useMemo } from "react";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
 
+// The Players page fetches /players/leaders?view=table, which returns only
+// the fields in backend PlayerLeaderTableRow (response_models/players.py).
+// A new column here needs its field added to PlayerLeaderTableRow too, or
+// it will render blank.
 const SKATER_COLUMNS = [
   { key: "points", label: "PTS" },
   { key: "goals", label: "G" },

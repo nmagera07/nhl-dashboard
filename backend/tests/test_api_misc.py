@@ -196,3 +196,52 @@ class TestPredictionTrackRecord:
         body = client.get("/predictions/track-record").json()
         assert body["games"] == 1 and body["favorite_won"] == 1.0 and body["pending"] == 3
         assert body["recent"][0]["home"] == "PIT"
+
+
+def _sim_team(conf, w, l, otl):
+    return {"points": 2 * w + otl, "wins": w, "losses": l, "ot_losses": otl, "regulation_wins": w,
+            "division": conf[0], "conference": conf}
+
+
+class TestPlayoffLine:
+    def test_returns_the_sim_line_and_each_teams_record(self, client, db_router):
+        payload = {
+            "season_id": 20262027, "as_of_date": "2026-10-13", "games": [["2026-10-14", "BUF", "BOS"]],
+            "cutline": {"Eastern": {"p25": 92, "p50": 95, "p75": 98}},
+            "teams": {"BUF": _sim_team("Eastern", 3, 3, 0), "NEW": _sim_team("Eastern", 0, 0, 0)},
+        }
+        db_router.when("from season_sim_inputs", [{"payload": payload}])
+
+        body = client.get("/playoff-line").json()
+
+        assert body["source"] == "sim"
+        assert body["as_of_date"] == "2026-10-13"
+        assert body["games_remaining"] == 1
+        assert body["cutline"] == {"Eastern": {"p25": 92, "p50": 95, "p75": 98}}
+        assert body["season_games"] == 84
+        assert body["teams"]["BUF"] == {"conference": "Eastern", "gp": 6, "pts": 6, "otl": 0, "point_pctg": 0.5, "games_left": 1}
+        assert body["teams"]["NEW"]["games_left"] == 0
+        assert body["teams"]["NEW"]["point_pctg"] is None
+
+    def test_older_payloads_fall_back_to_projecting_the_eighth_team(self, client, db_router):
+        teams = {f"T{i}": _sim_team("Western", i, 10 - i, 0) for i in range(10)}
+        db_router.when("from season_sim_inputs", [{"payload": {"season_id": 20262027, "as_of_date": "2026-10-13", "teams": teams, "games": []}}])
+
+        body = client.get("/playoff-line").json()
+
+        # 8th best is T2: 4 pts in 10 GP -> .200 x 168 (84 games) = 33.6 -> 34
+        assert body["source"] == "projection"
+        assert body["cutline"]["Western"] == {"p25": 34, "p50": 34, "p75": 34}
+
+    def test_season_length_follows_the_season(self):
+        from seasons import season_games
+        assert season_games(20252026) == 82 and season_games(20262027) == 84 and season_games(None) == 82
+
+    def test_404_before_the_first_run(self, client, db_router):
+        db_router.when("from season_sim_inputs", [])
+
+        assert client.get("/playoff-line").status_code == 404
+
+    def test_is_cacheable_daily_data(self, client, db_router):
+        import api
+        assert api._daily_cacheable("/playoff-line")

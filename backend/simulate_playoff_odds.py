@@ -409,7 +409,49 @@ def determine_playoff_teams(trial_standings, divisions, conferences):
     return playoff_teams
 
 
-def simulate(standings, schedule, trials, ratings, rng=random):
+def conference_cutlines(trial_standings, divisions, conferences):
+    """
+    The playoff line for one trial: the points of the second wild card (the
+    last team in) in each conference, ranked like determine_playoff_teams().
+    """
+    leftovers = defaultdict(list)
+    for division_teams in divisions.values():
+        ranked = sorted(division_teams, key=lambda a: _tiebreak_key(trial_standings[a]))
+        leftovers[conferences[ranked[0]]].extend(ranked[3:])
+    lines = {}
+    for conf, teams in leftovers.items():
+        ranked = sorted(teams, key=lambda a: _tiebreak_key(trial_standings[a]))
+        if len(ranked) >= 2:
+            lines[conf] = trial_standings[ranked[1]]["points"]
+    return lines
+
+
+def _percentile(sorted_values, q):
+    """Nearest-rank-ish linear interpolation on an already sorted list."""
+    if not sorted_values:
+        return None
+    pos = (len(sorted_values) - 1) * q
+    lo = int(pos)
+    hi = min(lo + 1, len(sorted_values) - 1)
+    return sorted_values[lo] + (sorted_values[hi] - sorted_values[lo]) * (pos - lo)
+
+
+def summarize_cutlines(samples):
+    """{conference: [points per trial]} -> {conference: {p25, p50, p75}}, rounded to 0.5."""
+    out = {}
+    for conf, values in samples.items():
+        ordered = sorted(values)
+        out[conf] = {f"p{int(q * 100)}": round(_percentile(ordered, q) * 2) / 2 for q in (0.25, 0.5, 0.75)}
+    return out
+
+
+def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None):
+    """
+    Monte Carlo playoff odds. If `cutline_out` is a dict, it's filled with
+    the playoff line per conference ({conference: {p25, p50, p75}} in points)
+    from the same trials -- no extra simulation or queries.
+    """
+    cutline_samples = defaultdict(list)
     divisions = defaultdict(list)
     conferences = {}
     for abbrev, s in standings.items():
@@ -443,22 +485,31 @@ def simulate(standings, schedule, trials, ratings, rng=random):
                 trial[winner]["regulation_wins"] += 1
                 trial[winner]["row"] += 1
 
-        for team in determine_playoff_teams(trial, divisions, conferences):
+        playoff_teams = determine_playoff_teams(trial, divisions, conferences)
+        for team in playoff_teams:
             made_playoffs[team] += 1
+        if cutline_out is not None:
+            for conf, pts in conference_cutlines(trial, divisions, conferences).items():
+                cutline_samples[conf].append(pts)
+
+    if cutline_out is not None:
+        cutline_out.update(summarize_cutlines(cutline_samples))
 
     return {team: made_playoffs[team] / trials for team in standings}
 
 
-def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, players=None):
+def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, players=None, cutline=None):
     """
     Everything the in-browser season simulator needs to play out the rest
     of the season exactly like simulate() does: the game model's constants,
     each team's record and strength rating, and the remaining schedule.
     `why` (odds_explanations()) rides along for GET /playoff-odds/why, and
-    `players` (player_values.player_values()) for roster-change scenarios.
+    `players` (player_values.player_values()) for roster-change scenarios,
+    and `cutline` (from simulate()) for GET /playoff-line.
     """
     return {
         "why": why or {},
+        "cutline": cutline or {},
         "players": {str(pid): v for pid, v in (players or {}).items()},
         "season_id": season_id,
         "as_of_date": str(as_of_date),
@@ -597,14 +648,16 @@ def main():
     logger.info(f"{len(schedule)} remaining games to simulate across {args.trials} trials")
 
     started = time.time()
-    odds = simulate(standings, schedule, args.trials, ratings)
+    cutline = {}
+    odds = simulate(standings, schedule, args.trials, ratings, cutline_out=cutline)
+    logger.info(f"Playoff line by conference: {cutline}")
     logger.info(f"Simulated in {time.time() - started:.1f}s")
 
     if not args.no_save:
         save_odds(odds, args.season, args.as_of, args.trials)
         why = odds_explanations(ratings, parts, games, args.as_of)
         players = compute_player_values(args.season)
-        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why, players=players))
+        save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why, players=players, cutline=cutline))
 
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
         mean, _ = ratings[team]

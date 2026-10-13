@@ -1,5 +1,7 @@
 """GET /players/leaders and GET /players/{player_id}."""
 
+from response_models import LEADER_TABLE_FIELDS, PlayerLeader
+
 
 class TestPlayerLeaders:
     def test_happy_path(self, client, db_router, roster_skater_row):
@@ -20,6 +22,68 @@ class TestPlayerLeaders:
 
         assert response.status_code == 200
         assert response.json() == []
+
+    @staticmethod
+    def _leader_rows(roster_skater_row):
+        skater = dict(roster_skater_row, team_name="Colorado Avalanche", team_logo_url="https://x/COL.svg")
+        second = dict(skater, player_id=8478402, first_name="Connor", last_name="McDavid", team_abbrev="EDM",
+                      team_name="Edmonton Oilers", team_logo_url=None, points=100)
+        goalie = dict(skater, player_id=8476945, first_name="Connor", last_name="Hellebuyck", position_code="G",
+                      team_abbrev="WPG", team_name="Winnipeg Jets", goals=None, assists=None, points=None,
+                      wins=47, losses=12, ot_losses=3, goals_against_avg=2.0, save_pctg=0.925, shutouts=8)
+        return [skater, second, goalie]
+
+    def test_default_returns_every_player_leader_field(self, client, db_router, roster_skater_row):
+        db_router.when("t.logo_url as team_logo_url", self._leader_rows(roster_skater_row))
+
+        body = client.get("/players/leaders").json()
+
+        assert len(PlayerLeader.model_fields) == 38
+        for row in body:
+            assert set(row) == set(PlayerLeader.model_fields)
+
+    def test_view_full_matches_default(self, client, db_router, roster_skater_row):
+        db_router.when("t.logo_url as team_logo_url", self._leader_rows(roster_skater_row))
+
+        default = client.get("/players/leaders")
+        full = client.get("/players/leaders?view=full")
+
+        assert full.status_code == 200
+        assert full.json() == default.json()
+
+    def test_view_table_has_only_table_fields(self, client, db_router, roster_skater_row):
+        db_router.when("t.logo_url as team_logo_url", self._leader_rows(roster_skater_row))
+
+        response = client.get("/players/leaders?view=table")
+
+        assert response.status_code == 200
+        assert len(LEADER_TABLE_FIELDS) == 19
+        for row in response.json():
+            assert set(row) == set(LEADER_TABLE_FIELDS)
+
+    def test_view_table_same_rows_order_and_values_as_full(self, client, db_router, roster_skater_row):
+        db_router.when("t.logo_url as team_logo_url", self._leader_rows(roster_skater_row))
+
+        full = client.get("/players/leaders").json()
+        table = client.get("/players/leaders?view=table").json()
+
+        assert len(table) == len(full) == 3
+        assert [r["player_id"] for r in table] == [r["player_id"] for r in full]
+        for t, f in zip(table, full):
+            assert t == {k: f[k] for k in LEADER_TABLE_FIELDS}
+
+    def test_unknown_view_is_422(self, client, db_router):
+        db_router.when("t.logo_url as team_logo_url", [])
+
+        assert client.get("/players/leaders?view=bogus").status_code == 422
+
+    def test_empty_result_both_views(self, client, db_router):
+        db_router.when("t.logo_url as team_logo_url", [])
+
+        for url in ("/players/leaders?view=full", "/players/leaders?view=table"):
+            response = client.get(url)
+            assert response.status_code == 200
+            assert response.json() == []
 
 
 class TestPlayerDetail:

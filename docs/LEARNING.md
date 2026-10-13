@@ -153,6 +153,55 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — Who's in net: a second null result, and a feature that didn't need a model
+
+**The model question:** the goalie part of the prior weights each goalie by *last* season's
+games, so a team whose starter got hurt still counts him all season. The fix seemed
+obvious: blend in this season's starts. I pulled every goalie's game log for 4 seasons
+(406 NHL API calls, cached) so the backtest could count starts *as of* each checkpoint.
+
+**Result: worse, monotonically.** The more weight on this season's starts, the worse the
+Brier (5 → 0.1127, 20 → 0.1122, 80 → 0.1117, never → 0.1114). Half of each rating is this
+season's actual goals, and goals against already show who's been in net. A backup who has
+been starting is already in the rating, so moving the prior too counts it twice. That's
+two null results in a row (aging, then this), and both times the model was already right
+for a reason I hadn't spelled out.
+
+**The feature Nate wanted is about the game, not the model:** "show the lines for each
+game".
+- *Tonight's* projected lines and starting goalies come from sites like DailyFaceoff. That
+  means scraping, which their terms don't allow and which breaks when their pages change.
+  The NHL API only flags the starting goalie once the game begins.
+- *Games in net so far* was already in the NHL's pregame feed (`goalieSeasonStats`).
+- *Lines, version 1:* MoneyPuck's `lines.csv`, the most-used 5-on-5 combinations this
+  season.
+- *Lines, version 2 (shipped):* Nate asked "how do we know these lines are current?", and
+  the honest answer was that we didn't. Season totals rank by cumulative ice time, so a line
+  broken up after three games could still top the list. The NHL publishes every shift of
+  every game. From the last game's shifts, keep the seconds when both teams had exactly 5
+  skaters (so power-play units don't blur the lines), add up each pair of teammates' time
+  together, and pick the trios and pairs with the most, each player once. On real data it
+  gave four clean lines and three pairs, and it showed Washington's new top line
+  (Ovechkin–A. Protas–I. Protas), which the season view didn't have at all. The card names
+  the game the lines came from.
+
+**What looking at real data caught:** the first version worked in tests and read wrong on
+a real game. MoneyPuck drops accents ("Slafkovsk"), Washington has two Protases
+("Protas – Protas – Kyrou"), and the top combinations repeated players. The fixes, which
+carried into version 2: names from the game's box score (first initial only when
+teammates share a last name), and a greedy pick that uses each player once, so it reads
+like a lineup. The UI is collapsed under the preview and fetches only when opened.
+
+**Lessons:**
+- *Before changing a model input, ask what already carries that information.* This
+  season's goals already knew who was in net.
+- *Separate "what the user wants to see" from "what the model needs".* The lines were a
+  display feature; they didn't need to move the odds to be useful.
+- *Check on real data before shipping a UI that shows names.* Fixtures don't have accents
+  or brothers.
+- *"Is this current?" is a question about the data's definition, not its timestamp.* Data
+  refreshed nightly can still describe the wrong period.
+
 ## 2026-10-13 — Aging curves: a real effect, the wrong direction (a null result)
 
 **The idea:** a 24-year-old usually improves and a 34-year-old declines, but the prior

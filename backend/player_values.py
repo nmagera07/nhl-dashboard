@@ -184,17 +184,36 @@ def goalie_rates(last, before_last, shrink=GOALIE_SHRINK_GAMES):
     return rates
 
 
-def team_goalie_strength(rates, last, rosters):
+def team_goalie_strength(rates, last, rosters, starts=None, prior_starts=None):
     """
     {team: goals/game its goalies save vs. a league-average tandem}: each
-    rostered goalie's rate weighted by his starts last season (a newcomer
+    rostered goalie's rate weighted by who's expected in net (a newcomer
     gets GOALIE_NEWCOMER_GAMES at replacement level), centered on the
     league. The xG prior has no goaltending in it at all (xG only measures
     shots), so this is added in full, not as a change.
+
+    Expected starts: with `starts` ({player_id: starts for his team this
+    season}), each goalie's weight is his share of the team's games last
+    season times `prior_starts`, plus his starts so far. Preseason that's
+    last season's split; as games are played, this season's usage takes
+    over, so a new starter rises and an injured one fades. Without
+    `starts`, it's last season's games alone.
+
+    The model doesn't pass `starts`: backtested 2026-10, every weighting of
+    this season's starts was worse (the more weight, the worse), likely
+    because this season's goals, half of each rating, already show who's
+    been in net. Kept for the backtest ("roster+goalie-starts").
     """
+    last_games = {pid: last.get(pid, {}).get("gp", 0) or GOALIE_NEWCOMER_GAMES for pid in rosters}
+    team_last = defaultdict(float)
+    for pid, team in rosters.items():
+        team_last[team] += last_games[pid]
     totals = defaultdict(lambda: [0.0, 0.0])
     for pid, team in rosters.items():
-        weight = last.get(pid, {}).get("gp", 0) or GOALIE_NEWCOMER_GAMES
+        if starts is None:
+            weight = last_games[pid]
+        else:
+            weight = prior_starts * last_games[pid] / team_last[team] + starts.get(pid, 0)
         totals[team][0] += weight * rates.get(pid, GOALIE_REPLACEMENT)
         totals[team][1] += weight
     level = {t: s / w for t, (s, w) in totals.items() if w}

@@ -349,6 +349,20 @@ CREATE TABLE IF NOT EXISTS playoff_odds (
 
 CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
     ON playoff_odds (season_id, as_of_date);
+-- Each team's forward lines and defense pairs from its last completed game,
+-- worked out from NHL shift charts. One row per team, replaced when the team
+-- plays again; created (and granted to the API role) by the job itself.
+-- See team_lines.py.
+CREATE TABLE IF NOT EXISTS team_lines (
+    team_abbrev             VARCHAR(3) PRIMARY KEY,
+    game_id                 BIGINT NOT NULL,
+    game_date               DATE NOT NULL,
+    opponent                VARCHAR(3) NOT NULL,
+    home                    BOOLEAN NOT NULL,
+    payload                 JSONB NOT NULL,
+    updated_at              TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- MoneyPuck's playoff odds, logged daily next to playoff_odds (same
 -- as_of_date = same games seen) for a head-to-head score. Created by the
 -- daily job itself; see moneypuck_odds.py.

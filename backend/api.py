@@ -16,6 +16,7 @@ generates this automatically from the code below).
 
 import asyncio
 from collections import OrderedDict
+import json
 import os
 import re
 import threading
@@ -914,6 +915,45 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
         conn.commit()
     except Exception:
         logger.error("Failed to delete push subscription", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/teams/{team_abbrev}/lines")
+@daily_cached
+def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
+    """
+    The team's forward lines and defense pairs from its last completed game
+    (worked out from NHL shift charts by team_lines.py), with which game
+    that was. Not tonight's confirmed lineup. game is null and the lists
+    are empty before the team's first game or the first daily run.
+    """
+    abbrev = team_abbrev.upper()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM teams WHERE team_abbrev = %s", (abbrev,))
+            if not cur.fetchone():
+                raise HTTPException(status_code=404, detail=f"No team found with abbreviation '{team_abbrev}'")
+            try:
+                cur.execute(
+                    "SELECT game_id, game_date, opponent, home, payload FROM team_lines WHERE team_abbrev = %s",
+                    (abbrev,),
+                )
+                row = cur.fetchone()
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()  # the daily job hasn't created the table yet
+                row = None
+        if not row:
+            return {"team": abbrev, "game": None, "lines": [], "pairs": []}
+        payload = row["payload"] if isinstance(row["payload"], dict) else json.loads(row["payload"])
+        game = {"id": row["game_id"], "date": str(row["game_date"]), "opponent": row["opponent"], "home": row["home"]}
+        return {"team": abbrev, "game": game, "lines": payload.get("lines", []), "pairs": payload.get("pairs", [])}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error(f"Failed to fetch lines for {abbrev}", exc_info=True)
         raise
     finally:
         conn.close()

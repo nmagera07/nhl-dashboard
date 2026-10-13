@@ -87,6 +87,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Added expected-goals (xG) data to the model and proved the gain with
   leave-one-season-out backtesting on as-of data (no lookahead): a further
   3.7% lower Brier overall and 7.6% early in the season.
+- Made the model's preseason prior roster-aware (last season's strength plus the value of
+  players gained minus players lost), backtested over 4 seasons: 2.6% lower Brier overall,
+  4.9% on Nov 1, never worse at any checkpoint; caught and fixed a data gap where the NHL's
+  roster feed dropped injured players, which had counted a team's best forward as departed.
 
 - Built an in-browser season simulator by porting the Monte Carlo model to
   JavaScript, validated against the Python original over 10,000 simulated
@@ -144,6 +148,56 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   parallel, with graceful degradation when the optional feeds fail.
 
 ---
+
+## 2026-10-13 — Roster-aware priors: last season's team isn't this season's team
+
+**The problem:** in October the model leans on last season. With 3 games played, about 90%
+of a team's rating is last season's xG differential, halved. So a team that lost three
+top-six forwards in the summer was rated like the team that had them, and a team that
+signed two good ones got no credit until the games caught up (by midseason).
+
+**What changed (model v2.2):** the prior is now *last season's strength + roster moves*.
+Every skater already has a value in goals/game over replacement (the trade simulator's
+`player_values.py`). For each team: add the value of skaters who arrived, subtract the
+value of those who left, each weighted by how much of last season he played (a regular
+who leaves costs more than a call-up). Players who stayed cancel out. Rookies and players
+from Europe count as replacement level (0), which is the honest default with no NHL data.
+
+**How I knew it was better (backtest first, then ship):**
+- 4 seasons x 5 checkpoints, as-of data (values use only the two seasons *before*, so no
+  peeking). Compared against the live v2.1 model, not just the old goals-only one.
+- Weight grid 0 to 1.5. The best was **1.0**: the player values work at face value, with
+  no fudge factor. That's a good sign the trade-simulator calibration (r = 0.86 against
+  team goal differential) was right.
+- Results: 2.6% lower Brier overall; Nov 1: 0.1551 → 0.1475 (4.9%); never worse at any
+  checkpoint; leave-one-season-out better on 3 of 4 held-out seasons.
+- Known leak, documented: MoneyPuck lists a traded player under his *last* team, so in the
+  backtest deadline deals leak in slightly. Most moves are summer moves, and the gain is
+  biggest in November, before the deadline.
+
+**The bug the dry run caught:** before shipping I ran today's model without saving and
+listed the players behind the biggest swings. Carolina was the second-biggest "loser",
+because Seth Jarvis and Alexander Nikishin "left for no team". They hadn't: the NHL's
+`roster/current` feed leaves out injured reserve, and our `on_roster` flag comes from it.
+The player landing endpoint has `currentTeamAbbrev` (set for injured players, empty for
+retired or unsigned ones: Kopitar, Tarasenko), so the model now looks up any missing
+regular big enough to matter (29 players, ~6 seconds). Carolina went from "lost 0.28
+goals/game" to about even.
+
+**Lessons:**
+- *Read the rows, not just the summary.* The backtest number was fine; the bug only showed
+  up when I asked "which players make up this −0.28?".
+- *A feature's data source can mean something narrower than its name.* "Current roster"
+  meant "active roster", and that's fine for a roster page but wrong for a season prior.
+- *Reuse the unit.* Because player values and team ratings were built in the same unit
+  (goals/game), the roster prior was ~30 lines plus a backtest, not a new model.
+
+**Interview framing:** "In October, my model was mostly last season's team. I folded in
+roster moves using player values I'd already calibrated for a trade simulator, backtested
+it against the live model on four seasons without lookahead, and the best weight was 1.0,
+so the values held up at face value. Early-season error dropped 5%. A dry run then caught
+injured players being counted as departures, which came down to the NHL's roster feed
+meaning 'active roster'."
 
 ## 2026-10-11 — A security audit: scanners first, then the parts scanners can't see
 

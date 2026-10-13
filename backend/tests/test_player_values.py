@@ -55,3 +55,26 @@ class TestPlayerValues:
                 2: {"name": "Retired", "team": "DET", "pos": "C", "gp": 82, "gs": 40.0}}
         values = pv.player_values({}, prev, rosters={1: "TOR"})
         assert list(values) == [1] and values[1]["team"] == "TOR"
+
+
+class TestRosterStrengthChange:
+    def _p(self, team, gp=82, gs=82.0, pos="C"):
+        return {"name": "X", "team": team, "pos": pos, "gp": gp, "gs": gs}
+
+    def test_a_move_costs_one_team_what_the_other_gains(self):
+        last = {1: self._p("DET"), 2: self._p("DET")}
+        change = pv.roster_strength_change(last, {}, rosters={1: "TOR", 2: "DET"})
+        value = pv.player_values(last, {})[1]["value"]
+        assert change == pytest.approx({"DET": -value, "TOR": value})
+
+    def test_departures_count_and_part_timers_count_less(self):
+        last = {1: self._p("DET"), 2: self._p("BOS", gp=41, gs=41.0)}
+        change = pv.roster_strength_change(last, {}, rosters={})
+        values = pv.player_values(last, {})
+        assert change == pytest.approx({"DET": -values[1]["value"], "BOS": -values[2]["value"] * 41 / 82})
+
+    def test_a_relocated_franchise_keeps_its_roster(self):
+        last = {1: self._p("ARI")}
+        assert pv.roster_strength_change(last, {}, rosters={1: "UTA"}) == {}
+        # ...but not in a season when the old team still exists
+        assert set(pv.roster_strength_change(last, {}, rosters={1: "ARI", 2: "UTA"})) == set()

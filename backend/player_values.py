@@ -118,6 +118,36 @@ def player_values(current, previous, rosters=None):
     return out
 
 
+# Relocated franchises: last season's roster counts toward the new team.
+FRANCHISE_MOVES = {"ARI": "UTA"}
+FULL_SEASON_GP = 82
+
+
+def roster_strength_change(last, before_last, rosters):
+    """
+    {team: goals/game gained (+) or lost (-) to roster moves since last
+    season}. Each skater counts at his value (from last season and the one
+    before) times his share of a full season played last year, so a regular
+    who leaves costs more than a call-up. Players who stayed cancel out;
+    newcomers with no NHL history count as replacement level (0).
+    `rosters` is {player_id: team} now.
+    """
+    change = defaultdict(float)
+    teams_now = set(rosters.values())
+    for pid, v in player_values(last, before_last).items():
+        played = min(last.get(pid, {}).get("gp", 0) / FULL_SEASON_GP, 1.0)
+        if not played:
+            continue
+        old_team = v["team"] if v["team"] in teams_now else FRANCHISE_MOVES.get(v["team"], v["team"])
+        new_team = rosters.get(pid)
+        if new_team == old_team:
+            continue
+        change[old_team] -= v["value"] * played
+        if new_team:
+            change[new_team] += v["value"] * played
+    return dict(change)
+
+
 def calibrate(years):
     """Refit GS_TO_GOALS (team GD/game on team Game Score/game) and the replacement levels."""
     xs, ys, fringe = [], [], defaultdict(lambda: [0.0, 0])

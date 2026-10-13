@@ -55,6 +55,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import push
+from daily_cache import cache as daily_cache, daily_cached
 import season_scenarios
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
@@ -144,6 +145,7 @@ def compute_staleness(last_updated, now, threshold_hours):
 
 
 async def check_ingestion_freshness_loop():
+    last_seen = None
     while True:
         try:
             conn = get_connection()
@@ -153,6 +155,13 @@ async def check_ingestion_freshness_loop():
                     last_updated = as_utc(cur.fetchone()["last_updated"])
             finally:
                 conn.close()
+
+            # New standings rows mean the daily ingest has run: drop cached
+            # responses now rather than waiting out their TTL.
+            if last_seen is not None and last_updated != last_seen:
+                daily_cache.clear()
+                logger.info("New ingest detected -- cleared the daily response cache")
+            last_seen = last_updated
 
             is_stale, hours_old = compute_staleness(
                 last_updated, datetime.now(timezone.utc), INGESTION_STALE_THRESHOLD_HOURS
@@ -415,6 +424,7 @@ def team_schedule_summary(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")
 
 
 @app.get("/teams", response_model=List[Team])
+@daily_cached
 def list_teams():
     """List all teams we have data for."""
     conn = get_connection()
@@ -431,6 +441,7 @@ def list_teams():
 
 @app.get("/playoff-odds", response_model=List[PlayoffOdds])
 @limiter.limit(EXPENSIVE_RATE_LIMIT)
+@daily_cached
 def playoff_odds(request: Request):
     """
     Monte Carlo playoff-odds simulation results for every team, as of the
@@ -459,6 +470,7 @@ def playoff_odds(request: Request):
 
 @app.get("/playoff-odds/history", response_model=PlayoffOddsHistory)
 @limiter.limit(EXPENSIVE_RATE_LIMIT)
+@daily_cached
 def playoff_odds_history(request: Request, season_id: Optional[int] = Query(None, ge=19171918, le=99999999)):
     """
     Every odds snapshot for one season (default: the latest season with
@@ -494,6 +506,7 @@ def playoff_odds_history(request: Request, season_id: Optional[int] = Query(None
 
 @app.get("/season-sim")
 @limiter.limit(EXPENSIVE_RATE_LIMIT)
+@daily_cached
 def season_sim_inputs(request: Request):
     """
     Inputs for the in-browser season simulator, for the latest season: the
@@ -517,6 +530,7 @@ def season_sim_inputs(request: Request):
 
 
 @app.get("/playoff-odds/why")
+@daily_cached
 def playoff_odds_why():
     """
     "Why these odds?": each team's rating split into this season's goals,
@@ -534,6 +548,7 @@ def playoff_odds_why():
 
 
 @app.get("/digest/latest")
+@daily_cached
 def latest_digest():
     """
     The most recent morning digest: AI-written text (or null if the AI was
@@ -555,6 +570,7 @@ def latest_digest():
 
 
 @app.get("/predictions/track-record")
+@daily_cached
 def prediction_track_record():
     """
     How the model's game predictions have done this season: how often its
@@ -832,6 +848,7 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
 
 
 @app.get("/teams/{team_abbrev}/roster", response_model=List[RosterPlayer])
+@daily_cached
 def team_roster(team_abbrev: str = Path(..., max_length=3)):
     """
     Current roster for one team, with each player's latest season stats.
@@ -885,6 +902,7 @@ _LEADER_TABLE_ADAPTER = TypeAdapter(List[PlayerLeaderTableRow])
 
 @app.get("/players/leaders", response_model=List[PlayerLeader])
 @limiter.limit(EXPENSIVE_RATE_LIMIT)
+@daily_cached
 def player_leaders(request: Request, view: Literal["full", "table"] = Query("full")):
     """
     Every rostered player with their latest season stats, for the league
@@ -1063,6 +1081,7 @@ STANDINGS_SORT_FIELDS = {
 
 
 @app.get("/standings/latest", response_model=List[StandingsLatestRow])
+@daily_cached
 def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
     """
     Most recent day's standings for every team, joined with this season's
@@ -1118,6 +1137,7 @@ def latest_standings(sort_by: Optional[str] = None, sort_dir: str = "desc"):
 
 
 @app.get("/standings/{team_abbrev}/seasons", response_model=List[SeasonFinalStanding])
+@daily_cached
 def team_season_history(team_abbrev: str = Path(..., max_length=3)):
     """
     Final standings for one team across past completed seasons, e.g.
@@ -1152,6 +1172,7 @@ def team_season_history(team_abbrev: str = Path(..., max_length=3)):
 
 
 @app.get("/standings/{team_abbrev}", response_model=List[StandingsHistoryRow])
+@daily_cached
 def team_history(
     team_abbrev: str = Path(..., max_length=3), start: Optional[date] = None, end: Optional[date] = None
 ):

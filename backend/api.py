@@ -573,6 +573,7 @@ def _fallback_cutline(teams, full_season):
 
 
 @app.get("/playoff-line")
+@daily_cached
 def playoff_line():
     """
     The playoff line (points of the last wild card at season's end) per

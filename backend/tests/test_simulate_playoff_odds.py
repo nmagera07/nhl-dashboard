@@ -459,3 +459,46 @@ class TestOddsExplanations:
         assert why["GOOD"]["rating_rank"] == 1 and why["BAD"]["rating_rank"] == 2
         assert why["GOOD"]["schedule"]["rank"] == 1  # plays the weak team, at home
         assert why["GOOD"]["goal_diff"] == 6
+
+
+# ---------------------------------------------------------------------------
+# playoff line (cutline)
+# ---------------------------------------------------------------------------
+
+
+class TestCutline:
+    def test_records_a_line_per_conference_in_order(self):
+        standings = _league()
+        ratings = {t: (0.0, 0.3) for t in standings}
+        schedule = [(h, a) for h in standings for a in standings if h != a]
+        cutline = {}
+
+        simulate(standings, schedule, 300, ratings, rng=random.Random(11), cutline_out=cutline)
+
+        assert set(cutline) == {"East", "West"}
+        for line in cutline.values():
+            assert line["p25"] <= line["p50"] <= line["p75"]
+            assert line["p50"] > 0
+
+    def test_without_games_the_line_is_the_last_wild_cards_points(self):
+        standings = _league()
+        for i, team in enumerate(standings):
+            standings[team]["points"] = 10 + i
+        ratings = {t: (0.0, 0.0) for t in standings}
+        cutline = {}
+
+        simulate(standings, [], 10, ratings, rng=random.Random(1), cutline_out=cutline)
+
+        # East: A1-A5 = 10..14, B1-B5 = 15..19. Top 3 per division: A3-A5, B3-B5;
+        # leftovers A1, A2, B1, B2 -> wild cards B2 (16) and B1 (15): the line is 15.
+        assert cutline["East"] == {"p25": 15, "p50": 15, "p75": 15}
+
+    def test_odds_are_unchanged_by_recording_the_line(self):
+        standings = _league()
+        ratings = {t: (0.0, 0.3) for t in standings}
+        schedule = [(h, a) for h in standings for a in standings if h != a]
+
+        plain = simulate(standings, schedule, 100, ratings, rng=random.Random(5))
+        with_line = simulate(standings, schedule, 100, ratings, rng=random.Random(5), cutline_out={})
+
+        assert plain == with_line

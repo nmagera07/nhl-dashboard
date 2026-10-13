@@ -22,9 +22,9 @@ function scheduleWord(effect) {
 }
 
 // "Why these odds?": the team's rating split into what built it (this
-// season's goals and xG, last season's carryover) plus its remaining
-// schedule, each with which way it pushes. Opens under the selected row on
-// the Playoffs page. `why` is one team from GET /playoff-odds/why.
+// season's goals and xG, last season's carryover, roster moves since)
+// plus its remaining schedule, each with which way it pushes. Opens under
+// the selected row on the Playoffs page. `why` is one team from GET /playoff-odds/why.
 function OddsWhy({ pct, why, teams, status }) {
   if (status === "error") return <p className="odds-why-note">Couldn't load the breakdown.</p>;
   if (!why) {
@@ -63,6 +63,13 @@ function OddsWhy({ pct, why, teams, status }) {
           </dd>
           <dd><Effect value={why.last_season} /></dd>
         </div>
+        {Math.abs(why.roster_change_per_game ?? 0) >= NEUTRAL && (
+          <div>
+            <dt>Roster moves</dt>
+            <dd>{signed(why.roster_change_per_game, 2)} goals/game from players gained and lost since last season</dd>
+            <dd><Effect value={why.roster} /></dd>
+          </div>
+        )}
         {sched.games_left > 0 && (
           <div>
             <dt>Schedule</dt>

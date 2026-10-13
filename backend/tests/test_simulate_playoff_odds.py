@@ -386,7 +386,9 @@ from simulate_playoff_odds import (
     odds_explanations,
     rating_parts,
     schedule_strength,
+    missing_player_teams,
     team_ratings,
+    with_roster_change,
 )
 
 
@@ -413,12 +415,46 @@ class TestRatingParts:
         assert p["last_season_per_game"] == pytest.approx(0.1 / PRIOR_CARRYOVER)
         assert p["last_season_share"] == pytest.approx(PRIOR_GAMES_XG / (12 + PRIOR_GAMES_XG), abs=1e-3)
 
+    def test_roster_moves_are_their_own_part(self):
+        moves = {"PIT": 0.15, "UTA": -0.05}
+        priors = with_roster_change(self.priors, moves)
+        assert priors == pytest.approx({"PIT": 0.25, "BOS": -0.2, "UTA": -0.05})
+
+        ratings = team_ratings(blend_xg(self.standings, self.xgd), priors, prior_games=PRIOR_GAMES_XG)
+        parts = rating_parts(self.standings, self.xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT, moves)
+        pit, bos = parts["PIT"], parts["BOS"]
+        assert pit["goals"] + pit["xg"] + pit["last_season"] + pit["roster"] == pytest.approx(ratings["PIT"][0], abs=1e-3)
+        assert pit["last_season_per_game"] == pytest.approx(0.1 / PRIOR_CARRYOVER)  # unchanged by the moves
+        assert pit["roster_change_per_game"] == 0.15 and pit["roster"] > 0
+        assert bos["roster"] == 0 and bos["roster_change_per_game"] == 0
+
     def test_goals_only_fallback_has_no_xg_part(self):
         ratings = team_ratings(self.standings, self.priors)
         p = rating_parts(self.standings, {}, self.priors, PRIOR_GAMES, 0.0)["PIT"]
 
         assert p["xg"] is None and p["xg_diff"] is None
         assert p["goals"] + p["last_season"] == pytest.approx(ratings["PIT"][0], abs=1e-3)
+
+
+class TestMissingPlayerTeams:
+    values = {1: {"name": "Injured", "value": 0.2}, 2: {"name": "Retired", "value": 0.2},
+              3: {"name": "Fringe", "value": 0.005}, 4: {"name": "Rostered", "value": 0.2}, 5: {"name": "Broken", "value": 0.2}}
+    last = {pid: {"gp": 82} for pid in values}
+
+    def test_looks_up_only_regulars_missing_from_rosters(self):
+        asked = []
+
+        def get(url):
+            pid = int(url.split("/")[-2])
+            asked.append(pid)
+            if pid == 5:
+                raise RuntimeError("HTTP 500")
+            return {1: {"currentTeamAbbrev": "CAR"}, 2: {"isActive": False}}[pid]
+
+        found = missing_player_teams(self.values, self.last, {4: "PIT"}, get=get)
+
+        assert found == {1: "CAR"}           # injured, still signed; retired and failed lookups stay gone
+        assert sorted(asked) == [1, 2, 5]    # fringe player and rostered player skipped
 
 
 class TestScheduleStrength:

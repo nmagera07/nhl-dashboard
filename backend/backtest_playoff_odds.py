@@ -13,6 +13,8 @@ grid of PRIOR_GAMES / TALENT_SD settings; used to choose those constants.
 Usage:
     python backtest_playoff_odds.py
     python backtest_playoff_odds.py --seasons 20242025 --trials 2000
+    python backtest_playoff_odds.py --only-production --cache-dir .bt --xg-file all_teams.csv \
+        --skaters-dir mp/   # roster-aware priors (MoneyPuck skaters_{year}.csv files)
 """
 
 import argparse
@@ -26,6 +28,7 @@ from datetime import date
 
 import psycopg2
 
+import player_values as player_values_mod
 import simulate_playoff_odds as sim
 
 CHECKPOINTS = ["11-01", "12-01", "01-01", "02-01", "03-01"]
@@ -165,6 +168,25 @@ def blended_standings(standings, xgd_totals, weight):
     return out
 
 
+ROSTER_BETAS = (0.0, 0.5, 1.0, 1.25, 1.5)
+_roster_change = {}
+
+
+def roster_change(skaters_dir, start):
+    """Goals/game each team gained or lost to roster moves before season
+    `start`, from MoneyPuck season files: values use only the two seasons
+    before, and the roster is each skater's team that season. (MoneyPuck
+    lists a traded player under his last team, so deadline deals leak in
+    slightly; most moves are summer moves.)"""
+    if start not in _roster_change:
+        def load(year):
+            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
+                return player_values_mod.season_game_scores(f.read())
+        rosters = {pid: p["team"] for pid, p in load(start).items()}
+        _roster_change[start] = player_values_mod.roster_strength_change(load(start - 1), load(start - 2), rosters)
+    return _roster_change[start]
+
+
 def calibration_table(pairs, buckets=10):
     """pairs: [(predicted, actual)]. Rows: bucket, n, mean predicted, observed rate."""
     rows = []
@@ -188,6 +210,8 @@ def main():
                         help='xG column variants to compare, e.g. "" scoreVenueAdjusted flurryScoreVenueAdjusted')
     parser.add_argument("--goalie-split", action="store_true",
                         help="Score separate finishing/goaltending weights (needs --xg-file)")
+    parser.add_argument("--skaters-dir", default=None,
+                        help="Folder of MoneyPuck skaters_{year}.csv files to score roster-aware priors (needs --xg-file)")
     parser.add_argument("--only-production", action="store_true", help="Skip the v2 grid; score v1, production, and xG variants")
     args = parser.parse_args()
 
@@ -219,6 +243,18 @@ def main():
                         priors = {t: c * v for t, v in base.items()}
                         ratings = sim.team_ratings(blended_standings(standings, xgd_now, w), priors, prior_games=k, talent_sd=sd)
                         runs[f"{label} w={w} K={k} prior={prior_src}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                if xg is not None and args.skaters_dir:
+                    games_by_season = xg[args.xg_measures[0]]
+                    start = season_id // 10000
+                    prior_xgd = season_xgd_per_game(games_by_season[start - 1])
+                    xgd_now = xg_diff_as_of(games_by_season[start], cp["date"])
+                    change = roster_change(args.skaters_dir, start)
+                    c, _, sd = PRODUCTION
+                    for beta in ROSTER_BETAS:
+                        for k in (30, 45):
+                            priors = {t: c * prior_xgd.get(t, 0.0) + beta * change.get(t, 0.0) for t in standings}
+                            ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=k, talent_sd=sd)
+                            runs[f"roster b={beta} K={k}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
                 if xg is not None and args.goalie_split:
                     games_by_season = xg[args.xg_measures[0]]
                     start = season_id // 10000
@@ -248,7 +284,7 @@ def main():
         return sum(vals) / len(vals)
 
     v2_models = [v2_name(*g) for g in grid]
-    xg_models = sorted(m for m in brier_by if m.startswith(("xg ", "xg[", "split ")))
+    xg_models = sorted(m for m in brier_by if m.startswith(("xg ", "xg[", "split ", "roster ")))
     sos_models = ["sos " + m for m in v2_models] if args.sos else []
     prod = v2_name(*PRODUCTION)
 
@@ -261,13 +297,14 @@ def main():
         print("\nWith MoneyPuck xG blended into team strength (all seasons x checkpoints):")
         for name in sorted(xg_models, key=mean):
             print(f"  {name:<30} {mean(name):.4f}")
-        print("  by checkpoint, production vs best xG:")
         best_xg = min(xg_models, key=mean)
+        live = "xg w=0.5 K=30 prior=xgd"  # v2.1, today's production model
+        live = live if live in brier_by else prod
+        print(f"  by checkpoint, {live} vs best xG:")
         for md in CHECKPOINTS:
-            label = md
-            p_vals = [b for (s_, d), b in brier_by[prod].items() if d.endswith(md)]
+            p_vals = [b for (s_, d), b in brier_by[live].items() if d.endswith(md)]
             x_vals = [b for (s_, d), b in brier_by[best_xg].items() if d.endswith(md)]
-            print(f"    {label}:  production {sum(p_vals) / len(p_vals):.4f}   {best_xg} {sum(x_vals) / len(x_vals):.4f}")
+            print(f"    {md}:  {sum(p_vals) / len(p_vals):.4f}   {best_xg} {sum(x_vals) / len(x_vals):.4f}")
     if sos_models:
         print("\nWith strength of schedule (top settings):")
         for name in sorted(sos_models, key=mean)[:5]:

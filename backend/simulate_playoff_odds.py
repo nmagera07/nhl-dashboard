@@ -1,5 +1,5 @@
 """
-Playoff Odds Simulator (v2.1: goals + MoneyPuck xG)
+Playoff Odds Simulator (v2.2: goals + MoneyPuck xG + roster moves)
 
 Monte Carlo simulation of the rest of the regular season to estimate each
 team's probability of making the playoffs.
@@ -11,6 +11,8 @@ How it works:
      pseudo-games. Early in the season the prior dominates; by midseason
      this season's results take over. If MoneyPuck is unreachable, it falls
      back to goals only (prior = last season's GD/game, PRIOR_GAMES).
+     v2.2 adds roster moves to the prior: the value of skaters who
+     arrived minus those who left (player_values.py).
      v1 used raw point %, which after a 4-0 start rated a team as
      near-unbeatable.
   2. Pull the remaining regular-season schedule from the NHL API.
@@ -68,7 +70,7 @@ MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
-MODEL_VERSION = "v2.1"       # logged with every game prediction (game_predictions.py)
+MODEL_VERSION = "v2.2"       # logged with every game prediction (game_predictions.py)
 
 # Game model -- fit by calibrate_playoff_model.py.
 HOME_EDGE = 0.264            # goals/game of home-ice advantage
@@ -88,6 +90,14 @@ TALENT_SD = 0.35             # spread of true strength (GD/game) with no data
 # prior = last season's xG differential per game.
 XG_WEIGHT = 0.5
 PRIOR_GAMES_XG = 30
+
+# Roster-aware prior (v2.2) -- backtested 2026-10 over 4 seasons: last
+# season's prior plus the goals/game each team gained or lost to roster
+# moves since (player_values.roster_strength_change). 2.6% better Brier
+# overall, 4.9% better on Nov 1, never worse at a checkpoint, better on 3
+# of 4 held-out seasons. Weight 1.0 (player values at face value) scored
+# best of 0 to 1.5.
+ROSTER_WEIGHT = 1.0
 
 DEFAULT_TRIALS = 10000
 
@@ -228,20 +238,23 @@ def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
     return team_ratings(blend_xg(standings, current), priors, prior_games=PRIOR_GAMES_XG)
 
 
-def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight):
+def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight, roster_change=None):
     """
     Each team's rating split into what pushed it there, in goals/game:
-    this season's goals, this season's xG, and last season's prior. The
-    three add up to the team_ratings() mean exactly. For the goals-only
-    fallback, pass xg_weight=0 (the xG part is then None).
+    this season's goals, this season's xG, last season's prior, and roster
+    moves since (already folded into `priors`; `roster_change` says how
+    much). The four add up to the team_ratings() mean exactly. For the
+    goals-only fallback, pass xg_weight=0 (the xG part is then None).
     """
+    roster_change = roster_change or {}
     parts = {}
     for abbrev, s in standings.items():
         gp = s["games_played"]
         gd = s.get("goal_differential", 0)
         xgd = xgd_totals.get(abbrev, (gd, None))[0] if xg_weight else None
         denom = gp + prior_games
-        prior = priors.get(abbrev, 0.0)
+        moves = roster_change.get(abbrev, 0.0)
+        prior = priors.get(abbrev, 0.0) - moves
         parts[abbrev] = {
             "games_played": gp,
             "goal_diff": gd,
@@ -252,6 +265,8 @@ def rating_parts(standings, xgd_totals, priors, prior_games, xg_weight):
             # Last season's per-game differential before the carryover haircut.
             "last_season_per_game": round(prior / PRIOR_CARRYOVER, 3),
             "last_season_share": round(prior_games / denom, 3),
+            "roster": round(prior_games * moves / denom, 4),
+            "roster_change_per_game": round(moves, 3),
         }
     return parts
 
@@ -547,6 +562,62 @@ def load_rosters():
             return dict(cur.fetchall())
 
 
+def roster_prior_change(season_id):
+    """
+    {team: goals/game gained or lost to roster moves since last season},
+    times ROSTER_WEIGHT, for the prior. Best effort: without it the prior
+    is last season's alone (the v2.1 model).
+    """
+    import player_values as pv
+
+    start = season_id // 10000
+    try:
+        last = pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 1))
+        before_last = pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 2))
+        rosters = load_rosters()
+        rosters.update(missing_player_teams(pv.player_values(last, before_last), last, rosters))
+        change = pv.roster_strength_change(last, before_last, rosters)
+    except Exception as exc:  # network, parse, or DB
+        logger.warning(f"Couldn't compute roster changes ({exc}); prior is last season's alone today")
+        return {}
+    return {t: round(ROSTER_WEIGHT * v, 4) for t, v in change.items()}
+
+
+PLAYER_LANDING_URL = "https://api-web.nhle.com/v1/player/{player_id}/landing"
+MISSING_LOOKUP_MIN = 0.01  # goals/game: smaller departures aren't worth an API call
+
+
+def missing_player_teams(values, last, rosters, get=nhl_get):
+    """
+    {player_id: team} for last season's regulars missing from today's
+    rosters who still have a team. The NHL's current-roster feed leaves out
+    injured reserve, so without this an injured star (Seth Jarvis, Oct
+    2026) counted as gone for the season. The player's landing page has
+    his team (none if retired or unsigned). Best effort per player.
+    """
+    found = {}
+    for pid, v in values.items():
+        played = min(last.get(pid, {}).get("gp", 0) / 82, 1.0)
+        if pid in rosters or abs(v["value"] * played) < MISSING_LOOKUP_MIN:
+            continue
+        try:
+            team = get(PLAYER_LANDING_URL.format(player_id=pid)).get("currentTeamAbbrev")
+        except Exception as exc:  # one player's page failing shouldn't cost the rest
+            logger.warning(f"No landing page for {v['name']} ({exc}); counting him as gone")
+            continue
+        if team:
+            found[pid] = team
+    if found:
+        logger.info(f"{len(found)} skaters off the current-roster feed but still signed (injured reserve, etc.)")
+    return found
+
+
+def with_roster_change(priors, change):
+    """Priors plus each team's roster change (a team new to the league
+    gets its change alone)."""
+    return {t: priors.get(t, 0.0) + change.get(t, 0.0) for t in set(priors) | set(change)}
+
+
 def compute_player_values(season_id):
     """
     Skater values for roster-change scenarios. Best effort: the odds don't
@@ -635,8 +706,13 @@ def main():
     if xg_inputs is not None:
         logger.info("Using the goals + MoneyPuck xG model")
         current_xgd, priors = xg_inputs
+        moves = roster_prior_change(args.season)
+        priors = with_roster_change(priors, moves)
         ratings = team_ratings(blend_xg(standings, current_xgd), priors, prior_games=PRIOR_GAMES_XG)
-        parts = rating_parts(standings, current_xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT)
+        parts = rating_parts(standings, current_xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT, moves)
+        if moves:
+            biggest = sorted(moves.items(), key=lambda kv: -abs(kv[1]))[:5]
+            logger.info("Roster changes (goals/game): " + ", ".join(f"{t} {v:+.2f}" for t, v in biggest))
     else:
         priors = load_priors(args.season)
         logger.info(f"Goals-only model: {len(priors)} prior ratings from season {previous_season_id(args.season)}")

@@ -149,6 +149,13 @@ class TestTools:
         assert "above its chance quality" in pit["goals_vs_xg"]  # +4 goals on +0.2 xG in 5 games
         assert pit["last_season"]["weight_vs_this_season_pct"] == 86
         assert "matchup" not in result and "negligible" in result["how_to_read"]
+        assert "roster_moves" not in pit  # no moves in this fixture
+
+    async def test_explain_odds_includes_roster_moves(self, monkeypatch):
+        monkeypatch.setitem(WHY["teams"], "PIT", {**WHY_TEAM(0.2, 9), "roster": -0.09, "roster_change_per_game": -0.3})
+        pit = (await self.call("explain_odds", {"team": "PIT"}))["teams"][0]
+
+        assert pit["roster_moves"] == {"goals_per_game_gained_or_lost": -0.3, "effect": -0.09, "push": "pulls down"}
 
     async def test_explain_odds_compares_two_teams_and_their_next_meeting(self):
         result = await self.call("explain_odds", {"team": "PIT", "opponent": "COL"})

@@ -261,8 +261,9 @@ class ToolRunner:
         result = {
             "as_of": why.get("as_of_date"),
             "teams": [_breakdown(t, names.get(t), teams[t], pct.get(t), len(teams)) for t in (abbrev, opp) if t],
-            "how_to_read": "Rating = goals + xg + last_season + roster_moves (goals/game vs. an average team; roster_moves = "
-                           "value of players gained minus players lost since last season). 'push' says which way each "
+            "how_to_read": "Rating = goals + xg + last_season + roster_moves + goaltending (goals/game vs. an average team; "
+                           "roster_moves = value of players gained minus players lost since last season; goaltending = "
+                           "the current goalies' saves above expected vs. an average tandem). 'push' says which way each "
                            "factor moves the rating; use it as given, and say 'negligible' factors barely matter. Compare factors by "
                            "'effect', not weight: last_season.weight_vs_this_season_pct is how much the model still trusts "
                            "last season over this season's few games (it fades as games are played). Playoff "
@@ -500,6 +501,8 @@ def _breakdown(team: str, name: str | None, w: dict, playoff_pct: float | None, 
                         "effect": w.get("last_season"), "push": _push(w.get("last_season"))},
         "roster_moves": {"goals_per_game_gained_or_lost": w.get("roster_change_per_game"), "effect": w.get("roster"),
                          "push": _push(w.get("roster"))} if w.get("roster_change_per_game") else None,
+        "goaltending": {"goals_per_game_saved_vs_average_tandem": w.get("goalies_per_game"), "effect": w.get("goalies"),
+                        "push": _push(w.get("goalies"))} if w.get("goalies_per_game") else None,
         "schedule": {"games_left": sched.get("games_left"), "rank": f"{_ordinal(sched.get('rank'))} easiest of {league_size}",
                      "effect": sched.get("effect"), "push": _push(sched.get("effect"))} if sched.get("games_left") else None,
     })

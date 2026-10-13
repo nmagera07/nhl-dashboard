@@ -36,6 +36,7 @@ const WHY = {
     PIT: {
       games_played: 10, goal_diff: 5, xg_diff: 0.1, goals: 0.063, xg: 0.001, last_season: 0.12,
       last_season_per_game: 0.32, last_season_share: 0.75, roster: -0.09, roster_change_per_game: -0.12,
+      goalies: 0.002, goalies_per_game: 0.01,
       rating: 0.184, rating_rank: 9,
       schedule: { games_left: 74, home_games: 37, effect: -0.01, rank: 5 },
     },
@@ -123,6 +124,7 @@ describe("PlayoffsPage", () => {
     expect(screen.getByText("−0.12 goals/game from players gained and lost since last season")).toBeInTheDocument();
     expect(screen.getAllByText("▲ pushes up")).toHaveLength(2); // goals, last season
     expect(screen.getAllByText("▼ pulls down")).toHaveLength(1); // roster moves
+    expect(screen.queryByText("Goaltending")).not.toBeInTheDocument(); // +0.01: too small to show
     expect(screen.getAllByText("– little effect")).toHaveLength(2); // xG, schedule
 
     await userEvent.click(rowFor("PIT"));

@@ -148,6 +148,62 @@ def roster_strength_change(last, before_last, rosters):
     return dict(change)
 
 
+# Goalies: goals saved above expected (GSAx = xG against - goals against)
+# per 60 minutes, from MoneyPuck's goalie season summaries. Year to year it
+# barely repeats (r = 0.16 for 25+ GP, 2020-21 to 2025-26), so each goalie
+# is pulled hard toward the regular-goalie average, GOALIE_SHRINK_GAMES
+# pseudo-games of it. Fringe goalies (5-19 GP) run -0.217 per 60, and a
+# goalie with no NHL history counts at that level.
+MONEYPUCK_GOALIES_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/goalies.csv"
+GOALIE_AVERAGE = 0.0
+GOALIE_REPLACEMENT = -0.217
+GOALIE_SHRINK_GAMES = 100   # backtested: 100 beat 50 and 250 (simulate_playoff_odds.GOALIE_WEIGHT)
+GOALIE_NEWCOMER_GAMES = 5   # expected-starts weight for a goalie with no games last season
+
+
+def season_goalies(csv_text):
+    """{player_id: {"name", "team", "gp", "games", "gsax"}} ("games" = 60-minute games played)."""
+    out = {}
+    for row in csv.DictReader(io.StringIO(csv_text)):
+        games = _f(row, "icetime") / 3600
+        if row["situation"] != "all" or games <= 0:
+            continue
+        out[int(row["playerId"])] = {"name": row["name"], "team": row["team"], "gp": int(_f(row, "games_played")),
+                                     "games": games, "gsax": _f(row, "xGoals") - _f(row, "goals")}
+    return out
+
+
+def goalie_rates(last, before_last, shrink=GOALIE_SHRINK_GAMES):
+    """{player_id: GSAx per 60 over the last two seasons, shrunk toward average}."""
+    rates = {}
+    for pid in set(last) | set(before_last):
+        a, b = last.get(pid, {}), before_last.get(pid, {})
+        gsax = a.get("gsax", 0) + b.get("gsax", 0)
+        games = a.get("games", 0) + b.get("games", 0)
+        rates[pid] = (gsax + shrink * GOALIE_AVERAGE) / (games + shrink)
+    return rates
+
+
+def team_goalie_strength(rates, last, rosters):
+    """
+    {team: goals/game its goalies save vs. a league-average tandem}: each
+    rostered goalie's rate weighted by his starts last season (a newcomer
+    gets GOALIE_NEWCOMER_GAMES at replacement level), centered on the
+    league. The xG prior has no goaltending in it at all (xG only measures
+    shots), so this is added in full, not as a change.
+    """
+    totals = defaultdict(lambda: [0.0, 0.0])
+    for pid, team in rosters.items():
+        weight = last.get(pid, {}).get("gp", 0) or GOALIE_NEWCOMER_GAMES
+        totals[team][0] += weight * rates.get(pid, GOALIE_REPLACEMENT)
+        totals[team][1] += weight
+    level = {t: s / w for t, (s, w) in totals.items() if w}
+    if not level:
+        return {}
+    mean = sum(level.values()) / len(level)
+    return {t: round(v - mean, 4) for t, v in level.items()}
+
+
 def calibrate(years):
     """Refit GS_TO_GOALS (team GD/game on team Game Score/game) and the replacement levels."""
     xs, ys, fringe = [], [], defaultdict(lambda: [0.0, 0])

@@ -57,6 +57,7 @@ from response_models import (
 import push
 from daily_cache import cache as daily_cache, daily_cached
 import season_scenarios
+from seasons import season_games
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
@@ -227,7 +228,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Data that changes once a day (after the 2 AM run) can be cached by the
 # browser for a few minutes, and served stale while it refreshes. Live data
 # (games, schedules, scenarios) is left alone.
-DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/players", "/teams", "/season-sim", "/predictions", "/digest",
+DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/playoff-line", "/players", "/teams", "/season-sim", "/predictions", "/digest",
                        "/news", "/injuries", "/transactions")  # news is cached ~15 min upstream anyway
 DAILY_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600"
 
@@ -544,6 +545,77 @@ def playoff_odds_why():
         "as_of_date": payload["as_of_date"],
         "model_version": payload.get("model", {}).get("version"),
         "teams": payload.get("why", {}),
+    }
+
+
+def _fallback_cutline(teams, full_season):
+    """
+    No simulated line (an older payload): project the current last wild card
+    in each conference to a full season (`full_season` games) at its points %. Pure arithmetic on the
+    payload -- no queries. Returns {conference: {p25, p50, p75}} (all equal,
+    there's no spread) or {} if no team has played yet.
+    """
+    by_conf = {}
+    for abbrev, t in teams.items():
+        by_conf.setdefault(t["conference"], []).append(t)
+    out = {}
+    for conf, conf_teams in by_conf.items():
+        ranked = sorted(conf_teams, key=lambda t: (-t["points"], -t.get("regulation_wins", 0), -t["wins"]))
+        if len(ranked) < 8:
+            continue
+        wc2 = ranked[7]  # 8th in points; close enough to the last playoff spot for a fallback
+        gp = wc2["wins"] + wc2.get("losses", 0) + wc2.get("ot_losses", 0)
+        if gp == 0:
+            continue
+        line = round(wc2["points"] / (2 * gp) * 2 * full_season)
+        out[conf] = {"p25": line, "p50": line, "p75": line}
+    return out
+
+
+@app.get("/playoff-line")
+@daily_cached
+def playoff_line():
+    """
+    The playoff line (points of the last wild card at season's end) per
+    conference from the latest daily sim -- median and p25-p75 range -- plus
+    each team's record, for the "points pace" row on the My Team card.
+    `source` is "sim", or "projection" when an older payload has no sim line
+    (then p25 = p50 = p75). 404 before the first sim run. One small read of
+    the latest sim payload; nothing is simulated per request.
+    """
+    payload = _latest_sim_inputs()
+    teams = payload.get("teams", {})
+    full_season = season_games(payload.get("season_id"))
+    # Each team's games still to play, from the remaining schedule (exact even
+    # with postponements, unlike season length minus games played).
+    games_left = {}
+    for _, home, away in payload.get("games", []):
+        games_left[home] = games_left.get(home, 0) + 1
+        games_left[away] = games_left.get(away, 0) + 1
+    cutline = payload.get("cutline") or {}
+    source = "sim"
+    if not cutline:
+        cutline = _fallback_cutline(teams, full_season)
+        source = "projection" if cutline else None
+    out_teams = {}
+    for abbrev, t in teams.items():
+        gp = t["wins"] + t.get("losses", 0) + t.get("ot_losses", 0)
+        out_teams[abbrev] = {
+            "conference": t["conference"],
+            "gp": gp,
+            "pts": t["points"],
+            "otl": t.get("ot_losses", 0),
+            "point_pctg": round(t["points"] / (2 * gp), 4) if gp else None,
+            "games_left": games_left.get(abbrev, 0),
+        }
+    return {
+        "season_id": payload.get("season_id"),
+        "as_of_date": payload.get("as_of_date"),
+        "games_remaining": len(payload.get("games", [])),
+        "season_games": full_season,
+        "source": source,
+        "cutline": cutline,
+        "teams": out_teams,
     }
 
 

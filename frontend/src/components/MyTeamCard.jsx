@@ -6,6 +6,7 @@ import { darkLogo } from "../utils/darkLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { gameTimeLabel } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
+import { formatPct, pointsPace } from "../utils/pointsPace.js";
 import GoalAlerts from "./GoalAlerts.jsx";
 
 const LIVE_REFRESH_MS = 30_000;
@@ -42,6 +43,82 @@ function useTeamSchedule(abbrev) {
 
   // Ignore a previous team's data while the new team's loads.
   return state.abbrev === abbrev ? state : { data: null, error: false };
+}
+
+const STALE_LINE_DAYS = 7;
+
+// The playoff line from the daily sim (GET /playoff-line): once-a-day data,
+// shown from the cache first. Never fetches /season-sim.
+function usePlayoffLine() {
+  const url = `${API_BASE}/playoff-line`;
+  const [data, setData] = useState(() => cachedResponse(url) ?? null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(url)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.status))))
+      .then((body) => {
+        if (cancelled || !body || typeof body !== "object" || !body.cutline) return;
+        rememberResponse(url, body);
+        setData(body);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+  return data;
+}
+
+function isStale(asOf, now = Date.now()) {
+  if (!asOf) return true;
+  return now - new Date(`${asOf}T12:00:00Z`).getTime() > STALE_LINE_DAYS * 86_400_000;
+}
+
+const pts = (n) => (Number.isInteger(n) ? n : n.toFixed(1));
+
+export function PlayoffLine({ data, team }) {
+  if (!data || data.games_remaining === 0 || isStale(data.as_of_date)) return null;
+  const row = data.teams?.[team.team_abbrev];
+  if (!row) return null;
+  const pace = pointsPace(data.cutline?.[row.conference], { ...row, clinch_indicator: team.clinch_indicator }, data.season_games);
+  if (!pace) return null;
+
+  const range = pace.low !== pace.high ? ` (${pts(pace.low)}–${pts(pace.high)})` : "";
+  const headline = `Line ≈ ${pts(pace.cutline)} pts${range} · You: ${pace.pts} pts${pace.pace != null ? `, pace ${pace.pace}` : ""}`;
+
+  let body;
+  if (pace.state === "clinched") body = <p className="my-team-line-status my-team-line-in">Clinched ✓</p>;
+  else if (pace.state === "above") body = <p className="my-team-line-status my-team-line-in">Above the line</p>;
+  else if (pace.state === "eliminated") body = <p className="my-team-line-status my-team-line-out">Eliminated</p>;
+  else {
+    const { w, l, otl } = pace.record;
+    const now = pace.pointPctg ?? 0;
+    body = (
+      <>
+        <div className="my-team-line-bar" role="img" aria-label={`Current points % ${formatPct(pace.pointPctg)}, needed ${formatPct(pace.reqPct)}`}>
+          <span className="my-team-line-now" style={{ width: `${Math.min(100, now * 100)}%` }} />
+          <span className="my-team-line-need" style={{ left: `${Math.min(100, pace.reqPct * 100)}%` }} />
+        </div>
+        <p className="my-team-line-need-text">
+          Need {pace.ptsNeeded} in {pace.gamesRemaining} GP → {formatPct(pace.reqPct)} (now {formatPct(pace.pointPctg)})
+        </p>
+        <p className="my-team-line-record">Roughly {w}-{l}-{otl} the rest of the way</p>
+      </>
+    );
+  }
+
+  // Collapsed to one line by default (the card stays short); tap for the details.
+  return (
+    <details className="my-team-line" aria-label="Playoff line">
+      <summary>
+        <span className="my-team-game-label">
+          Playoff line{pace.early && <span className="my-team-line-early"> · Early estimate</span>}
+        </span>
+        <span className="my-team-line-headline">{headline}</span>
+      </summary>
+      {body}
+    </details>
+  );
 }
 
 function GameLine({ schedule }) {
@@ -114,6 +191,7 @@ export function TeamPicker({ teams, value, onPick, label = "Follow a team" }) {
 // playoff odds, the live or next game, and recent results.
 function MyTeamCard({ team, odds, teams, onChangeTeam }) {
   const schedule = useTeamSchedule(team.team_abbrev);
+  const playoffLine = usePlayoffLine();
   const [changing, setChanging] = useState(false);
 
   const facts = [
@@ -141,6 +219,7 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
         )}
       </div>
       <p className="my-team-facts">{facts.join(" · ")}</p>
+      <PlayoffLine data={playoffLine} team={team} />
 
       {schedule.data ? (
         <>

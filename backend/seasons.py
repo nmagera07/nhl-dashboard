@@ -13,3 +13,8 @@ def current_season_id(today=None):
 def previous_season_id(season_id):
     start = season_id // 10000
     return int(f"{start - 1}{start}")
+
+
+def season_games(season_id):
+    """Regular-season length: 82 games through 2025-26, 84 from 2026-27 (2025 CBA)."""
+    return 84 if season_id and season_id >= 20262027 else 82

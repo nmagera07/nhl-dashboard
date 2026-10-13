@@ -115,3 +115,9 @@ a.my-team-game:hover { border-color: #2c3a58; }
 .my-team-line-need { position: absolute; top: -3px; width: 2px; height: 12px; background: #e0a100; transform: translateX(-1px); }
 .my-team-line-in { color: #2e9d55; font-weight: 600; }
 .my-team-line-out { color: #c0392b; font-weight: 600; }
+/* Collapsed by default: one summary line; tap to open the bar and the needed record. */
+.my-team-line summary { display: grid; gap: 0.15rem; cursor: pointer; list-style: none; }
+.my-team-line summary::-webkit-details-marker { display: none; }
+.my-team-line summary .my-team-line-headline::after { content: " ›"; color: var(--text-dim); }
+.my-team-line[open] summary .my-team-line-headline::after { content: " ⌄"; }
+.my-team-line[open] > :not(summary) { margin-top: 0.35rem; }

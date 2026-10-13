@@ -80,7 +80,7 @@ export function PlayoffLine({ data, team }) {
   if (!data || data.games_remaining === 0 || isStale(data.as_of_date)) return null;
   const row = data.teams?.[team.team_abbrev];
   if (!row) return null;
-  const pace = pointsPace(data.cutline?.[row.conference], { ...row, clinch_indicator: team.clinch_indicator });
+  const pace = pointsPace(data.cutline?.[row.conference], { ...row, clinch_indicator: team.clinch_indicator }, data.season_games);
   if (!pace) return null;
 
   const range = pace.low !== pace.high ? ` (${pts(pace.low)}–${pts(pace.high)})` : "";
@@ -107,14 +107,17 @@ export function PlayoffLine({ data, team }) {
     );
   }
 
+  // Collapsed to one line by default (the card stays short); tap for the details.
   return (
-    <div className="my-team-line" aria-label="Playoff line">
-      <span className="my-team-game-label">
-        Playoff line{pace.early && <span className="my-team-line-early"> · Early estimate</span>}
-      </span>
-      <p className="my-team-line-headline">{headline}</p>
+    <details className="my-team-line" aria-label="Playoff line">
+      <summary>
+        <span className="my-team-game-label">
+          Playoff line{pace.early && <span className="my-team-line-early"> · Early estimate</span>}
+        </span>
+        <span className="my-team-line-headline">{headline}</span>
+      </summary>
       {body}
-    </div>
+    </details>
   );
 }
 

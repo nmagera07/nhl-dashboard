@@ -53,6 +53,7 @@ from response_models import (
 )
 import push
 import season_scenarios
+from seasons import season_games
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
@@ -529,13 +530,10 @@ def playoff_odds_why():
     }
 
 
-FULL_SEASON_GAMES = 82
-
-
-def _fallback_cutline(teams):
+def _fallback_cutline(teams, full_season):
     """
     No simulated line (an older payload): project the current last wild card
-    in each conference to 82 games at its points %. Pure arithmetic on the
+    in each conference to a full season (`full_season` games) at its points %. Pure arithmetic on the
     payload -- no queries. Returns {conference: {p25, p50, p75}} (all equal,
     there's no spread) or {} if no team has played yet.
     """
@@ -551,7 +549,7 @@ def _fallback_cutline(teams):
         gp = wc2["wins"] + wc2.get("losses", 0) + wc2.get("ot_losses", 0)
         if gp == 0:
             continue
-        line = round(wc2["points"] / (2 * gp) * 2 * FULL_SEASON_GAMES)
+        line = round(wc2["points"] / (2 * gp) * 2 * full_season)
         out[conf] = {"p25": line, "p50": line, "p75": line}
     return out
 
@@ -568,10 +566,17 @@ def playoff_line():
     """
     payload = _latest_sim_inputs()
     teams = payload.get("teams", {})
+    full_season = season_games(payload.get("season_id"))
+    # Each team's games still to play, from the remaining schedule (exact even
+    # with postponements, unlike season length minus games played).
+    games_left = {}
+    for _, home, away in payload.get("games", []):
+        games_left[home] = games_left.get(home, 0) + 1
+        games_left[away] = games_left.get(away, 0) + 1
     cutline = payload.get("cutline") or {}
     source = "sim"
     if not cutline:
-        cutline = _fallback_cutline(teams)
+        cutline = _fallback_cutline(teams, full_season)
         source = "projection" if cutline else None
     out_teams = {}
     for abbrev, t in teams.items():
@@ -582,11 +587,13 @@ def playoff_line():
             "pts": t["points"],
             "otl": t.get("ot_losses", 0),
             "point_pctg": round(t["points"] / (2 * gp), 4) if gp else None,
+            "games_left": games_left.get(abbrev, 0),
         }
     return {
         "season_id": payload.get("season_id"),
         "as_of_date": payload.get("as_of_date"),
         "games_remaining": len(payload.get("games", [])),
+        "season_games": full_season,
         "source": source,
         "cutline": cutline,
         "teams": out_teams,

@@ -1,9 +1,10 @@
 // "Points pace" for the My Team card: how many points a team needs to reach
 // the playoff line, the points % that takes over the games left, and a
 // rough W-L-OTL record that gets there. Standard NHL points: W = 2, OTL = 1,
-// L = 0; an 82-game season.
+// L = 0. The season length (84 games from 2026-27) and each team's games
+// left come from GET /playoff-line, never a hardcoded 82.
 
-export const SEASON_GAMES = 82;
+export const DEFAULT_SEASON_GAMES = 84;
 export const LEAGUE_OTL_SHARE = 0.11; // ~11% of games end as an OT/SO loss
 export const EARLY_GP = 10;
 
@@ -27,20 +28,21 @@ export function neededRecord(need, gr, share) {
 }
 
 /**
- * line: {p25, p50, p75} in points. team: {gp, pts, otl, clinch_indicator}.
+ * line: {p25, p50, p75} in points. team: {gp, pts, otl, games_left, clinch_indicator}.
+ * seasonGames: the regular-season length from the API (84 from 2026-27).
  * Returns null when there's nothing to show (no line, season over).
  */
-export function pointsPace(line, team) {
+export function pointsPace(line, team, seasonGames = DEFAULT_SEASON_GAMES) {
   if (!line || line.p50 == null || !team) return null;
   const gp = team.gp ?? 0;
-  const gr = Math.max(0, SEASON_GAMES - gp);
+  const gr = Math.max(0, team.games_left ?? seasonGames - gp);
   if (gr === 0) return null;
 
   const cutline = line.p50;
   const ptsNeeded = Math.max(0, Math.ceil(cutline - team.pts));
   const reqPct = ptsNeeded / (2 * gr);
   const pointPctg = gp > 0 ? team.pts / (2 * gp) : null;
-  const pace = pointPctg == null ? null : Math.round(pointPctg * 2 * SEASON_GAMES);
+  const pace = pointPctg == null ? null : Math.round(pointPctg * 2 * seasonGames);
 
   const code = (team.clinch_indicator || "").toLowerCase();
   let state = "chasing";

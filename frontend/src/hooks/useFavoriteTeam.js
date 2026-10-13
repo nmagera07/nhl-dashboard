@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { track } from "../utils/analytics.js";
 
 // The viewer's favorite team, remembered in this browser (no accounts).
 // useSyncExternalStore keeps every component that reads it in sync: the
@@ -28,6 +29,7 @@ export function useFavoriteTeam() {
   const favorite = useSyncExternalStore(subscribe, read, () => null);
   const setFavorite = useCallback((abbrev) => {
     try {
+      if (abbrev) track("follow-team", { team: abbrev });
       if (abbrev) window.localStorage.setItem(KEY, abbrev);
       else window.localStorage.removeItem(KEY);
     } catch {

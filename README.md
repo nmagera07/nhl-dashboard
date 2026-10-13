@@ -139,8 +139,10 @@ See [`backend/README.md`](backend/README.md),
   scheduled workflows in public repos after 60 days without activity —
   re-enable it from the Actions tab if that happens. See [`backend/README.md`](backend/README.md) and
   [`frontend/README.md`](frontend/README.md) for how to run these locally.
-- Monitoring: Sentry (error tracking, optional —
-  `SENTRY_DSN`/`VITE_SENTRY_DSN`, not yet enabled in production), an
+- Analytics: Umami Cloud (cookieless; tracker self-hosted as
+  `frontend/public/stats.js` so the CSP keeps `script-src 'self'`). Page views
+  plus named feature events via `track()` in `frontend/src/utils/analytics.js`.
+- Monitoring: Sentry (error tracking and real-user performance, `SENTRY_DSN`/`VITE_SENTRY_DSN`), an
   Azure Monitor alert on any API crash (`nhl-api-startup-crash`, scans
   `ContainerAppConsoleLogs` for a Python traceback and emails via the
   `nhl-api-crash-alert` action group), and a healthchecks.io heartbeat

@@ -4,6 +4,7 @@ import ChatMarkdown from "./ChatMarkdown.jsx";
 import { SUGGESTIONS } from "./chatSuggestions.js";
 import { warmUpChat } from "../utils/warmUp.js";
 import { startChatTimer } from "../utils/chatTiming.js";
+import { track } from "../utils/analytics.js";
 
 // Follow-ups: send the last 2 exchanges so "what about their power play?"
 // makes sense. The service enforces the same cap.
@@ -93,6 +94,7 @@ export default function IntelligencePanel({ context, label }) {
       .slice(-HISTORY_MESSAGES)
       .map(({ role, content }) => ({ role, content }));
 
+    track("ai-question");
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     setLoading(true);

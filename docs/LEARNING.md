@@ -153,6 +153,43 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-13 — "I can't scroll up in the chat": three phone bugs in one complaint
+
+**The report (Nate, on his phone):** open the chat, start asking, and you can't scroll back
+up to the top. It just hangs there.
+
+**Reproduced first, in an iPhone 13 emulator** (Playwright), with a fake slow stream so it was
+repeatable. I scrolled the chat to the top mid-answer, and 300 ms later it was back at the
+bottom. Cause: an effect set `scrollTop = scrollHeight` on *every* change to the messages,
+and while an answer streams that's dozens of times a second.
+
+**Three fixes:**
+1. **Stick to the bottom only if the reader is there.** A scroll listener tracks whether
+   you're within 48 px of the bottom. New text follows only then, and sending a question
+   always jumps down to show it. That's the standard chat pattern; I'd skipped it.
+2. **Keep the sheet above the keyboard.** A bottom sheet `position: fixed; bottom: 0` doesn't
+   move when the phone keyboard opens, and iOS shifts the whole page up to keep the text box
+   in view, which pushes the top of the chat off the screen. The `visualViewport` API reports
+   what's actually visible. A small hook (`useKeepAboveKeyboard`) sets CSS variables so the
+   sheet's bottom sits on the keyboard and its height fits what's left.
+3. **Don't open the keyboard on open.** The chat auto-focused the text box, which on a
+   touchscreen opens the keyboard immediately, covering the suggestions and triggering #2.
+   Now it only auto-focuses with a mouse and keyboard (`(hover: none) and (pointer: coarse)`
+   means touch).
+
+**Verified:**
+- *Emulator:* scrolled up mid-answer, it stays put. At the bottom, it follows. A faked
+  keyboard (visible area 330 px of 664) gives a sheet from 12 px to 330 px, fully on screen.
+- *Unit tests:* the scroll behavior and the keyboard math.
+- *The limit:* a real iOS keyboard can't be emulated, so I faked the browser signal the fix
+  listens to.
+
+**Lessons:**
+- *Reproduce before fixing.* "Hangs" sounded like a freeze; it was a scroll fight.
+- *Mobile web has two viewports.* The layout one doesn't shrink for the keyboard; the visual
+  one does. Fixed-position UI near the bottom has to follow the visual one.
+- *Auto-focus is a desktop habit.* On a phone it means "open the keyboard now".
+
 ## 2026-10-13 — Who's in net: a second null result, and a feature that didn't need a model
 
 **The model question:** the goalie part of the prior weights each goalie by *last* season's

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useKeepAboveKeyboard } from "../hooks/useKeepAboveKeyboard.js";
 import { INTELLIGENCE_BASE } from "../config.js";
 import ChatMarkdown from "./ChatMarkdown.jsx";
 import { SUGGESTIONS } from "./chatSuggestions.js";
@@ -10,6 +11,12 @@ import { track } from "../utils/analytics.js";
 // makes sense. The service enforces the same cap.
 const HISTORY_MESSAGES = 4;
 const FALLBACK_ERROR = "PuckPulse AI could not answer right now.";
+
+const STICK_THRESHOLD_PX = 48;
+
+function isTouchScreen() {
+  return typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
 
 let nextId = 0;
 const newId = () => ++nextId;
@@ -60,6 +67,10 @@ export default function IntelligencePanel({ context, label }) {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
   const threadRef = useRef(null);
+  const drawerRef = useRef(null);
+  // Follow new text only while the reader is at the bottom. Snapping down on
+  // every streamed word made it impossible to scroll up mid-answer.
+  const stickToBottom = useRef(true);
 
   // A new page means new data: start a fresh conversation.
   const contextKey = JSON.stringify(context);
@@ -72,7 +83,9 @@ export default function IntelligencePanel({ context, label }) {
   useEffect(() => {
     if (!open) return undefined;
     warmUpChat();
-    inputRef.current?.focus();
+    // Phones: don't open the keyboard until the reader taps the box; it
+    // covers the suggestions and shoves the sheet up.
+    if (!isTouchScreen()) inputRef.current?.focus();
     const onKey = (e) => e.key === "Escape" && setOpen(false);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -80,8 +93,15 @@ export default function IntelligencePanel({ context, label }) {
 
   useEffect(() => {
     const thread = threadRef.current;
-    if (thread) thread.scrollTop = thread.scrollHeight;
+    if (thread && stickToBottom.current) thread.scrollTop = thread.scrollHeight;
   }, [messages]);
+
+  useKeepAboveKeyboard(open, drawerRef);
+
+  const onThreadScroll = (e) => {
+    const t = e.currentTarget;
+    stickToBottom.current = t.scrollHeight - t.scrollTop - t.clientHeight < STICK_THRESHOLD_PX;
+  };
 
   const updateLast = (patch) =>
     setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, ...patch(m) } : m)));
@@ -96,6 +116,7 @@ export default function IntelligencePanel({ context, label }) {
 
     track("ai-question");
     setInput("");
+    stickToBottom.current = true; // show the question just asked
     if (inputRef.current) inputRef.current.style.height = "auto";
     setLoading(true);
     setMessages((prev) => [
@@ -159,7 +180,7 @@ export default function IntelligencePanel({ context, label }) {
       {open && (
         <>
           <div className="intelligence-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-          <section className="intelligence-drawer" role="dialog" aria-label="PuckPulse AI chat">
+          <section className="intelligence-drawer" role="dialog" aria-label="PuckPulse AI chat" ref={drawerRef}>
             <header className="intelligence-header">
               <div>
                 <strong>✦ PuckPulse AI</strong>
@@ -175,7 +196,7 @@ export default function IntelligencePanel({ context, label }) {
               </div>
             </header>
 
-            <div className="intelligence-thread" ref={threadRef} aria-live="polite">
+            <div className="intelligence-thread" ref={threadRef} onScroll={onThreadScroll} aria-live="polite">
               {messages.length === 0 && (
                 <div className="intelligence-empty">
                   <p>Ask anything about the stats on this page. Answers use only this page's data.</p>

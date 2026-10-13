@@ -135,6 +135,16 @@ def _reset_rate_limiter():
     api.limiter.reset()
 
 
+@pytest.fixture(autouse=True)
+def _reset_daily_cache():
+    """The response cache is module-level too; start every test empty."""
+    import api
+
+    api.daily_cache.clear()
+    yield
+    api.daily_cache.clear()
+
+
 @pytest.fixture
 def client(monkeypatch, db_router):
     """

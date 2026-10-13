@@ -4,6 +4,8 @@ from .playoff_odds import PlayoffOdds, PlayoffOddsHistory, PlayoffOddsPoint
 from .players import (
     RosterPlayer,
     PlayerLeader,
+    PlayerLeaderTableRow,
+    LEADER_TABLE_FIELDS,
     PlayerDetail,
     PlayerSeasonStat,
     PlayerAdvancedStat,
@@ -22,6 +24,8 @@ __all__ = [
     "PlayoffOddsPoint",
     "RosterPlayer",
     "PlayerLeader",
+    "PlayerLeaderTableRow",
+    "LEADER_TABLE_FIELDS",
     "PlayerDetail",
     "PlayerSeasonStat",
     "PlayerAdvancedStat",

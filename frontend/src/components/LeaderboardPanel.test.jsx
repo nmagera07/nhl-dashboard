@@ -36,6 +36,47 @@ function playerRows() {
 const table = () => within(screen.getByRole("table"));
 const cardList = (group = "skaters") => within(screen.getByLabelText(`${group} player cards`));
 
+// The 19 fields GET /players/leaders?view=table returns (backend
+// PlayerLeaderTableRow). The panel must render from these alone.
+const TABLE_FIELDS = [
+  "player_id", "first_name", "last_name", "position_code", "team_abbrev", "team_logo_url",
+  "points", "goals", "assists", "plus_minus", "pim", "shots", "games_played",
+  "wins", "losses", "ot_losses", "goals_against_avg", "save_pctg", "shutouts",
+];
+
+describe("LeaderboardPanel with ?view=table rows", () => {
+  const rows = [
+    player({ player_id: 1, first_name: "Sidney", last_name: "Crosby", team_abbrev: "PIT", position_code: "C", points: 91, goals: 33, team_logo_url: "https://x/PIT_light.svg" }),
+    player({ player_id: 3, first_name: "Marc-Andre", last_name: "Fleury", team_abbrev: "MIN", position_code: "G", wins: 27, shutouts: 4 }),
+  ];
+
+  it("uses exactly the table fields", () => {
+    rows.forEach((r) => expect(Object.keys(r).sort()).toEqual([...TABLE_FIELDS].sort()));
+  });
+
+  it("renders skaters, goalies, search and mobile cards from them", async () => {
+    const onSelect = vi.fn();
+    render(<LeaderboardPanel players={rows} onSelectPlayer={onSelect} />);
+
+    expect(table().getByText(/crosby/i)).toBeInTheDocument();
+    expect(table().getByText("91")).toBeInTheDocument();
+    expect(cardList().getByText("Sidney Crosby")).toBeInTheDocument();
+    expect(cardList().getByText(/PIT · C/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText(/find a player/i), "pit");
+    expect(table().getByText(/crosby/i)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByPlaceholderText(/find a player/i));
+    await userEvent.click(screen.getByRole("button", { name: "GOALIES" }));
+    expect(table().getByText(/fleury/i)).toBeInTheDocument();
+    expect(table().getByText("27")).toBeInTheDocument();
+    expect(cardList("goalies").getByText("Marc-Andre Fleury")).toBeInTheDocument();
+
+    await userEvent.click(cardList("goalies").getByRole("button", { name: /open marc-andre fleury profile/i }));
+    expect(onSelect).toHaveBeenCalledWith(3);
+  });
+});
+
 describe("LeaderboardPanel", () => {
   const skaters = [
     player({ player_id: 1, first_name: "Sidney", last_name: "Crosby", team_abbrev: "PIT", position_code: "C", points: 90 }),

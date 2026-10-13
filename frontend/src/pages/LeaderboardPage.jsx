@@ -7,7 +7,8 @@ function LeaderboardPage() {
   const navigate = useNavigate();
 
   const { data: leaders, status: leadersStatus } = useFetchWithStatus(
-    `${API_BASE}/players/leaders`,
+    // Slim view: only the fields LeaderboardPanel renders (~0.5 MB vs 1.18 MB).
+    `${API_BASE}/players/leaders?view=table`,
     { initialData: [], transform: (data) => (Array.isArray(data) ? data : []) }
   );
 

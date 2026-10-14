@@ -349,6 +349,28 @@ CREATE TABLE IF NOT EXISTS playoff_odds (
 
 CREATE INDEX IF NOT EXISTS idx_playoff_odds_lookup
     ON playoff_odds (season_id, as_of_date);
+-- PuckPulse xG for each finished game, one row per team: expected goals for
+-- and against from NHL play-by-play, scored by xg_model.py. The playoff odds
+-- use this season's totals (MoneyPuck's when a game is missing). Created and
+-- granted by the daily job itself; see ingest_xg.py.
+CREATE TABLE IF NOT EXISTS team_game_xg (
+    game_id                 BIGINT NOT NULL,
+    team_abbrev             VARCHAR(3) NOT NULL,
+    season_id               INTEGER NOT NULL,
+    game_date               DATE NOT NULL,
+    game_type               SMALLINT NOT NULL,
+    is_home                 BOOLEAN NOT NULL,
+    xg_for                  NUMERIC(6,3) NOT NULL,
+    xg_against              NUMERIC(6,3) NOT NULL,
+    goals_for               SMALLINT NOT NULL,
+    goals_against           SMALLINT NOT NULL,
+    shots_for               SMALLINT NOT NULL,
+    shots_against           SMALLINT NOT NULL,
+    model_version           SMALLINT NOT NULL,
+    computed_at             TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (game_id, team_abbrev)
+);
+
 -- Each team's forward lines and defense pairs from its last completed game,
 -- worked out from NHL shift charts. One row per team, replaced when the team
 -- plays again; created (and granted to the API role) by the job itself.

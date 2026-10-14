@@ -95,6 +95,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   shots, not saves) and added each team's goalie strength (GSAx, shrunk for its 0.16
   year-to-year repeatability): 1.9% lower Brier again, better than the previous model in
   every backtested season.
+- Built an expected-goals model from 453,000 NHL shots (logistic regression, 41 features,
+  graded on held-out seasons against MoneyPuck's shot-level xG), then replaced MoneyPuck's xG
+  in the playoff model with it: as accurate or better (16 of 20 checkpoints, Brier 0.1104 ->
+  0.1093) and no longer dependent on a third party.
 - Rebuilt team strength as the sum of its players (a WAR-style roster rating) and found that,
   once the players are known, last season's team results add nothing: the best blend gave them
   zero weight. 1.2% lower Brier, better in all 4 backtested seasons, with no new tuning.
@@ -155,6 +159,71 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   parallel, with graceful degradation when the optional feeds fail.
 
 ---
+
+## 2026-10-14 — Our own expected goals (model v2.5)
+
+**Why:** the playoff model's main input, xG, came from MoneyPuck's free files. If they
+changed their terms or their file format, the model would fall back to a weaker version.
+And a real WAR (the next big project) needs shot quality for every shift, which needs our
+own xG.
+
+**Data:** NHL play-by-play for 4 seasons, 5,248 games (65 MB gzipped), downloaded once with 4
+polite workers. Every unblocked shot has its coordinates, type, the skaters-on-ice code,
+which net the home team defends, and the event before it. That's 453,000 shots and 32,000
+goals.
+
+**Model:** logistic regression with 41 features:
+- distance and angle as flexible piecewise curves
+- behind the net
+- shot type, and tips or deflections in close
+- rebound, and how far the angle swung on the rebound
+- rush, puck speed, and the previous event (faceoff, turnover, hit, a shot by the opponent)
+- strength (power play, shorthanded, empty net with its own distance slope)
+- score state and home ice
+
+Trained with Newton's method in numpy, a dev-only dependency. Production scores shots in
+plain Python from a 1.5 KB JSON of coefficients.
+
+**Grading against the best:** MoneyPuck publishes its xG for every shot, so each held-out
+season can be compared shot by shot (111,612 of 112,091 shots matched by game, period,
+time and shooter).
+
+| held-out season | ours (log loss) | MoneyPuck |
+|---|---|---|
+| 2022-23 | 0.2304 | 0.2161 |
+| 2023-24 | 0.2189 | 0.2148 |
+| 2024-25 | **0.2187** | **0.2186** |
+| 2025-26 | 0.2263 | 0.2237 |
+
+Close in recent seasons, tied in 2024-25, and well behind in 2022-23, likely because hand
+entered shot locations had rink-by-rink bias that MoneyPuck corrects and we don't yet.
+
+**The bug that mattered most:** v0 measured distance with an absolute value, so a shot from
+*behind* the net looked like a point-blank shot from the slot. Calibration by distance gave it
+away: 0-10 ft was over-predicted by 28%, and beyond 60 ft by 59%. A signed position relative
+to the goal line, plus a flexible distance curve, closed more than half the gap to
+MoneyPuck. *Check calibration by slices, not just the total.*
+
+**The test that decided it:** shot-level accuracy isn't the goal; team forecasts are. Each
+season was scored by an xG model trained on the *other* three, and fed to v2.4:
+
+- Brier 0.1104 with MoneyPuck's xG vs **0.1093** with ours, better at 16 of 20 checkpoints.
+- *Read the stats honestly:* the sign test says p = 0.006, but the checkpoints within a season
+  share teams. A bootstrap over team-seasons gives a 95% interval of -0.0032 to +0.0010,
+  which includes zero. So the claim is "at least as good," not "better."
+- *Why could a worse shot model help?* For forecasting, you want the repeatable part of shot
+  quality. Ours is simpler and built from the same NHL feed as the goals and standings.
+
+**Shipping it (v2.5):** a nightly step (`ingest_xg.py`) scores each finished game into
+`team_game_xg`. The odds use our totals only if every team's scored games match its games
+played; otherwise MoneyPuck's xG stands in for the day. The dry run caught one more bug: the
+84-game 2026-27 season opened **September 29**, and the first-run search started October 1.
+
+**Lessons:**
+- *Grade against the strongest public benchmark,* shot by shot, on seasons the model never saw.
+- *The metric that matters is the downstream one.* A slightly worse shot model was an
+  equal-or-better forecasting input.
+- *A significance test is only as good as its independence assumption.*
 
 ## 2026-10-14 — A team is the sum of its players (model v2.4)
 

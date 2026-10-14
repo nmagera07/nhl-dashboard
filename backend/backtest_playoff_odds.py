@@ -217,6 +217,28 @@ def goalie_strength(skaters_dir, start, shrink, mode):
 
 # Aging (2026-10): a null result -- worse Brier at every weight (0.5-2.0)
 # and carryover (0.5-0.7); see player_values.AGING_CURVE.
+# Tier 1 "WAR-style" team rating: the sum of the roster's player values
+# (player_values.team_roster_strength), alone (c=0) or blended with last
+# season's xG.
+ROSTER_RATING_CARRYOVERS = (0.0, 0.1)
+ROSTER_RATING_WEIGHTS = (1.0, 1.25, 1.5)
+_roster_rating = {}
+
+
+def roster_strength_as_of(skaters_dir, start):
+    """Team roster strength before season `start`: values from the two
+    seasons before, the roster each skater's team that season."""
+    if start not in _roster_rating:
+        def load(year):
+            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
+                return player_values_mod.season_game_scores(f.read())
+        last, before = load(start - 1), load(start - 2)
+        values = player_values_mod.player_values(last, before)
+        rosters = {pid: p["team"] for pid, p in load(start).items()}
+        _roster_rating[start] = player_values_mod.team_roster_strength(values, last, rosters)
+    return _roster_rating[start]
+
+
 AGING_WEIGHTS = (0.0,)
 AGING_CARRYOVERS = (0.5,)
 GOALIE_START_PRIORS = (5, 10, 20, 40, 80)
@@ -353,6 +375,13 @@ def main():
                             priors = {t: c * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + in_net.get(t, 0.0) for t in standings}
                             ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=30, talent_sd=sd)
                             runs[f"roster+goalie-starts K={k}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
+                    roster_rating = roster_strength_as_of(args.skaters_dir, start)
+                    for carry in ROSTER_RATING_CARRYOVERS:
+                        for gamma in ROSTER_RATING_WEIGHTS:
+                            for k in (30, 45, 60):
+                                priors = {t: carry * prior_xgd.get(t, 0.0) + gamma * roster_rating.get(t, 0.0) + goalies.get(t, 0.0) for t in standings}
+                                ratings = sim.team_ratings(blended_standings(standings, xgd_now, sim.XG_WEIGHT), priors, prior_games=k, talent_sd=sd)
+                                runs[f"roster-rating c={carry} g={gamma} K={k}"] = sim.simulate(standings, remaining, args.trials, ratings, rng=random.Random(1))
                     for carry in AGING_CARRYOVERS:
                         for aw in AGING_WEIGHTS:
                             priors = {t: carry * prior_xgd.get(t, 0.0) + change.get(t, 0.0) + goalies.get(t, 0.0) + aw * aging.get(t, 0.0) for t in standings}

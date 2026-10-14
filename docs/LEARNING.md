@@ -95,6 +95,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   shots, not saves) and added each team's goalie strength (GSAx, shrunk for its 0.16
   year-to-year repeatability): 1.9% lower Brier again, better than the previous model in
   every backtested season.
+- Rebuilt team strength as the sum of its players (a WAR-style roster rating) and found that,
+  once the players are known, last season's team results add nothing: the best blend gave them
+  zero weight. 1.2% lower Brier, better in all 4 backtested seasons, with no new tuning.
 
 - Built an in-browser season simulator by porting the Monte Carlo model to
   JavaScript, validated against the Python original over 10,000 simulated
@@ -152,6 +155,53 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   parallel, with graceful degradation when the optional feeds fail.
 
 ---
+
+## 2026-10-14 — A team is the sum of its players (model v2.4)
+
+**The question:** HockeyStats.com rates teams from player WAR. Could we? We already had
+something close: the trade simulator's player values are goals per game over replacement,
+calibrated to team goal differential. That's goals above replacement; WAR is roughly the same
+divided by 6. So Tier 1 was cheap: rate each team as the sum of its current players.
+
+**The rating:** each skater's value times his expected share of games (last season's games /
+82), summed per team. A game has 12 forward and 6 defense slots, so if a team's regulars add
+up to more, they're scaled down to fit (some will sit), and empty slots are replacement level
+(0). Then centered on the league, plus the existing goalie strength.
+
+**Backtest (4 seasons x 5 dates, as-of data):** three shapes. v2.3 as is, roster only, and
+blends of the two.
+
+| | 2022-23 | 2023-24 | 2024-25 | 2025-26 | overall |
+|---|---|---|---|---|---|
+| v2.3 | 0.0895 | 0.1077 | 0.1018 | 0.1468 | 0.1114 |
+| roster rating | **0.0868** | **0.1061** | **0.1014** | **0.1463** | **0.1101** |
+
+- *Better in every season,* with no new tuning: weight 1.0 (values at face value) and the
+  same 30-game prior weight as before.
+- *The optimum was in the middle of the grid* (1.0 and 1.25 tie, 1.5 is worse), unlike the
+  goalie settings that overfit at the edge.
+- *Calibration held:* at "90%+" teams made it 98.1% of the time (162 cases).
+
+**The finding bigger than 1.2%:** the best blend put **zero** weight on last season's team xG.
+Once you know who's on the roster, how the team did last year adds nothing. "Last season,
+adjusted for moves" was a proxy for the players all along.
+
+**Sanity checks before shipping:**
+- *Carolina:* rated +0.89 goals/game, higher than anything in the backtest years. The
+  breakdown showed depth: twelve full-time forwards with real value, filling exactly 12
+  slots. Vancouver had no skater above +0.07.
+- *Colorado at 97% in October:* checked against calibration. The top bucket is well
+  calibrated, so it stays.
+
+**What's next (Tier 2):** these player values come from Game Score, which credits a player for
+his linemates. A third-liner on a great team looks better than he is. A real WAR separates
+them by regressing every shift's results on who was on the ice (RAPM), which needs our own xG
+model first.
+
+**Interview framing:** "I rebuilt team strength from the bottom up, as the sum of player
+values I'd calibrated for a trade simulator. It beat the previous model in all four backtest
+seasons, and the interesting result was that last season's team results got zero weight in
+the best blend. Once you know the players, the team's history is redundant."
 
 ## 2026-10-13 — "I can't scroll up in the chat": three phone bugs in one complaint
 

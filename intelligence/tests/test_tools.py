@@ -159,6 +159,15 @@ class TestTools:
         assert pit["roster_moves"] == {"goals_per_game_gained_or_lost": -0.3, "effect": -0.09, "push": "pulls down"}
         assert pit["goaltending"] == {"goals_per_game_saved_vs_average_tandem": 0.08, "effect": 0.05, "push": "pushes up"}
 
+    async def test_explain_odds_v24_roster_stands_in_for_last_season(self, monkeypatch):
+        monkeypatch.setitem(WHY["teams"], "PIT", {**WHY_TEAM(0.2, 9), "last_season": 0, "last_season_per_game": 0,
+                                                  "roster": 0.12, "roster_per_game": 0.16})
+        pit = (await self.call("explain_odds", {"team": "PIT"}))["teams"][0]
+
+        assert pit["roster"] == {"players_goals_per_game_vs_average_roster": 0.16, "weight_vs_this_season_pct": 86,
+                                 "effect": 0.12, "push": "pushes up"}
+        assert "last_season" not in pit and "roster_moves" not in pit
+
     async def test_explain_odds_compares_two_teams_and_their_next_meeting(self):
         result = await self.call("explain_odds", {"team": "PIT", "opponent": "COL"})
 

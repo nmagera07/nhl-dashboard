@@ -95,7 +95,9 @@ Azure Static      Azure Container
 | Script | What it pulls | Schedule |
 |---|---|---|
 | `ingest_standings.py` | Daily standings snapshot, all 32 teams | Daily |
-| `simulate_playoff_odds.py` | Monte Carlo playoff odds (v2.4: goals + MoneyPuck xG ratings regressed to a roster rating (the sum of the players) plus goaltending, calibrated game model, NHL tiebreakers; falls back to goals only) | Daily |
+| `simulate_playoff_odds.py` | Monte Carlo playoff odds (v2.5: goals + PuckPulse xG ratings regressed to a roster rating (the sum of the players) plus goaltending, calibrated game model, NHL tiebreakers; falls back to goals only) | Daily |
+| `ingest_xg.py` | PuckPulse xG for each finished game (NHL play-by-play scored by `xg_model.py`), used by the playoff odds | Daily |
+| `train_xg.py` | Trains and grades the xG model (numpy, dev-only) against MoneyPuck's shot-level xG; writes `xg_model.json` | Manual |
 | `team_lines.py` | Each team's lines and D pairs from its last game, worked out from NHL shift charts; served by `GET /teams/{team}/lines` | Daily |
 | `moneypuck_odds.py` | MoneyPuck's playoff odds logged next to ours for a head-to-head score (`--report` compares them) | Daily |
 | `ingest_player_stats.py` | Full roster + season stats, all 32 teams; marks cut/released players off-roster | Daily |

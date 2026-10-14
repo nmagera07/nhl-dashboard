@@ -1,5 +1,5 @@
 """
-Playoff Odds Simulator (v2.4: goals + MoneyPuck xG + roster rating + goalies)
+Playoff Odds Simulator (v2.5: goals + PuckPulse xG + roster rating + goalies)
 
 Monte Carlo simulation of the rest of the regular season to estimate each
 team's probability of making the playoffs.
@@ -15,7 +15,9 @@ How it works:
      arrived minus those who left (player_values.py). v2.3 adds each
      team's goaltending (GSAx), which xG leaves out. v2.4 replaces last
      season's xG and the roster moves with a roster rating: the sum of the
-     current players' values (a WAR-style team rating).
+     current players' values (a WAR-style team rating). v2.5 uses our own
+     xG (xg_model.py, from NHL play-by-play) for this season, with
+     MoneyPuck's as the fallback.
      v1 used raw point %, which after a 4-0 start rated a team as
      near-unbeatable.
   2. Pull the remaining regular-season schedule from the NHL API.
@@ -73,7 +75,7 @@ MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
-MODEL_VERSION = "v2.4"       # logged with every game prediction (game_predictions.py)
+MODEL_VERSION = "v2.5"       # logged with every game prediction (game_predictions.py)
 
 # Game model -- fit by calibrate_playoff_model.py.
 HOME_EDGE = 0.264            # goals/game of home-ice advantage
@@ -111,6 +113,12 @@ ROSTER_WEIGHT = 1.0
 # (values at face value) and PRIOR_GAMES_XG unchanged; 1.25 tied, 1.5 was
 # worse. Replaces the v2.2 roster-change term (ROSTER_WEIGHT above).
 ROSTER_RATING_WEIGHT = 1.0
+
+# PuckPulse xG (v2.5) -- backtested 2026-10 against MoneyPuck's xG in v2.4,
+# each season scored by an xG model trained on the other three: Brier
+# 0.1104 -> 0.1093, 16 of 20 checkpoints better, but a team-season
+# bootstrap's 95% interval (-0.0032, +0.0010) includes zero. Switched for
+# independence, at no measurable cost; MoneyPuck stays the fallback.
 
 # Goaltending in the prior (v2.3) -- backtested 2026-10 like the roster
 # prior. xG measures shots, not saves, so the xG prior had no goaltending
@@ -249,6 +257,35 @@ def xg_model_inputs(season_id, fetch=fetch_moneypuck_xgd):
         return None
     priors = {t: PRIOR_CARRYOVER * xgd / gp for t, (xgd, gp) in previous.items() if gp}
     return current, priors
+
+
+def puckpulse_xgd(season_id, standings, rows=None):
+    """
+    {team: (xG for - xG against total, games)} this season from our own xG
+    (ingest_xg.py), in fetch_moneypuck_xgd()'s shape, or {} if any team's
+    count of scored games doesn't match its games played in the standings
+    (a game the nightly step couldn't score): then MoneyPuck stands in.
+    """
+    if rows is None:
+        try:
+            with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT team_abbrev, SUM(xg_for - xg_against), COUNT(*)
+                    FROM team_game_xg WHERE season_id = %s AND game_type = 2 GROUP BY team_abbrev
+                    """,
+                    (season_id,),
+                )
+                rows = cur.fetchall()
+        except psycopg2.Error as exc:  # table not created yet, DB hiccup
+            logger.warning(f"PuckPulse xG unavailable ({exc}); using MoneyPuck's")
+            return {}
+    totals = {team: (float(xgd), int(games)) for team, xgd, games in rows}
+    short = [t for t, s in standings.items() if totals.get(t, (0, 0))[1] != s["games_played"]]
+    if short:
+        logger.warning(f"PuckPulse xG is missing games for {', '.join(sorted(short))}; using MoneyPuck's today")
+        return {}
+    return {t: totals[t] for t in standings if t in totals}
 
 
 def xg_model_ratings(standings, season_id, fetch=fetch_moneypuck_xgd):
@@ -760,10 +797,12 @@ def main():
         return
     logger.info(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
 
-    xg_inputs = xg_model_inputs(args.season)
-    if xg_inputs is not None:
-        logger.info("Using the goals + MoneyPuck xG model")
-        current_xgd, last_season_xg = xg_inputs
+    xg_inputs = xg_model_inputs(args.season)  # MoneyPuck: the fallback xG, and last season's
+    ours = puckpulse_xgd(args.season, standings)
+    if ours or xg_inputs is not None:
+        current_xgd = ours or xg_inputs[0]
+        last_season_xg = xg_inputs[1] if xg_inputs else {}
+        logger.info(f"Using the goals + {'PuckPulse' if ours else 'MoneyPuck'} xG model")
         roster = roster_rating_prior(args.season)
         goalies = goalie_prior(args.season)
         # v2.4: the prior is the roster plus its goalies. Without roster

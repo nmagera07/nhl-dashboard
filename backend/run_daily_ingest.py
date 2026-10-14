@@ -6,19 +6,21 @@ Runs each ingestion script in its own process, in order:
                                  season that player stats are scoped to)
   2. ingest_advanced_stats.py -- 5-on-5 xG/Corsi/PDO from MoneyPuck (free
                                  for non-commercial use, credited in the UI)
-  3. simulate_playoff_odds.py -- Monte Carlo playoff odds (v2) from today's
+  3. ingest_xg.py             -- PuckPulse xG for each finished game (NHL
+                                 play-by-play), which the odds step uses
+  4. simulate_playoff_odds.py -- Monte Carlo playoff odds (v2) from today's
                                  standings
-  4. game_predictions.py      -- logs today's game predictions (from the
+  5. game_predictions.py      -- logs today's game predictions (from the
                                  ratings step 3 just saved) and grades
                                  earlier ones: the model's track record
-  5. daily_digest.py          -- the morning digest: facts gathered here,
+  6. daily_digest.py          -- the morning digest: facts gathered here,
                                  written up by NHL Intelligence (reads the
                                  odds and ratings step 3 just saved)
-  6. ingest_player_stats.py   -- rosters + season stats, including marking
+  7. ingest_player_stats.py   -- rosters + season stats, including marking
                                  cut/released players off-roster
-  7. team_lines.py            -- each team's lines from its last game (NHL
+  8. team_lines.py            -- each team's lines from its last game (NHL
                                  shift charts), after rosters
-  8. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
+  9. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
                                  ours for a head-to-head score
 
 A failure in one script doesn't stop the next, since e.g. a playoff-odds
@@ -47,6 +49,7 @@ HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
 SCRIPTS = [
     "ingest_standings.py",
     "ingest_advanced_stats.py",
+    "ingest_xg.py",
     "simulate_playoff_odds.py",
     "game_predictions.py",
     "daily_digest.py",

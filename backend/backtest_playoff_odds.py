@@ -345,7 +345,7 @@ def main():
                 for measure, games_by_season in (xg or {}).items():
                     start = season_id // 10000
                     xgd_now = xg_diff_as_of(games_by_season[start], cp["date"])
-                    prior_xgd = season_xgd_per_game(games_by_season[start - 1])
+                    prior_xgd = season_xgd_per_game(games_by_season.get(start - 1, []))
                     c, _, sd = PRODUCTION
                     label = f"xg[{measure}]" if measure else "xg"
                     for w, k, prior_src in XG_VARIANTS:
@@ -356,7 +356,7 @@ def main():
                 if xg is not None and args.skaters_dir:
                     games_by_season = xg[args.xg_measures[0]]
                     start = season_id // 10000
-                    prior_xgd = season_xgd_per_game(games_by_season[start - 1])
+                    prior_xgd = season_xgd_per_game(games_by_season.get(start - 1, []))
                     xgd_now = xg_diff_as_of(games_by_season[start], cp["date"])
                     change = roster_change(args.skaters_dir, start)
                     c, _, sd = PRODUCTION
@@ -395,7 +395,7 @@ def main():
                 if xg is not None and args.goalie_split:
                     games_by_season = xg[args.xg_measures[0]]
                     start = season_id // 10000
-                    prior_xgd = season_xgd_per_game(games_by_season[start - 1])
+                    prior_xgd = season_xgd_per_game(games_by_season.get(start - 1, []))
                     c, _, sd = PRODUCTION
                     priors = {t: c * v for t, v in prior_xgd.items()}
                     for fin in (0.0, 0.25, 0.5):

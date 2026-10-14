@@ -131,6 +131,22 @@ describe("PlayoffsPage", () => {
     expect(screen.queryByText("Why 42%?")).not.toBeInTheDocument();
   });
 
+  it("v2.4: the roster's players stand in for last season", async () => {
+    const pit = { ...WHY.teams.PIT, last_season: 0, last_season_per_game: 0, roster: 0.14, roster_per_game: 0.19,
+                  goalies: 0.04, goalies_per_game: 0.05 };
+    delete pit.roster_change_per_game;
+    mockApi(CURRENT, { ...WHY, teams: { PIT: pit } });
+    renderPage();
+    await screen.findByRole("img", { name: /playoff odds/i });
+    await userEvent.click(rowFor("PIT"));
+
+    expect(await screen.findByText(/\+0\.19 goals\/game vs\. an average roster/)).toBeInTheDocument();
+    expect(screen.getByText(/still 75% of the rating/i)).toBeInTheDocument();
+    expect(screen.queryByText("Last season")).not.toBeInTheDocument();
+    expect(screen.queryByText(/players gained and lost/)).not.toBeInTheDocument();
+    expect(screen.getByText("+0.05 goals/game saved vs. an average tandem")).toBeInTheDocument();
+  });
+
   it("says the breakdown is coming when the latest run predates it", async () => {
     mockApi(CURRENT, { ...WHY, teams: {} });
     renderPage();

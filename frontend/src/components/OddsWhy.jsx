@@ -22,8 +22,8 @@ function scheduleWord(effect) {
 }
 
 // "Why these odds?": the team's rating split into what built it (this
-// season's goals and xG, last season's carryover, roster moves since,
-// goaltending)
+// season's goals and xG, the roster's players or, in older data and the
+// fallback, last season's carryover, goaltending)
 // plus its remaining schedule, each with which way it pushes. Opens under
 // the selected row on the Playoffs page. `why` is one team from GET /playoff-odds/why.
 function OddsWhy({ pct, why, teams, status }) {
@@ -37,6 +37,9 @@ function OddsWhy({ pct, why, teams, status }) {
   }
   const games = `${why.games_played} game${why.games_played === 1 ? "" : "s"}`;
   const priorUnit = why.xg == null ? "goals" : "xG";
+  const share = Math.round(why.last_season_share * 100); // the prior's share of the rating
+  // v2.4: the prior is the roster's players (plus goalies), not last season.
+  const rosterIsPrior = why.roster_per_game != null && !why.last_season_per_game;
   const sched = why.schedule;
 
   return (
@@ -57,14 +60,25 @@ function OddsWhy({ pct, why, teams, status }) {
             <dd><Effect value={why.xg} /></dd>
           </div>
         )}
-        <div>
-          <dt>Last season</dt>
-          <dd>
-            {signed(why.last_season_per_game, 2)} {priorUnit}/game. Still {Math.round(why.last_season_share * 100)}% of the rating; it fades as games are played
-          </dd>
-          <dd><Effect value={why.last_season} /></dd>
-        </div>
-        {Math.abs(why.roster_change_per_game ?? 0) >= NEUTRAL && (
+        {rosterIsPrior ? (
+          <div>
+            <dt>Roster</dt>
+            <dd>
+              {signed(why.roster_per_game, 2)} goals/game vs. an average roster, from its players&apos; last two seasons. Still {share}% of the rating; it fades as games are played
+            </dd>
+            <dd><Effect value={why.roster} /></dd>
+          </div>
+        ) : (
+          <div>
+            <dt>Last season</dt>
+            <dd>
+              {signed(why.last_season_per_game, 2)} {priorUnit}/game. Still {share}% of the rating; it fades as games are played
+            </dd>
+            <dd><Effect value={why.last_season} /></dd>
+          </div>
+        )}
+        {/* Saved before v2.4: roster moves were a separate adjustment to last season. */}
+        {!rosterIsPrior && Math.abs(why.roster_change_per_game ?? 0) >= NEUTRAL && (
           <div>
             <dt>Roster moves</dt>
             <dd>{signed(why.roster_change_per_game, 2)} goals/game from players gained and lost since last season</dd>

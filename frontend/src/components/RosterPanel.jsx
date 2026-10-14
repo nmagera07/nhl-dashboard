@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { formatToi } from "../utils/format.js";
 import TeamNews from "./TeamNews.jsx";
 import TeamSummary from "./TeamSummary.jsx";
 import SeasonSimulator from "./SeasonSimulator.jsx";
+import TeamLines from "./TeamLines.jsx";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
 
@@ -112,6 +114,24 @@ function GoalieTable({ players, onSelectPlayer }) {
   );
 }
 
+// Collapsed until tapped, and only then fetched, like the game preview's.
+function LinesSection({ abbrev }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="team-lines">
+      <details className="preview-lines" onToggle={(e) => setOpen(e.currentTarget.open)}>
+        <summary><h2 className="roster-section-label">Lines</h2><span className="muted">From the last game</span></summary>
+        {open && (
+          <>
+            <TeamLines abbrev={abbrev} showTeam={false} />
+            <p className="preview-note">Who played together most at even strength, from the NHL&apos;s shift charts.</p>
+          </>
+        )}
+      </details>
+    </section>
+  );
+}
+
 function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
   const forwards = roster.filter((p) => ["C", "L", "R"].includes(p.position_code));
   const defensemen = roster.filter((p) => p.position_code === "D");
@@ -126,6 +146,7 @@ function RosterPanel({ team, roster, onSelectPlayer, onBack }) {
       <SkaterTable label="Forwards" players={forwards} onSelectPlayer={onSelectPlayer} />
       <SkaterTable label="Defense" players={defensemen} onSelectPlayer={onSelectPlayer} />
       <GoalieTable players={goalies} onSelectPlayer={onSelectPlayer} />
+      {team && <LinesSection abbrev={team.team_abbrev} />}
       <StatGlossary labels={{ ATOI: "TOI" }} terms={["GP", "G", "A", "PTS", "+/-", "ATOI", "SOG", "PIM", "W", "L", "OTL", "GAA", "SV%", "SO"]} />
     </main>
   );

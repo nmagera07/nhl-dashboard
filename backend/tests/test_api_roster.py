@@ -34,6 +34,18 @@ class TestTeamRoster:
         roster_query = next(q for q, _ in db_router.calls if "where p.team_abbrev" in q.lower())
         assert "and p.on_roster" in " ".join(roster_query.split()).lower()
 
+    def test_the_query_selects_time_on_ice(self, client, db_router, roster_skater_row):
+        # The fake DB returns the fixture row whatever the SQL asks for, so
+        # check the SQL itself: TOI was in the response model and the
+        # fixture, but missing from the SELECT, so production sent nulls.
+        db_router.when("select 1 from teams where team_abbrev", {"?column?": 1})
+        db_router.when("where p.team_abbrev = %s", [roster_skater_row])
+
+        client.get("/teams/COL/roster")
+
+        roster_query = next(q for q, _ in db_router.calls if "where p.team_abbrev" in q.lower())
+        assert "s.avg_toi_seconds" in roster_query
+
     def test_real_team_with_no_roster_rows_returns_200_empty_list(self, client, db_router):
         # Real team (passes the teams existence check), but the roster
         # query itself comes back empty -- e.g. a new team before its

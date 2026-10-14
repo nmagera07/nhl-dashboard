@@ -4,7 +4,7 @@ import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
-import { shortDateLabel } from "../utils/dates.js";
+import TeamLines from "./TeamLines.jsx";
 
 const pct = (v, digits = 1) => (v == null ? "—" : `${(Number(v) * 100).toFixed(digits)}%`);
 const num = (v, digits = 2) => (v == null ? "—" : Number(v).toFixed(digits));
@@ -89,32 +89,6 @@ function inNet(goalies, teamId) {
     .slice(0, 3);
   if (!used.length) return "—";
   return used.map((g) => `${(g.name?.default || "").replace(/^\S+\.\s*/, "")} ${g.gamesPlayed}`).join(" · ");
-}
-
-function TeamLines({ abbrev }) {
-  const { data, status } = useFetchWithStatus(`${API_BASE}/teams/${abbrev}/lines`);
-  if (status === "error") return <p className="preview-note">Couldn&apos;t load {abbrev}&apos;s lines.</p>;
-  if (!data) return <p className="preview-note">Loading…</p>;
-  const group = (items, label) =>
-    items.length > 0 && (
-      <ol className="preview-lines-list" aria-label={`${abbrev} ${label}`}>
-        {items.map((l) => (
-          <li key={l.player_ids.join("-")}>
-            <span>{l.players.join(" – ")}</span>
-            <span className="muted">{l.minutes} min</span>
-          </li>
-        ))}
-      </ol>
-    );
-  if (!data.game) return <p className="preview-note">No {abbrev} lines yet this season.</p>;
-  const { date, opponent, home } = data.game;
-  return (
-    <div className="preview-lines-team">
-      <h3>{abbrev} <span className="muted">· {shortDateLabel(date)} {home ? "vs" : "@"} {opponent}</span></h3>
-      {group(data.lines, "forward lines")}
-      {group(data.pairs, "defense pairs")}
-    </div>
-  );
 }
 
 // Each team's lines from its last game (NHL shift charts, at even strength).

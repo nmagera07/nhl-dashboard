@@ -425,8 +425,8 @@ class TestRatingParts:
         pit, bos = parts["PIT"], parts["BOS"]
         assert pit["goals"] + pit["xg"] + pit["last_season"] + pit["roster"] == pytest.approx(ratings["PIT"][0], abs=1e-3)
         assert pit["last_season_per_game"] == pytest.approx(0.1 / PRIOR_CARRYOVER)  # unchanged by the moves
-        assert pit["roster_change_per_game"] == 0.15 and pit["roster"] > 0
-        assert bos["roster"] == 0 and bos["roster_change_per_game"] == 0
+        assert pit["roster_per_game"] == 0.15 and pit["roster"] > 0
+        assert bos["roster"] == 0 and bos["roster_per_game"] == 0
 
     def test_goaltending_is_its_own_part(self):
         moves, goalies = {"PIT": 0.15}, {"PIT": -0.04, "BOS": 0.06}
@@ -439,6 +439,17 @@ class TestRatingParts:
             assert total == pytest.approx(ratings[team][0], abs=1e-3)
         assert parts["PIT"]["last_season_per_game"] == pytest.approx(0.1 / PRIOR_CARRYOVER)
         assert parts["PIT"]["goalies_per_game"] == -0.04 and parts["BOS"]["goalies"] > 0
+
+    def test_v24_prior_is_roster_plus_goalies_with_no_last_season_part(self):
+        roster, goalies = {"PIT": 0.2, "BOS": -0.1}, {"PIT": -0.05}
+        priors = with_roster_change(with_roster_change({}, roster), goalies)
+        ratings = team_ratings(blend_xg(self.standings, self.xgd), priors, prior_games=PRIOR_GAMES_XG)
+        parts = rating_parts(self.standings, self.xgd, priors, PRIOR_GAMES_XG, XG_WEIGHT, roster, goalies)
+
+        pit = parts["PIT"]
+        assert pit["last_season"] == 0 and pit["last_season_per_game"] == 0
+        assert pit["roster_per_game"] == 0.2 and pit["goalies_per_game"] == -0.05
+        assert pit["goals"] + pit["xg"] + pit["roster"] + pit["goalies"] == pytest.approx(ratings["PIT"][0], abs=1e-3)
 
     def test_goals_only_fallback_has_no_xg_part(self):
         ratings = team_ratings(self.standings, self.priors)

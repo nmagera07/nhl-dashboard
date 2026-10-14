@@ -261,12 +261,13 @@ class ToolRunner:
         result = {
             "as_of": why.get("as_of_date"),
             "teams": [_breakdown(t, names.get(t), teams[t], pct.get(t), len(teams)) for t in (abbrev, opp) if t],
-            "how_to_read": "Rating = goals + xg + last_season + roster_moves + goaltending (goals/game vs. an average team; "
-                           "roster_moves = value of players gained minus players lost since last season; goaltending = "
-                           "the current goalies' saves above expected vs. an average tandem). 'push' says which way each "
+            "how_to_read": "Rating = goals + xg + roster + goaltending (goals/game vs. an average team; roster = how good this "
+                           "roster's players were over the last two seasons vs. an average roster; goaltending = the current "
+                           "goalies' saves above expected vs. an average tandem). Older data has last_season + roster_moves "
+                           "in place of roster. 'push' says which way each "
                            "factor moves the rating; use it as given, and say 'negligible' factors barely matter. Compare factors by "
-                           "'effect', not weight: last_season.weight_vs_this_season_pct is how much the model still trusts "
-                           "last season over this season's few games (it fades as games are played). Playoff "
+                           "'effect', not weight: weight_vs_this_season_pct is how much the model still trusts the "
+                           "roster (or last season) over this season's few games (it fades as games are played). Playoff "
                            "odds also depend on points already banked, not just the rating.",
         }
         if opp:
@@ -496,11 +497,19 @@ def _breakdown(team: str, name: str | None, w: dict, playoff_pct: float | None, 
                   "push": _push(w.get("goals"))},
         "xg": {"xg_diff": w.get("xg_diff"), "effect": w.get("xg"), "push": _push(w.get("xg"))} if w.get("xg") is not None else None,
         "goals_vs_xg": _finishing(w),
-        "last_season": {("xg_diff_per_game" if w.get("xg") is not None else "goal_diff_per_game"): w.get("last_season_per_game"),
-                        "weight_vs_this_season_pct": round((w.get("last_season_share") or 0) * 100),
-                        "effect": w.get("last_season"), "push": _push(w.get("last_season"))},
-        "roster_moves": {"goals_per_game_gained_or_lost": w.get("roster_change_per_game"), "effect": w.get("roster"),
-                         "push": _push(w.get("roster"))} if w.get("roster_change_per_game") else None,
+        # v2.4: the prior is the roster's players; older data (and the
+        # fallback) carry last season's xG plus roster moves instead.
+        **({"roster": {"players_goals_per_game_vs_average_roster": w.get("roster_per_game"),
+                       "weight_vs_this_season_pct": round((w.get("last_season_share") or 0) * 100),
+                       "effect": w.get("roster"), "push": _push(w.get("roster"))}}
+           if w.get("roster_per_game") is not None and not w.get("last_season_per_game") else {
+            "last_season": {("xg_diff_per_game" if w.get("xg") is not None else "goal_diff_per_game"): w.get("last_season_per_game"),
+                            "weight_vs_this_season_pct": round((w.get("last_season_share") or 0) * 100),
+                            "effect": w.get("last_season"), "push": _push(w.get("last_season"))},
+            "roster_moves": {"goals_per_game_gained_or_lost": w.get("roster_change_per_game") or w.get("roster_per_game"),
+                             "effect": w.get("roster"), "push": _push(w.get("roster"))}
+            if (w.get("roster_change_per_game") or w.get("roster_per_game")) else None,
+        }),
         "goaltending": {"goals_per_game_saved_vs_average_tandem": w.get("goalies_per_game"), "effect": w.get("goalies"),
                         "push": _push(w.get("goalies"))} if w.get("goalies_per_game") else None,
         "schedule": {"games_left": sched.get("games_left"), "rank": f"{_ordinal(sched.get('rank'))} easiest of {league_size}",

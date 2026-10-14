@@ -118,6 +118,40 @@ def player_values(current, previous, rosters=None):
     return out
 
 
+# Lineup slots per game, for team_roster_strength().
+LINEUP_SLOTS = {"F": 12, "D": 6}
+
+
+def team_roster_strength(values, last, rosters, slots=LINEUP_SLOTS):
+    """
+    {team: goals/game its skaters add vs. a league-average roster}: each
+    rostered skater's value (goals/game over replacement) times his
+    expected share of games (last season's games / a full season). If a
+    team's regulars at a position add up to more than its lineup slots
+    (12 forwards, 6 defensemen), their shares are scaled down to fit, since
+    some will sit; slots left over are filled at replacement level (0).
+    Centered on the league. A WAR-style team rating: the sum of its players.
+    """
+    shares = defaultdict(lambda: defaultdict(list))  # team -> F/D -> [(value, share)]
+    for pid, team in rosters.items():
+        v = values.get(pid)
+        played = min(last.get(pid, {}).get("gp", 0) / FULL_SEASON_GP, 1.0)
+        if v and played:
+            shares[team][position_group(v["pos"])].append((v["value"], played))
+    totals = {}
+    for team, groups in shares.items():
+        total = 0.0
+        for group, players in groups.items():
+            weight = sum(s for _, s in players)
+            scale = min(1.0, slots[group] / weight) if weight else 0.0
+            total += scale * sum(v * s for v, s in players)
+        totals[team] = total
+    if not totals:
+        return {}
+    mean = sum(totals.values()) / len(totals)
+    return {t: round(v - mean, 4) for t, v in totals.items()}
+
+
 # Relocated franchises: last season's roster counts toward the new team.
 FRANCHISE_MOVES = {"ARI": "UTA"}
 FULL_SEASON_GP = 82

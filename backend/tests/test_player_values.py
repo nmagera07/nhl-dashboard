@@ -152,3 +152,19 @@ class TestAging:
         seasons = {2024: {1: {"gp": 40, "gs": 20.0}, 2: {"gp": 40, "gs": 20.0}},
                    2025: {1: {"gp": 40, "gs": 30.0}, 2: {"gp": 10, "gs": 9.0}, 3: {"gp": 40, "gs": 9.0}}}
         assert pv.aging_pairs(seasons, {2025: {1: 24, 2: 24, 3: 24}}) == [(24, 0.25, 40.0)]
+
+
+class TestRosterStrength:
+    def test_sums_values_by_games_and_centers_on_the_league(self):
+        values = {1: {"pos": "C", "value": 0.10}, 2: {"pos": "D", "value": 0.05}, 3: {"pos": "C", "value": -0.02}}
+        last = {1: {"gp": 82}, 2: {"gp": 41}, 3: {"gp": 82}}
+        strength = pv.team_roster_strength(values, last, {1: "AAA", 2: "AAA", 3: "BBB"})
+        aaa, bbb = 0.10 + 0.05 * 0.5, -0.02
+        assert strength == pytest.approx({"AAA": round(aaa - (aaa + bbb) / 2, 4), "BBB": round(bbb - (aaa + bbb) / 2, 4)})
+
+    def test_more_regulars_than_slots_are_scaled_to_fit(self):
+        values = {i: {"pos": "D", "value": 0.06} for i in range(8)}  # 8 full-time D for 6 slots
+        last = {i: {"gp": 82} for i in range(8)}
+        rosters = {**{i: "DEEP" for i in range(8)}, 99: "NONE"}
+        strength = pv.team_roster_strength({**values, 99: {"pos": "C", "value": 0.0}}, {**last, 99: {"gp": 82}}, rosters)
+        assert strength["DEEP"] - strength["NONE"] == pytest.approx(6 * 0.06, abs=1e-3)

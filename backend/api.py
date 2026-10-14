@@ -984,7 +984,7 @@ def team_roster(team_abbrev: str = Path(..., max_length=3)):
                        s.shorthanded_goals, s.shorthanded_points,
                        s.game_winning_goals, s.ot_goals,
                        s.wins, s.losses, s.ot_losses, s.goals_against_avg,
-                       s.save_pctg, s.shutouts
+                       s.save_pctg, s.shutouts, s.avg_toi_seconds
                 FROM players p
                 LEFT JOIN LATERAL (
                     SELECT * FROM player_season_stats pss
@@ -1038,7 +1038,7 @@ def player_leaders(request: Request, view: Literal["full", "table"] = Query("ful
                        s.shorthanded_goals, s.shorthanded_points,
                        s.game_winning_goals, s.ot_goals,
                        s.wins, s.losses, s.ot_losses, s.goals_against_avg,
-                       s.save_pctg, s.shutouts
+                       s.save_pctg, s.shutouts, s.avg_toi_seconds
                 FROM players p
                 JOIN teams t ON t.team_abbrev = p.team_abbrev
                 LEFT JOIN LATERAL (

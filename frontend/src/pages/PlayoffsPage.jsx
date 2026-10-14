@@ -28,12 +28,13 @@ function Change({ value }) {
   );
 }
 
-function RaceRows({ label, teams, odds, highlighted, onHighlight, why }) {
+function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChange }) {
+  const columns = showChange ? 6 : 5;
   const [favorite] = useFavoriteTeam();
   return (
     <>
       <tr className="race-group">
-        <th colSpan={6} scope="colgroup">{label}</th>
+        <th colSpan={columns} scope="colgroup">{label}</th>
       </tr>
       {teams.map((row) => {
         const status = clinchStatus(row.clinch_indicator);
@@ -74,11 +75,11 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why }) {
                   {formatOdds(teamOdds?.pct)}
                 </span>
               </td>
-              <td><Change value={teamOdds?.change} /></td>
+              {showChange && <td><Change value={teamOdds?.change} /></td>}
             </tr>
             {selected && why && teamOdds && (
               <tr className="race-why-row">
-                <td colSpan={6}>
+                <td colSpan={columns}>
                   <OddsWhy pct={teamOdds.pct} why={why.data.teams[row.team_abbrev]} teams={why.teamCount} status={why.status} />
                 </td>
               </tr>
@@ -124,6 +125,9 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
     () => (latest.season_id === currentSeason ? latestWithChange(latest.points) : {}),
     [latest, currentSeason]
   );
+  // The 7d column needs a snapshot from a week back; early in a season
+  // there isn't one yet, and a column of dashes looks broken.
+  const showChange = Object.values(odds).some((o) => o.change != null);
 
   // Same season check as the odds: no breakdown for last season's numbers.
   const why = Object.keys(odds).length
@@ -229,25 +233,26 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
                 <th scope="col"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
                 <th scope="col" className="race-col-pace"><StatAbbr term="PACE">Pace</StatAbbr></th>
                 <th scope="col" className="race-col-odds"><StatAbbr term="PO%" /></th>
-                <th scope="col"><StatAbbr term="7D">7d</StatAbbr></th>
+                {showChange && <th scope="col"><StatAbbr term="7D">7d</StatAbbr></th>}
               </tr>
             </thead>
             <tbody>
               {groups.divisions.map((d) => (
-                <RaceRows key={d.name} label={d.name} teams={d.teams} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
+                <RaceRows key={d.name} label={d.name} teams={d.teams} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} showChange={showChange} />
               ))}
-              <RaceRows label="Wild card" teams={groups.wildcards} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
-              <tr className="race-cutline" aria-hidden="true"><td colSpan={6} /></tr>
-              <RaceRows label="Chasing" teams={groups.chasing} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} />
+              <RaceRows label="Wild card" teams={groups.wildcards} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} showChange={showChange} />
+              <tr className="race-cutline" aria-hidden="true"><td colSpan={showChange ? 6 : 5} /></tr>
+              <RaceRows label="Chasing" teams={groups.chasing} odds={odds} highlighted={highlighted} onHighlight={highlight} why={why} showChange={showChange} />
             </tbody>
           </table>
         </div>
         )}
       </section>
 
-      <StatGlossary terms={["GP", "TEAM_PTS", "PACE", "PO%", "7D"]} labels={{ TEAM_PTS: "PTS", PACE: "Pace", "7D": "7d" }} />
+      <StatGlossary terms={showChange ? ["GP", "TEAM_PTS", "PACE", "PO%", "7D"] : ["GP", "TEAM_PTS", "PACE", "PO%"]} labels={{ TEAM_PTS: "PTS", PACE: "Pace", "7D": "7d" }} />
       <p className="data-credit">
-        Odds from 10,000 simulations of the rest of the season, blending goals with expected goals (xG) courtesy of{" "}
+        Odds from 10,000 simulations of the rest of the season, blending goals with PuckPulse&apos;s own expected goals
+        (xG, from NHL play-by-play) and each roster&apos;s players. Player and goalie data courtesy of{" "}
         <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
         {" "}<Link className="accent-link" to="/track-record">How accurate is the model?</Link>
       </p>

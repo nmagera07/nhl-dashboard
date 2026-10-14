@@ -77,6 +77,14 @@ describe("PlayoffsPage", () => {
     expect(screen.queryByRole("link", { name: "COL" })).not.toBeInTheDocument(); // other conference
   });
 
+  it("hides the 7d column until there's a snapshot from a week back", async () => {
+    mockApi({ ...CURRENT, points: [...pts("2026-11-05", { PIT: 0.3 }), ...pts("2026-11-08", { PIT: 0.42 })] });
+    renderPage();
+    await screen.findByRole("img", { name: /playoff odds/i });
+
+    expect(screen.queryByRole("columnheader", { name: /7d/i })).not.toBeInTheDocument();
+  });
+
   it("shows clinched and eliminated badges", async () => {
     mockApi();
     renderPage();

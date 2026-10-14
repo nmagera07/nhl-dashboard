@@ -160,6 +160,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-14 — The TOI column that passed every test and showed nothing
+
+**Report (Nate):** time on ice never shows on team rosters.
+
+**Cause:** the TOI work three days earlier added the column to the database, the ingest, the
+response model, the fixture and the UI, but not to the roster query's `SELECT` list. The
+query names its columns one by one, so the API filled `avg_toi_seconds` with its default:
+null. The league leaders query had the same gap. The data was there all along (666 of 734
+skaters this season).
+
+**Why the tests passed:** the API tests use a fake database that returns whatever row the
+test hands it. The fixture row included `avg_toi_seconds`, so the response had it, whatever
+the SQL asked for. The tests proved the plumbing *after* the database, not the query itself.
+
+**Fix:** add the column to both queries, plus a test that checks the SQL text for
+`s.avg_toi_seconds`.
+
+**Lesson:** *a fake that returns fixed rows can't catch a missing column.* When a field
+crosses a hand-written `SELECT`, test the query (or run it against a real database), not just
+the response.
+
+**Same session, two smaller ones:**
+- *The Playoffs "7d" column:* it compares with odds from at least 7 days back, and the odds
+  history began only 7 days earlier, so every row showed "—". It's not a bug, but it looked
+  like one, so the column now hides until there's data.
+- *The lines card:* it existed only on upcoming game previews, which is hard to find on a
+  2-game night. Team pages now have a collapsed "Lines" section too.
+
 ## 2026-10-14 — Our own expected goals (model v2.5)
 
 **Why:** the playoff model's main input, xG, came from MoneyPuck's free files. If they

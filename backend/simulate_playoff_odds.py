@@ -52,7 +52,7 @@ import os
 import random
 import time
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 import psycopg2
 import requests
@@ -75,13 +75,20 @@ MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 SCHEDULE_URL = "https://api-web.nhle.com/v1/club-schedule-season/{team}/{season}"
 
-MODEL_VERSION = "v2.5"       # logged with every game prediction (game_predictions.py)
+MODEL_VERSION = "v2.6"       # logged with every game prediction (game_predictions.py)
 
-# Game model -- fit by calibrate_playoff_model.py.
-HOME_EDGE = 0.264            # goals/game of home-ice advantage
-SCALE = 1.47                 # logistic steepness, in goals/game
-OT_PROBABILITY = 0.221       # share of games reaching overtime
-SHOOTOUT_SHARE_OF_OT = 0.32  # share of OT games decided in a shootout
+# Game model -- fit by calibrate_playoff_model.py on 5,248 games (2022-23 to
+# 2025-26). The second night of a back-to-back is part of the margin (v2.6):
+# a tired road team is worth +0.53 goals/game to the home team, a tired home
+# team -0.31. Without it, "home ice" (0.24) was partly road fatigue, since
+# road teams play the second night about twice as often. Better log loss in
+# all 4 seasons held out. Who starts in net added nothing measurable.
+HOME_EDGE = 0.160            # goals/game of home-ice advantage
+SCALE = 1.457                # logistic steepness, in goals/game
+HOME_B2B = -0.306            # home team on the 2nd night of a back-to-back
+AWAY_B2B = 0.530             # away team on the 2nd night (helps the home team)
+OT_PROBABILITY = 0.223       # share of games reaching overtime
+SHOOTOUT_SHARE_OF_OT = 0.319 # share of OT games decided in a shootout
 
 # Team-strength model -- chosen by backtest_playoff_odds.py.
 PRIOR_CARRYOVER = 0.5        # how much of last season's strength carries over
@@ -143,9 +150,20 @@ def nhl_get(url, retries=6):
     response.raise_for_status()
 
 
-def win_probability(home_rating, away_rating):
+def home_margin(home_b2b=False, away_b2b=False, model=None):
+    """
+    The home team's built-in edge in goals/game: home ice plus the second
+    night of a back-to-back for either side. `model` (a sim_inputs()
+    "model" dict) supplies the constants it was saved with.
+    """
+    m = model or {}
+    edge = m.get("home_edge", HOME_EDGE)
+    return edge + (m.get("home_b2b", HOME_B2B) if home_b2b else 0.0) + (m.get("away_b2b", AWAY_B2B) if away_b2b else 0.0)
+
+
+def win_probability(home_rating, away_rating, home_b2b=False, away_b2b=False):
     """P(home team wins), ratings in goals/game of strength."""
-    x = (home_rating - away_rating + HOME_EDGE) / SCALE
+    x = (home_rating - away_rating + home_margin(home_b2b, away_b2b)) / SCALE
     if x < -700:  # avoid math.exp overflow on absurd inputs
         return 0.0
     return 1 / (1 + math.exp(-x))
@@ -188,18 +206,35 @@ def fetch_season_games(team_abbrevs, season_id):
                 "away_score": g["awayTeam"].get("score") if final else None,
             }
         time.sleep(0.2)
-    return list(seen.values())
+    return mark_back_to_backs(list(seen.values()))
+
+
+def mark_back_to_backs(games):
+    """Adds home_b2b / away_b2b to each game: that team also plays (or
+    played) the day before. Known from the schedule alone, so future
+    games get it too."""
+    days = defaultdict(set)
+    for g in games:
+        days[g["home"]].add(g["date"])
+        days[g["away"]].add(g["date"])
+    for g in games:
+        yesterday = str(date.fromisoformat(g["date"]) - timedelta(days=1))
+        g["home_b2b"] = yesterday in days[g["home"]]
+        g["away_b2b"] = yesterday in days[g["away"]]
+    return games
 
 
 def split_games(games, as_of_date):
     """
-    (completed games with scores up to the date, remaining (home, away)
-    pairs). Standings for a date include that day's games once they're
+    (completed games with scores up to the date, remaining (home, away,
+    home_b2b, away_b2b) tuples). Standings for a date include that day's games once they're
     played, so a game on the as-of date is remaining until it has a final
     score -- the daily run happens before that day's games, and treating
     them as done dropped them from the simulation entirely.
     """
-    return [g for g in games if _is_played(g, as_of_date)], [(g["home"], g["away"]) for g in remaining_games(games, as_of_date)]
+    remaining = [(g["home"], g["away"], g.get("home_b2b", False), g.get("away_b2b", False))
+                 for g in remaining_games(games, as_of_date)]
+    return [g for g in games if _is_played(g, as_of_date)], remaining
 
 
 def _is_played(game, as_of_date):
@@ -340,16 +375,21 @@ def schedule_strength(ratings, games, as_of_date):
     """
     How the remaining schedule helps or hurts each team, in goals/game like
     the rating: how much weaker than a typical team's opponents its
-    opponents are, plus home ice for any extra home games. Positive = an
+    opponents are, plus home ice for any extra home games, plus rest (its
+    own back-to-backs cost it; its opponents' help it). Positive = an
     easier road ahead. {team: {"games_left", "home_games", "effect"}}.
     """
     opponents = defaultdict(list)
     home_games = defaultdict(int)
+    rest = defaultdict(float)  # goals/game the team gains (+) or loses to back-to-backs
     for g in remaining_games(games, as_of_date):
         if g["home"] in ratings and g["away"] in ratings:
             opponents[g["home"]].append(ratings[g["away"]][0])
             opponents[g["away"]].append(ratings[g["home"]][0])
             home_games[g["home"]] += 1
+            fatigue = home_margin(g.get("home_b2b"), g.get("away_b2b")) - HOME_EDGE
+            rest[g["home"]] += fatigue
+            rest[g["away"]] -= fatigue
     avg_opp = {t: sum(o) / len(o) for t, o in opponents.items()}
     if not avg_opp:
         return {t: {"games_left": 0, "home_games": 0, "effect": 0.0} for t in ratings}
@@ -364,7 +404,7 @@ def schedule_strength(ratings, games, as_of_date):
         out[team] = {
             "games_left": n,
             "home_games": home_games[team],
-            "effect": round(typical - avg_opp[team] + home_tilt, 4),
+            "effect": round(typical - avg_opp[team] + home_tilt + rest[team] / n, 4),
         }
     return out
 
@@ -534,6 +574,8 @@ def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None)
     cutline_samples = defaultdict(list)
     divisions = defaultdict(list)
     conferences = {}
+    # Each game's home margin (home ice + back-to-backs) once, not per trial.
+    games = [(home, away, home_margin(*b2b)) for home, away, *b2b in schedule]
     for abbrev, s in standings.items():
         divisions[s["division"]].append(abbrev)
         conferences[abbrev] = s["conference"]
@@ -552,8 +594,9 @@ def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None)
             for abbrev, s in standings.items()
         }
 
-        for home, away in schedule:
-            home_wins = rng.random() < win_probability(strength[home], strength[away])
+        for home, away, margin in games:
+            x = (strength[home] - strength[away] + margin) / SCALE
+            home_wins = rng.random() < (1 / (1 + math.exp(-x)) if x > -700 else 0.0)
             winner, loser = (home, away) if home_wins else (away, home)
             trial[winner]["points"] += 2
             trial[winner]["wins"] += 1
@@ -597,6 +640,8 @@ def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, playe
             "version": MODEL_VERSION,
             "home_edge": HOME_EDGE,
             "scale": SCALE,
+            "home_b2b": HOME_B2B,
+            "away_b2b": AWAY_B2B,
             "ot_probability": OT_PROBABILITY,
             "shootout_share_of_ot": SHOOTOUT_SHARE_OF_OT,
         },
@@ -615,7 +660,9 @@ def sim_inputs(standings, ratings, games, season_id, as_of_date, why=None, playe
             }
             for abbrev, s in standings.items()
         },
-        "games": [[g["date"], g["home"], g["away"]] for g in remaining_games(games, as_of_date)],
+        # [date, home, away, home_b2b, away_b2b]; readers unpack the first three.
+        "games": [[g["date"], g["home"], g["away"], g.get("home_b2b", False), g.get("away_b2b", False)]
+                  for g in remaining_games(games, as_of_date)],
     }
 
 

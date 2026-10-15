@@ -13,14 +13,16 @@ Runs each ingestion script in its own process, in order:
   5. game_predictions.py      -- logs today's game predictions (from the
                                  ratings step 3 just saved) and grades
                                  earlier ones: the model's track record
-  6. daily_digest.py          -- the morning digest: facts gathered here,
+  6. market_odds.py           -- Kalshi's odds for today's games, logged next
+                                 to our predictions (graded later, both ways)
+  7. daily_digest.py          -- the morning digest: facts gathered here,
                                  written up by NHL Intelligence (reads the
                                  odds and ratings step 3 just saved)
-  7. ingest_player_stats.py   -- rosters + season stats, including marking
+  8. ingest_player_stats.py   -- rosters + season stats, including marking
                                  cut/released players off-roster
-  8. team_lines.py            -- each team's lines from its last game (NHL
+  9. team_lines.py            -- each team's lines from its last game (NHL
                                  shift charts), after rosters
-  9. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
+  10. moneypuck_odds.py        -- MoneyPuck's playoff odds, logged next to
                                  ours for a head-to-head score
 
 A failure in one script doesn't stop the next, since e.g. a playoff-odds
@@ -52,6 +54,7 @@ SCRIPTS = [
     "ingest_xg.py",
     "simulate_playoff_odds.py",
     "game_predictions.py",
+    "market_odds.py",
     "daily_digest.py",
     "ingest_player_stats.py",
     "team_lines.py",

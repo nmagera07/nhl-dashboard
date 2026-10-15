@@ -385,6 +385,26 @@ CREATE TABLE IF NOT EXISTS team_lines (
     updated_at              TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Prediction-market odds for each game, logged before puck drop next to our
+-- prediction (game_predictions) so both can be graded. Created and granted by
+-- the daily job itself; see market_odds.py.
+CREATE TABLE IF NOT EXISTS market_odds (
+    game_id                 BIGINT NOT NULL,
+    source                  VARCHAR(16) NOT NULL,
+    captured                VARCHAR(10) NOT NULL,
+    game_date               DATE NOT NULL,
+    home_abbrev             VARCHAR(3) NOT NULL,
+    away_abbrev             VARCHAR(3) NOT NULL,
+    home_prob               NUMERIC(5,4) NOT NULL,
+    home_bid                NUMERIC(5,4),
+    home_ask                NUMERIC(5,4),
+    away_bid                NUMERIC(5,4),
+    away_ask                NUMERIC(5,4),
+    volume                  NUMERIC(14,2),
+    captured_at             TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (game_id, source, captured)
+);
+
 -- MoneyPuck's playoff odds, logged daily next to playoff_odds (same
 -- as_of_date = same games seen) for a head-to-head score. Created by the
 -- daily job itself; see moneypuck_odds.py.

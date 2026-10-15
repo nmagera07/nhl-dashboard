@@ -920,6 +920,47 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
         conn.close()
 
 
+@app.get("/market-odds")
+@daily_cached
+def market_odds_for_day(day: date = Query(..., alias="date")):
+    """
+    The sportsbook consensus for each game on a date (logged before puck
+    drop by market_odds.py): the home team's implied win probability with
+    the books' margin removed, the median moneylines, and how many books.
+    Only sportsbooks: Kalshi's prices are logged for grading, not shown.
+    {"date", "games": {game_id: {...}}}; empty before the first daily run.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    SELECT game_id, home_abbrev, away_abbrev, home_prob, home_line, away_line, books, captured_at
+                    FROM market_odds WHERE game_date = %s AND source = 'sportsbooks' AND captured = 'morning'
+                    """,
+                    (day,),
+                )
+                rows = cur.fetchall()
+            except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn):
+                conn.rollback()  # the daily job hasn't created the table (or columns) yet
+                rows = []
+        games = {
+            str(r["game_id"]): {
+                "home": r["home_abbrev"], "away": r["away_abbrev"], "home_prob": float(r["home_prob"]),
+                "home_line": r["home_line"], "away_line": r["away_line"], "books": r["books"],
+                "as_of": r["captured_at"].isoformat() if r["captured_at"] else None,
+            }
+            for r in rows
+        }
+        return {"date": str(day), "games": games}
+    except Exception:
+        logger.error(f"Failed to fetch market odds for {day}", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
 @app.get("/teams/{team_abbrev}/lines")
 @daily_cached
 def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):

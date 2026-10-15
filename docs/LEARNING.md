@@ -164,6 +164,39 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-15 — Market view: the model next to the sportsbooks
+
+**Which odds?**
+- *Sportsbooks* (DraftKings, FanDuel, BetMGM…) are what bettors recognize ("DET -138").
+- *Kalshi* prices are already probabilities.
+- *Polymarket* lists NHL games, but $4K-$50K per game is 20-200x thinner than Kalshi.
+
+Shown: the **sportsbook consensus** via The Odds API (free tier: 500 calls a month, and one
+call covers every game). Kalshi stays in the comparison log only, because I couldn't verify
+its terms for displaying prices elsewhere.
+
+**Turning moneylines into one probability:**
+1. *Implied probability:* -150 means 150/250 = 60%, and +130 means 100/230 = 43.5%. They sum
+   to 103.5%; the extra 3.5% is the book's margin (the "vig").
+2. *Remove the margin per book:* divide each side by the sum (60/103.5 = 58%).
+3. *Take the median across books* (9 today), so one outlier book can't move it.
+
+**First real comparison (11 games):** the sportsbooks and Kalshi agreed within about a point on
+every game. The markets are consistent with each other, and PuckPulse is the outlier, by up to
+6 points, mostly less confident on favorites (VGK, FLA, TBL each about 5 points lower) and
+higher on Detroit. Whether that's an edge or a blind spot is what the grading log is for.
+
+**On the page:** collapsed under the game preview's win probability, fetched only when opened.
+Two rows (PuckPulse, Sportsbooks), the median moneylines, one sentence on the gap ("PuckPulse
+is 5 points higher on DET than the books"), and "For entertainment, 21+... 1-800-GAMBLER".
+The phone screenshot caught a ragged layout and the hotline wrapping at a hyphen.
+
+**Small lessons:**
+- *Team names never match across APIs:* "St Louis" vs "St. Louis". Compare normalized names
+  (no punctuation, no accents).
+- *Keys stay out of the transcript:* the script read the key from `.env` and printed only the
+  quota headers.
+
 ## 2026-10-14 — "I only get one goal alert a game"
 
 **Report (Nate):** goal alerts arrive about once per game; it should be every goal.

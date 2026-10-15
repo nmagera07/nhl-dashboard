@@ -11,6 +11,7 @@
 @import "./styles/team.css"; /* Team page: summary, trend, roster */
 @import "./styles/players.css"; /* Players: leaderboard and player page */
 @import "./styles/track-record.css"; /* Track record page */
+@import "./styles/pickem.css"; /* "Beat PuckPulse" pick'em */
 @import "./styles/playoffs.css"; /* Playoffs page: odds chart, race table, why-these-odds */
 @import "./styles/my-team.css"; /* My team card, follow button, star markers */
 @import "./styles/season-sim.css"; /* Season simulator (team page) */

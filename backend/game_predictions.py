@@ -40,7 +40,9 @@ def predictions(games: list[dict], payload: dict, day: date) -> list[dict]:
     """Today's not-yet-started games with the model's home-win probability."""
     teams = payload.get("teams", {})
     model = payload.get("model", {})
-    home_edge, scale = model.get("home_edge", sim.HOME_EDGE), model.get("scale", sim.SCALE)
+    scale = model.get("scale", sim.SCALE)
+    # Back-to-back flags ride along in the saved schedule ([date, home, away, home_b2b, away_b2b]).
+    b2b = {(row[0], row[1], row[2]): row[3:5] for row in payload.get("games", []) if len(row) >= 5}
     rows = []
     for g in games:
         if g.get("gameState") not in NOT_STARTED:
@@ -52,7 +54,7 @@ def predictions(games: list[dict], payload: dict, day: date) -> list[dict]:
         rows.append({
             "game_id": g["id"], "season_id": payload["season_id"], "game_date": day,
             "home_abbrev": home, "away_abbrev": away,
-            "home_win_prob": round(1 / (1 + math.exp(-(hr - ar + home_edge) / scale)), 4),
+            "home_win_prob": round(1 / (1 + math.exp(-(hr - ar + sim.home_margin(*b2b.get((str(day), home, away), ()), model=model)) / scale)), 4),
             "home_rating": hr, "away_rating": ar,
             "model_version": model.get("version", sim.MODEL_VERSION), "source": "daily",
         })

@@ -168,6 +168,15 @@ class TestTools:
                                  "effect": 0.12, "push": "pushes up"}
         assert "last_season" not in pit and "roster_moves" not in pit
 
+    async def test_next_meeting_includes_a_back_to_back(self, monkeypatch):
+        monkeypatch.setitem(SIM_INPUTS, "model", {"home_edge": 0.16, "scale": 1.457, "home_b2b": -0.306, "away_b2b": 0.53})
+        monkeypatch.setitem(SIM_INPUTS, "games", [["2026-10-10", "PIT", "COL", False, True], *SIM_INPUTS["games"]])
+        meeting = (await self.call("explain_odds", {"team": "PIT", "opponent": "COL"}))["matchup"]["next_meeting"]
+
+        # (0.2 - 0.6 + 0.16 + 0.53) / 1.457 -> PIT is now favored at home against a tired COL.
+        assert meeting["PIT_win_pct"] == 55.0 and meeting["back_to_back"] == ["COL"]
+        assert "second night of a back-to-back" in meeting["note"]
+
     async def test_explain_odds_compares_two_teams_and_their_next_meeting(self):
         result = await self.call("explain_odds", {"team": "PIT", "opponent": "COL"})
 

@@ -33,3 +33,4 @@
 .preview-lines-list li { display: flex; justify-content: space-between; gap: 10px; }
 .preview-lines-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .preview-lines-list li span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.preview-rest { margin: 8px 0 0; font-size: 12px; color: var(--text); }

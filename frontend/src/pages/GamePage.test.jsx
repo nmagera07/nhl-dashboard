@@ -248,6 +248,20 @@ describe("GamePage", () => {
     expect(screen.getByText(/Not tonight's confirmed lineup/)).toBeInTheDocument();
   });
 
+  it("a team on the second night of a back-to-back shifts the odds, and the preview says so", async () => {
+    const upcoming = finalGame({
+      gameState: "FUT", gameDate: "2026-10-14", linescore: {}, shotsByPeriod: [], summary: {}, teamGameStats: [],
+      awayTeam: { abbrev: "DAL" }, homeTeam: { abbrev: "COL" }, matchup: {},
+    });
+    const sim = { model: { home_edge: 0.16, scale: 1.457, home_b2b: -0.306, away_b2b: 0.53 },
+                  teams: { DAL: { rating: 0.1 }, COL: { rating: 0.1 } }, games: [["2026-10-14", "COL", "DAL", false, true]] };
+    renderGame(upcoming, { standings: [] }, sim);
+
+    // Equal teams: home ice (0.16) plus a tired road team (0.53) -> 62%.
+    expect(await screen.findByRole("img", { name: "DAL 38% chance to win, COL 62%" })).toBeInTheDocument();
+    expect(screen.getByText(/DAL played last night/)).toBeInTheDocument();
+  });
+
   it("shows each team's record from the standings once the game has started", async () => {
     const standings = [
       { team_abbrev: "NSH", wins: 3, losses: 2, ot_losses: 1 },

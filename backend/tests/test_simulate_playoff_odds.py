@@ -11,7 +11,7 @@ import random
 
 import pytest
 
-from simulate_playoff_odds import determine_playoff_teams, simulate, team_ratings, win_probability
+from simulate_playoff_odds import determine_playoff_teams, home_margin, mark_back_to_backs, simulate, team_ratings, win_probability
 
 
 # ---------------------------------------------------------------------------
@@ -21,16 +21,24 @@ from simulate_playoff_odds import determine_playoff_teams, simulate, team_rating
 
 class TestWinProbability:
     def test_evenly_matched_teams_favor_home_ice(self):
-        # Equal ratings: only home ice separates them. Calibrated from real
-        # games, the home team wins about 54.5%.
-        assert win_probability(0.0, 0.0) == pytest.approx(0.5448, abs=1e-3)
+        # Equal ratings, both rested: only home ice separates them. Calibrated
+        # from real games (with back-to-backs fit separately), about 52.7%.
+        assert win_probability(0.0, 0.0) == pytest.approx(0.5274, abs=1e-3)
 
     def test_only_the_rating_difference_matters(self):
         assert win_probability(0.5, 0.5) == pytest.approx(win_probability(-0.3, -0.3))
 
     def test_strong_home_favorite(self):
         # A +1.0 GD/game team hosting a -1.0 team.
-        assert win_probability(1.0, -1.0) == pytest.approx(0.823, abs=1e-3)
+        assert win_probability(1.0, -1.0) == pytest.approx(0.815, abs=1e-3)
+
+    def test_back_to_backs_move_the_margin(self):
+        rested = win_probability(0.0, 0.0)
+        assert win_probability(0.0, 0.0, away_b2b=True) == pytest.approx(0.616, abs=1e-3)  # tired road team (60.4% observed)
+        assert win_probability(0.0, 0.0, home_b2b=True) < rested
+        assert win_probability(0.0, 0.0, True, True) > rested  # both tired: the road trip costs more
+        # A saved model's constants win over today's.
+        assert home_margin(False, True, model={"home_edge": 0.1, "away_b2b": 0.2}) == pytest.approx(0.3)
 
     def test_strong_away_favorite_despite_home_ice(self):
         assert win_probability(-1.0, 1.0) < 0.25
@@ -294,7 +302,7 @@ class TestSplitGames:
 
         completed, remaining = split_games(games, "2026-10-09")
 
-        assert len(completed) == 1 and remaining == [("B", "A")]
+        assert len(completed) == 1 and remaining == [("B", "A", False, False)]
 
     def test_todays_unplayed_games_are_still_remaining(self):
         # Regression: the daily run happens before that day's games, and
@@ -304,7 +312,7 @@ class TestSplitGames:
 
         completed, remaining = split_games([tonight, played_today], "2026-10-09")
 
-        assert completed == [played_today] and remaining == [("CBJ", "PIT")]
+        assert completed == [played_today] and remaining == [("CBJ", "PIT", False, False)]
 
 
 class TestSimInputs:
@@ -326,7 +334,7 @@ class TestSimInputs:
         assert payload["model"]["scale"] == SCALE
         assert payload["teams"]["PIT"]["rating"] == 0.1235
         assert payload["teams"]["PIT"]["losses"] == 2
-        assert payload["games"] == [["2026-10-09", "CBJ", "PIT"], ["2026-10-12", "PIT", "BOS"]]
+        assert payload["games"] == [["2026-10-09", "CBJ", "PIT", False, False], ["2026-10-12", "PIT", "BOS", False, False]]
 
     def test_carries_player_values_keyed_by_string_id(self):
         from simulate_playoff_odds import sim_inputs
@@ -561,3 +569,22 @@ class TestCutline:
         with_line = simulate(standings, schedule, 100, ratings, rng=random.Random(5), cutline_out={})
 
         assert plain == with_line
+
+
+class TestBackToBacks:
+    def test_marked_from_the_schedule_including_future_games(self):
+        games = mark_back_to_backs([
+            {"date": "2026-10-13", "home": "DAL", "away": "COL"},
+            {"date": "2026-10-14", "home": "COL", "away": "DAL"},   # both played yesterday
+            {"date": "2026-10-16", "home": "PIT", "away": "COL"},   # COL rested a day
+            {"date": "2026-10-17", "home": "COL", "away": "WSH"},   # COL on the second night
+        ])
+        assert [(g["home_b2b"], g["away_b2b"]) for g in games] == [(False, False), (True, True), (False, False), (True, False)]
+
+    def test_schedule_strength_counts_rest(self):
+        ratings = {"A": (0.0, 0.1), "B": (0.0, 0.1)}
+        tired = [{"date": "2026-10-20", "home": "A", "away": "B", "home_score": None, "away_score": None,
+                  "home_b2b": False, "away_b2b": True}]
+        s = schedule_strength(ratings, tired, "2026-10-19")
+        assert s["A"]["effect"] > s["B"]["effect"]
+        assert s["A"]["effect"] - s["B"]["effect"] == pytest.approx(2 * HOME_EDGE + 2 * 0.530, abs=1e-3)

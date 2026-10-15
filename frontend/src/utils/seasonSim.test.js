@@ -18,6 +18,17 @@ function inputs(overrides = {}) {
   return { model: MODEL, teams, games };
 }
 
+describe("winProbability with back-to-backs", () => {
+  const model = { home_edge: 0.16, scale: 1.457, home_b2b: -0.306, away_b2b: 0.53 };
+  it("matches the Python model's margin", () => {
+    expect(winProbability(0, 0, model, false, true)).toBeCloseTo(1 / (1 + Math.exp(-(0.16 + 0.53) / 1.457)), 10);
+    expect(winProbability(0, 0, model, true, false)).toBeCloseTo(1 / (1 + Math.exp(-(0.16 - 0.306) / 1.457)), 10);
+  });
+  it("older saved models without back-to-back terms ignore the flags", () => {
+    expect(winProbability(0, 0, { home_edge: 0.264, scale: 1.47 }, true, true)).toBeCloseTo(winProbability(0, 0, { home_edge: 0.264, scale: 1.47 }), 10);
+  });
+});
+
 describe("winProbability", () => {
   it("matches the Python model: home ice is worth a bit over half a game", () => {
     expect(winProbability(0, 0, MODEL)).toBeCloseTo(1 / (1 + Math.exp(-0.264 / 1.47)), 10);

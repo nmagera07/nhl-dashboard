@@ -84,7 +84,13 @@ export function PlayoffLine({ data, team }) {
   if (!pace) return null;
 
   const range = pace.low !== pace.high ? ` (${pts(pace.low)}–${pts(pace.high)})` : "";
-  const headline = `Line ≈ ${pts(pace.cutline)} pts${range} · You: ${pace.pts} pts${pace.pace != null ? `, pace ${pace.pace}` : ""}`;
+  // Name the team ("You" read as the viewer, not the team they follow). The
+  // label above already says "Playoff line" and the card shows the points,
+  // so: what it takes, and where the team is headed. Non-breaking spaces
+  // keep "96 pts" and "on pace for 84" together on a phone.
+  const nb = (text) => text.replace(/ /g, "\u00a0");
+  const where = pace.pace != null ? nb(`${team.team_abbrev} on pace for ${pace.pace}`) : nb(`${team.team_abbrev} at ${pace.pts} pts`);
+  const headline = `≈ ${nb(`${pts(pace.cutline)} pts`)} to make it${range} · ${where}`;
 
   let body;
   if (pace.state === "clinched") body = <p className="my-team-line-status my-team-line-in">Clinched ✓</p>;

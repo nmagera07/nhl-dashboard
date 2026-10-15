@@ -82,6 +82,9 @@ describe("MyTeamCard", () => {
 });
 
 
+// Non-breaking spaces keep "95 pts" and "on pace for 84" together on a phone.
+const HEADLINE = /^≈ 95\spts to make it \(92–98\) · PIT\son\space\sfor\s84$/;
+
 describe("PlayoffLine", () => {
   const today = new Date().toISOString().slice(0, 10);
   const data = (row, extra) => ({
@@ -94,7 +97,7 @@ describe("PlayoffLine", () => {
 
   it("shows the line, the pace and the record needed (84-game season), collapsed to one line", () => {
     show(data());
-    const headline = screen.getByText("Line ≈ 95 pts (92–98) · You: 20 pts, pace 84");
+    const headline = screen.getByText(HEADLINE);
     expect(headline.closest("details").open).toBe(false); // the card stays short until tapped
     expect(screen.getByText("Need 75 in 64 GP → .586 (now .500)")).toBeInTheDocument();
     expect(screen.getByText(/^Roughly \d+-\d+-\d+ the rest of the way$/)).toBeInTheDocument();
@@ -140,7 +143,7 @@ describe("PlayoffLine", () => {
       json: async () => (url.endsWith("/playoff-line") ? data() : SCHEDULE),
     }));
     renderCard();
-    expect(await screen.findByText("Line ≈ 95 pts (92–98) · You: 20 pts, pace 84")).toBeInTheDocument();
+    expect(await screen.findByText(HEADLINE)).toBeInTheDocument();
     const urls = fetchMock.mock.calls.map(([u]) => u);
     expect(urls.some((u) => u.endsWith("/playoff-line"))).toBe(true);
     expect(urls.some((u) => u.includes("/season-sim"))).toBe(false);

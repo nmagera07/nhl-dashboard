@@ -164,6 +164,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-14 — Logging the betting market next to the model
+
+**Why first:** before any betting feature faces users, we need to know whether the model has
+an edge. The only honest way is to record the market's odds *before* each game, next to our
+prediction, and grade both on the same games. It's the same write-it-down-first rule as the
+prediction log and the MoneyPuck log.
+
+**Source: Kalshi.** It's a regulated prediction market, and its market data is public: no
+account or key needed to read it.
+- *One event per game:* `KXNHLGAME-26OCT14DALCOL` (date, away, home), with a "Colorado
+  wins" and a "Dallas wins" market, priced in dollars.
+- *Implied probability:* the midpoint of each side's bid and ask, normalized to sum to 1.
+  Tonight: COL 58.5% (bid 58c, ask 59c, about 1M contracts traded).
+- *Team codes:* four differ from the NHL's (LA, NJ, SJ, TB).
+
+**The bug I almost shipped:** testing tonight, Kalshi had Washington at 47.5% while we said
+60%. That was a huge gap, until I checked the game: tied 3-3 in the 2nd period. The market
+prices the *live* game. The 2 AM job naturally runs before puck drop, but the job retries on
+failure, and a late retry would have recorded live prices as "the market's prediction." So
+the logger checks the NHL feed and only logs games that haven't started.
+
+**What it logs:** one row per game (implied probability, both sides' bid and ask, volume),
+right after our 2 AM predictions. `market_odds.py --report` grades both by Brier score and
+counts who was right when we picked different winners.
+
+**Next:** a closing-line snapshot at puck drop, the toughest benchmark there is. Then decide
+what to show users, behind a "Market view" toggle.
+
 ## 2026-10-14 — Back-to-backs, and the goalie data we didn't need (model v2.6)
 
 **How it started:** Nate saw Kalshi at 60% for Colorado over Dallas while we said 67%. Why

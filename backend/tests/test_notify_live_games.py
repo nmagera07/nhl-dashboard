@@ -35,7 +35,7 @@ class TestEvents:
             "title": "🚨 PIT goal! PIT 2, CBJ 1",
             "body": "S. Crosby (5) from E. Malkin, K. Letang · power play · 2nd 12:34",
             "url": "/games/2026020068",
-            "tag": "game-2026020068",
+            "tag": "goal-2026020068-2-1",
         }
 
     def test_only_the_newest_goal_is_sent_and_older_ones_are_claimed_quietly(self):
@@ -44,7 +44,19 @@ class TestEvents:
         candidates, claim_only = n.events_for([game], NOW)
 
         assert [e["payload"]["body"] for e in candidates] == ["S. Crosby (5), unassisted · 1st 06:10"]
-        assert [e["key"] for e in claim_only] == ["goal:2026020068:1:05:00:PIT"]
+        assert [e["key"] for e in claim_only] == ["goal:2026020068:PIT:1-0"]
+
+    def test_a_corrected_goal_time_is_the_same_goal(self):
+        # The NHL posts a goal, then fixes its time a few seconds later: one alert, not two.
+        first = n.events_for([_game("LIVE", [_goal("CHI", 1, "17:49", 1, 2)])], NOW)[0][0]
+        fixed = n.events_for([_game("LIVE", [_goal("CHI", 1, "17:50", 1, 2)])], NOW)[0][0]
+        assert first["key"] == fixed["key"]
+
+    def test_each_goal_is_its_own_notification(self):
+        game = _game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 1, "06:10", 1, 1)])
+        (newest,), (older,) = n.events_for([game], NOW)
+        final = n.final_event(_game("FINAL", away_score=1, home_score=1))
+        assert len({newest["payload"]["tag"], older["payload"]["tag"], final["payload"]["tag"]}) == 3
 
     def test_final_with_overtime(self):
         game = _game("FINAL", [_goal("PIT", 4, "02:11", 3, 2)], away_score=3, home_score=2, last="OT")
@@ -139,7 +151,7 @@ class TestRun:
     def test_never_sends_the_same_event_twice(self, monkeypatch):
         count, sent, _ = _run(
             monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])],
-            already_sent={"goal:2026020068:1:05:00:PIT"}, subs=[SUB],
+            already_sent={"goal:2026020068:PIT:1-0"}, subs=[SUB],
         )
 
         assert count == 0 and sent == []

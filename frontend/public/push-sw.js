@@ -14,8 +14,8 @@ self.addEventListener("push", (event) => {
       body: data.body || "",
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",
-      // One notification per game: a newer goal replaces the last one
-      // instead of stacking, and still buzzes (renotify).
+      // Tags are per goal (and per final), so each one is its own
+      // notification; renotify only matters if a tag ever repeats.
       tag: data.tag,
       renotify: Boolean(data.tag),
       data: { url: data.url || "/" },

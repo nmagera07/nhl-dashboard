@@ -164,6 +164,29 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-14 — "I only get one goal alert a game"
+
+**Report (Nate):** goal alerts arrive about once per game; it should be every goal.
+
+**Server first, from the logs:** every send is logged with the event key and the push
+service's reply. For PIT @ CHI (8 goals), every goal went out and Google's push service (FCM)
+accepted every one (201), plus the final. So nothing was skipped on our side.
+
+**Two real problems found:**
+1. *Duplicates:* three goals were sent twice, a minute apart. The NHL posts a goal, then
+   corrects its time by a second or two (17:49 to 17:50), and the event key included the
+   time, so the corrected goal looked new. The key is now the score the goal made
+   (`goal:{game}:{team}:{away}-{home}`), which doesn't change.
+2. *One per game on the phone:* all of a game's notifications shared one tag, so each goal
+   replaced the last. That was a choice made to avoid clutter. `renotify` asks the phone to
+   alert again, but Android can play a replacement quietly, especially rapid updates from one
+   app. So it looked like one alert per game. Each goal now gets its own tag, so it's a new
+   notification that always alerts. Android groups them under the app.
+
+**Lesson:** *check the server's evidence before guessing at the phone.* The logs ruled out
+the notifier in one query and turned up a duplicate bug no one had reported. And *a UX choice
+("don't stack") can read as a bug.* The user wanted every goal, visibly.
+
 ## 2026-10-14 — Logging the betting market next to the model
 
 **Why first:** before any betting feature faces users, we need to know whether the model has

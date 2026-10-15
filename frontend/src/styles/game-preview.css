@@ -34,3 +34,13 @@
 .preview-lines-list li span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .preview-lines-list li span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .preview-rest { margin: 8px 0 0; font-size: 12px; color: var(--text); }
+/* Market view: collapsed under the win probability. */
+.preview-market-view { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.preview-market-view summary h3 { margin: 0; font-size: 14px; }
+.preview-market { display: grid; gap: 6px; margin: 10px 0 0; font-size: 13px; }
+.preview-market div { display: flex; justify-content: space-between; gap: 10px; }
+.preview-market-lines { margin: -2px 0 0; color: var(--text-dim); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
+.preview-market dt { color: var(--text-dim); }
+.preview-market dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.preview-market-gap { margin: 8px 0 0; font-size: 13px; }

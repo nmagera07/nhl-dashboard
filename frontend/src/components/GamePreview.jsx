@@ -25,12 +25,16 @@ const SEASON_STATS = [
 const SKATER_LABELS = { points: "Points", goals: "Goals", assists: "Assists" };
 const RESULT = { W: "W", L: "L", OTL: "OT", SOL: "SO" };
 
-function WinProbability({ away, home }) {
+function WinProbability({ away, home, date }) {
   const { data: inputs } = useFetchWithStatus(`${API_BASE}/season-sim`);
   const a = inputs?.teams?.[away.abbrev];
   const h = inputs?.teams?.[home.abbrev];
   if (!a || !h || !inputs.model) return null;
-  const homeWin = winProbability(h.rating, a.rating, inputs.model);
+  // The model's schedule rows: [date, home, away, home_b2b, away_b2b].
+  const row = (inputs.games || []).find(([d, hm, aw]) => d === date && hm === home.abbrev && aw === away.abbrev);
+  const [homeB2b, awayB2b] = row ? [Boolean(row[3]), Boolean(row[4])] : [false, false];
+  const tired = [homeB2b && home.abbrev, awayB2b && away.abbrev].filter(Boolean);
+  const homeWin = winProbability(h.rating, a.rating, inputs.model, homeB2b, awayB2b);
   const homePct = Math.round(homeWin * 100);
   return (
     <section className="boxscore-card preview-odds" aria-label="Win probability">
@@ -42,8 +46,13 @@ function WinProbability({ away, home }) {
       <div className="preview-odds-bar" role="img" aria-label={`${away.abbrev} ${100 - homePct}% chance to win, ${home.abbrev} ${homePct}%`}>
         <span style={{ width: `${100 - homePct}%` }} />
       </div>
+      {tired.length > 0 && (
+        <p className="preview-rest">
+          {tired.join(" and ")} played last night (second night of a back-to-back), which the odds include.
+        </p>
+      )}
       <p className="preview-note">
-        PuckPulse&apos;s model: each team&apos;s goals and expected-goals rating, plus home ice. Single games are
+        PuckPulse&apos;s model: each team&apos;s rating (its players, goals and expected goals), plus home ice and rest. Single games are
         close to coin flips, so treat it as a lean, not a lock. For fun and insight, not betting advice.{" "}
         <Link className="accent-link" to="/track-record">See how the model has done.</Link>
       </p>
@@ -135,7 +144,7 @@ function GamePreview({ game, standingsByTeam = {}, playoffOddsByTeam = {} }) {
 
   return (
     <>
-      <WinProbability away={away} home={home} />
+      <WinProbability away={away} home={home} date={game.gameDate} />
 
       <section className="boxscore-card">
         <h2>Matchup</h2>

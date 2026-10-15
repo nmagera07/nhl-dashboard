@@ -29,6 +29,14 @@ class TestPredictions:
         assert row["home_win_prob"] == pytest.approx(0.4722, abs=1e-4)
         assert row["model_version"] == "v2.1" and row["source"] == "daily"
 
+    def test_a_tired_road_team_moves_the_prediction(self):
+        payload = {**PAYLOAD, "model": {"version": "v2.6", "home_edge": 0.16, "scale": 1.457, "home_b2b": -0.306, "away_b2b": 0.53},
+                   "games": [["2026-10-11", "PIT", "CAR", False, True]]}  # CAR played yesterday
+        [tired] = gp.predictions([_game(1, "CAR", "PIT")], payload, DAY)
+        [rested] = gp.predictions([_game(1, "CAR", "PIT")], {**payload, "games": []}, DAY)
+        assert tired["home_win_prob"] == pytest.approx(1 / (1 + 2.718281828 ** (-(0.137 - 0.565 + 0.16 + 0.53) / 1.457)), abs=1e-4)
+        assert tired["home_win_prob"] > rested["home_win_prob"]
+
     def test_outcome_needs_a_final_and_records_how_it_ended(self):
         assert gp.outcome(_game(1, "CAR", "PIT")) is None
         assert gp.outcome(_game(1, "DAL", "PIT", state="OFF", away_score=1, home_score=2, ended="SO")) == {

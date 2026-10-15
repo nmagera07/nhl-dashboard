@@ -291,12 +291,22 @@ class ToolRunner:
         if date and len(ratings) == 2:
             model = inputs.get("model", {})
             away = opp if home == team else team
-            p_home = 1 / (1 + math.exp(-(ratings[home] - ratings[away] + model.get("home_edge", 0.264)) / model.get("scale", 1.47)))
+            # Back-to-back flags ride along in the model's schedule ([date, home, away, home_b2b, away_b2b]).
+            row = next((g for g in inputs.get("games", []) if g[0] == date and g[1] == home and g[2] == away), None)
+            home_b2b, away_b2b = (bool(row[3]), bool(row[4])) if row and len(row) >= 5 else (False, False)
+            edge = model.get("home_edge", 0.264)
+            margin = edge + (model.get("home_b2b", 0.0) if home_b2b else 0.0) + (model.get("away_b2b", 0.0) if away_b2b else 0.0)
+            p_home = 1 / (1 + math.exp(-(ratings[home] - ratings[away] + margin) / model.get("scale", 1.47)))
             p_team = p_home if home == team else 1 - p_home
+            tired = [t for t, flag in ((home, home_b2b), (away, away_b2b)) if flag]
+            note = f"{home} is at home (worth about {edge:.2f} goals/game)."
+            if tired:
+                note += f" {' and '.join(tired)} played the day before (second night of a back-to-back), which the odds include."
             out["next_meeting"] = {
                 "date": date, "home_team": home,
                 f"{team}_win_pct": round(p_team * 100, 1), f"{opp}_win_pct": round((1 - p_team) * 100, 1),
-                "note": f"{home} is at home (worth about 0.26 goals/game). Single games are close to coin flips.",
+                "back_to_back": tired or None,
+                "note": note + " Single games are close to coin flips.",
             }
         return compact._clean(out)
 
@@ -304,7 +314,7 @@ class ToolRunner:
         inputs = await self._sim_inputs()
         teams = inputs["teams"]
         totals: dict[str, list[float]] = {t: [] for t in teams}
-        for _, home, away in inputs["games"]:
+        for _, home, away, *_ in inputs["games"]:
             if home in teams and away in teams:
                 totals[home].append(teams[away]["rating"])
                 totals[away].append(teams[home]["rating"])

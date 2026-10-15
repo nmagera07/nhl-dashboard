@@ -590,7 +590,7 @@ def playoff_line():
     # Each team's games still to play, from the remaining schedule (exact even
     # with postponements, unlike season length minus games played).
     games_left = {}
-    for _, home, away in payload.get("games", []):
+    for _, home, away, *_ in payload.get("games", []):
         games_left[home] = games_left.get(home, 0) + 1
         games_left[away] = games_left.get(away, 0) + 1
     cutline = payload.get("cutline") or {}

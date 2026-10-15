@@ -26,7 +26,7 @@ def _next_games(payload, team, n, played=frozenset()):
     holds (date, home, away) for games already over: the inputs are a
     morning snapshot, so by evening one of its "upcoming" games may be done.
     """
-    found = [i for i, (date, home, away) in enumerate(payload["games"])
+    found = [i for i, (date, home, away, *_) in enumerate(payload["games"])
              if team in (home, away) and (date, home, away) not in played]
     return found[:n]
 
@@ -46,7 +46,7 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
     shift = shift or {}
     tracked = track or [team]
     model, teams, games = payload["model"], payload["teams"], payload["games"]
-    home_edge, scale = model["home_edge"], model["scale"]
+    scale = model["scale"]
     ot_p, so_share = model["ot_probability"], model["shootout_share_of_ot"]
     divisions, conferences = defaultdict(list), {}
     for abbrev, t in teams.items():
@@ -54,6 +54,7 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
         conferences[abbrev] = t["conference"]
 
     rng, shuffle_rng = random.Random(seed), random.Random(seed + 1)
+    margins = [sim.home_margin(*row[3:5], model=model) for row in games]
     made, points = defaultdict(int), defaultdict(int)
 
     for _ in range(trials):
@@ -67,10 +68,10 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
             shuffle_rng.shuffle(outcomes)
             outcomes = dict(zip(window, outcomes))
 
-        for i, (_, home, away) in enumerate(games):
+        for i, (_, home, away, *_) in enumerate(games):
             if home not in rec or away not in rec:
                 continue
-            x = (strength[home] - strength[away] + home_edge) / scale
+            x = (strength[home] - strength[away] + margins[i]) / scale
             home_wins = rng.random() < 1 / (1 + 2.718281828459045 ** -x)
             went_ot = rng.random() < ot_p
             shootout = rng.random() < so_share
@@ -110,7 +111,7 @@ def _check_team(payload, team):
 def _opponents(payload, team, window):
     out = []
     for i in window:
-        date, home, away = payload["games"][i]
+        date, home, away, *_ = payload["games"][i]
         out.append(f"{date} {'vs' if home == team else '@'} {away if home == team else home}")
     return out
 

@@ -95,6 +95,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   shots, not saves) and added each team's goalie strength (GSAx, shrunk for its 0.16
   year-to-year repeatability): 1.9% lower Brier again, better than the previous model in
   every backtested season.
+- Added schedule fatigue to the game model after a market comparison flagged a big gap: a
+  road team on the second night of a back-to-back is worth +0.53 goals/game to its opponent,
+  better log loss in all 4 held-out seasons; and showed that predicting the starting goalie
+  added nothing measurable, so I didn't build a scraper for confirmed starters.
 - Built an expected-goals model from 453,000 NHL shots (logistic regression, 41 features,
   graded on held-out seasons against MoneyPuck's shot-level xG), then replaced MoneyPuck's xG
   in the playoff model with it: as accurate or better (16 of 20 checkpoints, Brier 0.1104 ->
@@ -159,6 +163,55 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   parallel, with graceful degradation when the optional feeds fail.
 
 ---
+
+## 2026-10-14 — Back-to-backs, and the goalie data we didn't need (model v2.6)
+
+**How it started:** Nate saw Kalshi at 60% for Colorado over Dallas while we said 67%. Why
+would the market differ? Two things it knows that the model ignored: tired teams (the second
+night of a back-to-back) and who starts in net. "Shouldn't we add those?" Yes, if the data
+is reliable. Back-to-backs are pure schedule math. Confirmed starters only come from sites
+we'd have to scrape.
+
+**Measure before building:** the cached play-by-play for 5,248 games has every team's
+dates, and the starting goalie (the goalie in net for the first shot).
+- *Home team wins:* 52.7% with both teams rested, **60.4%** when only the road team played
+  the night before, 47.1% when only the home team did.
+- *#1 goalie starts:* 64% on a normal night, **35%** on the second night of a back-to-back.
+
+**Fit (same frame as calibrate_playoff_model.py: full-season goal differential per game):**
+
+| game model | log loss | home edge | home team tired | road team tired | goalie term |
+|---|---|---|---|---|---|
+| today's | 0.65134 | +0.238 | | | |
+| + back-to-backs | **0.64895** | +0.160 | -0.31 | **+0.53** (for home) | |
+| + expected starter | 0.64886 | +0.160 | -0.34 | +0.57 | wrong sign |
+| + actual starter | 0.64892 | +0.159 | -0.30 | +0.52 | +0.21, ~nothing |
+
+- *Back-to-backs are real:* better log loss on all 4 held-out seasons, and the road effect is
+  steady every season (+0.36 to +0.66).
+- *Part of "home ice" was road fatigue:* road teams play the second night about twice as often,
+  so the home edge dropped from 0.24 to 0.16 once fatigue had its own term.
+- *The starting goalie added nothing,* even the **actual** starter. Our goalie quality ratings
+  are too noisy (year-to-year r = 0.16) for "backup vs. starter" to predict much beyond what
+  the back-to-back flag already says. So a scraper for confirmed starters wouldn't have paid
+  off. *Measuring first saved building the wrong thing.*
+
+**Shipping it (v2.6):**
+- `home_margin()`: home ice plus both back-to-back terms, in one place, used by the
+  simulation, schedule strength, the prediction log and the scenario tools.
+- *Flags in the schedule:* every game carries home_b2b / away_b2b, marked from the schedule,
+  so future games have them too. The exported schedule rows grew to
+  `[date, home, away, home_b2b, away_b2b]`.
+- *Readers:* every reader unpacks with `*rest`, so older saved rows still work.
+- *Browser and AI:* the browser simulator and PuckPulse AI's matchup tool read the same
+  constants, and the game preview says when a team played last night.
+- *Calibration:* calibrate_playoff_model.py now fits the back-to-back terms too, so a rerun
+  won't quietly drop them.
+
+**The twist:** in the game that started it, all four teams were on the second night, which
+still favors the home team. So v2.6 moved Colorado *up* (66.5% to 68.5%). The fatigue effect
+is real across 5,248 games but didn't explain that game's gap with the market. That's
+another reason to log the market every night and grade both over hundreds of games.
 
 ## 2026-10-14 — The TOI column that passed every test and showed nothing
 

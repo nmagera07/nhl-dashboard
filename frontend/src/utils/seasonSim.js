@@ -24,8 +24,15 @@ function gauss(rng, mean, sd) {
   return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-export function winProbability(home, away, model) {
-  return 1 / (1 + Math.exp(-(home - away + model.home_edge) / model.scale));
+// Home ice plus the second night of a back-to-back for either side, in
+// goals/game (simulate_playoff_odds.home_margin). Older saved models have
+// no back-to-back terms, so they count as 0.
+export function homeMargin(model, homeB2b = false, awayB2b = false) {
+  return model.home_edge + (homeB2b ? model.home_b2b ?? 0 : 0) + (awayB2b ? model.away_b2b ?? 0 : 0);
+}
+
+export function winProbability(home, away, model, homeB2b = false, awayB2b = false) {
+  return 1 / (1 + Math.exp(-(home - away + homeMargin(model, homeB2b, awayB2b)) / model.scale));
 }
 
 // Points, then regulation wins, then regulation + OT wins, then wins.
@@ -68,9 +75,9 @@ export function simulateSeason(inputs, rng = makeRng(), focus = null) {
   });
 
   const log = [];
-  for (const [date, home, away] of games) {
+  for (const [date, home, away, homeB2b, awayB2b] of games) {
     if (!records[home] || !records[away]) continue;
-    const homeWins = rng() < winProbability(strength[home], strength[away], model);
+    const homeWins = rng() < winProbability(strength[home], strength[away], model, homeB2b, awayB2b);
     const [winner, loser] = homeWins ? [home, away] : [away, home];
     const w = records[winner];
     const l = records[loser];

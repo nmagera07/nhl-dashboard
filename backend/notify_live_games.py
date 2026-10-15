@@ -58,8 +58,12 @@ def goal_event(game, goal):
     credit = f"{scorer} from {', '.join(assists)}" if assists else f"{scorer}, unassisted"
     when = f"{_period(goal.get('periodDescriptor'))} {goal.get('timeInPeriod', '')}".strip()
     strength = STRENGTH.get(goal.get("strength"))
+    # Keyed by the score it made, not its clock time: the NHL corrects a
+    # goal's time a few seconds after posting it (17:49 -> 17:50), and a
+    # time-based key sent the corrected goal again as a new one.
+    score = f"{goal.get('awayScore')}-{goal.get('homeScore')}"
     return {
-        "key": f"goal:{game['id']}:{goal.get('period')}:{goal.get('timeInPeriod')}:{goal.get('teamAbbrev')}",
+        "key": f"goal:{game['id']}:{goal.get('teamAbbrev')}:{score}",
         "kind": "goals",
         "ttl": 15 * 60,  # a goal alert much later than that is noise
         "teams": [away, home],
@@ -67,7 +71,10 @@ def goal_event(game, goal):
             "title": f"🚨 {goal.get('teamAbbrev')} goal! {_scoreline(away, home, goal.get('awayScore'), goal.get('homeScore'))}",
             "body": " · ".join(filter(None, [credit, strength, when])),
             "url": f"/games/{game['id']}",
-            "tag": f"game-{game['id']}",
+            # One notification per goal (they stack, grouped under the app):
+            # a shared per-game tag replaced the last goal, and Android often
+            # played the replacement silently, so it felt like one alert a game.
+            "tag": f"goal-{game['id']}-{score}",
         },
     }
 
@@ -86,7 +93,7 @@ def final_event(game):
             "title": f"Final{suffix}: {_scoreline(away['abbrev'], home['abbrev'], away.get('score'), home.get('score'))}",
             "body": f"{winner['abbrev']} wins. Tap for the box score.",
             "url": f"/games/{game['id']}",
-            "tag": f"game-{game['id']}",
+            "tag": f"final-{game['id']}",
         },
     }
 
@@ -94,9 +101,9 @@ def final_event(game):
 def events_for(games, now):
     """
     New-event candidates from the scoreboard. Per game, only the newest
-    goal is a candidate: two goals inside one minute is rare, and the phone
-    would only show the latest anyway (notifications share a per-game tag).
-    The older ones are still claimed, so they're never sent late.
+    goal is a candidate: two goals inside one minute is rare, and an alert
+    for a goal that's already been followed by another one is stale. The
+    older ones are still claimed, so they're never sent late.
     """
     candidates, claim_only = [], []
     for game in games:

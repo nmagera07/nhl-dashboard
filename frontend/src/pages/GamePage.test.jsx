@@ -262,6 +262,27 @@ describe("GamePage", () => {
     expect(screen.getByText(/DAL played last night/)).toBeInTheDocument();
   });
 
+  it("Market view compares the model with the sportsbooks, only when opened", async () => {
+    const upcoming = finalGame({
+      id: 2026020120, gameState: "FUT", gameDate: "2026-10-15", linescore: {}, shotsByPeriod: [], summary: {}, teamGameStats: [],
+      awayTeam: { abbrev: "PHI" }, homeTeam: { abbrev: "DET" }, matchup: {},
+    });
+    const sim = { model: { home_edge: 0.16, scale: 1.457 }, teams: { PHI: { rating: -0.2 }, DET: { rating: 0.3 } }, games: [] };
+    const market = { date: "2026-10-15", games: { 2026020120: { home: "DET", away: "PHI", home_prob: 0.558, home_line: -138, away_line: 117, books: 9 } } };
+    renderGame(upcoming, { standings: [] }, sim, { "/market-odds": market });
+    await screen.findByRole("img", { name: /PHI \d+% chance to win, DET \d+%/ });
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/market-odds"));
+
+    await userEvent.click(screen.getByText("How the betting markets see it"));
+
+    // Ours: (0.3 + 0.2 + 0.16) / 1.457 -> 61%; the books: 56%.
+    expect(await screen.findByText("DET 61%")).toBeInTheDocument();
+    expect(screen.getByText("DET 56%")).toBeInTheDocument();
+    expect(screen.getByText("DET −138 · PHI +117 · median of 9 books")).toBeInTheDocument();
+    expect(screen.getByText("PuckPulse is 5 points higher on DET than the books.")).toBeInTheDocument();
+    expect(screen.getByText(/1-800-GAMBLER/)).toBeInTheDocument();
+  });
+
   it("shows each team's record from the standings once the game has started", async () => {
     const standings = [
       { team_abbrev: "NSH", wins: 3, losses: 2, ot_losses: 1 },

@@ -1,7 +1,14 @@
 """
-Prediction-market odds for each game, logged next to our own prediction so
-both can be graded on the same games. Behind the scenes for now: the point
-is to learn whether the model has an edge before showing users anything.
+Market odds for each game, logged next to our own prediction so both can
+be graded on the same games, from two sources:
+
+  - sportsbooks: the consensus of US books (DraftKings, FanDuel, BetMGM...)
+    from The Odds API (the-odds-api.com, free tier: one call covers every
+    game; needs ODDS_API_KEY). Each book's moneyline has its margin removed
+    (the two implied probabilities normalized to 1), then the median across
+    books. Shown to users in the game preview's "Market view".
+  - kalshi: the prediction market (below). Logged and graded only; not
+    shown until its terms for displaying prices are confirmed.
 
 Source: Kalshi's public market data (no account needed to read). Each NHL
 game is an event (KXNHLGAME-26OCT14DALCOL: date, away, home) with one market
@@ -19,8 +26,12 @@ Usage:
 
 import argparse
 import os
+import re
+import statistics
 import time
-from datetime import date
+import unicodedata
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import psycopg2
 import requests
@@ -39,6 +50,10 @@ NHL_SCORE_URL = "https://api-web.nhle.com/v1/score/{date}"
 NOT_STARTED = {"FUT", "PRE"}
 HEADERS = {"User-Agent": "nhl-dashboard (personal project)"}
 SOURCE = "kalshi"
+ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/icehockey_nhl/odds"
+ODDS_API_KEY = os.getenv("ODDS_API_KEY")
+SPORTSBOOKS = "sportsbooks"
+EASTERN = ZoneInfo("America/New_York")
 # Kalshi's team codes differ from the NHL's for four teams.
 KALSHI_CODES = {"LAK": "LA", "NJD": "NJ", "SJS": "SJ", "TBL": "TB"}
 MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
@@ -61,6 +76,95 @@ CREATE TABLE IF NOT EXISTS market_odds (
     PRIMARY KEY (game_id, source, captured)
 )
 """
+# Sportsbook consensus: the median line and how many books it's from.
+COLUMNS_SQL = """
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS home_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS away_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS books SMALLINT;
+"""
+
+
+def american_to_prob(price):
+    """-150 -> 0.6, +130 -> 0.4348 (the book's implied probability, margin included)."""
+    price = float(price)
+    return -price / (-price + 100) if price < 0 else 100 / (price + 100)
+
+
+def _norm(name):
+    """'St Louis Blues' and 'St. Louis Blues', 'Montréal' and 'Montreal' compare equal."""
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z]", "", plain.lower())
+
+
+def sportsbook_consensus(event, home_name, away_name):
+    """
+    {"home_prob", "home_line", "away_line", "books"} for one Odds API event:
+    each book's two moneylines turned into probabilities with the margin
+    removed, then the median across books (and the median lines, for
+    showing). None if no book has both sides.
+    """
+    probs, home_lines, away_lines = [], [], []
+    for book in event.get("bookmakers", []):
+        h2h = next((m for m in book.get("markets", []) if m.get("key") == "h2h"), None)
+        prices = {_norm(o["name"]): o["price"] for o in (h2h or {}).get("outcomes", [])}
+        h, a = prices.get(_norm(home_name)), prices.get(_norm(away_name))
+        if h is None or a is None:
+            continue
+        ph, pa = american_to_prob(h), american_to_prob(a)
+        probs.append(ph / (ph + pa))
+        home_lines.append(h)
+        away_lines.append(a)
+    if not probs:
+        return None
+    return {"home_prob": round(statistics.median(probs), 4), "home_line": round(statistics.median(home_lines)),
+            "away_line": round(statistics.median(away_lines)), "books": len(probs)}
+
+
+def log_sportsbooks(cur, day, games, names, get=None):
+    """
+    games: [(game_id, home, away)]; names: {abbrev: full team name}. One Odds
+    API call covers every upcoming game; only today's (Eastern) are logged.
+    """
+    if not ODDS_API_KEY and get is None:
+        logger.info("No ODDS_API_KEY; skipping sportsbook odds")
+        return 0
+    cur.execute(TABLE_SQL)
+    cur.execute(COLUMNS_SQL)
+    try:
+        events = (get or _get_odds_api)()
+    except requests.RequestException as exc:
+        logger.warning(f"The Odds API unavailable ({exc}); skipping sportsbook odds")
+        return 0
+    by_teams = {}
+    for e in events:
+        start = datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")).astimezone(EASTERN).date()
+        if start == day:
+            by_teams[(_norm(e["home_team"]), _norm(e["away_team"]))] = e
+    logged = 0
+    for game_id, home, away in games:
+        event = by_teams.get((_norm(names.get(home, "")), _norm(names.get(away, ""))))
+        odds = event and sportsbook_consensus(event, names[home], names[away])
+        if not odds:
+            continue
+        cur.execute(
+            """
+            INSERT INTO market_odds (game_id, source, captured, game_date, home_abbrev, away_abbrev, home_prob,
+                                     home_line, away_line, books, captured_at)
+            VALUES (%s, %s, 'morning', %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (game_id, source, captured) DO NOTHING
+            """,
+            (game_id, SPORTSBOOKS, day, home, away, odds["home_prob"], odds["home_line"], odds["away_line"], odds["books"]),
+        )
+        logged += 1
+    return logged
+
+
+def _get_odds_api():
+    response = requests.get(ODDS_API_URL, params={"apiKey": ODDS_API_KEY, "regions": "us", "markets": "h2h",
+                                                  "oddsFormat": "american"}, timeout=30)
+    response.raise_for_status()
+    logger.info(f"The Odds API: {response.headers.get('x-requests-remaining')} requests left this month")
+    return response.json()
 
 
 def kalshi_code(abbrev):
@@ -158,7 +262,9 @@ def log_today():
         pending = not_started(day)
         games = [g for g in cur.fetchall() if g[0] in pending]
         logged = log_games(cur, day, games)
-    logger.info(f"Logged Kalshi odds for {logged} of {len(games)} games on {day}")
+        cur.execute("SELECT team_abbrev, team_name FROM teams")
+        books = log_sportsbooks(cur, day, games, dict(cur.fetchall()))
+    logger.info(f"Logged Kalshi odds for {logged} and sportsbook odds for {books} of {len(games)} games on {day}")
 
 
 def brier(pairs):
@@ -186,22 +292,23 @@ def compare(rows):
 
 
 def report():
+    """Our predictions vs. each market, graded on the same finished games."""
     with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT p.game_date, p.away_abbrev, p.home_abbrev, p.home_win_prob, m.home_prob, p.home_won
-            FROM game_predictions p
-            JOIN market_odds m ON m.game_id = p.game_id AND m.source = %s AND m.captured = 'morning'
-            WHERE p.home_won IS NOT NULL
-            ORDER BY p.game_date
-            """,
-            (SOURCE,),
-        )
-        rows = cur.fetchall()
-    print(compare([(float(o), float(m), bool(y)) for *_, o, m, y in rows]))
-    print("\nBiggest disagreements (ours vs Kalshi, home team):")
-    for day, away, home, o, m, won in sorted(rows, key=lambda r: -abs(float(r[3]) - float(r[4])))[:10]:
-        print(f"  {day} {away} @ {home}: ours {float(o):.0%}, Kalshi {float(m):.0%}, home {'won' if won else 'lost'}")
+        for source in (SPORTSBOOKS, SOURCE):
+            cur.execute(
+                """
+                SELECT p.game_date, p.away_abbrev, p.home_abbrev, p.home_win_prob, m.home_prob, p.home_won
+                FROM game_predictions p
+                JOIN market_odds m ON m.game_id = p.game_id AND m.source = %s AND m.captured = 'morning'
+                WHERE p.home_won IS NOT NULL
+                ORDER BY p.game_date
+                """,
+                (source,),
+            )
+            rows = cur.fetchall()
+            print(f"\nPuckPulse vs {source}:", compare([(float(o), float(m), bool(y)) for *_, o, m, y in rows]))
+            for day, away, home, o, m, won in sorted(rows, key=lambda r: -abs(float(r[3]) - float(r[4])))[:5]:
+                print(f"  {day} {away} @ {home}: ours {float(o):.0%}, {source} {float(m):.0%}, home {'won' if won else 'lost'}")
 
 
 def main():

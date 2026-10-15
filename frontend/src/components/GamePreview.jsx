@@ -25,7 +25,52 @@ const SEASON_STATS = [
 const SKATER_LABELS = { points: "Points", goals: "Goals", assists: "Assists" };
 const RESULT = { W: "W", L: "L", OTL: "OT", SOL: "SO" };
 
-function WinProbability({ away, home, date }) {
+const line = (n) => (n == null ? "—" : n > 0 ? `+${n}` : `−${Math.abs(n)}`);
+
+// What the betting markets say, next to the model. Fetched only when opened.
+function MarketOdds({ gameId, date, away, home, homeWin }) {
+  const { data, status } = useFetchWithStatus(`${API_BASE}/market-odds?date=${date}`);
+  if (status === "error") return <p className="preview-note">Couldn&apos;t load the market odds.</p>;
+  if (!data) return <p className="preview-note">Loading…</p>;
+  const m = data.games?.[String(gameId)];
+  if (!m) return <p className="preview-note">No market odds for this game yet. They&apos;re captured each morning.</p>;
+  const ours = Math.round(homeWin * 100);
+  const books = Math.round(m.home_prob * 100);
+  const gap = ours - books;
+  const leaning = gap > 0 ? home.abbrev : away.abbrev;
+  return (
+    <>
+      <dl className="preview-market">
+        <div><dt>PuckPulse</dt><dd>{home.abbrev} {ours}%</dd></div>
+        <div><dt>Sportsbooks</dt><dd>{home.abbrev} {books}%</dd></div>
+        <p className="preview-market-lines">
+          {home.abbrev} {line(m.home_line)} · {away.abbrev} {line(m.away_line)} · median of {m.books} books
+        </p>
+      </dl>
+      <p className="preview-market-gap">
+        {Math.abs(gap) < 3
+          ? "PuckPulse and the books roughly agree."
+          : `PuckPulse is ${Math.abs(gap)} points higher on ${leaning} than the books.`}
+      </p>
+      <p className="preview-note">
+        The books&apos; odds with their margin removed (the median of US sportsbooks, captured this morning; via The Odds
+        API). For entertainment, 21+. If you bet, bet responsibly: <span className="nowrap">1-800-GAMBLER</span>.
+      </p>
+    </>
+  );
+}
+
+function MarketView(props) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="preview-lines preview-market-view" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary><h3>Market view</h3><span className="muted">How the betting markets see it</span></summary>
+      {open && <MarketOdds {...props} />}
+    </details>
+  );
+}
+
+function WinProbability({ away, home, date, gameId }) {
   const { data: inputs } = useFetchWithStatus(`${API_BASE}/season-sim`);
   const a = inputs?.teams?.[away.abbrev];
   const h = inputs?.teams?.[home.abbrev];
@@ -56,6 +101,7 @@ function WinProbability({ away, home, date }) {
         close to coin flips, so treat it as a lean, not a lock. For fun and insight, not betting advice.{" "}
         <Link className="accent-link" to="/track-record">See how the model has done.</Link>
       </p>
+      <MarketView gameId={gameId} date={date} away={away} home={home} homeWin={homeWin} />
     </section>
   );
 }
@@ -144,7 +190,7 @@ function GamePreview({ game, standingsByTeam = {}, playoffOddsByTeam = {} }) {
 
   return (
     <>
-      <WinProbability away={away} home={home} date={game.gameDate} />
+      <WinProbability away={away} home={home} date={game.gameDate} gameId={game.id} />
 
       <section className="boxscore-card">
         <h2>Matchup</h2>

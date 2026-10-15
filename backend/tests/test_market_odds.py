@@ -60,3 +60,49 @@ def test_compare_grades_both_and_the_disagreements():
 def test_only_games_that_havent_started_are_logged():
     scores = {"games": [{"id": 1, "gameState": "FUT"}, {"id": 2, "gameState": "LIVE"}, {"id": 3, "gameState": "PRE"}]}
     assert mo.not_started(date(2026, 10, 14), get=lambda url: scores) == {1, 3}
+
+
+EVENT = {
+    "commence_time": "2026-10-15T23:30:00Z", "home_team": "St. Louis Blues", "away_team": "Montreal Canadiens",
+    "bookmakers": [
+        {"key": "dk", "markets": [{"key": "h2h", "outcomes": [{"name": "St Louis Blues", "price": -150}, {"name": "Montréal Canadiens", "price": 130}]}]},
+        {"key": "fd", "markets": [{"key": "h2h", "outcomes": [{"name": "St Louis Blues", "price": -140}, {"name": "Montréal Canadiens", "price": 120}]}]},
+        {"key": "x", "markets": [{"key": "totals", "outcomes": []}]},
+    ],
+}
+
+
+def test_american_odds_to_probability():
+    assert mo.american_to_prob(-150) == pytest.approx(0.6)
+    assert mo.american_to_prob(130) == pytest.approx(100 / 230)
+
+
+def test_sportsbook_consensus_removes_the_margin_and_takes_the_median():
+    odds = mo.sportsbook_consensus(EVENT, "St. Louis Blues", "Montréal Canadiens")
+    dk = 0.6 / (0.6 + 100 / 230)
+    fd = (140 / 240) / (140 / 240 + 100 / 220)
+    assert odds["home_prob"] == pytest.approx((dk + fd) / 2, abs=1e-4)
+    assert (odds["home_line"], odds["away_line"], odds["books"]) == (-145, 125, 2)
+
+
+def test_log_sportsbooks_matches_todays_games_by_name():
+    cur = FakeCursor()
+    names = {"STL": "St. Louis Blues", "MTL": "Montréal Canadiens", "PIT": "Pittsburgh Penguins", "BOS": "Boston Bruins"}
+    later = {**EVENT, "commence_time": "2026-10-17T00:00:00Z", "home_team": "Pittsburgh Penguins", "away_team": "Boston Bruins"}
+    logged = mo.log_sportsbooks(cur, date(2026, 10, 15), [(7, "STL", "MTL"), (8, "PIT", "BOS")], names, get=lambda: [EVENT, later])
+    assert logged == 1  # the PIT game is another day's
+    assert cur.inserted[0][:5] == (7, "sportsbooks", date(2026, 10, 15), "STL", "MTL")
+
+
+class TestMarketOddsRoute:
+    def test_returns_the_days_sportsbook_odds(self, client, db_router):
+        from datetime import datetime, timezone
+        db_router.when("from market_odds", [{"game_id": 2026020120, "home_abbrev": "DET", "away_abbrev": "PHI", "home_prob": 0.5612,
+                                             "home_line": -135, "away_line": 115, "books": 8,
+                                             "captured_at": datetime(2026, 10, 15, 6, 5, tzinfo=timezone.utc)}])
+        body = client.get("/market-odds?date=2026-10-15").json()
+        assert body["date"] == "2026-10-15"
+        assert body["games"]["2026020120"] == {"home": "DET", "away": "PHI", "home_prob": 0.5612, "home_line": -135,
+                                               "away_line": 115, "books": 8, "as_of": "2026-10-15T06:05:00+00:00"}
+        query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
+        assert "source = 'sportsbooks'" in query  # Kalshi is graded, not shown

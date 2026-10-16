@@ -16,6 +16,7 @@ import RosterPage from "./pages/RosterPage.jsx";
 import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
+import PickemPage from "./pages/PickemPage.jsx";
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";
 import NewsPage from "./pages/NewsPage.jsx";
 
@@ -180,6 +181,7 @@ export default function NHLDashboard() {
           <Route path="/players" element={<LeaderboardPage />} />
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
           <Route path="/track-record" element={<TrackRecordPage />} />
+          <Route path="/pickem" element={<PickemPage />} />
           <Route path="/games/:gameId" element={<GamePage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />

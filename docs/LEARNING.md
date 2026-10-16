@@ -164,6 +164,40 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-15 — "Beat PuckPulse": a pick'em with no accounts
+
+**What:** pick each game's winner before puck drop, one point per right pick, on a public
+leaderboard. PuckPulse plays too, picking the model's favorite every game. It's the first
+feature where users *save* something.
+
+**Decisions (Nate):**
+- *No sign-up:* a display name, and the browser keeps a random key.
+- *Public leaderboard first;* friend leagues later.
+- *1 point per correct pick.*
+
+**Security for a no-account feature:**
+- *Keys:* `pp_` + 24 random bytes. Only the SHA-256 hash is stored, so a database leak can't
+  be used to make picks as anyone.
+- *Where the key travels:* only in POST bodies, never in URLs (which end up in logs and
+  history).
+- *Names:* 3-20 characters from a safe set, unique regardless of case, with "PuckPulse" and
+  the like reserved, plus a basic filter.
+- *Rate limits:* 5 joins per hour per IP, 60 picks per minute.
+- *Locking is the server's job:* a pick is refused if the game's state isn't "not started"
+  **or** its start time has passed. A cached scoreboard can say FUT for up to a minute after
+  puck drop, and the start time closes that gap.
+
+**Fairness:** PuckPulse picks every game, so ranking it by total correct picks would bury
+anyone who doesn't play daily. It's a benchmark line instead ("PuckPulse, on every game:
+30-15"), and each player gets "vs PuckPulse" on *their* games.
+
+**Not anchoring the user:** PuckPulse's pick (and its percentage) appears only after you pick,
+or once the game locks.
+
+**Fast scoring for free:** the goal-alert job already sees every final within a minute, so it
+now also writes `game_results`. It's best effort, inside a savepoint, so a missing table can't
+break alerts. The nightly grading is the fallback.
+
 ## 2026-10-15 — Market view: the model next to the sportsbooks
 
 **Which odds?**

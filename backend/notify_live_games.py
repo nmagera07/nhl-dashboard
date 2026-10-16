@@ -87,6 +87,9 @@ def final_event(game):
     return {
         "key": f"final:{game['id']}",
         "kind": "finals",
+        # For pick'em scoring: recorded when the final is first seen.
+        "result": {"game_id": game["id"], "home_won": home.get("score", 0) > away.get("score", 0),
+                   "home_score": home.get("score"), "away_score": away.get("score")},
         "ttl": 3 * 60 * 60,  # still worth seeing when the phone wakes up
         "teams": [away["abbrev"], home["abbrev"]],
         "payload": {
@@ -133,6 +136,30 @@ def claim(cur, keys):
     return {r[0] for r in rows}
 
 
+def record_results(cur, results):
+    """
+    Final scores into game_results, so pick'em picks are scored minutes
+    after a game ends (the nightly grading is the fallback). Best effort:
+    a missing table (pick'em not set up) mustn't stop the alerts.
+    """
+    if not results:
+        return
+    try:
+        cur.execute("SAVEPOINT results")
+        for r in results:
+            cur.execute(
+                """
+                INSERT INTO game_results (game_id, home_won, home_score, away_score)
+                VALUES (%s, %s, %s, %s) ON CONFLICT (game_id) DO NOTHING
+                """,
+                (r["game_id"], r["home_won"], r["home_score"], r["away_score"]),
+            )
+        cur.execute("RELEASE SAVEPOINT results")
+    except psycopg2.Error as exc:
+        cur.execute("ROLLBACK TO SAVEPOINT results")
+        logger.warning(f"Couldn't record game results ({exc.__class__.__name__}); pick'em scoring waits for the nightly grade")
+
+
 def subscribers(cur, teams, kind):
     column = {"goals": "notify_goals", "finals": "notify_finals"}[kind]
     cur.execute(
@@ -154,6 +181,8 @@ def run(now=None, fetch=None):
         claim(cur, [e["key"] for e in claim_only])
         fresh = claim(cur, [e["key"] for e in candidates])
         conn.commit()  # claimed before sending: a crash mid-send can't cause a duplicate later
+        record_results(cur, [e["result"] for e in candidates if e["key"] in fresh and e.get("result")])
+        conn.commit()
         for event in (e for e in candidates if e["key"] in fresh):
             statuses = []
             for sub in subscribers(cur, event["teams"], event["kind"]):

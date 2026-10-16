@@ -5,6 +5,7 @@ import { API_BASE, DIVISION_ORDER } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
+import { useScrollToTop } from "./hooks/useScrollToTop.js";
 import { cachedResponse } from "./utils/responseCache.js";
 import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
@@ -35,6 +36,7 @@ export default function NHLDashboard() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  useScrollToTop();
 
   const standingsUrl = standingsSortBy
     ? `${API_BASE}/standings/latest?sort_by=${standingsSortBy}&sort_dir=${standingsSortDir}`

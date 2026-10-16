@@ -1,0 +1,6 @@
+# Only what notify_live_games.py and push.py need, pinned to backend/requirements.txt.
+azure-functions==1.25.0  # 2.x needs Python 3.13; the backend runs 3.12
+requests==2.34.2
+psycopg2-binary==2.9.13
+python-dotenv==1.2.4
+pywebpush==2.5.0

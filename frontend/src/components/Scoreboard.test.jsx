@@ -2,6 +2,9 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Scoreboard from "./Scoreboard.jsx";
 import { sortGames, statusLabel } from "./gameStatus.js";
+import { rememberResponse } from "../utils/responseCache.js";
+import { API_BASE } from "../config.js";
+import { todayISO } from "../utils/dates.js";
 
 const REG = (number) => ({ number, periodType: "REG", maxRegulationPeriods: 3 });
 
@@ -120,6 +123,14 @@ describe("Scoreboard", () => {
     expect(screen.getByRole("button", { name: /PIT at WSH/ })).toBeInTheDocument();
     resolveFresh({ ok: true, json: () => Promise.resolve({ games: [live, upcoming] }) });
     await waitFor(() => expect(screen.getAllByRole("button", { name: / at / })).toHaveLength(2));
+  });
+
+  it("shows today's games from the pick'em page's copy of the same response", () => {
+    // The pick'em page fetches this URL too and caches the full response.
+    rememberResponse(`${API_BASE}/games/date/${todayISO()}`, { games: [live] });
+    globalThis.fetch = vi.fn().mockReturnValue(new Promise(() => {}));
+    render(<MemoryRouter><Scoreboard /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: /PIT at WSH/ })).toBeInTheDocument();
   });
 });
 

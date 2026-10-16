@@ -9,6 +9,7 @@ import { nhlVideoUrl } from "../utils/highlights.js";
 import FavoriteStar from "./FavoriteStar.jsx";
 
 const scoresUrl = (date) => `${API_BASE}/games/date/${date || todayISO()}`;
+const gamesIn = (response) => (Array.isArray(response?.games) ? response.games : undefined);
 
 function networks(game) {
   const names = (game.tvBroadcasts || []).filter((b) => b.market === "N").map((b) => b.network);
@@ -81,8 +82,10 @@ export default function Scoreboard({ date = null, pinTeam = null }) {
   const navigate = useNavigate();
   const location = useLocation();
   // Coming back from a box score: show the scores we just had, then refresh.
-  const [games, setGames] = useState(() => cachedResponse(scoresUrl(date)) ?? []);
-  const [status, setStatus] = useState(() => (cachedResponse(scoresUrl(date)) ? "ready" : "loading"));
+  // The cache holds the API's response as-is ({games: [...]}), the same as
+  // useFetchWithStatus, since the pick'em page fetches this URL too.
+  const [games, setGames] = useState(() => gamesIn(cachedResponse(scoresUrl(date))) ?? []);
+  const [status, setStatus] = useState(() => (gamesIn(cachedResponse(scoresUrl(date))) ? "ready" : "loading"));
   useEffect(() => {
     let active = true;
     // Re-read "today" on each refresh, so a page left open past midnight moves on.
@@ -95,9 +98,8 @@ export default function Scoreboard({ date = null, pinTeam = null }) {
         })
         .then((data) => {
           if (!active) return;
-          const fresh = Array.isArray(data.games) ? data.games : [];
-          rememberResponse(url, fresh);
-          setGames(fresh);
+          rememberResponse(url, data);
+          setGames(gamesIn(data) ?? []);
           setStatus("ready");
         })
         .catch(() => active && setStatus("error"));

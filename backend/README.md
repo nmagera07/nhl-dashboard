@@ -136,7 +136,7 @@ upserts, nothing duplicates.
 | `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team- and skater-level, from MoneyPuck's public seasonSummary CSVs | Weekly in-season |
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
 | `daily_digest.py` | The morning digest: facts gathered here, written by NHL Intelligence (`/digest/write`), stored in `daily_digest`; set up once with `scripts/setup_daily_digest.py` | Daily (after playoff odds) |
-| `notify_live_games.py` | Goal and final-score push notifications for followed teams (`nhl-live-notifier` job, every minute during game hours; set up once with `scripts/setup_push_notifications.py`) | Every minute |
+| `notify_live_games.py` | Goal and final-score push notifications for followed teams (the `puckpulse-live-notifier` Azure Function in `notifier_function/`, every minute during game hours; set up once with `scripts/setup_push_notifications.py`, then `scripts/setup_notifier_function.py`) | Every minute |
 | `backfill_playoff_odds.py` | Weekly odds for a past season, using xG as of each date (MoneyPuck game-by-game file), for the race chart | One-off |
 | `backfill_season_history.py --years N` | Final standings for the last N completed seasons | One-time, or to extend the range |
 

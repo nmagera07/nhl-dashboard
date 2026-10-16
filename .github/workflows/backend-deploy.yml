@@ -40,6 +40,7 @@ env:
   CONTAINER_APP: nhl-dashboard-api
   INGESTION_JOB: nhl-standings-ingest
   NOTIFIER_JOB: nhl-live-notifier
+  NOTIFIER_FUNCTION: puckpulse-live-notifier
   HEALTH_URL: https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/health
 
 jobs:
@@ -104,28 +105,45 @@ jobs:
 
       - name: Update API, ingestion job, and live notifier
         run: |
-          # The API peaks around 80 MB, so the smallest size is plenty. It's
-          # awake most hours, so its size is most of the Container Apps bill.
+          # The API peaks around 80 MB, so the smallest size is plenty. One
+          # replica always stays up: no cold starts, and Azure bills a replica
+          # with no requests at the much lower idle rate.
           az containerapp update \
             --name "$CONTAINER_APP" \
             --resource-group "$RESOURCE_GROUP" \
             --image "$IMAGE:${GITHUB_SHA}" \
             --cpu 0.25 --memory 0.5Gi \
+            --min-replicas 1 \
             -o none
           az containerapp job update \
             --name "$INGESTION_JOB" \
             --resource-group "$RESOURCE_GROUP" \
             --image "$IMAGE:${GITHUB_SHA}" \
             -o none
-          # The live notifier is created once by backend/scripts/setup_push_notifications.py.
+          # The old Container Apps notifier, until setup_notifier_function.py --retire-job deletes it.
           if az containerapp job show --name "$NOTIFIER_JOB" --resource-group "$RESOURCE_GROUP" -o none 2>/dev/null; then
             az containerapp job update \
               --name "$NOTIFIER_JOB" \
               --resource-group "$RESOURCE_GROUP" \
               --image "$IMAGE:${GITHUB_SHA}" \
               -o none
+          fi
+
+      # The goal/final notifier is an Azure Function, created once by
+      # backend/scripts/setup_notifier_function.py. Remote build installs its
+      # requirements on Azure's side for the right Python and platform.
+      - name: Deploy the live notifier function
+        run: |
+          if az functionapp show --name "$NOTIFIER_FUNCTION" --resource-group "$RESOURCE_GROUP" -o none 2>/dev/null; then
+            ZIP=$(python3 backend/scripts/package_notifier.py "$RUNNER_TEMP/notifier.zip")
+            az functionapp deployment source config-zip \
+              --name "$NOTIFIER_FUNCTION" \
+              --resource-group "$RESOURCE_GROUP" \
+              --src "$ZIP" \
+              --build-remote true \
+              -o none
           else
-            echo "::notice::$NOTIFIER_JOB doesn't exist yet; skipping (run backend/scripts/setup_push_notifications.py)"
+            echo "::notice::$NOTIFIER_FUNCTION doesn't exist yet; skipping (run backend/scripts/setup_notifier_function.py)"
           fi
 
       # `az containerapp update` only means the request was accepted. In

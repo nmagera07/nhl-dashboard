@@ -1,6 +1,6 @@
 """
 Goal and final-score push notifications. Run every minute during game
-hours by the nhl-live-notifier Container Apps Job.
+hours by the puckpulse-live-notifier Azure Function (notifier_function/).
 
 Each run reads the NHL's live scoreboard (one request covers every game),
 turns new goals and finals into events, claims each event in the database
@@ -25,7 +25,8 @@ from logging_config import setup_logging
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-logger = setup_logging("notify_live_games")
+# Console only: neither the function nor the old job keeps local files.
+logger = setup_logging("notify_live_games", log_to_file=False)
 
 SCORE_URL = "https://api-web.nhle.com/v1/score/now"
 RECENT = timedelta(hours=6)  # ignore games that started longer ago (yesterday's finals linger in the feed)

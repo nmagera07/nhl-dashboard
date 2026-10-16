@@ -20,9 +20,11 @@ import notify_live_games
 
 app = func.FunctionApp()
 
-# The Functions worker already forwards log records to the host; the
-# notifier's own console handler would print each line a second time.
+# The Functions worker forwards log records that reach the root logger to
+# the host (and App Insights). setup_logging gives the notifier its own
+# console handler and turns propagation off, which would hide every line.
 notify_live_games.logger.handlers.clear()
+notify_live_games.logger.propagate = True
 
 
 # NCRONTAB has a seconds field; the Functions host runs in UTC.

@@ -104,10 +104,13 @@ jobs:
 
       - name: Update API, ingestion job, and live notifier
         run: |
+          # The API peaks around 80 MB, so the smallest size is plenty. It's
+          # awake most hours, so its size is most of the Container Apps bill.
           az containerapp update \
             --name "$CONTAINER_APP" \
             --resource-group "$RESOURCE_GROUP" \
             --image "$IMAGE:${GITHUB_SHA}" \
+            --cpu 0.25 --memory 0.5Gi \
             -o none
           az containerapp job update \
             --name "$INGESTION_JOB" \

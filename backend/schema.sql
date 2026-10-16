@@ -490,3 +490,34 @@ CREATE TABLE IF NOT EXISTS game_predictions (
 
 CREATE INDEX IF NOT EXISTS idx_game_predictions_ungraded
     ON game_predictions (game_date) WHERE home_won IS NULL;
+
+-- "Beat PuckPulse" pick'em (pickem.py). Players have no accounts: a random
+-- key, stored only as its SHA-256 hash. game_results is written by
+-- notify_live_games.py when a game goes final, for quick scoring.
+-- Created by scripts/setup_pickem.py, which also grants the API role
+-- SELECT, INSERT, UPDATE on the pick'em tables and SELECT on game_results.
+CREATE TABLE IF NOT EXISTS pickem_players (
+    player_id               UUID PRIMARY KEY,
+    key_hash                CHAR(64) NOT NULL UNIQUE,
+    display_name            VARCHAR(20) NOT NULL,
+    created_at              TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS pickem_players_name ON pickem_players (LOWER(display_name));
+CREATE TABLE IF NOT EXISTS pickem_picks (
+    player_id               UUID NOT NULL REFERENCES pickem_players (player_id) ON DELETE CASCADE,
+    game_id                 BIGINT NOT NULL,
+    game_date               DATE NOT NULL,
+    home_abbrev             VARCHAR(3) NOT NULL,
+    away_abbrev             VARCHAR(3) NOT NULL,
+    pick                    VARCHAR(3) NOT NULL,
+    picked_at               TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (player_id, game_id)
+);
+CREATE INDEX IF NOT EXISTS pickem_picks_game ON pickem_picks (game_id);
+CREATE TABLE IF NOT EXISTS game_results (
+    game_id                 BIGINT PRIMARY KEY,
+    home_won                BOOLEAN NOT NULL,
+    home_score              SMALLINT,
+    away_score              SMALLINT,
+    recorded_at             TIMESTAMPTZ DEFAULT NOW()
+);

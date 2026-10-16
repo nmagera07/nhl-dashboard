@@ -59,6 +59,7 @@ import push
 from daily_cache import cache as daily_cache, daily_cached
 import season_scenarios
 from seasons import season_games
+from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
@@ -915,6 +916,164 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
         conn.commit()
     except Exception:
         logger.error("Failed to delete push subscription", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+PICKEM_JOIN_RATE_LIMIT = "5/hour"
+PICKEM_RATE_LIMIT = "60/minute"
+
+
+def _pickem_player(cur, key):
+    """The player for a key, or 401. Keys are compared by hash."""
+    import pickem
+
+    cur.execute("SELECT player_id, display_name FROM pickem_players WHERE key_hash = %s", (pickem.hash_key(key),))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Unknown player key.")
+    return row
+
+
+def _pickem_tables_missing(exc):
+    return isinstance(exc, (psycopg2.errors.UndefinedTable, psycopg2.errors.InsufficientPrivilege))
+
+
+@app.post("/pickem/join")
+@limiter.limit(PICKEM_JOIN_RATE_LIMIT)
+def pickem_join(request: Request, body: PickemJoinIn):
+    """
+    Join the pick'em with a display name. Returns the player's key once;
+    the browser keeps it and shows it as a recovery code. 409 if the name
+    is taken (names are unique regardless of case).
+    """
+    import uuid
+
+    import pickem
+
+    name = body.name.strip()
+    problem = pickem.name_problem(name)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    key = pickem.new_key()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO pickem_players (player_id, key_hash, display_name) VALUES (%s, %s, %s)",
+                (str(uuid.uuid4()), pickem.hash_key(key), name),
+            )
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail="That name is taken.")
+    except psycopg2.Error as exc:
+        conn.rollback()
+        if _pickem_tables_missing(exc):
+            raise HTTPException(status_code=503, detail="Pick'em isn't set up yet.")
+        logger.error("Failed to create pick'em player", exc_info=True)
+        raise
+    finally:
+        conn.close()
+    return {"name": name, "key": key}
+
+
+@app.post("/pickem/me")
+@limiter.limit(PICKEM_RATE_LIMIT)
+def pickem_me(request: Request, body: PickemMeIn):
+    """A player's name, record (and PuckPulse's on the same games), and picks for a day."""
+    import pickem
+    from daily_digest import today_eastern
+
+    day = body.day or today_eastern()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            player = _pickem_player(cur, body.key)
+            record = pickem.player_record(cur, player["player_id"])
+            cur.execute("SELECT game_id, pick FROM pickem_picks WHERE player_id = %s AND game_date = %s",
+                        (player["player_id"], day))
+            picks = {str(r["game_id"]): r["pick"] for r in cur.fetchall()}
+        return {
+            "name": player["display_name"],
+            "record": {"correct": record["correct"], "graded": record["graded"], "pending": record["pending"]},
+            "vs_puckpulse": {"you": record["correct"], "puckpulse": record["model_correct"], "games": record["model_games"]},
+            "date": str(day),
+            "picks": picks,
+        }
+    except psycopg2.Error as exc:
+        conn.rollback()
+        if _pickem_tables_missing(exc):
+            raise HTTPException(status_code=503, detail="Pick'em isn't set up yet.")
+        raise
+    finally:
+        conn.close()
+
+
+@app.post("/pickem/pick")
+@limiter.limit(PICKEM_RATE_LIMIT)
+def pickem_pick(request: Request, body: PickemPickIn):
+    """
+    Pick (or change) a game's winner. The server checks the game hasn't
+    started, by both its state and its start time, so a late pick can't
+    slip through a cached scoreboard.
+    """
+    import pickem
+
+    team = body.team.upper()
+    try:
+        game = game_boxscore(body.game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not game or not game.get("homeTeam"):
+        raise HTTPException(status_code=404, detail="No such game.")
+    problem = pickem.pick_problem(game, team)
+    if problem:
+        raise HTTPException(status_code=409, detail=problem)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            player = _pickem_player(cur, body.key)
+            cur.execute(
+                """
+                INSERT INTO pickem_picks (player_id, game_id, game_date, home_abbrev, away_abbrev, pick)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (player_id, game_id) DO UPDATE SET pick = EXCLUDED.pick, picked_at = NOW()
+                """,
+                (player["player_id"], body.game_id, game.get("gameDate"), game["homeTeam"]["abbrev"],
+                 game["awayTeam"]["abbrev"], team),
+            )
+        conn.commit()
+        return {"game_id": body.game_id, "pick": team}
+    except HTTPException:
+        raise
+    except psycopg2.Error as exc:
+        conn.rollback()
+        if _pickem_tables_missing(exc):
+            raise HTTPException(status_code=503, detail="Pick'em isn't set up yet.")
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/pickem/leaderboard")
+def pickem_leaderboard():
+    """Players by correct picks, and PuckPulse's record on every graded game as the benchmark."""
+    import pickem
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            players, model = pickem.leaderboard(cur)
+        return {
+            "players": [{"name": p["display_name"], "correct": p["correct"], "graded": p["graded"]} for p in players],
+            "puckpulse": {"correct": model["correct"], "graded": model["graded"]},
+        }
+    except psycopg2.Error as exc:
+        conn.rollback()
+        if _pickem_tables_missing(exc):
+            return {"players": [], "puckpulse": {"correct": 0, "graded": 0}}
         raise
     finally:
         conn.close()

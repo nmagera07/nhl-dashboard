@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
@@ -65,6 +65,12 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
           <span>Pin your team's next game, results, and playoff odds here.</span>
         </div>
       ) : null}
+      {isToday && (
+        <Link className="pickem-link" to="/pickem">
+          <span><strong>Beat PuckPulse</strong> · pick tonight&apos;s winners</span>
+          <span aria-hidden="true">›</span>
+        </Link>
+      )}
       {isToday && <TopHeadlines />}
     </main>
   );

@@ -11,7 +11,7 @@ const startTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric
 // value badge when the price pays more than the fair odds by enough.
 function Side({ label, side, showBook, open }) {
   if (!side) return <td />;
-  const title = `${label}: PuckPulse ${formatPct(side.ours)}${side.market != null ? `, books ${formatPct(side.market)}` : ""}`;
+  const title = `${label}: PuckPulse's model ${formatPct(side.model ?? side.ours)}${side.market != null ? `, books ${formatPct(side.market)}, fair ${formatPct(side.ours)}` : ""}`;
   return (
     <td className={side.value && open ? "bets-side bets-side-value" : "bets-side"} title={title}>
       <span className="bets-label">{label}</span>
@@ -86,8 +86,8 @@ export default function BetsPage() {
     <main className="page bets-page">
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
-        Today&apos;s lines next to PuckPulse&apos;s fair odds. <strong>Value</strong> means the best price pays more
-        than our fair odds by at least 3 points of win chance.
+        Today&apos;s lines next to PuckPulse&apos;s fair odds. <strong>Value</strong> means a price that returns at
+        least 2% by our fair odds.
       </p>
       {status === "error" ? (
         <p className="bets-note">Couldn&apos;t load today&apos;s lines.</p>
@@ -104,8 +104,8 @@ export default function BetsPage() {
         <h2>How to read this</h2>
         <ul>
           <li><strong>Price</strong>: the moneyline is the best price across US sportsbooks (the book is named); the puck line and total are the typical price.</li>
-          <li><strong>Fair</strong>: what the price would be if PuckPulse&apos;s chance were exactly right.</li>
-          <li><strong>Value +6%</strong>: the expected return per bet at that price, if PuckPulse is right. It often isn&apos;t: the books are sharp, and our edge on them is unproven. We grade every game against the closing line.</li>
+          <li><strong>Fair</strong>: the price we think is right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
+          <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>
         </ul>
         <p className="bets-legal">

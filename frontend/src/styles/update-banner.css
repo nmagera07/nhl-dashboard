@@ -10,10 +10,10 @@
   width: max-content;
   max-width: calc(100vw - 24px);
   padding: 10px 10px 10px 16px;
-  border: 1px solid #2c3a58;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: #111a2e;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  background: var(--card-tint);
+  box-shadow: 0 10px 30px var(--shadow);
   color: var(--text);
   font-size: 13px;
   transform: translateX(-50%);
@@ -23,7 +23,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font: inherit;
   font-weight: 700;
   cursor: pointer;

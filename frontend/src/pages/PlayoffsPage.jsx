@@ -9,7 +9,7 @@ import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import FavoriteStar from "../components/FavoriteStar.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
-import { darkLogo } from "../utils/darkLogo.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups, seasonGames } from "../utils/playoffRace.js";
 
@@ -56,7 +56,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChang
             >
               <td className="col-team">
                 <span className="team-cell">
-                  <img className="team-cell-logo" src={darkLogo(row.logo_url)} alt="" />
+                  <img className="team-cell-logo" src={teamLogo(row.logo_url)} alt="" />
                   <Link className="team-abbrev race-team-link" to={`/teams/${row.team_abbrev}`} onClick={(e) => e.stopPropagation()}>
                     {row.team_abbrev}
                   </Link>

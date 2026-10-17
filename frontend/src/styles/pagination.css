@@ -32,7 +32,7 @@
 }
 .pagination-btn-active {
   border-color: var(--accent);
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 .pagination-ellipsis {

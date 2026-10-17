@@ -1,6 +1,7 @@
 """market_odds: Kalshi's game odds, logged next to our predictions."""
 
-from datetime import date
+import statistics
+from datetime import date, datetime, timezone
 
 import pytest
 
@@ -91,7 +92,7 @@ def test_log_sportsbooks_matches_todays_games_by_name():
     later = {**EVENT, "commence_time": "2026-10-17T00:00:00Z", "home_team": "Pittsburgh Penguins", "away_team": "Boston Bruins"}
     logged = mo.log_sportsbooks(cur, date(2026, 10, 15), [(7, "STL", "MTL"), (8, "PIT", "BOS")], names, get=lambda: [EVENT, later])
     assert logged == 1  # the PIT game is another day's
-    assert cur.inserted[0][:5] == (7, "sportsbooks", date(2026, 10, 15), "STL", "MTL")
+    assert cur.inserted[0][:6] == (7, "sportsbooks", "morning", date(2026, 10, 15), "STL", "MTL")
 
 
 class TestMarketOddsRoute:
@@ -106,3 +107,144 @@ class TestMarketOddsRoute:
                                                "away_line": 115, "books": 8, "as_of": "2026-10-15T06:05:00+00:00"}
         query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
         assert "source = 'sportsbooks'" in query  # Kalshi is graded, not shown
+
+
+def test_prices_round_trip_and_the_median_is_taken_as_probabilities():
+    assert (mo.prob_to_american(0.6), mo.prob_to_american(100 / 230)) == (-150, 130)
+    assert mo.median_price([-105, 100]) == -102  # not -2.5, the plain median of the two numbers
+    assert mo.best_price([-120, -105, -110]) == -105
+    assert mo.best_price([140, 150, 135]) == 150
+
+
+def _book(key, moneyline, spread=None, total=None):
+    markets = [{"key": "h2h", "outcomes": [{"name": "Colorado Avalanche", "price": moneyline[0]},
+                                           {"name": "Pittsburgh Penguins", "price": moneyline[1]}]}]
+    if spread:
+        point, home_price, away_price = spread
+        markets.append({"key": "spreads", "outcomes": [{"name": "Colorado Avalanche", "price": home_price, "point": point},
+                                                       {"name": "Pittsburgh Penguins", "price": away_price, "point": -point}]})
+    if total:
+        point, over, under = total
+        markets.append({"key": "totals", "outcomes": [{"name": "Over", "price": over, "point": point},
+                                                      {"name": "Under", "price": under, "point": point}]})
+    return {"key": key, "markets": markets}
+
+
+GAME = {"commence_time": "2026-10-17T01:00:00Z", "home_team": "Colorado Avalanche", "away_team": "Pittsburgh Penguins",
+        "bookmakers": [_book("dk", (-200, 165), (-1.5, 120, -140), (6.5, -110, -110)),
+                       _book("fd", (-190, 160), (-1.5, 125, -150), (6.5, -105, -115)),
+                       _book("mgm", (-210, 170), (-1.5, 118, -138), (6.0, -130, 110))]}
+
+
+def test_consensus_has_the_puck_line_total_and_best_prices():
+    odds = mo.sportsbook_consensus(GAME, "Colorado Avalanche", "Pittsburgh Penguins")
+    assert (odds["best_home_line"], odds["best_away_line"], odds["books"]) == (-190, 170, 3)
+    assert (odds["home_spread"], odds["home_spread_line"], odds["away_spread_line"]) == (-1.5, 120, -140)
+    cover = statistics.median(mo.american_to_prob(h) / (mo.american_to_prob(h) + mo.american_to_prob(a))
+                              for h, a in ((120, -140), (125, -150), (118, -138)))
+    assert odds["home_cover_prob"] == pytest.approx(cover, abs=1e-4)
+    # Two books say 6.5, one 6.0: the total is 6.5, from those two books only.
+    assert (odds["total"], odds["over_line"], odds["under_line"]) == (6.5, -107, -112)
+    assert odds["over_prob"] == pytest.approx(0.5 * (0.5 + (105 / 205) / (105 / 205 + 115 / 215)), abs=1e-4)
+
+
+def test_consensus_without_a_puck_line_or_total_leaves_them_empty():
+    odds = mo.sportsbook_consensus({**GAME, "bookmakers": [_book("dk", (-200, 165))]}, "Colorado Avalanche", "Pittsburgh Penguins")
+    assert odds["home_prob"] and odds["home_spread"] is None and odds["total"] is None
+
+
+def _game(game_id, start, state="FUT"):
+    return {"id": game_id, "gameState": state, "startTimeUTC": start,
+            "homeTeam": {"abbrev": "COL"}, "awayTeam": {"abbrev": "PIT"}}
+
+
+NOW = datetime(2026, 10, 16, 22, 50, tzinfo=timezone.utc)  # 6:50 PM ET
+
+
+def test_closing_snapshot_waits_until_a_game_is_15_minutes_out():
+    games = [_game(1, "2026-10-16T23:10:00Z"), _game(2, "2026-10-17T01:00:00Z")]
+    assert mo.closing_due(games, set(), NOW) == []  # 20 minutes out
+
+
+def test_closing_snapshot_covers_every_game_in_the_next_75_minutes():
+    games = [_game(1, "2026-10-16T23:00:00Z"), _game(2, "2026-10-16T23:30:00Z"), _game(3, "2026-10-17T01:00:00Z"),
+             _game(4, "2026-10-16T22:00:00Z", "LIVE")]
+    assert [g["id"] for g in mo.closing_due(games, set(), NOW)] == [1, 2]
+
+
+def test_closing_snapshot_is_taken_once():
+    games = [_game(1, "2026-10-16T23:00:00Z"), _game(2, "2026-10-16T23:30:00Z")]
+    assert mo.closing_due(games, {1}, NOW) == []  # game 2 is still 40 minutes out
+
+
+class ClosingCursor(FakeCursor):
+    def __init__(self, have_close=()):
+        super().__init__()
+        self.have_close = list(have_close)
+        self.result = []
+
+    def execute(self, sql, params=None):
+        super().execute(sql, params)
+        if "SELECT DISTINCT game_id" in sql:
+            self.result = [(g,) for g in self.have_close]
+        elif "FROM teams" in sql:
+            self.result = [("COL", "Colorado Avalanche"), ("PIT", "Pittsburgh Penguins")]
+
+    def fetchall(self):
+        return self.result
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeConnection:
+    def __init__(self, cur):
+        self.cur = cur
+
+    def cursor(self):
+        return self.cur
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _closing_run(monkeypatch, cur, credits=400):
+    monkeypatch.setattr(mo.psycopg2, "connect", lambda url: FakeConnection(cur))
+    scores = {"games": [_game(2026020120, "2026-10-17T01:00:00Z")]}
+    get = lambda url: scores if "api-web.nhle.com" in url else {"markets": []}  # noqa: E731
+    now = datetime(2026, 10, 17, 0, 50, tzinfo=timezone.utc)
+    return mo.log_closing(now=now, get=get, odds_get=lambda: [GAME], credits=lambda: credits)
+
+
+def test_closing_run_logs_the_full_sportsbook_snapshot_and_replaces_an_older_one(monkeypatch):
+    cur = ClosingCursor()
+    assert _closing_run(monkeypatch, cur) == 1
+    insert = next(s for s in cur.sql if s.lstrip().startswith("INSERT") and "home_spread" in s)
+    assert "DO UPDATE SET" in insert
+    params = cur.inserted[-1]
+    assert params[:6] == (2026020120, "sportsbooks", "close", date(2026, 10, 16), "COL", "PIT")
+    assert -1.5 in params and 6.5 in params
+
+
+def test_closing_run_skips_sportsbooks_when_credits_run_low(monkeypatch):
+    cur = ClosingCursor()
+    assert _closing_run(monkeypatch, cur, credits=mo.CREDIT_FLOOR - 1) == 1
+    assert not any(p[1] == "sportsbooks" for p in cur.inserted)
+
+
+def test_compare_bets_grades_puck_line_and_total_and_skips_pushes():
+    rows = [
+        (3.3, 2.4, -1.5, 0.44, 6.5, 0.54, 5, 2),   # home covers, over
+        (2.6, 2.9, 1.5, 0.70, 6.0, 0.52, 3, 3),    # (a tie can't be final; 6 total is a push on 6.0)
+        (2.9, 2.7, -1.5, 0.40, 5.5, 0.55, 2, 1),   # home doesn't cover, under
+    ]
+    result = mo.compare_bets(rows)
+    assert result["puck line"]["games"] == 3
+    assert result["total"]["games"] == 2
+    assert 0 < result["puck line"]["brier_ours"] < 1 and 0 < result["total"]["brier_market"] < 1

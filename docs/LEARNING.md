@@ -38,6 +38,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 - Replaced a log-based Azure alert with a heartbeat monitor (healthchecks.io)
   that also detects a scheduled job that never runs, and cut the monthly
   Azure bill from ~$11.44 to ~$0.97.
+- Diagnosed a rising Azure bill with the Cost Management API (free compute grant used up by
+  a per-minute container job) and moved the job to an Azure Functions timer, right-sized an
+  over-provisioned API (1 GB for ~80 MB of use), and removed cold starts, for a projected
+  ~50% lower monthly cost.
 
 **AI engineering**
 - Built a write-once prediction log for a live model: every game prediction stored before
@@ -80,6 +84,13 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   holds a read-only credential, stored as a secret).
 
 **Data and modeling**
+- Built a hockey score model (Conway-Maxwell-Poisson goals with a shared component, measured
+  tie inflation from score effects, and empty-net goals by lead) from 5,248 games of
+  play-by-play. Backtested leave-one-season-out, its puck-line probabilities are calibrated
+  within 1-3 points; it's consistent with the win model by solving for the goal margin.
+- Built closing-line capture for sports-market benchmarking: an event-driven snapshot near
+  game start that batches games into ~2.5 API calls a day, de-margined consensus odds
+  (moneyline, spread, total) across 8-9 sportsbooks, and a credit budget guard.
 - Rebuilt a Monte Carlo playoff-odds model (regressed team ratings, game
   model calibrated on ~4,000 real games, official tiebreakers) and validated
   it by backtesting against 3 past seasons: 15% lower Brier score overall,
@@ -161,6 +172,100 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-16 — A goal model: from "who wins" to puck lines and totals
+
+**What:** the win model says *who* wins. Bettors also need *by how much* (the puck line,
+±1.5) and *how many goals* (the total), so I built a model of the full final score.
+
+The data is 5,248 games (2022-26) from the cached play-by-play: final scores, how each game
+ended, regulation goals with empty-netters split out, and xG. It's graded walk-forward and
+leave-one-season-out.
+
+**What the data said, one surprise at a time:**
+1. **Empty-netters drive the puck line.** A team up one late adds an empty-net goal 0.56
+   times a game; up two, 0.69; up three or more, 0.17. My first guess was 0.20, which badly
+   undercounted two-goal wins.
+2. **Pace barely predicts.** Team ratings predict the margin well (slope ~1.1), but the real
+   total moves only 0.43 goals per goal of predicted difference. So the expected total is
+   pulled 57% of the way back to the league average.
+3. **Goals are less random than Poisson.** Once team strength is known, the variance is
+   0.91 of the mean, and the two teams' goals rise and fall slightly together (cov 0.16).
+   Modeled with Conway-Maxwell-Poisson (a Poisson with a dispersion knob) plus a shared
+   Poisson part.
+4. **Hockey ties more than independent scoring says**, 22% to OT vs. 17% predicted. That's
+   score effects: the leader sits back, the trailer pushes, and 6-on-5 goals come late.
+   Weighting tied regulation scores ×1.37 and one-goal scores ×1.09 fixed it.
+
+Each fix showed up in the calibration table. The favorite covering -1.5 went from 3-5 points
+too high to within 1-3 points in every bucket.
+
+**Consistency trick:** in production, the moneyline still comes from the main v2.6 model
+(with roster and goalie priors). The goal model supplies the total and then *solves for the
+margin* that reproduces that win probability. That way the moneyline, puck line, and total
+come from one distribution and can't contradict each other.
+
+**Honest result:** the puck line is well calibrated and beats always-guessing-the-average in
+every season. Totals don't beat the average yet. Pace is hard, and the books probably know
+things we don't (goalie starts). The next test is against the closing line.
+
+**Interview angle:** "Walk me through improving a model." Start from a simple baseline, read
+the calibration table, find the physical cause of each miss (empty nets, score effects),
+model it, and confirm out of sample.
+
+---
+
+## 2026-10-16 — The closing line: the market's best guess, and the real test
+
+**What:** a second odds snapshot near puck drop, plus the puck line, total, and best price
+on each side. It runs as a 5-minute timer in the notifier function. Once a game is 15
+minutes out, one call snapshots every game starting in the next 75 minutes.
+
+**What I learned:**
+- **Why the closing line?** The price at puck drop has the most information in it:
+  confirmed goalies, late scratches, and the sharp bettors' money. Beating it over
+  hundreds of games ("closing line value") is the standard test of whether a model or a
+  bettor has an edge, and it doesn't wait on lucky or unlucky results.
+- **Batch around a budget.** One call per game would be about 12 a day, 1,000+ credits a
+  month on a 500-credit plan. Grouping by start window takes ~2.5 calls a day (checked
+  against the real schedule: about 310 credits a month with the morning snapshot). A floor
+  guard skips the sportsbooks before the credits run out.
+- **Don't take the median of American odds.** -105 and +100 average to -2.5, which is
+  nonsense, because the scale jumps from -100 to +100. Convert to probabilities, take the
+  median there, and convert back.
+- **Books list different lines.** Most say total 6.5, but one might say 6.0. Take the line
+  most books offer, and only average prices at that line.
+
+**Interview angle:** "How would you evaluate a prediction model against a market?" Compare
+with the closing line, on the same games, with the margin removed, and say how many games
+it takes before the difference means anything.
+
+---
+
+## 2026-10-15 — The Azure bill: free grants, cold starts, and the right home for a cron job
+
+**What:** the bill was on pace for ~$25 a month. Two leftover registries ($10) were already
+gone, but the free Container Apps compute ran out around Oct 12. The per-minute notifier
+job alone used more than the whole grant: 960 container starts a day, about 25 s each,
+almost all of it startup. Fixes:
+- shrank the API to 0.25 CPU / 0.5 GB (it peaks around 80 MB)
+- moved the notifier to an Azure Functions (Flex Consumption) timer
+- kept one API replica always up, so no cold starts
+
+**What I learned:**
+- **Free tiers are monthly budgets, not features.** Read where the spend goes (the Cost
+  Management query API, by resource and meter) rather than trusting the forecast. The
+  forecast lagged the real daily jump by days.
+- **Match the service to the workload.** A container job is right for the 2 AM ingest
+  (minutes of work). For a one-second check every minute, startup dominates the cost.
+  A Functions timer keeps a warm worker and bills only the seconds used.
+- **Always-on isn't free, but it's cheap.** An idle replica bills CPU at about 1/8 the
+  active rate, but memory at the full rate. My first guess ("about even") was wrong; the
+  real cost is about $3-5 a month for no cold starts.
+- A logging gotcha: our `setup_logging` turns propagation off, so inside Functions the
+  notifier's own log lines vanished until they propagated to the root logger.
 
 ---
 

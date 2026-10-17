@@ -236,3 +236,15 @@ def test_closing_run_skips_sportsbooks_when_credits_run_low(monkeypatch):
     cur = ClosingCursor()
     assert _closing_run(monkeypatch, cur, credits=mo.CREDIT_FLOOR - 1) == 1
     assert not any(p[1] == "sportsbooks" for p in cur.inserted)
+
+
+def test_compare_bets_grades_puck_line_and_total_and_skips_pushes():
+    rows = [
+        (3.3, 2.4, -1.5, 0.44, 6.5, 0.54, 5, 2),   # home covers, over
+        (2.6, 2.9, 1.5, 0.70, 6.0, 0.52, 3, 3),    # (a tie can't be final; 6 total is a push on 6.0)
+        (2.9, 2.7, -1.5, 0.40, 5.5, 0.55, 2, 1),   # home doesn't cover, under
+    ]
+    result = mo.compare_bets(rows)
+    assert result["puck line"]["games"] == 3
+    assert result["total"]["games"] == 2
+    assert 0 < result["puck line"]["brier_ours"] < 1 and 0 < result["total"]["brier_market"] < 1

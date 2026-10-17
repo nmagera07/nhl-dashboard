@@ -111,3 +111,31 @@ class TestTrackRecord:
         assert record["brier"] == pytest.approx((0.09 + 0.36 + 0.2704 + 0.25) / 4, abs=1e-4)
         assert [b["label"] for b in record["calibration"]] == ["50-55%", "60-65%", "65%+"]
         assert record["recent"][0]["game_id"] == 4 and record["recent"][0]["favorite_won"] is None
+
+
+def test_scoring_ratings_blend_this_season_with_last():
+    prior = {"COL": (82, 300, 230), "SJS": (82, 200, 300)}
+    seen = {"COL": (5, 20, 10, 18.0, 11.0), "SJS": (5, 10, 20, 11.0, 18.0)}
+    ratings, league = gp.scoring_ratings(prior, seen)
+    assert ratings["COL"]["offense"] > league > ratings["SJS"]["offense"]
+    assert ratings["COL"]["defense"] < ratings["SJS"]["defense"]
+    # 5 games barely move a 40-game prior.
+    alone, _ = gp.scoring_ratings(prior, {})
+    assert abs(ratings["COL"]["offense"] - alone["COL"]["offense"]) < 0.3
+
+
+def test_predictions_carry_expected_goals_that_match_the_win_probability():
+    import goal_model
+    scoring = gp.scoring_ratings({"BOS": (82, 260, 240), "TOR": (82, 270, 250)}, {})
+    payload = {"season_id": 20262027, "teams": {"BOS": {"rating": 0.2}, "TOR": {"rating": 0.0}}, "model": {}, "games": []}
+    game = {"id": 1, "gameState": "FUT", "homeTeam": {"abbrev": "BOS"}, "awayTeam": {"abbrev": "TOR"}}
+    (row,) = gp.predictions([game], payload, date(2026, 10, 16), scoring)
+    assert row["home_goals"] > row["away_goals"]
+    assert goal_model.home_win(goal_model.final_scores(row["home_goals"], row["away_goals"])) == pytest.approx(row["home_win_prob"], abs=1e-3)
+
+
+def test_predictions_without_scoring_ratings_still_log_the_win_probability():
+    payload = {"season_id": 20262027, "teams": {"BOS": {"rating": 0.2}, "TOR": {"rating": 0.0}}, "model": {}, "games": []}
+    game = {"id": 1, "gameState": "FUT", "homeTeam": {"abbrev": "BOS"}, "awayTeam": {"abbrev": "TOR"}}
+    (row,) = gp.predictions([game], payload, date(2026, 10, 16))
+    assert row["home_win_prob"] and row["home_goals"] is None

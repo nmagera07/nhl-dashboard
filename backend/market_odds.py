@@ -47,6 +47,7 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+import goal_model
 from logging_config import setup_logging
 
 load_dotenv()
@@ -434,6 +435,29 @@ def compare(rows):
     }
 
 
+def compare_bets(rows):
+    """
+    rows: [(home goals, away goals, home_spread, market cover prob, total,
+    market over prob, home score, away score)] on finished games with a
+    logged puck line and total. Brier for ours and the market's on each
+    bet. A total landing exactly on the line (a push) isn't graded.
+    """
+    cover, totals = [], []
+    for hg, ag, spread, m_cover, line, m_over, hs, as_ in rows:
+        scores = goal_model.final_scores(hg, ag)
+        if spread is not None and m_cover is not None:
+            cover.append((goal_model.home_covers(scores, spread), m_cover, hs + spread > as_))
+        if line is not None and m_over is not None and hs + as_ != line:
+            totals.append((goal_model.over(scores, line), m_over, hs + as_ > line))
+    out = {}
+    for name, graded in (("puck line", cover), ("total", totals)):
+        if graded:
+            out[name] = {"games": len(graded), "brier_ours": round(brier([(o, y) for o, _, y in graded]), 4),
+                         "brier_market": round(brier([(m, y) for _, m, y in graded]), 4),
+                         "mean_abs_gap": round(sum(abs(o - m) for o, m, _ in graded) / len(graded), 4)}
+    return out
+
+
 def report():
     """Our predictions vs. each market and snapshot, graded on the same finished games."""
     with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
@@ -453,6 +477,19 @@ def report():
                   compare([(float(o), float(m), bool(y)) for *_, o, m, y in rows]))
             for day, away, home, o, m, won in sorted(rows, key=lambda r: -abs(float(r[3]) - float(r[4])))[:5]:
                 print(f"  {day} {away} @ {home}: ours {float(o):.0%}, {source} {float(m):.0%}, home {'won' if won else 'lost'}")
+        for captured in ("morning", "close"):
+            cur.execute(
+                """
+                SELECT p.home_goals, p.away_goals, m.home_spread, m.home_cover_prob, m.total, m.over_prob,
+                       p.home_score, p.away_score
+                FROM game_predictions p
+                JOIN market_odds m ON m.game_id = p.game_id AND m.source = %s AND m.captured = %s
+                WHERE p.home_won IS NOT NULL AND p.home_goals IS NOT NULL
+                """,
+                (SPORTSBOOKS, captured),
+            )
+            rows = [tuple(float(v) if v is not None else None for v in r) for r in cur.fetchall()]
+            print(f"\nPuck line and total vs sportsbooks ({captured}):", compare_bets(rows) or "no graded games yet")
 
 
 def main():

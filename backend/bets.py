@@ -2,15 +2,21 @@
 The Bets tab: each game's lines next to PuckPulse's fair odds.
 
 For every game: the moneyline, puck line, and total, each side with
-  - ours: PuckPulse's chance (the win model; the goal model for the puck
-    line and total, at the books' line),
-  - fair: that chance as American odds (what the price "should" be),
+  - model: PuckPulse's own chance (the win model; the goal model for the
+    puck line and total, at the books' line),
   - market: the books' chance with their margin removed,
+  - ours: the fair chance we stand behind, MODEL_WEIGHT of the model and
+    the rest the market. The books are sharp and our edge on them isn't
+    proven yet, so the model only nudges the market; raise the weight as
+    the closing-line report card earns it,
+  - fair: ours as American odds (what the price "should" be),
   - price: the price to bet at (the best book's for the moneyline, the
     median for the puck line and total),
   - edge: ours minus the market's, and ev: the expected return per $1 at
     that price (ours x decimal odds - 1),
-  - value: edge of at least VALUE_EDGE and a positive ev.
+  - value: the model leans this way (edge > 0) and ev is at least
+    VALUE_EV. With the blend that takes both some disagreement and a good
+    price, so line shopping (one book paying more) counts.
 Totals never get a value flag: in the backtest our totals didn't beat
 always guessing the average, so they're shown as experimental.
 """
@@ -18,7 +24,8 @@ always guessing the average, so they're shown as experimental.
 import goal_model
 from market_odds import american_to_prob, prob_to_american
 
-VALUE_EDGE = 0.03
+MODEL_WEIGHT = 0.3
+VALUE_EV = 0.02
 
 
 def decimal_odds(price):
@@ -26,8 +33,9 @@ def decimal_odds(price):
     return 1 + (price / 100 if price > 0 else 100 / -price)
 
 
-def _side(ours, market, price, flag=True, book=None):
-    side = {"ours": round(ours, 4), "fair": prob_to_american(min(max(ours, 0.01), 0.99))}
+def _side(model, market, price, flag=True, book=None):
+    ours = model if market is None else MODEL_WEIGHT * model + (1 - MODEL_WEIGHT) * market
+    side = {"model": round(model, 4), "ours": round(ours, 4), "fair": prob_to_american(min(max(ours, 0.01), 0.99))}
     if market is not None:
         side["market"] = round(market, 4)
         side["edge"] = round(ours - market, 4)
@@ -36,7 +44,7 @@ def _side(ours, market, price, flag=True, book=None):
         side["ev"] = round(ours * decimal_odds(price) - 1, 4)
         if book:
             side["book"] = book
-    side["value"] = bool(flag and side.get("edge", 0) >= VALUE_EDGE and side.get("ev", 0) > 0)
+    side["value"] = bool(flag and side.get("edge", 0) > 0 and side.get("ev", -1) >= VALUE_EV)
     return side
 
 

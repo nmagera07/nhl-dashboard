@@ -4,6 +4,7 @@
 // under Playoffs, players under Players.
 export const SECTIONS = [
   { key: "scores", label: "Scores", to: "/" },
+  { key: "bets", label: "Bets", to: "/bets" },
   { key: "standings", label: "Standings", to: "/standings" },
   { key: "playoffs", label: "Playoffs", to: "/playoffs" },
   { key: "players", label: "Players", to: "/players" },
@@ -15,5 +16,6 @@ export function sectionFor(pathname) {
   if (pathname.startsWith("/playoffs") || pathname.startsWith("/track-record")) return "playoffs";
   if (pathname.startsWith("/players") || pathname.startsWith("/leaderboard")) return "players";
   if (pathname.startsWith("/news")) return "news";
+  if (pathname.startsWith("/bets")) return "bets";
   return "scores";
 }

@@ -17,20 +17,35 @@ def test_decimal_odds():
     assert bets.decimal_odds(150) == 2.5 and bets.decimal_odds(-200) == 1.5
 
 
-def test_moneyline_value_needs_an_edge_and_a_positive_return_at_the_best_price():
+def test_our_fair_chance_blends_the_model_with_the_market():
+    home = bets.game_board(PRED, MARKET)["moneyline"]["home"]
+    blend = 0.3 * 0.663 + 0.7 * 0.60
+    assert home["model"] == 0.663 and home["ours"] == pytest.approx(blend, abs=1e-4)
+    assert home["edge"] == pytest.approx(blend - 0.60, abs=1e-4)
+    assert home["fair"] == bets.prob_to_american(blend)
+
+
+def test_moneyline_value_needs_the_model_to_lean_that_way_and_a_good_price():
     ml = bets.game_board(PRED, MARKET)["moneyline"]
     home = ml["home"]
-    assert home["edge"] == pytest.approx(0.063) and home["price"] == -150 and home["book"] == "DraftKings"
-    assert home["ev"] == pytest.approx(0.663 * (1 + 100 / 150) - 1, abs=1e-4)
-    assert home["value"] and not ml["away"]["value"]
-    assert home["fair"] == -197
+    blend = 0.3 * 0.663 + 0.7 * 0.60
+    assert home["price"] == -150 and home["book"] == "DraftKings"
+    assert home["ev"] == pytest.approx(blend * (1 + 100 / 150) - 1, abs=1e-4)
+    assert home["value"]  # the best price (-150) beats the consensus (-160) and the model agrees
+    assert not ml["away"]["value"]
+    # Same lean, but at the consensus price: not enough return.
+    assert not bets.game_board(PRED, {**MARKET, "best_home_line": -160})["moneyline"]["home"]["value"]
 
 
 def test_puck_line_uses_the_books_line_and_the_goal_model():
     pl = bets.game_board(PRED, MARKET)["puck_line"]
     assert pl["home_spread"] == -1.5
     assert pl["home"]["ours"] + pl["away"]["ours"] == pytest.approx(1)
-    assert 0.4 < pl["home"]["ours"] < 0.5 and pl["home"]["value"]  # 44.7% vs the books' 39% at +150
+    assert 0.4 < pl["home"]["model"] < 0.5
+    # Model 44.7% vs the books' 39%: blended 40.7% at +150 returns +1.8%, under the bar...
+    assert pl["home"]["ev"] == pytest.approx(0.0176, abs=1e-3) and not pl["home"]["value"]
+    # ...at +165 it clears it.
+    assert bets.game_board(PRED, {**MARKET, "home_spread_line": 165})["puck_line"]["home"]["value"]
 
 
 def test_totals_are_experimental_and_never_flagged():
@@ -41,12 +56,12 @@ def test_totals_are_experimental_and_never_flagged():
 
 def test_a_whole_number_total_can_push():
     total = bets.game_board(PRED, {**MARKET, "total": 6.0})["total"]
-    assert total["over"]["ours"] + total["under"]["ours"] < 0.95
+    assert total["over"]["model"] + total["under"]["model"] < 0.95
 
 
 def test_without_market_odds_or_expected_goals():
     board = bets.game_board({**PRED, "home_goals": None, "away_goals": None})
-    assert board["moneyline"]["home"]["fair"] == -197 and "market" not in board["moneyline"]["home"]
+    assert board["moneyline"]["home"]["fair"] == -197 and "market" not in board["moneyline"]["home"]  # no market: the model alone
     assert "puck_line" not in board and not board["moneyline"]["home"]["value"]
 
 

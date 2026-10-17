@@ -54,13 +54,18 @@ def setup_logging(name, log_to_file=True, level=logging.INFO):
     logger.addHandler(console_handler)
 
     if log_to_file:
-        os.makedirs(LOGS_DIR, exist_ok=True)
-        log_file = os.path.join(LOGS_DIR, f"{name}.log")
-        file_handler = logging.handlers.RotatingFileHandler(
-            log_file, maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT
-        )
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        # A read-only deploy (the Azure Function's code folder) can't hold
+        # log files: log to the console only rather than fail to import.
+        try:
+            os.makedirs(LOGS_DIR, exist_ok=True)
+            file_handler = logging.handlers.RotatingFileHandler(
+                os.path.join(LOGS_DIR, f"{name}.log"), maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT
+            )
+        except OSError:
+            file_handler = None
+        if file_handler:
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
 
     logger.propagate = False
     return logger

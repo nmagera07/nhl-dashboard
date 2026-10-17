@@ -146,7 +146,7 @@ class TestRun:
     def test_sends_a_new_goal_to_followers(self, monkeypatch):
         count, sent, _ = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB])
 
-        assert count == 1 and sent == [(SUB["endpoint"], "🚨 PIT goal! PIT 1, CBJ 0", 15 * 60)]
+        assert count == 1 and sent == [(SUB["endpoint"], "🚨 PIT goal! PIT 1, CBJ 0", 60 * 60)]
 
     def test_never_sends_the_same_event_twice(self, monkeypatch):
         count, sent, _ = _run(

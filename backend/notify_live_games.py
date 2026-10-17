@@ -66,7 +66,10 @@ def goal_event(game, goal):
     return {
         "key": f"goal:{game['id']}:{goal.get('teamAbbrev')}:{score}",
         "kind": "goals",
-        "ttl": 15 * 60,  # a goal alert much later than that is noise
+        # An idle Android phone can hold even high-urgency pushes until it's
+        # picked up; past the TTL the push service drops them and the alert
+        # never shows (two goals on 2026-10-16). A late alert beats none.
+        "ttl": 60 * 60,
         "teams": [away, home],
         "payload": {
             "title": f"🚨 {goal.get('teamAbbrev')} goal! {_scoreline(away, home, goal.get('awayScore'), goal.get('homeScore'))}",

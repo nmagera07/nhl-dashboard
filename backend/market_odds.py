@@ -3,10 +3,13 @@ Market odds for each game, logged next to our own prediction so both can
 be graded on the same games, from two sources:
 
   - sportsbooks: the consensus of US books (DraftKings, FanDuel, BetMGM...)
-    from The Odds API (the-odds-api.com, free tier: one call covers every
-    game; needs ODDS_API_KEY). Each book's moneyline has its margin removed
-    (the two implied probabilities normalized to 1), then the median across
-    books. Shown to users in the game preview's "Market view".
+    from The Odds API (the-odds-api.com; needs ODDS_API_KEY). One call
+    covers every game's moneyline, puck line, and total (3 of the free
+    tier's 500 credits a month). Each book's two prices have its margin
+    removed (the implied probabilities normalized to 1), then the median
+    across books; for the puck line and total, at the line most books
+    offer. Also the best moneyline price on each side, for line shopping.
+    Shown to users in the game preview's "Market view".
   - kalshi: the prediction market (below). Logged and graded only; not
     shown until its terms for displaying prices are confirmed.
 
@@ -15,12 +18,18 @@ game is an event (KXNHLGAME-26OCT14DALCOL: date, away, home) with one market
 per team ("Colorado wins"), priced in dollars. The implied probability is
 the midpoint of each side's bid and ask, normalized so the two add to 1.
 
-Timing: the daily job logs a "morning" snapshot right after our 2 AM
-predictions, so both see the same information. (The tougher benchmark is
-the closing line at puck drop; that would be a second snapshot.)
+Timing, two snapshots per game:
+  - "morning": the daily job, right after our 2 AM predictions, so both
+    see the same information.
+  - "close": the notifier function checks every 5 minutes; once a game is
+    within 15 minutes of puck drop, one call snapshots every game starting
+    in the next 75 minutes (a few calls a day, not one per game). The
+    closing line has the most information in it (confirmed goalies, late
+    injuries), so it's the hardest benchmark: beating it is the real test.
 
 Usage:
     python market_odds.py              # log today's games (the daily job)
+    python market_odds.py --close      # closing snapshot if one is due (the function)
     python market_odds.py --report     # our predictions vs. the market, graded
 """
 
@@ -30,14 +39,14 @@ import re
 import statistics
 import time
 import unicodedata
-from datetime import date, datetime
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import psycopg2
 import requests
 from dotenv import load_dotenv
 
-from daily_digest import today_eastern
 from logging_config import setup_logging
 
 load_dotenv()
@@ -56,13 +65,16 @@ SPORTSBOOKS = "sportsbooks"
 EASTERN = ZoneInfo("America/New_York")
 # Kalshi's team codes differ from the NHL's for four teams.
 KALSHI_CODES = {"LAK": "LA", "NJD": "NJ", "SJS": "SJ", "TBL": "TB"}
+CLOSE_LEAD = timedelta(minutes=15)   # a game this close to puck drop triggers the closing snapshot
+CLOSE_COVER = timedelta(minutes=75)  # which covers every game starting this soon
+CREDIT_FLOOR = 30                    # leave the last Odds API credits for the morning snapshots
 MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
 
 TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS market_odds (
     game_id                 BIGINT NOT NULL,
     source                  VARCHAR(16) NOT NULL,
-    captured                VARCHAR(10) NOT NULL,     -- 'morning' (with our 2 AM prediction)
+    captured                VARCHAR(10) NOT NULL,     -- 'morning' (with our 2 AM prediction) or 'close' (near puck drop)
     game_date               DATE NOT NULL,
     home_abbrev             VARCHAR(3) NOT NULL,
     away_abbrev             VARCHAR(3) NOT NULL,
@@ -76,12 +88,27 @@ CREATE TABLE IF NOT EXISTS market_odds (
     PRIMARY KEY (game_id, source, captured)
 )
 """
-# Sportsbook consensus: the median line and how many books it's from.
+# Sportsbook consensus: the median line and how many books it's from;
+# the puck line (home_spread -1.5 = home favored by 1.5) and total, each
+# with its median prices and no-margin probability; the best moneylines.
 COLUMNS_SQL = """
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS home_line INTEGER;
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS away_line INTEGER;
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS books SMALLINT;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS best_home_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS best_away_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS home_spread NUMERIC(3,1);
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS home_spread_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS away_spread_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS home_cover_prob NUMERIC(5,4);
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS total NUMERIC(3,1);
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS over_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS under_line INTEGER;
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS over_prob NUMERIC(5,4);
 """
+ODDS_COLUMNS = ("home_prob", "home_line", "away_line", "books", "best_home_line", "best_away_line",
+                "home_spread", "home_spread_line", "away_spread_line", "home_cover_prob",
+                "total", "over_line", "under_line", "over_prob")
 
 
 def american_to_prob(price):
@@ -90,40 +117,92 @@ def american_to_prob(price):
     return -price / (-price + 100) if price < 0 else 100 / (price + 100)
 
 
+def prob_to_american(prob):
+    """0.6 -> -150, 0.4348 -> +130."""
+    return round(-100 * prob / (1 - prob)) if prob >= 0.5 else round(100 * (1 - prob) / prob)
+
+
+def median_price(prices):
+    """The median of American prices, taken as probabilities: a plain median
+    of -105 and +100 would be -2.5."""
+    return prob_to_american(statistics.median(american_to_prob(p) for p in prices))
+
+
+def best_price(prices):
+    """The price that pays the most: +150 over +140, -105 over -120."""
+    return min(prices, key=american_to_prob)
+
+
+def today_eastern(now=None):
+    return (now or datetime.now(EASTERN)).astimezone(EASTERN).date()
+
+
 def _norm(name):
     """'St Louis Blues' and 'St. Louis Blues', 'Montréal' and 'Montreal' compare equal."""
     plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z]", "", plain.lower())
 
 
+def _offers(event, market_key, first, second):
+    """Each book's (point, first's no-margin probability, first's price, second's price) in one two-way market."""
+    offers = []
+    for book in event.get("bookmakers", []):
+        market = next((m for m in book.get("markets", []) if m.get("key") == market_key), None)
+        outcomes = {_norm(o["name"]): o for o in (market or {}).get("outcomes", [])}
+        a, b = outcomes.get(_norm(first)), outcomes.get(_norm(second))
+        if not a or not b:
+            continue
+        pa, pb = american_to_prob(a["price"]), american_to_prob(b["price"])
+        offers.append((a.get("point"), pa / (pa + pb), a["price"], b["price"]))
+    return offers
+
+
+def _main_line(offers):
+    """(point, offers at it): the point most books list, since a few post a different one."""
+    point = Counter(o[0] for o in offers).most_common(1)[0][0]
+    return point, [o for o in offers if o[0] == point]
+
+
 def sportsbook_consensus(event, home_name, away_name):
     """
-    {"home_prob", "home_line", "away_line", "books"} for one Odds API event:
-    each book's two moneylines turned into probabilities with the margin
-    removed, then the median across books (and the median lines, for
-    showing). None if no book has both sides.
+    For one Odds API event: from the moneylines, {"home_prob", "home_line",
+    "away_line", "books", "best_home_line", "best_away_line"}; plus the
+    puck line ("home_spread", "home_spread_line", "away_spread_line",
+    "home_cover_prob") and total ("total", "over_line", "under_line",
+    "over_prob"), None where no book posts them. Probabilities have each
+    book's margin removed, then the median across books. None without a
+    moneyline.
     """
-    probs, home_lines, away_lines = [], [], []
-    for book in event.get("bookmakers", []):
-        h2h = next((m for m in book.get("markets", []) if m.get("key") == "h2h"), None)
-        prices = {_norm(o["name"]): o["price"] for o in (h2h or {}).get("outcomes", [])}
-        h, a = prices.get(_norm(home_name)), prices.get(_norm(away_name))
-        if h is None or a is None:
-            continue
-        ph, pa = american_to_prob(h), american_to_prob(a)
-        probs.append(ph / (ph + pa))
-        home_lines.append(h)
-        away_lines.append(a)
-    if not probs:
+    moneylines = _offers(event, "h2h", home_name, away_name)
+    if not moneylines:
         return None
-    return {"home_prob": round(statistics.median(probs), 4), "home_line": round(statistics.median(home_lines)),
-            "away_line": round(statistics.median(away_lines)), "books": len(probs)}
+    odds = dict.fromkeys(ODDS_COLUMNS)
+    odds.update(
+        home_prob=round(statistics.median(o[1] for o in moneylines), 4),
+        home_line=median_price([o[2] for o in moneylines]),
+        away_line=median_price([o[3] for o in moneylines]),
+        books=len(moneylines),
+        best_home_line=best_price([o[2] for o in moneylines]),
+        best_away_line=best_price([o[3] for o in moneylines]),
+    )
+    spreads = [o for o in _offers(event, "spreads", home_name, away_name) if o[0] is not None]
+    if spreads:
+        point, at = _main_line(spreads)
+        odds.update(home_spread=point, home_cover_prob=round(statistics.median(o[1] for o in at), 4),
+                    home_spread_line=median_price([o[2] for o in at]), away_spread_line=median_price([o[3] for o in at]))
+    totals = [o for o in _offers(event, "totals", "Over", "Under") if o[0] is not None]
+    if totals:
+        point, at = _main_line(totals)
+        odds.update(total=point, over_prob=round(statistics.median(o[1] for o in at), 4),
+                    over_line=median_price([o[2] for o in at]), under_line=median_price([o[3] for o in at]))
+    return odds
 
 
-def log_sportsbooks(cur, day, games, names, get=None):
+def log_sportsbooks(cur, day, games, names, get=None, captured="morning"):
     """
     games: [(game_id, home, away)]; names: {abbrev: full team name}. One Odds
     API call covers every upcoming game; only today's (Eastern) are logged.
+    A closing snapshot replaces an earlier one for the same game.
     """
     if not ODDS_API_KEY and get is None:
         logger.info("No ODDS_API_KEY; skipping sportsbook odds")
@@ -146,22 +225,24 @@ def log_sportsbooks(cur, day, games, names, get=None):
         odds = event and sportsbook_consensus(event, names[home], names[away])
         if not odds:
             continue
+        on_conflict = "DO NOTHING" if captured == "morning" else (
+            "DO UPDATE SET " + ", ".join(f"{c} = EXCLUDED.{c}" for c in (*ODDS_COLUMNS, "captured_at")))
         cur.execute(
-            """
-            INSERT INTO market_odds (game_id, source, captured, game_date, home_abbrev, away_abbrev, home_prob,
-                                     home_line, away_line, books, captured_at)
-            VALUES (%s, %s, 'morning', %s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (game_id, source, captured) DO NOTHING
+            f"""
+            INSERT INTO market_odds (game_id, source, captured, game_date, home_abbrev, away_abbrev,
+                                     {", ".join(ODDS_COLUMNS)}, captured_at)
+            VALUES (%s, %s, %s, %s, %s, %s, {", ".join(["%s"] * len(ODDS_COLUMNS))}, NOW())
+            ON CONFLICT (game_id, source, captured) {on_conflict}
             """,
-            (game_id, SPORTSBOOKS, day, home, away, odds["home_prob"], odds["home_line"], odds["away_line"], odds["books"]),
+            (game_id, SPORTSBOOKS, captured, day, home, away, *(odds[c] for c in ODDS_COLUMNS)),
         )
         logged += 1
     return logged
 
 
 def _get_odds_api():
-    response = requests.get(ODDS_API_URL, params={"apiKey": ODDS_API_KEY, "regions": "us", "markets": "h2h",
-                                                  "oddsFormat": "american"}, timeout=30)
+    response = requests.get(ODDS_API_URL, params={"apiKey": ODDS_API_KEY, "regions": "us",
+                                                  "markets": "h2h,spreads,totals", "oddsFormat": "american"}, timeout=30)
     response.raise_for_status()
     logger.info(f"The Odds API: {response.headers.get('x-requests-remaining')} requests left this month")
     return response.json()
@@ -267,6 +348,68 @@ def log_today():
     logger.info(f"Logged Kalshi odds for {logged} and sportsbook odds for {books} of {len(games)} games on {day}")
 
 
+def _credits_left():
+    """The Odds API credits left this month (listing the sports is free)."""
+    response = requests.get("https://api.the-odds-api.com/v4/sports", params={"apiKey": ODDS_API_KEY}, timeout=15)
+    response.raise_for_status()
+    return int(response.headers.get("x-requests-remaining", 0))
+
+
+def _start(game):
+    return datetime.fromisoformat(game["startTimeUTC"].replace("Z", "+00:00"))
+
+
+def closing_due(games, have_close, now):
+    """
+    games: the NHL score feed's games; have_close: IDs already snapshotted.
+    Once a not-started game without a closing snapshot is within CLOSE_LEAD
+    of puck drop: every not-started game within CLOSE_COVER (one Odds API
+    call covers them all). Otherwise [].
+    """
+    upcoming = [(g, _start(g)) for g in games if g.get("gameState") in NOT_STARTED and g.get("startTimeUTC")]
+    upcoming = [(g, start) for g, start in upcoming if start > now]
+    if not any(start - now <= CLOSE_LEAD and g["id"] not in have_close for g, start in upcoming):
+        return []
+    return [g for g, start in upcoming if start - now <= CLOSE_COVER]
+
+
+def log_closing(now=None, get=_get, odds_get=None, credits=None):
+    """
+    The closing snapshot, if one is due. Runs every 5 minutes; most runs
+    make one NHL request and stop. A game whose snapshot failed is retried
+    on the next run until puck drop.
+    """
+    now = now or datetime.now(timezone.utc)
+    day = today_eastern(now)
+    games = get(NHL_SCORE_URL.format(date=day)).get("games", [])
+    if not closing_due(games, set(), now):
+        return 0
+    with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+        cur.execute(TABLE_SQL)
+        cur.execute(COLUMNS_SQL)
+        cur.execute("SELECT DISTINCT game_id FROM market_odds WHERE captured = 'close' AND game_id = ANY(%s)",
+                    ([g["id"] for g in games],))
+        due = closing_due(games, {row[0] for row in cur.fetchall()}, now)
+        if not due:
+            return 0
+        rows = [(g["id"], g["homeTeam"]["abbrev"], g["awayTeam"]["abbrev"]) for g in due]
+        kalshi = log_games(cur, day, rows, captured="close", get=get)
+        books = 0
+        if ODDS_API_KEY or odds_get:
+            try:
+                left = (credits or _credits_left)()
+            except requests.RequestException as exc:
+                left = 0
+                logger.warning(f"The Odds API unavailable ({exc})")
+            if left >= CREDIT_FLOOR:
+                cur.execute("SELECT team_abbrev, team_name FROM teams")
+                books = log_sportsbooks(cur, day, rows, dict(cur.fetchall()), get=odds_get, captured="close")
+            else:
+                logger.warning(f"{left} Odds API credits left; skipping sportsbook closing odds")
+    logger.info(f"Closing odds for {len(rows)} games: Kalshi {kalshi}, sportsbooks {books}")
+    return len(rows)
+
+
 def brier(pairs):
     return sum((p - y) ** 2 for p, y in pairs) / len(pairs)
 
@@ -292,21 +435,22 @@ def compare(rows):
 
 
 def report():
-    """Our predictions vs. each market, graded on the same finished games."""
+    """Our predictions vs. each market and snapshot, graded on the same finished games."""
     with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
-        for source in (SPORTSBOOKS, SOURCE):
+        for source, captured in ((s, c) for s in (SPORTSBOOKS, SOURCE) for c in ("morning", "close")):
             cur.execute(
                 """
                 SELECT p.game_date, p.away_abbrev, p.home_abbrev, p.home_win_prob, m.home_prob, p.home_won
                 FROM game_predictions p
-                JOIN market_odds m ON m.game_id = p.game_id AND m.source = %s AND m.captured = 'morning'
+                JOIN market_odds m ON m.game_id = p.game_id AND m.source = %s AND m.captured = %s
                 WHERE p.home_won IS NOT NULL
                 ORDER BY p.game_date
                 """,
-                (source,),
+                (source, captured),
             )
             rows = cur.fetchall()
-            print(f"\nPuckPulse vs {source}:", compare([(float(o), float(m), bool(y)) for *_, o, m, y in rows]))
+            print(f"\nPuckPulse vs {source} ({captured}):",
+                  compare([(float(o), float(m), bool(y)) for *_, o, m, y in rows]))
             for day, away, home, o, m, won in sorted(rows, key=lambda r: -abs(float(r[3]) - float(r[4])))[:5]:
                 print(f"  {day} {away} @ {home}: ours {float(o):.0%}, {source} {float(m):.0%}, home {'won' if won else 'lost'}")
 
@@ -314,10 +458,16 @@ def report():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", action="store_true")
+    parser.add_argument("--close", action="store_true", help="closing snapshot, if one is due")
     args = parser.parse_args()
     if not DATABASE_URL:
         raise SystemExit("DATABASE_URL is not set")
-    report() if args.report else log_today()
+    if args.report:
+        report()
+    elif args.close:
+        log_closing()
+    else:
+        log_today()
 
 
 if __name__ == "__main__":

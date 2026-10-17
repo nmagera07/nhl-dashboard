@@ -4,7 +4,7 @@
 // src/hooks/useTheme.js.
 (function () {
   var theme = null;
-  try { theme = localStorage.getItem("pp-theme"); } catch (e) { /* storage blocked: follow the system */ }
+  try { theme = localStorage.getItem("pp-theme"); } catch { /* storage blocked: follow the system */ }
   if (theme !== "light" && theme !== "dark") {
     theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }

@@ -106,8 +106,11 @@ ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS total NUMERIC(3,1);
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS over_line INTEGER;
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS under_line INTEGER;
 ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS over_prob NUMERIC(5,4);
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS best_home_book VARCHAR(40);
+ALTER TABLE market_odds ADD COLUMN IF NOT EXISTS best_away_book VARCHAR(40);
 """
 ODDS_COLUMNS = ("home_prob", "home_line", "away_line", "books", "best_home_line", "best_away_line",
+                "best_home_book", "best_away_book",
                 "home_spread", "home_spread_line", "away_spread_line", "home_cover_prob",
                 "total", "over_line", "under_line", "over_prob")
 
@@ -145,7 +148,7 @@ def _norm(name):
 
 
 def _offers(event, market_key, first, second):
-    """Each book's (point, first's no-margin probability, first's price, second's price) in one two-way market."""
+    """Each book's (point, first's no-margin probability, first's price, second's price, book name) in one two-way market."""
     offers = []
     for book in event.get("bookmakers", []):
         market = next((m for m in book.get("markets", []) if m.get("key") == market_key), None)
@@ -154,7 +157,7 @@ def _offers(event, market_key, first, second):
         if not a or not b:
             continue
         pa, pb = american_to_prob(a["price"]), american_to_prob(b["price"])
-        offers.append((a.get("point"), pa / (pa + pb), a["price"], b["price"]))
+        offers.append((a.get("point"), pa / (pa + pb), a["price"], b["price"], book.get("title") or book.get("key")))
     return offers
 
 
@@ -183,9 +186,11 @@ def sportsbook_consensus(event, home_name, away_name):
         home_line=median_price([o[2] for o in moneylines]),
         away_line=median_price([o[3] for o in moneylines]),
         books=len(moneylines),
-        best_home_line=best_price([o[2] for o in moneylines]),
-        best_away_line=best_price([o[3] for o in moneylines]),
     )
+    best_home = min(moneylines, key=lambda o: american_to_prob(o[2]))
+    best_away = min(moneylines, key=lambda o: american_to_prob(o[3]))
+    odds.update(best_home_line=best_home[2], best_home_book=best_home[4],
+                best_away_line=best_away[3], best_away_book=best_away[4])
     spreads = [o for o in _offers(event, "spreads", home_name, away_name) if o[0] is not None]
     if spreads:
         point, at = _main_line(spreads)

@@ -9,6 +9,13 @@ const ICONS = {
       <path d="M4 10v4c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5v-4" />
     </>
   ),
+  // Bet slip (a ticket)
+  bets: (
+    <>
+      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2.5a2.5 2.5 0 0 0 0 5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2.5a2.5 2.5 0 0 0 0-5V7z" />
+      <path d="M14 5v14" strokeDasharray="2 2" />
+    </>
+  ),
   // Ranked list
   standings: (
     <>

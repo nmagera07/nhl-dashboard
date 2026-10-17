@@ -266,6 +266,11 @@ almost all of it startup. Fixes:
   real cost is about $3-5 a month for no cold starts.
 - A logging gotcha: our `setup_logging` turns propagation off, so inside Functions the
   notifier's own log lines vanished until they propagated to the root logger.
+- **A second one bit in production (10-17).** Importing `market_odds` in the function
+  created `logs/` in the read-only code folder. The import failed, and the whole function
+  (goal alerts too) was down for 10 minutes mid-game. My package check had imported it
+  from a *writable* folder. The lesson is to test in an environment shaped like production:
+  now the check runs on a read-only copy, and logging falls back to the console.
 
 ---
 

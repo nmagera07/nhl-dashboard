@@ -103,7 +103,7 @@ export default function BetsPage() {
       <section className="bets-about">
         <h2>How to read this</h2>
         <ul>
-          <li><strong>Price</strong>: the moneyline is the best price across US sportsbooks (the book is named); the puck line and total are the typical price.</li>
+          <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
           <li><strong>Fair</strong>: the price we think is right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>

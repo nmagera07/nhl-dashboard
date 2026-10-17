@@ -77,3 +77,8 @@ class TestBetsRoute:
         assert game["moneyline"]["home"]["value"] and game["as_of"].startswith("2026-10-17T00:45")
         query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
         assert "source = 'sportsbooks'" in query and "captured = 'close'" in query
+
+
+def test_an_offshore_best_price_falls_back_to_the_median():
+    ml = bets.game_board(PRED, {**MARKET, "best_away_book": "Bovada", "best_away_line": 160})["moneyline"]["away"]
+    assert ml["price"] == 140 and "book" not in ml

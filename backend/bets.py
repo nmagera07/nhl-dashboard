@@ -24,6 +24,9 @@ always guessing the average, so they're shown as experimental.
 import goal_model
 from market_odds import american_to_prob, prob_to_american
 
+# Offshore books' names as logged before market_odds limited the best price
+# to licensed US books (10-17): those rows fall back to the median price.
+OFFSHORE_BOOKS = {"Bovada", "BetOnline.ag", "MyBookie.ag", "BetUS", "LowVig.ag"}
 MODEL_WEIGHT = 0.3
 VALUE_EV = 0.02
 
@@ -33,7 +36,7 @@ def decimal_odds(price):
     return 1 + (price / 100 if price > 0 else 100 / -price)
 
 
-def _side(model, market, price, flag=True, book=None):
+def _side(model, market, price, book=None, flag=True):
     ours = model if market is None else MODEL_WEIGHT * model + (1 - MODEL_WEIGHT) * market
     side = {"model": round(model, 4), "ours": round(ours, 4), "fair": prob_to_american(min(max(ours, 0.01), 0.99))}
     if market is not None:
@@ -62,10 +65,16 @@ def game_board(pred, market=None, b2b=(False, False)):
     board = {"home": pred["home"], "away": pred["away"], "b2b": {"home": bool(b2b[0]), "away": bool(b2b[1])},
              "snapshot": m.get("captured"), "as_of": m.get("captured_at"), "books": m.get("books")}
     home_market = _num(m.get("home_prob"))
+    def best(side):
+        """The best licensed price and its book, else the median price."""
+        book = m.get(f"best_{side}_book")
+        if m.get(f"best_{side}_line") is not None and book not in OFFSHORE_BOOKS:
+            return m[f"best_{side}_line"], book
+        return m.get(f"{side}_line"), None
+
     board["moneyline"] = {
-        "home": _side(p, home_market, m.get("best_home_line") or m.get("home_line"), book=m.get("best_home_book")),
-        "away": _side(1 - p, None if home_market is None else 1 - home_market,
-                      m.get("best_away_line") or m.get("away_line"), book=m.get("best_away_book")),
+        "home": _side(p, home_market, *best("home")),
+        "away": _side(1 - p, None if home_market is None else 1 - home_market, *best("away")),
     }
     if pred.get("home_goals") is None:
         return board

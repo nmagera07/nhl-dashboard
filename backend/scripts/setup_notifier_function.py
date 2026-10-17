@@ -5,8 +5,9 @@ Consumption). Run from backend/ with the Azure CLI logged in:
     .venv/bin/python scripts/setup_notifier_function.py
     .venv/bin/python scripts/setup_notifier_function.py --retire-job
 
-Reads DATABASE_URL and the VAPID keys from backend/.env so nothing secret
-is typed or printed. Safe to re-run.
+Reads DATABASE_URL, the VAPID keys, and ODDS_API_KEY (optional; the
+closing-odds snapshot's sportsbook prices) from backend/.env so nothing
+secret is typed or printed. Safe to re-run.
 
 1. A storage account (Flex Consumption keeps its code and timer state there).
 2. Application Insights on the existing Log Analytics workspace, for logs.
@@ -86,9 +87,13 @@ if not exists("functionapp", "show", "--name", APP, "--resource-group", RG):
     az("functionapp", "create", "--name", APP, "--resource-group", RG, "--storage-account", storage,
        "--flexconsumption-location", LOCATION, "--runtime", "python", "--runtime-version", "3.12",
        "--instance-memory", "512", "--app-insights", INSIGHTS)
-az("functionapp", "config", "appsettings", "set", "--name", APP, "--resource-group", RG, "--settings",
-   f"DATABASE_URL={env['DATABASE_URL']}", f"VAPID_PRIVATE_KEY={env['VAPID_PRIVATE_KEY']}",
-   f"VAPID_PUBLIC_KEY={env['VAPID_PUBLIC_KEY']}")
+settings = [f"DATABASE_URL={env['DATABASE_URL']}", f"VAPID_PRIVATE_KEY={env['VAPID_PRIVATE_KEY']}",
+            f"VAPID_PUBLIC_KEY={env['VAPID_PUBLIC_KEY']}"]
+if env.get("ODDS_API_KEY"):
+    settings.append(f"ODDS_API_KEY={env['ODDS_API_KEY']}")
+else:
+    print("   (no ODDS_API_KEY in .env: closing odds will be Kalshi only)")
+az("functionapp", "config", "appsettings", "set", "--name", APP, "--resource-group", RG, "--settings", *settings)
 
 print("4/4 Deploying the code (remote build, a minute or two)...")
 with tempfile.TemporaryDirectory() as tmp:

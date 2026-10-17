@@ -1,10 +1,89 @@
+/* The Rink palette: two themes on the same color roles. Dark is the
+   default; [data-theme="light"] on <html> switches (set before first paint
+   by the script in index.html, from the saved choice or the system's). */
+:root {
+  color-scheme: dark;
+  --bg: #0b1424;            /* page: deep navy */
+  --card: #121e33;
+  --card-raised: #182742;   /* popovers, highlighted rows, tooltips */
+  --card-tint: #142c4d;     /* the start of a card's accent gradient */
+  --border: #1e2d47;
+  --border-strong: #2a3d5e;
+  --text: #e8eef7;
+  --text-dim: #8fa1bb;
+  --text-faint: #4a5d7a;    /* disabled text, chart gridlines */
+  --accent: #4cc2ff;        /* ice blue */
+  --accent-strong: #7dd3fc; /* links and accent text */
+  --accent-fill: #1d8fd6;   /* solid buttons */
+  --on-accent: #06213a;     /* text on --accent */
+  --accent-soft: rgba(76, 194, 255, 0.13);
+  --accent-mid: rgba(76, 194, 255, 0.26);
+  --accent-line: rgba(76, 194, 255, 0.55);
+  --accent-bg: #12355a;     /* the chat's own messages, chosen chips */
+  --accent-bg-strong: #174b80;
+  --accent-bg-text: #dbeefc;
+  --live: #ff4d5e;          /* goal-light red: live games, alerts */
+  --bad: #ff8a95;
+  --bad-soft: rgba(255, 77, 94, 0.14);
+  --bad-line: rgba(255, 77, 94, 0.5);
+  --good: #34d399;
+  --good-soft: rgba(52, 211, 153, 0.14);
+  --good-line: rgba(52, 211, 153, 0.5);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+  --warn-line: rgba(251, 191, 36, 0.5);
+  --neutral-soft: rgba(143, 161, 187, 0.13);
+  --neutral-mid: rgba(143, 161, 187, 0.24);
+  --hover-faint: rgba(255, 255, 255, 0.03);
+  --header-bg: rgba(11, 20, 36, 0.92);
+  --tabbar-bg: rgba(18, 30, 51, 0.96);
+  --scrim: rgba(3, 8, 16, 0.6);
+  --scrim-soft: rgba(11, 20, 36, 0.5);
+  --shadow: rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f7fb;            /* ice white */
+  --card: #ffffff;
+  --card-raised: #eef3f9;
+  --card-tint: #e6f0fb;
+  --border: #dde5ef;
+  --border-strong: #c3d0e0;
+  --text: #0f1b2d;
+  --text-dim: #55657c;
+  --text-faint: #a3b0c2;
+  --accent: #0a6fd6;
+  --accent-strong: #0a63c0;
+  --accent-fill: #0a6fd6;
+  --on-accent: #ffffff;
+  --accent-soft: rgba(10, 111, 214, 0.09);
+  --accent-mid: rgba(10, 111, 214, 0.2);
+  --accent-line: rgba(10, 111, 214, 0.5);
+  --accent-bg: #dcebfb;
+  --accent-bg-strong: #c4dcf7;
+  --accent-bg-text: #0f1b2d;
+  --live: #e11d48;
+  --bad: #c81e3c;
+  --bad-soft: rgba(225, 29, 72, 0.09);
+  --bad-line: rgba(225, 29, 72, 0.45);
+  --good: #047857;
+  --good-soft: rgba(5, 150, 105, 0.1);
+  --good-line: rgba(5, 150, 105, 0.45);
+  --warn: #b45309;
+  --warn-soft: rgba(217, 119, 6, 0.11);
+  --warn-line: rgba(217, 119, 6, 0.45);
+  --neutral-soft: rgba(85, 101, 124, 0.09);
+  --neutral-mid: rgba(85, 101, 124, 0.18);
+  --hover-faint: rgba(15, 27, 45, 0.03);
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --tabbar-bg: rgba(255, 255, 255, 0.96);
+  --scrim: rgba(15, 27, 45, 0.4);
+  --scrim-soft: rgba(255, 255, 255, 0.6);
+  --shadow: rgba(15, 27, 45, 0.14);
+}
+
 .dashboard {
-  --accent: #3b82f6;
-  --bg: #0a0b0f;
-  --card: #12141a;
-  --border: #1f2430;
-  --text: #e5e7eb;
-  --text-dim: #8b93a3;
   --gutter: 24px;
   background: var(--bg);
   color: var(--text);

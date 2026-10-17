@@ -139,6 +139,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Re-themed the app with semantic color tokens: about 120 hard-coded colors across 20+
+  stylesheets mapped to ~35 roles. That enabled a light/dark mode that follows the system
+  until chosen, with no flash of the wrong theme (a CSP-compliant pre-paint script) and
+  theme-aware team logos.
 - Built a news aggregator (NHL.com, ESPN, Sportsnet headlines, injuries, transactions) with
   per-source caching and failure isolation, similarity-based dedupe of cross-outlet recaps, and
   LLM agent tools for injuries and news, caught and fixed a wrong-team lookup bug via evals.
@@ -172,6 +176,29 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-17 — Light mode, and why it starts with naming colors
+
+**What:** a new "Rink" palette (navy, ice blue, goal-light red) with a matching light theme,
+and a sun/moon switch in the header. It follows the phone's setting until you pick one,
+then remembers your choice.
+
+**What I learned:**
+- **A theme is a set of roles, not a set of colors.** The app had about 120 hard-coded colors
+  ("#4ade80", "rgba(59,130,246,.15)") in 20+ files. Each one was really a role: good, bad,
+  warning, accent-tint, raised card, shadow. Once every color was a variable named for its
+  role, a light theme was just a second set of values for the same names.
+- **No flash of the wrong theme.** The theme has to be set before the page paints. That
+  usually means an inline script, but the site's Content-Security-Policy blocks inline
+  scripts, so it's a tiny file loaded at the top of `<head>`.
+- **Images don't follow CSS.** The NHL's team logos come in two versions: `TBL_dark.svg` for
+  dark backgrounds and `TBL_light.svg` for light ones. On white, the dark-background Lightning
+  logo vanished. The logo helper now picks by theme, and the theme state lives at the app's
+  root so a switch re-renders every logo.
+- **Contrast flips.** White text on the old blue was fine, but on the brighter ice blue it's
+  hard to read, so dark mode uses navy text on blue buttons.
 
 ---
 

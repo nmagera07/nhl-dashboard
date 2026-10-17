@@ -1,12 +1,12 @@
 .game-page { max-width: 860px; margin: 0 auto; padding: 0 var(--gutter); }
-.back-link { color: #93c5fd; font-size: 13px; }
+.back-link { color: var(--accent-strong); font-size: 13px; }
 .game-hero, .boxscore-card { margin-top: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .standings-mobile-list { display: none; }
 .game-hero p, .muted { color: var(--text-dim); }
 .game-hero { text-align: center; }
 .game-hero p { margin: 14px 0 0; font-size: 12px; }
 .game-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.game-status-live { color: #ef4444; }
+.game-status-live { color: var(--live); }
 .game-scoreboard { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; margin-top: 14px; }
 .game-team { display: grid; justify-items: center; gap: 4px; min-width: 0; }
 .game-team-logo { width: 64px; height: 64px; object-fit: contain; }
@@ -48,7 +48,7 @@
 .goal-score { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
 .three-stars { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .three-stars li { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: baseline; gap: 4px 10px; }
-.three-stars-rank { grid-row: span 2; color: #facc15; letter-spacing: 1px; }
+.three-stars-rank { grid-row: span 2; color: var(--warn); letter-spacing: 1px; }
 .three-stars li .muted { grid-column: 2; font-size: 12px; }
 .three-stars-line { grid-column: 3; grid-row: 1 / span 2; align-self: center; color: var(--text-dim); font-size: 12px; }
 .team-stats { display: grid; }

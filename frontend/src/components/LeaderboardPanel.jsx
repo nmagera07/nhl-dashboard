@@ -1,4 +1,4 @@
-import { darkLogo } from "../utils/darkLogo.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import { useState, useMemo } from "react";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
@@ -181,7 +181,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
               <tr key={p.player_id} onClick={() => onSelectPlayer(p.player_id)}>
                 <td className="col-rank">{startIdx + i + 1}</td>
                 <td className="col-team">
-                  {p.team_logo_url && <img className="leaderboard-team-logo" src={darkLogo(p.team_logo_url)} alt="" />}
+                  {p.team_logo_url && <img className="leaderboard-team-logo" src={teamLogo(p.team_logo_url)} alt="" />}
                   <span className="team-abbrev">{p.team_abbrev}</span>
                   <span className="team-name" title={`${p.first_name} ${p.last_name}`}>{p.first_name} {p.last_name}</span>
                 </td>
@@ -208,7 +208,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
           >
             <span className="leaderboard-player-card-header">
               <span className="leaderboard-player-rank">{startIdx + i + 1}</span>
-              {p.team_logo_url && <img className="leaderboard-team-logo" src={darkLogo(p.team_logo_url)} alt="" />}
+              {p.team_logo_url && <img className="leaderboard-team-logo" src={teamLogo(p.team_logo_url)} alt="" />}
               <span className="leaderboard-player-identity">
                 <strong>{p.first_name} {p.last_name}</strong>
                 <small>{p.team_abbrev} · {p.position_code}</small>

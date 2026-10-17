@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { phase, sortGames, statusLabel } from "./gameStatus.js";
-import { darkLogo } from "../utils/darkLogo.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import { todayISO } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import { nhlVideoUrl } from "../utils/highlights.js";
@@ -20,7 +20,7 @@ function TeamLine({ team, phase: gamePhase, isWinner, isLoser }) {
   const showScore = gamePhase !== "upcoming";
   return (
     <span className={`game-card-team${isWinner ? " is-winner" : ""}${isLoser ? " is-loser" : ""}`}>
-      {team?.logo ? <img className="game-card-logo" src={darkLogo(team.logo)} alt="" /> : <span className="game-card-logo" />}
+      {team?.logo ? <img className="game-card-logo" src={teamLogo(team.logo)} alt="" /> : <span className="game-card-logo" />}
       <span className="game-card-abbrev">{team?.abbrev || "—"}</span>
       {gamePhase === "upcoming" && team?.record && <span className="game-card-record">{team.record}</span>}
       {showScore && <strong className="game-card-score">{team?.score ?? 0}</strong>}

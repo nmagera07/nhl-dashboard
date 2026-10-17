@@ -43,7 +43,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px var(--shadow);
 }
 .game-calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .game-calendar-header strong { font-size: 14px; }
@@ -67,11 +67,11 @@
   cursor: pointer;
 }
 .game-calendar-day small { color: var(--accent); font-size: 9px; font-weight: 700; line-height: 1; }
-.game-calendar-day:hover:not(:disabled) { background: rgba(59, 130, 246, 0.12); }
-.game-calendar-day:disabled { color: #3a4150; font-weight: 400; cursor: default; }
+.game-calendar-day:hover:not(:disabled) { background: var(--accent-soft); }
+.game-calendar-day:disabled { color: var(--text-faint); font-weight: 400; cursor: default; }
 .game-calendar-day.is-today { border-color: var(--border); }
-.game-calendar-day.is-selected { background: var(--accent); color: #fff; }
-.game-calendar-day.is-selected small { color: #dbeafe; }
+.game-calendar-day.is-selected { background: var(--accent); color: var(--on-accent); }
+.game-calendar-day.is-selected small { color: var(--accent-bg-text); }
 .game-calendar-note { margin: 8px 0 0; color: var(--text-dim); font-size: 11px; text-align: center; }
 .scoreboard-games {
   display: grid;
@@ -92,11 +92,11 @@
 }
 .scoreboard-game:hover { border-color: var(--accent); }
 .game-card-wrap { position: relative; display: grid; }
-.game-card-recap { position: absolute; top: 9px; right: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(59, 130, 246, 0.15); color: var(--accent); font-size: 11px; font-weight: 700; text-decoration: none; }
-.game-card-recap:hover { background: rgba(59, 130, 246, 0.28); }
-.game-card-live { border-color: rgba(239, 68, 68, 0.45); }
+.game-card-recap { position: absolute; top: 9px; right: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; text-decoration: none; }
+.game-card-recap:hover { background: var(--accent-mid); }
+.game-card-live { border-color: var(--bad-line); }
 .game-card-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
-.game-card-live .game-card-status { color: #ef4444; }
+.game-card-live .game-card-status { color: var(--live); }
 .game-card-tv { margin-left: auto; overflow: hidden; font-weight: 500; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
 .game-card-team { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 15px; }
 .game-card-logo { width: 26px; height: 26px; flex: 0 0 26px; object-fit: contain; }
@@ -108,7 +108,7 @@
 .scoreboard-empty { margin: 0 0 12px; color: var(--text-dim); font-size: 13px; }
 
 /* Your team's game, pinned first on the scoreboard. */
-.game-card-mine { border-color: rgba(59, 130, 246, 0.55); }
+.game-card-mine { border-color: var(--accent-line); }
 .game-card-status .favorite-star { margin-left: auto; }
 .scoreboard + .my-team-card, .scoreboard + .my-team-prompt { margin-top: 16px; }
 .scoreboard ~ .top-headlines { margin-top: 16px; }

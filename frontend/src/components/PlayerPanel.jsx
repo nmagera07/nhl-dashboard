@@ -2,7 +2,7 @@ import { formatSigned, formatToi } from "../utils/format.js";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
-import { darkLogo } from "../utils/darkLogo.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
 
@@ -173,7 +173,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
             <p className="player-hero-sub">
               {player.team_abbrev && (
                 <Link className="player-team-link" to={`/teams/${player.team_abbrev}`}>
-                  {player.team_logo_url && <img className="player-team-logo" src={darkLogo(player.team_logo_url)} alt="" />}
+                  {player.team_logo_url && <img className="player-team-logo" src={teamLogo(player.team_logo_url)} alt="" />}
                   {player.team_abbrev}
                 </Link>
               )}

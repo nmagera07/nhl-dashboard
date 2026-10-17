@@ -4,6 +4,7 @@ import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
 import { todayISO } from "../utils/dates.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import { track } from "../utils/analytics.js";
 import { fetchMe, joinPickem, makePick, record, saveKey, savedKey } from "../utils/pickem.js";
 
@@ -79,7 +80,7 @@ function GameRow({ game, pick, onPick, inputs }) {
   const button = (team, logo) => (
     <button type="button" className={`pickem-team${pick === team ? " pickem-team-picked" : ""}`}
             aria-pressed={pick === team} disabled={!open} onClick={() => onPick(game.id, team)}>
-      {logo && <img src={logo} alt="" width="28" height="28" />}
+      {logo && <img src={teamLogo(logo)} alt="" width="28" height="28" />}
       <span>{team}</span>
     </button>
   );

@@ -2,7 +2,7 @@ import { ordinal } from "../utils/ordinal.js";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
-import { darkLogo } from "../utils/darkLogo.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { gameTimeLabel } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
@@ -146,7 +146,7 @@ function GameLine({ schedule }) {
     <Link className="my-team-game" to={`/games/${next.id}`} aria-label={`Next game: ${versus(next)}, ${gameTimeLabel(next.start_time_utc)}`}>
       <span className="my-team-game-label">Next</span>
       <span className="my-team-game-main">
-        {next.opponent_logo && <img src={next.opponent_logo} alt="" />}
+        {next.opponent_logo && <img src={teamLogo(next.opponent_logo)} alt="" />}
         {versus(next)}
       </span>
       <span className="my-team-game-time">{gameTimeLabel(next.start_time_utc)}</span>
@@ -211,7 +211,7 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
     <section className="my-team-card" aria-label={`My team: ${team.team_name}`}>
       <div className="my-team-header">
         <Link className="my-team-identity" to={`/teams/${team.team_abbrev}`}>
-          {team.logo_url && <img className="my-team-logo" src={darkLogo(team.logo_url)} alt="" />}
+          {team.logo_url && <img className="my-team-logo" src={teamLogo(team.logo_url)} alt="" />}
           <span>
             <span className="my-team-kicker">★ My team</span>
             <span className="my-team-name">{team.team_name}</span>

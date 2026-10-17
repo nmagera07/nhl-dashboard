@@ -6,6 +6,7 @@ import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
 import { useScrollToTop } from "./hooks/useScrollToTop.js";
+import { useTheme } from "./hooks/useTheme.js";
 import { cachedResponse } from "./utils/responseCache.js";
 import TopNav from "./components/TopNav.jsx";
 import TabBar from "./components/TabBar.jsx";
@@ -18,6 +19,7 @@ import PlayerPage from "./pages/PlayerPage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 import PickemPage from "./pages/PickemPage.jsx";
+import BetsPage from "./pages/BetsPage.jsx";
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";
 import NewsPage from "./pages/NewsPage.jsx";
 
@@ -37,6 +39,9 @@ export default function NHLDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
+  // Held here, not in the header, so a switch re-renders the whole page
+  // (team logos pick their version by theme as they render).
+  const [theme, toggleTheme] = useTheme();
 
   const standingsUrl = standingsSortBy
     ? `${API_BASE}/standings/latest?sort_by=${standingsSortBy}&sort_dir=${standingsSortDir}`
@@ -147,7 +152,7 @@ export default function NHLDashboard() {
 
   return (
     <div className="dashboard">
-      <TopNav search={search} onSearchChange={setSearch} />
+      <TopNav search={search} onSearchChange={setSearch} theme={theme} onToggleTheme={toggleTheme} />
       <IntelligencePanel context={intelligenceContext} label={intelligenceLabel} />
 
       <div className="app-content">
@@ -184,6 +189,7 @@ export default function NHLDashboard() {
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
           <Route path="/track-record" element={<TrackRecordPage />} />
           <Route path="/pickem" element={<PickemPage />} />
+          <Route path="/bets" element={<BetsPage />} />
           <Route path="/games/:gameId" element={<GamePage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />

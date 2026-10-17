@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
+import { teamLogo } from "../utils/teamLogo.js";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
@@ -82,7 +83,7 @@ function teamRecord(team, standingsRow) {
 function TeamHeader({ team, side, record }) {
   return (
     <div className={`game-team game-team-${side}`}>
-      {team?.darkLogo && <img className="game-team-logo" src={team.darkLogo} alt="" />}
+      {(team?.darkLogo || team?.logo) && <img className="game-team-logo" src={teamLogo(team.darkLogo || team.logo)} alt="" />}
       <span className="game-team-abbrev">{team?.abbrev}</span>
       <span className="game-team-name">{teamName(team)}</span>
       {record && <span className="game-team-record">{record}</span>}

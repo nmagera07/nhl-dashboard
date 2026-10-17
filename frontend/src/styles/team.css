@@ -21,8 +21,8 @@
 .team-summary-stat dt { color: var(--text-dim); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 .team-summary-stat dd { margin: 4px 0 0; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .team-summary-stat dd.is-highlight { color: var(--accent); font-size: 20px; line-height: 1; }
-.team-summary-stat dd.is-pos { color: #22c55e; }
-.team-summary-stat dd.is-neg { color: #ef4444; }
+.team-summary-stat dd.is-pos { color: var(--good); }
+.team-summary-stat dd.is-neg { color: var(--live); }
 .trend-eyebrow {
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -42,14 +42,14 @@
   border-radius: 2px;
   margin-right: 6px;
 }
-.legend-dot-playoff { background: #3b82f6; }
-.legend-dot-missed { background: #4b5563; }
+.legend-dot-playoff { background: var(--accent-fill); }
+.legend-dot-missed { background: var(--text-faint); }
 .status-line {
   font-size: 13px;
   color: var(--text-dim);
   padding: 0 var(--gutter);
 }
-.status-error { color: #ef4444; }
+.status-error { color: var(--live); }
 .back-link {
   background: none;
   border: none;

@@ -55,6 +55,7 @@ from response_models import (
     StandingsHistoryRow,
     SeasonFinalStanding,
 )
+import bets
 import push
 from daily_cache import cache as daily_cache, daily_cached
 import season_scenarios
@@ -1074,6 +1075,60 @@ def pickem_leaderboard():
         conn.rollback()
         if _pickem_tables_missing(exc):
             return {"players": [], "puckpulse": {"correct": 0, "graded": 0}}
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/bets")
+@daily_cached
+def bets_for_day(day: date = Query(..., alias="date")):
+    """
+    The Bets tab for a date: each game's moneyline, puck line, and total
+    from the sportsbooks (the closing snapshot once it's taken, else the
+    morning one), next to PuckPulse's fair odds, the edge, and the expected
+    value at the best price (bets.py). {"date", "games": {game_id: {...}}}.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT game_id, home_abbrev, away_abbrev, home_win_prob, home_goals, away_goals
+                FROM game_predictions WHERE game_date = %s
+                """,
+                (day,),
+            )
+            predictions = cur.fetchall()
+            try:
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (game_id) *
+                    FROM market_odds WHERE game_date = %s AND source = 'sportsbooks'
+                    ORDER BY game_id, (captured = 'close') DESC
+                    """,
+                    (day,),
+                )
+                markets = {r["game_id"]: dict(r) for r in cur.fetchall()}
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()
+                markets = {}
+            cur.execute("SELECT payload->'games' AS games FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
+            row = cur.fetchone()
+        # The model's schedule rows: [date, home, away, home_b2b, away_b2b].
+        b2b = {(g[1], g[2]): (bool(g[3]), bool(g[4])) for g in (row["games"] if row and row["games"] else [])
+               if len(g) >= 5 and g[0] == str(day)}
+        games = {}
+        for p in predictions:
+            market = markets.get(p["game_id"])
+            if market and market.get("captured_at"):
+                market["captured_at"] = market["captured_at"].isoformat()
+            pred = {"home": p["home_abbrev"], "away": p["away_abbrev"], "home_win_prob": p["home_win_prob"],
+                    "home_goals": p["home_goals"], "away_goals": p["away_goals"]}
+            games[str(p["game_id"])] = bets.game_board(pred, market, b2b.get((p["home_abbrev"], p["away_abbrev"]), (False, False)))
+        return {"date": str(day), "games": games}
+    except Exception:
+        logger.error(f"Failed to build the bets board for {day}", exc_info=True)
         raise
     finally:
         conn.close()

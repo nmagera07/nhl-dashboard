@@ -11,7 +11,7 @@
   font-size: 18px;
   letter-spacing: -0.02em;
 }
-.brand-accent { color: #22a8f2; }  /* PuckPulse brand sky blue */
+.brand-accent { color: var(--accent); }  /* PuckPulse brand sky blue */
 .nav-tabs {
   display: flex;
   gap: 20px;
@@ -47,3 +47,21 @@
   background: currentColor;
 }
 .tabbar { display: none; }
+
+/* Light/dark switch, at the right end of the header. */
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.theme-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.search-input + .theme-toggle { margin-left: 0; }

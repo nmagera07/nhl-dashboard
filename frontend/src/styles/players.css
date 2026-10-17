@@ -107,5 +107,5 @@
   vertical-align: middle;
 }
 .col-po { width: 48px; font-weight: 700; }
-.po-in { color: #22c55e; }
+.po-in { color: var(--good); }
 .po-out { color: var(--text-dim); }

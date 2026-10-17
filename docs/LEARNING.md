@@ -84,6 +84,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   holds a read-only credential, stored as a secret).
 
 **Data and modeling**
+- Built a hockey score model (Conway-Maxwell-Poisson goals with a shared component, measured
+  tie inflation from score effects, and empty-net goals by lead) from 5,248 games of
+  play-by-play. Backtested leave-one-season-out, its puck-line probabilities are calibrated
+  within 1-3 points; it's consistent with the win model by solving for the goal margin.
 - Built closing-line capture for sports-market benchmarking: an event-driven snapshot near
   game start that batches games into ~2.5 API calls a day, de-margined consensus odds
   (moneyline, spread, total) across 8-9 sportsbooks, and a credit budget guard.
@@ -168,6 +172,48 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-16 — A goal model: from "who wins" to puck lines and totals
+
+**What:** the win model says *who* wins. Bettors also need *by how much* (the puck line,
+±1.5) and *how many goals* (the total), so I built a model of the full final score.
+
+The data is 5,248 games (2022-26) from the cached play-by-play: final scores, how each game
+ended, regulation goals with empty-netters split out, and xG. It's graded walk-forward and
+leave-one-season-out.
+
+**What the data said, one surprise at a time:**
+1. **Empty-netters drive the puck line.** A team up one late adds an empty-net goal 0.56
+   times a game; up two, 0.69; up three or more, 0.17. My first guess was 0.20, which badly
+   undercounted two-goal wins.
+2. **Pace barely predicts.** Team ratings predict the margin well (slope ~1.1), but the real
+   total moves only 0.43 goals per goal of predicted difference. So the expected total is
+   pulled 57% of the way back to the league average.
+3. **Goals are less random than Poisson.** Once team strength is known, the variance is
+   0.91 of the mean, and the two teams' goals rise and fall slightly together (cov 0.16).
+   Modeled with Conway-Maxwell-Poisson (a Poisson with a dispersion knob) plus a shared
+   Poisson part.
+4. **Hockey ties more than independent scoring says**, 22% to OT vs. 17% predicted. That's
+   score effects: the leader sits back, the trailer pushes, and 6-on-5 goals come late.
+   Weighting tied regulation scores ×1.37 and one-goal scores ×1.09 fixed it.
+
+Each fix showed up in the calibration table. The favorite covering -1.5 went from 3-5 points
+too high to within 1-3 points in every bucket.
+
+**Consistency trick:** in production, the moneyline still comes from the main v2.6 model
+(with roster and goalie priors). The goal model supplies the total and then *solves for the
+margin* that reproduces that win probability. That way the moneyline, puck line, and total
+come from one distribution and can't contradict each other.
+
+**Honest result:** the puck line is well calibrated and beats always-guessing-the-average in
+every season. Totals don't beat the average yet. Pace is hard, and the books probably know
+things we don't (goalie starts). The next test is against the closing line.
+
+**Interview angle:** "Walk me through improving a model." Start from a simple baseline, read
+the calibration table, find the physical cause of each miss (empty nets, score effects),
+model it, and confirm out of sample.
 
 ---
 

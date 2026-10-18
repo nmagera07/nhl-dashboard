@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // (and keeps following it); once they toggle, the choice is saved on this
 // device. public/theme-init.js applies the same rule before first paint.
 const KEY = "pp-theme";
-const BAR_COLORS = { light: "#f4f7fb", dark: "#0b1424" };
+const BAR_COLORS = { light: "#f4f7fb", dark: "#0a0b0f" };
 
 function saved() {
   try {

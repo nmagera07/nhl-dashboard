@@ -1,17 +1,19 @@
-/* The Rink palette: two themes on the same color roles. Dark is the
+/* The Rink palette: two themes on the same color roles. Dark ("black +
+   ice") keeps the near-black background with ice-blue and goal-red
+   accents; light is ice white and navy. Dark is the
    default; [data-theme="light"] on <html> switches (set before first paint
-   by the script in index.html, from the saved choice or the system's). */
+   by public/theme-init.js, from the saved choice or the system's). */
 :root {
   color-scheme: dark;
-  --bg: #0b1424;            /* page: deep navy */
-  --card: #121e33;
-  --card-raised: #182742;   /* popovers, highlighted rows, tooltips */
-  --card-tint: #142c4d;     /* the start of a card's accent gradient */
-  --border: #1e2d47;
-  --border-strong: #2a3d5e;
+  --bg: #0a0b0f;            /* page: near-black */
+  --card: #13151c;
+  --card-raised: #1a1d26;   /* popovers, highlighted rows, tooltips */
+  --card-tint: #121b2c;     /* the start of a card's accent gradient */
+  --border: #21252f;
+  --border-strong: #2e3442;
   --text: #e8eef7;
-  --text-dim: #8fa1bb;
-  --text-faint: #4a5d7a;    /* disabled text, chart gridlines */
+  --text-dim: #8b93a3;
+  --text-faint: #4b5263;    /* disabled text, chart gridlines */
   --accent: #4cc2ff;        /* ice blue */
   --accent-strong: #7dd3fc; /* links and accent text */
   --accent-fill: #1d8fd6;   /* solid buttons */
@@ -35,10 +37,10 @@
   --neutral-soft: rgba(143, 161, 187, 0.13);
   --neutral-mid: rgba(143, 161, 187, 0.24);
   --hover-faint: rgba(255, 255, 255, 0.03);
-  --header-bg: rgba(11, 20, 36, 0.92);
-  --tabbar-bg: rgba(18, 30, 51, 0.96);
+  --header-bg: rgba(10, 11, 15, 0.92);
+  --tabbar-bg: rgba(19, 21, 28, 0.96);
   --scrim: rgba(3, 8, 16, 0.6);
-  --scrim-soft: rgba(11, 20, 36, 0.5);
+  --scrim-soft: rgba(10, 11, 15, 0.5);
   --shadow: rgba(0, 0, 0, 0.45);
 }
 

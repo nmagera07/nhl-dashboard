@@ -28,16 +28,19 @@ def test_game_totals_add_each_teams_shots():
 
 
 class FakeCursor:
-    def __init__(self, stored=()):
+    def __init__(self, stored=(), missing_starters=()):
         self.stored, self.inserted, self.sql = list(stored), [], []
+        self.missing_starters, self.updated = [(g,) for g in missing_starters], []
 
     def execute(self, sql, params=None):
         self.sql.append(sql)
         if sql.lstrip().startswith("INSERT"):
             self.inserted.append(params)
+        if sql.lstrip().startswith("UPDATE"):
+            self.updated.append(params)
 
     def fetchall(self):
-        return self.stored
+        return self.missing_starters if "starting_goalie_id IS NULL" in self.sql[-1] else self.stored
 
 
 def test_update_scores_only_new_finished_games_through_yesterday():
@@ -67,3 +70,23 @@ def test_odds_use_puckpulse_xg_only_when_every_game_is_scored():
     complete = [("PIT", 1.5, 3), ("WSH", -0.5, 2)]
     assert sim.puckpulse_xgd(20262027, standings, rows=complete) == {"PIT": (1.5, 3), "WSH": (-0.5, 2)}
     assert sim.puckpulse_xgd(20262027, standings, rows=[("PIT", 1.5, 2), ("WSH", -0.5, 2)]) == {}  # PIT missing a game
+
+
+def _pbp_with_goalies():
+    return {"homeTeam": {"id": 1, "abbrev": "PIT"}, "awayTeam": {"id": 2, "abbrev": "CBJ"}, "plays": [
+        {"typeDescKey": "faceoff", "details": {"eventOwnerTeamId": 1}},
+        {"typeDescKey": "shot-on-goal", "details": {"eventOwnerTeamId": 1, "goalieInNetId": 900}},  # CBJ's goalie
+        {"typeDescKey": "shot-on-goal", "details": {"eventOwnerTeamId": 1, "goalieInNetId": 901}},  # later: ignored
+        {"typeDescKey": "missed-shot", "details": {"eventOwnerTeamId": 2, "goalieInNetId": 800}},  # PIT's goalie
+    ]}
+
+
+def test_starters_are_the_goalies_in_net_for_each_teams_first_shot_against():
+    import goalie_starts
+    assert goalie_starts.starters(_pbp_with_goalies()) == {"CBJ": 900, "PIT": 800}
+
+
+def test_games_stored_before_starters_were_recorded_get_filled_in():
+    cur = FakeCursor(missing_starters=[2026020009])
+    assert ix.fill_starters(cur, 20262027, get=lambda url: _pbp_with_goalies()) == 1
+    assert sorted(cur.updated) == [(800, 2026020009, "PIT"), (900, 2026020009, "CBJ")]

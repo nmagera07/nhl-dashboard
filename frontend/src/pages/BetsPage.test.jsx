@@ -6,6 +6,7 @@ import BetsPage from "./BetsPage.jsx";
 const side = (over) => ({ ours: 0.5, fair: 100, market: 0.5, edge: 0, price: -110, ev: -0.05, value: false, ...over });
 const BOARD = {
   home: "COL", away: "PIT", b2b: { home: false, away: true }, snapshot: "close",
+  goalies: { home: [{ name: "Mackenzie Blackwood", prob: 0.81 }], away: [{ name: "Arturs Silovs", prob: 0.62 }] },
   moneyline: { home: side({ ours: 0.66, fair: -194, price: -150, book: "DraftKings", ev: 0.1, edge: 0.06, value: true }),
                away: side({ ours: 0.34, fair: 194, price: 145, book: "FanDuel" }) },
   puck_line: { home_spread: -1.5, home: side({ price: 150 }), away: side({ price: -175 }) },
@@ -33,6 +34,7 @@ describe("BetsPage", () => {
     expect(within(card).getByText("Value +10%")).toBeInTheDocument();
     expect(within(card).getByText(/PIT on the 2nd night of a back-to-back/)).toBeInTheDocument();
     expect(within(card).getByText("COL −1.5")).toBeInTheDocument();
+    expect(within(card).getByText(/Silovs 62% · Blackwood 81%/)).toBeInTheDocument();
     expect(within(card).getAllByText(/^Value/)).toHaveLength(1); // the totals' positive EV is never badged
   });
 

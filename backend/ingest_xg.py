@@ -24,6 +24,7 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+import goalie_starts
 import xg_model as xm
 from logging_config import setup_logging
 from seasons import current_season_id
@@ -58,6 +59,9 @@ CREATE TABLE IF NOT EXISTS team_game_xg (
     PRIMARY KEY (game_id, team_abbrev)
 )
 """
+# The team's starting goalie (in net for the first shot it faced), for the
+# projected starters (goalie_starts.py).
+STARTER_SQL = "ALTER TABLE team_game_xg ADD COLUMN IF NOT EXISTS starting_goalie_id INTEGER"
 
 
 def _get(url):
@@ -103,6 +107,7 @@ def update(cur, season_id, since=None, today=None, get=_get, model=None):
     """Score and store finished games not stored yet. Returns games added."""
     model = model or xm.load_model()
     cur.execute(TABLE_SQL)
+    cur.execute(STARTER_SQL)
     cur.execute("GRANT SELECT ON team_game_xg TO nhl_api_readonly")
     cur.execute("SELECT game_id, MAX(game_date) FROM team_game_xg WHERE season_id = %s GROUP BY game_id", (season_id,))
     rows = cur.fetchall()
@@ -115,7 +120,9 @@ def update(cur, season_id, since=None, today=None, get=_get, model=None):
         if game_id in stored:
             continue
         try:
-            totals = game_totals(get(PBP_URL.format(game_id=game_id)), model)
+            pbp = get(PBP_URL.format(game_id=game_id))
+            totals = game_totals(pbp, model)
+            starters = goalie_starts.starters(pbp)
         except requests.RequestException as exc:
             logger.warning(f"Game {game_id}: no play-by-play ({exc}); will retry next run")
             continue
@@ -123,16 +130,40 @@ def update(cur, season_id, since=None, today=None, get=_get, model=None):
             cur.execute(
                 """
                 INSERT INTO team_game_xg (game_id, team_abbrev, season_id, game_date, game_type, is_home, xg_for, xg_against,
-                                          goals_for, goals_against, shots_for, shots_against, model_version)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                          goals_for, goals_against, shots_for, shots_against, model_version,
+                                          starting_goalie_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (game_id, team_abbrev) DO NOTHING
                 """,
                 (game_id, t["team"], season_id, day, game_type, t["is_home"], t["xg_for"], t["xg_against"],
-                 t["goals_for"], t["goals_against"], t["shots_for"], t["shots_against"], model.get("version", 1)),
+                 t["goals_for"], t["goals_against"], t["shots_for"], t["shots_against"], model.get("version", 1),
+                 starters.get(t["team"])),
             )
         added += 1
         time.sleep(0.3)  # polite to the NHL API
+    fill_starters(cur, season_id, get=get)
     return added
+
+
+def fill_starters(cur, season_id, get=_get):
+    """Games stored before starters were recorded: fetch their play-by-play once and fill them in."""
+    cur.execute("SELECT DISTINCT game_id FROM team_game_xg WHERE season_id = %s AND starting_goalie_id IS NULL",
+                (season_id,))
+    filled = 0
+    for (game_id,) in cur.fetchall():
+        try:
+            starters = goalie_starts.starters(get(PBP_URL.format(game_id=game_id)))
+        except requests.RequestException as exc:
+            logger.warning(f"Game {game_id}: no play-by-play for its starters ({exc}); will retry next run")
+            continue
+        for team, goalie in starters.items():
+            cur.execute("UPDATE team_game_xg SET starting_goalie_id = %s WHERE game_id = %s AND team_abbrev = %s",
+                        (goalie, game_id, team))
+        filled += 1
+        time.sleep(0.3)
+    if filled:
+        logger.info(f"Filled in starting goalies for {filled} earlier games")
+    return filled
 
 
 def main():

@@ -1087,7 +1087,8 @@ def bets_for_day(day: date = Query(..., alias="date")):
     The Bets tab for a date: each game's moneyline, puck line, and total
     from the sportsbooks (the closing snapshot once it's taken, else the
     morning one), next to PuckPulse's fair odds, the edge, and the expected
-    value at the best price (bets.py). {"date", "games": {game_id: {...}}}.
+    value at the best price (bets.py), and each team's projected starting
+    goalies (goalie_starts.py). {"date", "games": {game_id: {...}}}.
     """
     conn = get_connection()
     try:
@@ -1113,6 +1114,18 @@ def bets_for_day(day: date = Query(..., alias="date")):
             except psycopg2.errors.UndefinedTable:
                 conn.rollback()
                 markets = {}
+            try:
+                cur.execute(
+                    """
+                    SELECT game_id, team_abbrev, goalie_name, start_prob FROM goalie_projections
+                    WHERE game_date = %s ORDER BY game_id, team_abbrev, start_prob DESC
+                    """,
+                    (day,),
+                )
+                projections = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()  # the daily job hasn't created it yet
+                projections = []
             cur.execute("SELECT payload->'games' AS games FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
             row = cur.fetchone()
         # The model's schedule rows: [date, home, away, home_b2b, away_b2b].
@@ -1125,7 +1138,13 @@ def bets_for_day(day: date = Query(..., alias="date")):
                 market["captured_at"] = market["captured_at"].isoformat()
             pred = {"home": p["home_abbrev"], "away": p["away_abbrev"], "home_win_prob": p["home_win_prob"],
                     "home_goals": p["home_goals"], "away_goals": p["away_goals"]}
-            games[str(p["game_id"])] = bets.game_board(pred, market, b2b.get((p["home_abbrev"], p["away_abbrev"]), (False, False)))
+            board = bets.game_board(pred, market, b2b.get((p["home_abbrev"], p["away_abbrev"]), (False, False)))
+            board["goalies"] = {
+                side: [{"name": g["goalie_name"], "prob": float(g["start_prob"])} for g in projections
+                       if g["game_id"] == p["game_id"] and g["team_abbrev"] == p[f"{side}_abbrev"]]
+                for side in ("home", "away")
+            }
+            games[str(p["game_id"])] = board
         return {"date": str(day), "games": games}
     except Exception:
         logger.error(f"Failed to build the bets board for {day}", exc_info=True)

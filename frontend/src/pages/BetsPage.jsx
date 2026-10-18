@@ -23,6 +23,12 @@ function Side({ label, side, showBook, open }) {
   );
 }
 
+// "Silovs 62%": a team's likeliest starter by last name.
+function goalieLabel(goalies) {
+  const top = goalies?.[0];
+  return top ? `${top.name.split(" ").slice(1).join(" ") || top.name} ${formatPct(top.prob)}` : null;
+}
+
 function BetCard({ game, board }) {
   const open = NOT_STARTED.has(game.gameState);
   const away = game.awayTeam.abbrev;
@@ -40,6 +46,12 @@ function BetCard({ game, board }) {
         <span className="bets-time">{open ? startTime(game.startTimeUTC) : game.gameState === "LIVE" || game.gameState === "CRIT" ? "Live" : "Final"}</span>
       </div>
       {tired.length > 0 && <p className="bets-chip">{tired.join(" & ")} on the 2nd night of a back-to-back</p>}
+      {open && (goalieLabel(board.goalies?.away) || goalieLabel(board.goalies?.home)) && (
+        <p className="bets-goalies">
+          <span className="bets-goalies-label">In net (projected)</span>{" "}
+          {goalieLabel(board.goalies?.away) || "?"} · {goalieLabel(board.goalies?.home) || "?"}
+        </p>
+      )}
       {!hasMarket ? (
         <p className="bets-note">No lines yet. PuckPulse: {home} {formatPct(board.moneyline.home.ours)} (fair {formatPrice(board.moneyline.home.fair)}).</p>
       ) : (
@@ -106,6 +118,7 @@ export default function BetsPage() {
           <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
           <li><strong>Fair</strong>: the price we think is right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
+          <li><strong>In net (projected)</strong>: the likeliest starting goalie and his chance, from who&apos;s been starting and back-to-backs (teams usually give the backup the second night). Teams confirm close to puck drop. In our tests the starter mattered less to who wins than rest did, so it isn&apos;t in our odds.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>
         </ul>
         <p className="bets-legal">

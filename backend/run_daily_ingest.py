@@ -13,6 +13,8 @@ Runs each ingestion script in its own process, in order:
   5. game_predictions.py      -- logs today's game predictions (from the
                                  ratings step 3 just saved) and grades
                                  earlier ones: the model's track record
+  5b. goalie_starts.py        -- projected starting goalies for today's games
+                                 (from the starters ingest_xg.py recorded)
   6. market_odds.py           -- Kalshi's odds for today's games, logged next
                                  to our predictions (graded later, both ways)
   7. daily_digest.py          -- the morning digest: facts gathered here,
@@ -54,6 +56,7 @@ SCRIPTS = [
     "ingest_xg.py",
     "simulate_playoff_odds.py",
     "game_predictions.py",
+    "goalie_starts.py",
     "market_odds.py",
     "daily_digest.py",
     "ingest_player_stats.py",

@@ -6,6 +6,8 @@
 .bets-matchup { color: var(--text); font-size: 16px; font-weight: 700; text-decoration: none; }
 .bets-at, .bets-time { color: var(--text-dim); font-weight: 400; }
 .bets-time { font-size: 13px; }
+.bets-goalies { margin: 6px 0 0; color: var(--text); font-size: 12px; }
+.bets-goalies-label { color: var(--text-dim); }
 .bets-chip { display: inline-block; margin: 8px 0 0; padding: 2px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 11px; }
 .bets-table { width: 100%; margin-top: 10px; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .bets-table th { width: 26%; padding: 8px 6px 8px 0; color: var(--text-dim); font-size: 12px; font-weight: 600; text-align: left; vertical-align: middle; }

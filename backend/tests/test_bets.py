@@ -70,11 +70,17 @@ class TestBetsRoute:
         db_router.when("from game_predictions", [{"game_id": 7, "home_abbrev": "COL", "away_abbrev": "PIT",
                                                   "home_win_prob": 0.663, "home_goals": 3.345, "away_goals": 2.357}])
         db_router.when("from market_odds", [{**MARKET, "game_id": 7, "captured_at": datetime(2026, 10, 17, 0, 45, tzinfo=timezone.utc)}])
+        db_router.when("from goalie_projections", [
+            {"game_id": 7, "team_abbrev": "COL", "goalie_name": "Mackenzie Blackwood", "start_prob": 0.81},
+            {"game_id": 7, "team_abbrev": "COL", "goalie_name": "Scott Wedgewood", "start_prob": 0.19},
+            {"game_id": 7, "team_abbrev": "PIT", "goalie_name": "Arturs Silovs", "start_prob": 0.62}])
         db_router.when("from season_sim_inputs", [{"games": [["2026-10-16", "COL", "PIT", False, True]]}])
         body = client.get("/bets?date=2026-10-16").json()
         game = body["games"]["7"]
         assert game["snapshot"] == "close" and game["b2b"] == {"home": False, "away": True}
         assert game["moneyline"]["home"]["value"] and game["as_of"].startswith("2026-10-17T00:45")
+        assert game["goalies"]["home"] == [{"name": "Mackenzie Blackwood", "prob": 0.81}, {"name": "Scott Wedgewood", "prob": 0.19}]
+        assert game["goalies"]["away"] == [{"name": "Arturs Silovs", "prob": 0.62}]
         query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
         assert "source = 'sportsbooks'" in query and "captured = 'close'" in query
 

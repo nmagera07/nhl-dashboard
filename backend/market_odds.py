@@ -66,6 +66,15 @@ SPORTSBOOKS = "sportsbooks"
 EASTERN = ZoneInfo("America/New_York")
 # Kalshi's team codes differ from the NHL's for four teams.
 KALSHI_CODES = {"LAK": "LA", "NJD": "NJ", "SJS": "SJ", "TBL": "TB"}
+# State-licensed US sportsbooks (The Odds API keys). The API's "us" region
+# also returns offshore books (Bovada, BetOnline, MyBookie, BetUS, LowVig)
+# that aren't licensed in any state: their prices still count toward the
+# consensus (they're real market prices), but the best price we show
+# people only comes from these.
+LICENSED_BOOKS = {
+    "draftkings", "fanduel", "betmgm", "williamhill_us", "espnbet", "betrivers", "fanatics",
+    "hardrockbet", "ballybet", "betparx", "bet365_us", "unibet_us", "pointsbetus", "wynnbet", "superbook",
+}
 CLOSE_LEAD = timedelta(minutes=15)   # a game this close to puck drop triggers the closing snapshot
 CLOSE_COVER = timedelta(minutes=75)  # which covers every game starting this soon
 CREDIT_FLOOR = 30                    # leave the last Odds API credits for the morning snapshots
@@ -148,7 +157,10 @@ def _norm(name):
 
 
 def _offers(event, market_key, first, second):
-    """Each book's (point, first's no-margin probability, first's price, second's price, book name) in one two-way market."""
+    """
+    Each book's (point, first's no-margin probability, first's price,
+    second's price, book name, licensed in a US state) in one two-way market.
+    """
     offers = []
     for book in event.get("bookmakers", []):
         market = next((m for m in book.get("markets", []) if m.get("key") == market_key), None)
@@ -157,7 +169,8 @@ def _offers(event, market_key, first, second):
         if not a or not b:
             continue
         pa, pb = american_to_prob(a["price"]), american_to_prob(b["price"])
-        offers.append((a.get("point"), pa / (pa + pb), a["price"], b["price"], book.get("title") or book.get("key")))
+        offers.append((a.get("point"), pa / (pa + pb), a["price"], b["price"], book.get("title") or book.get("key"),
+                       book.get("key") in LICENSED_BOOKS))
     return offers
 
 
@@ -187,10 +200,12 @@ def sportsbook_consensus(event, home_name, away_name):
         away_line=median_price([o[3] for o in moneylines]),
         books=len(moneylines),
     )
-    best_home = min(moneylines, key=lambda o: american_to_prob(o[2]))
-    best_away = min(moneylines, key=lambda o: american_to_prob(o[3]))
-    odds.update(best_home_line=best_home[2], best_home_book=best_home[4],
-                best_away_line=best_away[3], best_away_book=best_away[4])
+    licensed = [o for o in moneylines if o[5]]
+    if licensed:
+        best_home = min(licensed, key=lambda o: american_to_prob(o[2]))
+        best_away = min(licensed, key=lambda o: american_to_prob(o[3]))
+        odds.update(best_home_line=best_home[2], best_home_book=best_home[4],
+                    best_away_line=best_away[3], best_away_book=best_away[4])
     spreads = [o for o in _offers(event, "spreads", home_name, away_name) if o[0] is not None]
     if spreads:
         point, at = _main_line(spreads)

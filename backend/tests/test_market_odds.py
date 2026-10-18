@@ -131,9 +131,9 @@ def _book(key, moneyline, spread=None, total=None):
 
 
 GAME = {"commence_time": "2026-10-17T01:00:00Z", "home_team": "Colorado Avalanche", "away_team": "Pittsburgh Penguins",
-        "bookmakers": [_book("dk", (-200, 165), (-1.5, 120, -140), (6.5, -110, -110)),
-                       _book("fd", (-190, 160), (-1.5, 125, -150), (6.5, -105, -115)),
-                       _book("mgm", (-210, 170), (-1.5, 118, -138), (6.0, -130, 110))]}
+        "bookmakers": [_book("draftkings", (-200, 165), (-1.5, 120, -140), (6.5, -110, -110)),
+                       _book("fanduel", (-190, 160), (-1.5, 125, -150), (6.5, -105, -115)),
+                       _book("betmgm", (-210, 170), (-1.5, 118, -138), (6.0, -130, 110))]}
 
 
 def test_consensus_has_the_puck_line_total_and_best_prices():
@@ -248,3 +248,14 @@ def test_compare_bets_grades_puck_line_and_total_and_skips_pushes():
     assert result["puck line"]["games"] == 3
     assert result["total"]["games"] == 2
     assert 0 < result["puck line"]["brier_ours"] < 1 and 0 < result["total"]["brier_market"] < 1
+
+
+def test_the_best_price_only_comes_from_licensed_books():
+    offshore = {"key": "bovada", "title": "Bovada", "markets": [{"key": "h2h", "outcomes": [
+        {"name": "Colorado Avalanche", "price": -150}, {"name": "Pittsburgh Penguins", "price": 200}]}]}
+    game = {**GAME, "bookmakers": [{**b, "key": k, "title": t} for b, (k, t) in
+                                   zip(GAME["bookmakers"], [("draftkings", "DraftKings"), ("fanduel", "FanDuel"), ("betmgm", "BetMGM")])] + [offshore]}
+    odds = mo.sportsbook_consensus(game, "Colorado Avalanche", "Pittsburgh Penguins")
+    assert odds["books"] == 4  # Bovada still counts toward the consensus
+    assert (odds["best_away_line"], odds["best_away_book"]) == (170, "BetMGM")  # not Bovada's +200
+    assert (odds["best_home_line"], odds["best_home_book"]) == (-190, "FanDuel")

@@ -182,6 +182,41 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-18 — Tonight's lineups, without scraping anyone
+
+**The ask:** "the lines are portrayed weird, and I want current lines that day. But we can't
+scrape DailyFaceoff, and AI doesn't play nicely with X."
+
+**What was weird about the old card:**
+- Shift charts don't know positions, so lines read "Johnson – Knies – Fantilli" instead of
+  LW–C–RW.
+- Lines were ranked by minutes together, so a checking line could show as "line 2".
+- "15.9 min" meant nothing to most fans.
+- No goalies, no scratches.
+
+**The source was already in our stack:** NHL.com posts a "{Away} at {Home} projected
+lineups" article for every game a few hours before puck drop. It's on the same NHL content
+API our news feed uses, and its address is predictable from the two teams' full names and
+the date. All 46 recent articles matched, St. Louis and Montréal included. The X API starts
+at $200 a month; this is free and is the league's own.
+
+**Parsing lessons:**
+- **Read from the bottom up.** On an 11-forward / 7-D night, the 4th line has two forwards
+  and the 7th D is listed alone, so "two names = a D pair" breaks. Instead: the last two
+  single names are the goalies (starter first), single names just above them are extra D,
+  the last three two-man lines are the pairs, and everything above is forwards.
+- **Test on every real example you can get.** Running the parser over all 46 articles found
+  both odd formats (the 11F/7D nights and a missing space in "DeAngelo --Mayfield") before
+  users did.
+- **Keep facts, link the prose.** We show who's on which line and link NHL.com's status
+  report instead of copying their writing.
+
+**A free check on our goalie model:** on 10-18, NHL.com's starters matched our projection
+for 3 of 4 teams. The miss was Calgary, Cooley instead of Wolf at 71%, which is information
+we don't have.
+
+---
+
 ## 2026-10-18 — Projected starting goalies (and a what-if I didn't build)
 
 **What:** each team's likely starter and their chance, on the Bets tab ("In net (projected):

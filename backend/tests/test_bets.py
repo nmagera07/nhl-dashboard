@@ -66,7 +66,13 @@ def test_without_market_odds_or_expected_goals():
 
 
 class TestBetsRoute:
-    def test_prefers_the_closing_snapshot_and_marks_back_to_backs(self, client, db_router):
+    def test_prefers_the_closing_snapshot_and_marks_back_to_backs(self, client, db_router, monkeypatch):
+        import api
+        monkeypatch.setattr(api.projected_lineups, "lineup", lambda away, home, day: {
+            "url": "https://www.nhl.com/news/x", "published": "2026-10-16T21:00:00Z",
+            "away": {"goalies": ["Arturs Silovs", "Sergei Murashov"]}, "home": {"goalies": ["Mackenzie Blackwood", "Scott Wedgewood"]}})
+        db_router.when("from teams", [{"team_abbrev": "COL", "team_name": "Colorado Avalanche"},
+                                      {"team_abbrev": "PIT", "team_name": "Pittsburgh Penguins"}])
         db_router.when("from game_predictions", [{"game_id": 7, "home_abbrev": "COL", "away_abbrev": "PIT",
                                                   "home_win_prob": 0.663, "home_goals": 3.345, "away_goals": 2.357}])
         db_router.when("from market_odds", [{**MARKET, "game_id": 7, "captured_at": datetime(2026, 10, 17, 0, 45, tzinfo=timezone.utc)}])
@@ -81,6 +87,7 @@ class TestBetsRoute:
         assert game["moneyline"]["home"]["value"] and game["as_of"].startswith("2026-10-17T00:45")
         assert game["goalies"]["home"] == [{"name": "Mackenzie Blackwood", "prob": 0.81}, {"name": "Scott Wedgewood", "prob": 0.19}]
         assert game["goalies"]["away"] == [{"name": "Arturs Silovs", "prob": 0.62}]
+        assert game["nhl_starters"] == {"home": "Mackenzie Blackwood", "away": "Arturs Silovs"}
         query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
         assert "source = 'sportsbooks'" in query and "captured = 'close'" in query
 

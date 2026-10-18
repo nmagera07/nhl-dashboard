@@ -38,6 +38,14 @@ describe("BetsPage", () => {
     expect(within(card).getAllByText(/^Value/)).toHaveLength(1); // the totals' positive EV is never badged
   });
 
+  it("shows NHL.com's starters once its lineups are posted", async () => {
+    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: { ...BOARD, nhl_starters: { away: "Sergei Murashov", home: "Scott Wedgewood" } } });
+    render(<MemoryRouter><BetsPage /></MemoryRouter>);
+    expect(await screen.findByText(/Murashov · Wedgewood/)).toBeInTheDocument();
+    expect(screen.getByText("In net (NHL.com projects)")).toBeInTheDocument();
+    expect(screen.queryByText(/Silovs 62%/)).not.toBeInTheDocument();
+  });
+
   it("drops the badges once a game starts", async () => {
     mockFetch([game(7, "LIVE", "2026-10-17T23:00:00Z")], { 7: BOARD });
     render(<MemoryRouter><BetsPage /></MemoryRouter>);

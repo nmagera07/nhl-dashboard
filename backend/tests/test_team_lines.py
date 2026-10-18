@@ -69,11 +69,14 @@ class TestLinesRoute:
         db_router.when("select 1 from teams where team_abbrev", {"?column?": 1})
         db_router.when("from team_lines", {"game_id": 2026020087, "game_date": "2026-10-12", "opponent": "BUF",
                                            "home": True, "payload": json.dumps(payload)})
+        # Shift charts list a line in no particular order; positions put it left wing, center, right wing.
+        db_router.when("from players", [{"player_id": 1, "position_code": "C"}, {"player_id": 2, "position_code": "R"},
+                                        {"player_id": 3, "position_code": "L"}])
 
         body = client.get("/teams/fla/lines").json()
 
         assert body["team"] == "FLA" and body["game"] == {"id": 2026020087, "date": "2026-10-12", "opponent": "BUF", "home": True}
-        assert body["lines"][0]["players"] == ["A", "B", "C"]
+        assert body["lines"][0]["players"] == ["C", "A", "B"] and body["lines"][0]["player_ids"] == [3, 1, 2]
 
     def test_no_lines_yet(self, client, db_router):
         db_router.when("select 1 from teams where team_abbrev", {"?column?": 1})

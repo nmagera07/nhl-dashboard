@@ -3,15 +3,15 @@
    by the script in index.html, from the saved choice or the system's). */
 :root {
   color-scheme: dark;
-  --bg: #0b1424;            /* page: deep navy */
-  --card: #121e33;
-  --card-raised: #182742;   /* popovers, highlighted rows, tooltips */
-  --card-tint: #142c4d;     /* the start of a card's accent gradient */
-  --border: #1e2d47;
-  --border-strong: #2a3d5e;
-  --text: #e8eef7;
-  --text-dim: #8fa1bb;
-  --text-faint: #4a5d7a;    /* disabled text, chart gridlines */
+  --bg: #0a1a33;            /* page: rink navy */
+  --card: #10264a;
+  --card-raised: #16325e;   /* popovers, highlighted rows, tooltips */
+  --card-tint: #173a6b;     /* the start of a card's accent gradient */
+  --border: #1d3a66;
+  --border-strong: #2a4f85;
+  --text: #eaf2ff;
+  --text-dim: #93acd0;
+  --text-faint: #4d6a94;    /* disabled text, chart gridlines */
   --accent: #4cc2ff;        /* ice blue */
   --accent-strong: #7dd3fc; /* links and accent text */
   --accent-fill: #1d8fd6;   /* solid buttons */
@@ -35,10 +35,10 @@
   --neutral-soft: rgba(143, 161, 187, 0.13);
   --neutral-mid: rgba(143, 161, 187, 0.24);
   --hover-faint: rgba(255, 255, 255, 0.03);
-  --header-bg: rgba(11, 20, 36, 0.92);
-  --tabbar-bg: rgba(18, 30, 51, 0.96);
+  --header-bg: rgba(10, 26, 51, 0.92);
+  --tabbar-bg: rgba(14, 34, 66, 0.96);
   --scrim: rgba(3, 8, 16, 0.6);
-  --scrim-soft: rgba(11, 20, 36, 0.5);
+  --scrim-soft: rgba(10, 26, 51, 0.5);
   --shadow: rgba(0, 0, 0, 0.45);
 }
 
@@ -81,6 +81,20 @@
   --scrim: rgba(15, 27, 45, 0.4);
   --scrim-soft: rgba(255, 255, 255, 0.6);
   --shadow: rgba(15, 27, 45, 0.14);
+}
+
+/* Dark only: ice under the lights. A soft ice-blue glow at the top of the
+   page and under the header, and cards with a cool edge. */
+:root:not([data-theme="light"]) .dashboard {
+  background: radial-gradient(120% 60% at 50% -10%, rgba(76, 194, 255, 0.14), transparent 60%), var(--bg);
+}
+:root:not([data-theme="light"]) .topnav {
+  border-bottom-color: rgba(76, 194, 255, 0.25);
+  box-shadow: 0 1px 18px rgba(76, 194, 255, 0.1);
+}
+:root:not([data-theme="light"]) :is(.bets-card, .game-card, .boxscore-card) {
+  border-color: rgba(76, 194, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(125, 211, 252, 0.08);
 }
 
 .dashboard {

@@ -16,6 +16,7 @@ generates this automatically from the code below).
 
 import asyncio
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import re
@@ -27,6 +28,7 @@ from typing import List, Literal, Optional
 
 import psycopg2
 import psycopg2.errors
+import requests
 import psycopg2.extras
 import sentry_sdk
 from dotenv import load_dotenv
@@ -56,6 +58,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import projected_lineups
 import push
 from daily_cache import cache as daily_cache, daily_cached
 import season_scenarios
@@ -412,6 +415,58 @@ def game_box_score(game_id: int = Path(..., gt=0)):
         return game_boxscore(game_id)
     except NHLGamesUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _team_names():
+    return daily_cache.get_or_compute(("team_names",), lambda: _query_team_names())
+
+
+def _query_team_names():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT team_abbrev, team_name FROM teams")
+            return {r["team_abbrev"]: r["team_name"] for r in cur.fetchall()}
+    finally:
+        conn.close()
+
+
+def _lineup(game_id, away, home, day):
+    """NHL.com's projected lineup for a game (projected_lineups.py), or None before it's posted. Cached 10 minutes."""
+    def fetch():
+        names = _team_names()
+        if away not in names or home not in names:
+            return None
+        try:
+            return projected_lineups.lineup(names[away], names[home], day)
+        except requests.RequestException:
+            logger.warning(f"NHL.com lineup for {game_id} unavailable", exc_info=True)
+            return None
+    return daily_cache.get_or_compute(("lineup", game_id), fetch)
+
+
+@app.get("/games/{game_id}/lineup")
+def game_lineup(game_id: int = Path(..., gt=0)):
+    """
+    Tonight's projected lineups from NHL.com for one game: each team's
+    forward lines, defense pairs, goalies (the projected starter first),
+    scratches, and injuries. {"available": false} until NHL.com posts them,
+    a few hours before puck drop.
+    """
+    try:
+        game = game_boxscore(game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    away, home = (game.get("awayTeam") or {}).get("abbrev"), (game.get("homeTeam") or {}).get("abbrev")
+    try:
+        day = date.fromisoformat(str(game.get("gameDate")))
+    except ValueError:
+        return {"available": False}
+    found = _lineup(game_id, away, home, day)
+    if not found:
+        return {"available": False}
+    return {"available": True, "source": "NHL.com", "url": found["url"], "published": found["published"],
+            "away": {"abbrev": away, **found["away"]}, "home": {"abbrev": home, **found["home"]}}
 
 
 @app.get("/teams/{team_abbrev}/schedule")
@@ -1087,7 +1142,8 @@ def bets_for_day(day: date = Query(..., alias="date")):
     The Bets tab for a date: each game's moneyline, puck line, and total
     from the sportsbooks (the closing snapshot once it's taken, else the
     morning one), next to PuckPulse's fair odds, the edge, and the expected
-    value at the best price (bets.py). {"date", "games": {game_id: {...}}}.
+    value at the best price (bets.py), and each team's projected starting
+    goalies (goalie_starts.py). {"date", "games": {game_id: {...}}}.
     """
     conn = get_connection()
     try:
@@ -1113,11 +1169,30 @@ def bets_for_day(day: date = Query(..., alias="date")):
             except psycopg2.errors.UndefinedTable:
                 conn.rollback()
                 markets = {}
+            try:
+                cur.execute(
+                    """
+                    SELECT game_id, team_abbrev, goalie_name, start_prob FROM goalie_projections
+                    WHERE game_date = %s ORDER BY game_id, team_abbrev, start_prob DESC
+                    """,
+                    (day,),
+                )
+                projections = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()  # the daily job hasn't created it yet
+                projections = []
             cur.execute("SELECT payload->'games' AS games FROM season_sim_inputs ORDER BY season_id DESC LIMIT 1")
             row = cur.fetchone()
         # The model's schedule rows: [date, home, away, home_b2b, away_b2b].
         b2b = {(g[1], g[2]): (bool(g[3]), bool(g[4])) for g in (row["games"] if row and row["games"] else [])
                if len(g) >= 5 and g[0] == str(day)}
+        # NHL.com's projected lineups name the likely starters once posted (a
+        # few hours before puck drop); fetched in parallel, each cached.
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            lineups = dict(zip(
+                [p["game_id"] for p in predictions],
+                pool.map(lambda p: _lineup(p["game_id"], p["away_abbrev"], p["home_abbrev"], day), predictions),
+            ))
         games = {}
         for p in predictions:
             market = markets.get(p["game_id"])
@@ -1125,7 +1200,16 @@ def bets_for_day(day: date = Query(..., alias="date")):
                 market["captured_at"] = market["captured_at"].isoformat()
             pred = {"home": p["home_abbrev"], "away": p["away_abbrev"], "home_win_prob": p["home_win_prob"],
                     "home_goals": p["home_goals"], "away_goals": p["away_goals"]}
-            games[str(p["game_id"])] = bets.game_board(pred, market, b2b.get((p["home_abbrev"], p["away_abbrev"]), (False, False)))
+            board = bets.game_board(pred, market, b2b.get((p["home_abbrev"], p["away_abbrev"]), (False, False)))
+            board["goalies"] = {
+                side: [{"name": g["goalie_name"], "prob": float(g["start_prob"])} for g in projections
+                       if g["game_id"] == p["game_id"] and g["team_abbrev"] == p[f"{side}_abbrev"]]
+                for side in ("home", "away")
+            }
+            lineup = lineups.get(p["game_id"])
+            board["nhl_starters"] = ({side: (lineup[side]["goalies"] or [None])[0] for side in ("home", "away")}
+                                     if lineup else None)
+            games[str(p["game_id"])] = board
         return {"date": str(day), "games": games}
     except Exception:
         logger.error(f"Failed to build the bets board for {day}", exc_info=True)
@@ -1175,6 +1259,16 @@ def market_odds_for_day(day: date = Query(..., alias="date")):
         conn.close()
 
 
+POSITION_ORDER = {"L": 0, "C": 1, "R": 2}
+
+
+def _wing_center_wing(line, positions):
+    """A forward line in the usual left wing, center, right wing order (shift charts don't know positions)."""
+    pairs = sorted(zip(line.get("players", []), line.get("player_ids", [])),
+                   key=lambda pair: POSITION_ORDER.get(positions.get(pair[1]), 1))
+    return {**line, "players": [p for p, _ in pairs], "player_ids": [i for _, i in pairs]}
+
+
 @app.get("/teams/{team_abbrev}/lines")
 @daily_cached
 def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
@@ -1204,7 +1298,15 @@ def team_lines_today(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
             return {"team": abbrev, "game": None, "lines": [], "pairs": []}
         payload = row["payload"] if isinstance(row["payload"], dict) else json.loads(row["payload"])
         game = {"id": row["game_id"], "date": str(row["game_date"]), "opponent": row["opponent"], "home": row["home"]}
-        return {"team": abbrev, "game": game, "lines": payload.get("lines", []), "pairs": payload.get("pairs", [])}
+        lines = payload.get("lines", [])
+        ids = [pid for line in lines for pid in line.get("player_ids", [])]
+        positions = {}
+        if ids:
+            with conn.cursor() as cur:
+                cur.execute("SELECT player_id, position_code FROM players WHERE player_id = ANY(%s)", (ids,))
+                positions = {r["player_id"]: r["position_code"] for r in cur.fetchall()}
+        return {"team": abbrev, "game": game, "lines": [_wing_center_wing(line, positions) for line in lines],
+                "pairs": payload.get("pairs", [])}
     except HTTPException:
         raise
     except Exception:

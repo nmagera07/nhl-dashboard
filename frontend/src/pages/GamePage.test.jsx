@@ -241,11 +241,12 @@ describe("GamePage", () => {
 
     await userEvent.click(screen.getByText("From each team's last game"));
 
-    expect(await screen.findByRole("list", { name: "TOR forward lines" })).toHaveTextContent("Knies – Matthews – Marner41 min");
-    expect(screen.getByRole("list", { name: "NSH defense pairs" })).toHaveTextContent("Rielly – McCabe");
-    expect(screen.getByRole("heading", { name: "TOR · Oct 12 vs BUF" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "NSH · Oct 12 @ BUF" })).toBeInTheDocument();
-    expect(screen.getByText(/Not tonight's confirmed lineup/)).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "NSH forward lines" })).toHaveTextContent("L1Knies – Matthews – Marner");
+    await userEvent.click(screen.getByRole("button", { name: "TOR" }));
+    expect(await screen.findByRole("list", { name: "TOR forward lines" })).toHaveTextContent("L1Knies – Matthews – Marner");
+    expect(screen.getByRole("list", { name: "TOR defense pairs" })).toHaveTextContent("D1Rielly – McCabe");
+    expect(screen.getByRole("heading", { name: "Last game: Oct 12 vs BUF" })).toBeInTheDocument();
+    expect(screen.getByText(/projected lineup for tonight shows up here/)).toBeInTheDocument();
   });
 
   it("a team on the second night of a back-to-back shifts the odds, and the preview says so", async () => {

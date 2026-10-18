@@ -84,6 +84,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   holds a read-only credential, stored as a secret).
 
 **Data and modeling**
+- Built projected NHL starting goalies (recency-weighted starts, back-to-back rotation,
+  current roster) calibrated on 10,112 team-games: the top pick started 66% of the time
+  (78% on back-to-back nights), with stated chances accurate within a few points.
 - Built a hockey score model (Conway-Maxwell-Poisson goals with a shared component, measured
   tie inflation from score effects, and empty-net goals by lead) from 5,248 games of
   play-by-play. Backtested leave-one-season-out, its puck-line probabilities are calibrated
@@ -176,6 +179,73 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-18 — Tonight's lineups, without scraping anyone
+
+**The ask:** "the lines are portrayed weird, and I want current lines that day. But we can't
+scrape DailyFaceoff, and AI doesn't play nicely with X."
+
+**What was weird about the old card:**
+- Shift charts don't know positions, so lines read "Johnson – Knies – Fantilli" instead of
+  LW–C–RW.
+- Lines were ranked by minutes together, so a checking line could show as "line 2".
+- "15.9 min" meant nothing to most fans.
+- No goalies, no scratches.
+
+**The source was already in our stack:** NHL.com posts a "{Away} at {Home} projected
+lineups" article for every game a few hours before puck drop. It's on the same NHL content
+API our news feed uses, and its address is predictable from the two teams' full names and
+the date. All 46 recent articles matched, St. Louis and Montréal included. The X API starts
+at $200 a month; this is free and is the league's own.
+
+**Parsing lessons:**
+- **Read from the bottom up.** On an 11-forward / 7-D night, the 4th line has two forwards
+  and the 7th D is listed alone, so "two names = a D pair" breaks. Instead: the last two
+  single names are the goalies (starter first), single names just above them are extra D,
+  the last three two-man lines are the pairs, and everything above is forwards.
+- **Test on every real example you can get.** Running the parser over all 46 articles found
+  both odd formats (the 11F/7D nights and a missing space in "DeAngelo --Mayfield") before
+  users did.
+- **Keep facts, link the prose.** We show who's on which line and link NHL.com's status
+  report instead of copying their writing.
+
+**A free check on our goalie model:** on 10-18, NHL.com's starters matched our projection
+for 3 of 4 teams. The miss was Calgary, Cooley instead of Wolf at 71%, which is information
+we don't have.
+
+---
+
+## 2026-10-18 — Projected starting goalies (and a what-if I didn't build)
+
+**What:** each team's likely starter and their chance, on the Bets tab ("In net (projected):
+Silovs 62% · Blackwood 81%"). NHL teams confirm late, and the NHL's own feed names the
+starter only once the game begins, so these are projections from data we already have.
+
+**How:**
+- **The training data was already cached.** The goalie in net for a team's first shot
+  against is the starter, so 4 seasons of play-by-play gave 10,112 starts.
+- **The model:** each goalie gets a weight from his starts this season (each start's weight
+  halves every 8 games back), plus a pinch of last season's split. On the second night of a
+  back-to-back, last night's starter keeps only 5% of his weight.
+- **The grid kept walking to the edge.** The best settings were the most extreme ones I'd
+  tried, so I widened twice. That's the data's way of saying something strong: goalies almost
+  never start both nights, and this season's starts beat last season's split almost at once.
+- **Result:** the top pick started 65.6% of the time (78.0% on back-to-back nights). Log loss
+  went from 0.87 to 0.78, and the stated chances matched reality within a few points.
+- **Production:** the nightly xG job now records each team's starter, and fills in this
+  season's earlier games once. A new daily step stores projections from the current NHL
+  roster, which also handles injured reserve and call-ups.
+
+**The what-if I didn't build:** "if the backup starts, COL drops 64% → 59%" sounded great.
+But our own 10-13 test found that even the *actual* starter added nothing to win
+predictions once back-to-backs were counted. Showing a big swing would have meant
+inventing evidence. So the page says that plainly: the starter matters less to who wins
+than rest does.
+
+**Interview angle:** knowing when *not* to ship a feature. The evidence said the what-if
+would mislead, so I didn't build it.
 
 ---
 

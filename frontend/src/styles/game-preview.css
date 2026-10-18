@@ -44,3 +44,11 @@
 .preview-market dt { color: var(--text-dim); }
 .preview-market dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
 .preview-market-gap { margin: 8px 0 0; font-size: 13px; }
+.preview-lines-toggle { display: inline-flex; gap: 4px; margin: 12px 0 10px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; }
+.preview-lines-toggle button { padding: 4px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--text-dim); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.preview-lines-toggle button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.preview-lines-tag { flex: none; width: 26px; color: var(--text-dim); font-size: 11px; font-weight: 700; }
+.preview-lines-list li { justify-content: flex-start; }
+.preview-lines-goalies { display: flex; gap: 10px; margin: 2px 0 0; font-size: 13px; }
+.preview-lines-extra { margin: 0; color: var(--text-dim); font-size: 12px; }
+.preview-lines-extra strong { color: var(--text); font-weight: 600; }

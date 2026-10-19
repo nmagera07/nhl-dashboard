@@ -36,7 +36,7 @@ from pydantic import TypeAdapter
 from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -58,6 +58,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import og_image
 import projected_lineups
 import push
 from daily_cache import cache as daily_cache, daily_cached
@@ -467,6 +468,44 @@ def game_lineup(game_id: int = Path(..., gt=0)):
         return {"available": False}
     return {"available": True, "source": "NHL.com", "url": found["url"], "published": found["published"],
             "away": {"abbrev": away, **found["away"]}, "home": {"abbrev": home, **found["home"]}}
+
+
+def _share_game(game_id):
+    """(NHL game dict, the logged home-win chance or None) for a game's link preview."""
+    try:
+        game = game_boxscore(game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not (game.get("awayTeam") or {}).get("abbrev"):
+        raise HTTPException(status_code=404, detail="No such game")
+    prob = None
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT home_win_prob FROM game_predictions WHERE game_id = %s", (game_id,))
+            row = cur.fetchone()
+            prob = float(row["home_win_prob"]) if row else None
+    finally:
+        conn.close()
+    return game, prob
+
+
+@app.get("/og/game/{game_id}.png")
+def game_preview_image(game_id: int = Path(..., gt=0)):
+    """The game's link preview image (og_image.py): win chances before it, the score once it's on. 1200x630 PNG."""
+    game, prob = _share_game(game_id)
+    key = ("og", game_id, game.get("gameState"), game["awayTeam"].get("score"), game["homeTeam"].get("score"), prob)
+    png = daily_cache.get_or_compute(key, lambda: og_image.render_game(game, prob))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.get("/games/{game_id}/share")
+def game_share(game_id: int = Path(..., gt=0)):
+    """Title, description, and image for a game's link preview (served by the site's /g/{id} share page)."""
+    game, prob = _share_game(game_id)
+    title, description = og_image.share_text(game, prob)
+    return {"title": title, "description": description, "url": f"https://puckpulse.io/games/{game_id}",
+            "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/game/{game_id}.png"}
 
 
 @app.get("/teams/{team_abbrev}/schedule")

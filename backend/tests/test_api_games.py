@@ -76,3 +76,18 @@ def test_team_schedule_reports_an_nhl_outage(client, monkeypatch):
     monkeypatch.setattr(api, "team_schedule", unavailable)
     response = client.get("/teams/PIT/schedule")
     assert response.status_code == 503
+
+
+class TestSharePreview:
+    GAME = {"gameState": "FUT", "startTimeUTC": "2026-10-19T00:00:00Z", "awayTeam": {"abbrev": "PIT"}, "homeTeam": {"abbrev": "COL"}}
+
+    def test_share_text_and_image(self, client, db_router, monkeypatch):
+        import api
+        monkeypatch.setattr(api, "game_boxscore", lambda game_id: self.GAME)
+        db_router.when("from game_predictions", {"home_win_prob": 0.663})
+        body = client.get("/games/2026020150/share").json()
+        assert body["url"] == "https://puckpulse.io/games/2026020150"
+        assert body["image"].endswith("/og/game/2026020150.png") and "66% chance" in body["description"]
+        image = client.get("/og/game/2026020150.png")
+        assert image.status_code == 200 and image.headers["content-type"] == "image/png"
+        assert image.content[:8] == b"\x89PNG\r\n\x1a\n"

@@ -142,6 +142,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Added link preview cards to a single-page app: Open Graph tags, a site-wide card, and
+  per-game cards drawn server-side (Pillow) and served by a serverless share page
+  (Azure Static Web Apps function) that link previewers can read without JavaScript.
 - Re-themed the app with semantic color tokens: about 120 hard-coded colors across 20+
   stylesheets mapped to ~35 roles. That enabled a light/dark mode that follows the system
   until chosen, with no flash of the wrong theme (a CSP-compliant pre-paint script) and
@@ -179,6 +182,36 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-18 — Preview cards: making every shared link an ad
+
+**Why:** "we need users." The cheapest growth lever is making every share look good. A
+puckpulse.io link pasted into iMessage, Discord, or Reddit showed as a bare URL.
+
+**The catch with a single-page app:** link previewers read a page's HTML **without running
+JavaScript**, and an SPA serves the same `index.html` for every URL. So:
+1. **A site-wide card:** Open Graph and Twitter tags in `index.html`, plus a 1200×630 image.
+   I designed it in HTML and screenshotted it with Playwright, so the source is editable.
+2. **Per-game cards:** a share link `puckpulse.io/g/{id}` that the site *rewrites to a
+   serverless function* (Azure Static Web Apps managed functions, free tier). The function
+   asks our API for the game's title and description and returns just the preview tags plus
+   an instant redirect to the real game page. Crawlers see the game's card; people land on
+   the game.
+3. **The image itself** is drawn by the API with Pillow: team-colored panels, win chances
+   before the game, the score after. Two gotchas:
+   - **Fonts:** a slim server image has no fonts, so Inter ships in the repo, with its SIL
+     Open Font License.
+   - **Logos:** NHL logos are SVG only, which Pillow can't draw, so it uses team colors and
+     abbreviations. The darkest teams get an accent border so they don't vanish into the
+     background.
+
+**Small things that matter:**
+- An **installed PWA's service worker** answers page loads itself, so the app also forwards
+  `/g/{id}` to `/games/{id}`.
+- A meta refresh needs no script, so the strict Content-Security-Policy doesn't block it.
+- The function only accepts a numeric game id; anything else falls back to the site card.
 
 ---
 

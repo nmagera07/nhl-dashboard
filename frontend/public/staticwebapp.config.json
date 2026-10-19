@@ -4,10 +4,15 @@
     "exclude": [
       "/assets/*",
       "/images/*",
-      "*.{png,jpg,jpeg,gif,svg,ico,css,js,json,webmanifest,txt,map}"
+      "*.{png,jpg,jpeg,gif,svg,ico,css,js,json,webmanifest,txt,map}",
+      "/api/*"
     ]
   },
   "routes": [
+    {
+      "route": "/g/*",
+      "rewrite": "/api/share"
+    },
     {
       "route": "/sw.js",
       "headers": {
@@ -36,5 +41,8 @@
     "X-Frame-Options": "DENY",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Cross-Origin-Opener-Policy": "same-origin"
+  },
+  "platform": {
+    "apiRuntime": "node:20"
   }
 }

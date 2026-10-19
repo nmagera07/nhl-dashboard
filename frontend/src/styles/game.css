@@ -60,3 +60,7 @@
 .team-stats-bar { height: 4px; border-radius: 2px; background: var(--accent); overflow: hidden; }
 .team-stats-bar-away { height: 100%; background: var(--text-dim); }
 .game-team-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.game-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.share-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.share-button:hover { border-color: var(--border-strong); }
+.share-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }

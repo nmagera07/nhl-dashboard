@@ -27,6 +27,14 @@ export default defineConfig([
     },
   },
   {
+    // The site's managed functions (Azure Static Web Apps) run in Node as CommonJS.
+    files: ['api/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: 'commonjs',
+    },
+  },
+  {
     files: ['**/*.test.{js,jsx}'],
     languageOptions: {
       globals: globals.vitest,

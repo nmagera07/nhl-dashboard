@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { teamLogo } from "../utils/teamLogo.js";
+import ShareButton from "../components/ShareButton.jsx";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
@@ -396,7 +397,10 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
 
   return (
     <main className="game-page">
-      <Link className="back-link" to={backTo}>← Scores</Link>
+      <div className="game-topbar">
+        <Link className="back-link" to={backTo}>← Scores</Link>
+        <ShareButton gameId={game.id || gameId} title={`${game.awayTeam?.abbrev} @ ${game.homeTeam?.abbrev} on PuckPulse`} />
+      </div>
 
       <div className="game-hero">
         <span className={`game-status${isLive ? " game-status-live" : ""}`}>

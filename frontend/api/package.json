@@ -1,0 +1,6 @@
+{
+  "name": "puckpulse-site-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The site's managed functions (Azure Static Web Apps): link preview pages for shared games."
+}

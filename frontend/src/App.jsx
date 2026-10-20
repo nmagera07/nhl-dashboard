@@ -20,6 +20,7 @@ import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 import PickemPage from "./pages/PickemPage.jsx";
 import BetsPage from "./pages/BetsPage.jsx";
+import ReportCardPage from "./pages/ReportCardPage.jsx";
 import { useParams } from "react-router-dom";
 
 function ShareRedirect() {
@@ -196,6 +197,7 @@ export default function NHLDashboard() {
           <Route path="/track-record" element={<TrackRecordPage />} />
           <Route path="/pickem" element={<PickemPage />} />
           <Route path="/bets" element={<BetsPage />} />
+          <Route path="/report-card" element={<ReportCardPage />} />
           <Route path="/games/:gameId" element={<GamePage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />
           {/* A shared link (puckpulse.io/g/{id}): the server answers it with the preview card and a redirect,
               but an installed app's service worker serves the app shell instead, so forward it here too. */}

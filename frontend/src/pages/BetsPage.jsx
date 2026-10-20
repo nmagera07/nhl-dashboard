@@ -106,7 +106,7 @@ export default function BetsPage() {
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
         Today&apos;s lines next to PuckPulse&apos;s fair odds. <strong>Value</strong> means a price that returns at
-        least 2% by our fair odds.
+        least 2% by our fair odds. <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
       </p>
       {status === "error" ? (
         <p className="bets-note">Couldn&apos;t load today&apos;s lines.</p>

@@ -16,6 +16,6 @@ export function sectionFor(pathname) {
   if (pathname.startsWith("/playoffs") || pathname.startsWith("/track-record")) return "playoffs";
   if (pathname.startsWith("/players") || pathname.startsWith("/leaderboard")) return "players";
   if (pathname.startsWith("/news")) return "news";
-  if (pathname.startsWith("/bets")) return "bets";
+  if (pathname.startsWith("/bets") || pathname.startsWith("/report-card")) return "bets";
   return "scores";
 }

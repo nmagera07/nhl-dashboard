@@ -14,6 +14,7 @@
 @import "./styles/pickem.css"; /* "Beat PuckPulse" pick'em */
 @import "./styles/bets.css"; /* Bets tab: lines next to fair odds */
 @import "./styles/report-card.css"; /* Report card: PuckPulse vs. the books */
+@import "./styles/lottery.css"; /* Draft lottery odds */
 @import "./styles/playoffs.css"; /* Playoffs page: odds chart, race table, why-these-odds */
 @import "./styles/my-team.css"; /* My team card, follow button, star markers */
 @import "./styles/season-sim.css"; /* Season simulator (team page) */

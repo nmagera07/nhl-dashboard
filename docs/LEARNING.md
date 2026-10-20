@@ -185,6 +185,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-20 — Draft lottery odds: rules as code, checked against the official table
+
+**What:** a `/draft-lottery` page (linked from the Playoffs page) with two views:
+- **Projected:** each team's chance at the No. 1 pick and the top 3 from the daily
+  simulation. In every one of the 10,000 simulated seasons, the 16 teams that miss go through
+  the lottery's exact odds.
+- **If the season ended today:** the exact odds for today's bottom 16.
+
+**What I learned:**
+- **Check the rules, then check the code against published numbers.** The 2022 format has a
+  twist: no team moves up more than 10 spots. So if a team ranked 12th–16th wins the first
+  draw, it moves up 10 and the worst team keeps No. 1. That's why last place has a **25.5%**
+  chance, not its 18.5% share. The test asserts the official table for the worst team:
+  25.5% / 18.8% / 55.7%.
+- **That test caught a real bug on the first run.** My "move up" could move a team *down*:
+  when the worst team, still at No. 1, also won the second draw, it slid to No. 2. A draw win
+  should never cost spots. The fix is one guard, and the numbers then matched exactly.
+- **Exact beats sampling when it's cheap.** Enumerating every pair of draw winners (16 × 15)
+  takes 0.23 ms, so each simulated season adds the exact lottery odds for its order, with no
+  extra sampling noise. That's about 2 s more on the nightly run.
+- **Use the source's own rankings.** "If the season ended today" uses the NHL's league and
+  wild-card ranks from the standings feed, so the official tiebreakers come for free.
+- **Projected and today differ, and that's the insight.** LA was last today (0-4-2) but
+  Vancouver was the likeliest No. 1 in the projection: LA had 4 games in hand and a much better
+  rating.
+
+---
+
 ## 2026-10-19 — The report card: grading ourselves in public
 
 **What:** a `/report-card` page (linked from Bets) for the last 7 days and the season. It shows:

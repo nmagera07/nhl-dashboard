@@ -1,4 +1,4 @@
 -r requirements.txt
 pytest==9.1.1
 httpx==0.28.1
-numpy==2.3.3        # train_xg.py only; production scores xG in plain Python
+numpy==2.5.4        # train_xg.py only; production scores xG in plain Python

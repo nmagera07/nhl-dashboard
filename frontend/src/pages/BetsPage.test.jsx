@@ -34,6 +34,9 @@ describe("BetsPage", () => {
     expect(within(card).getByText("Value +10%")).toBeInTheDocument();
     expect(within(card).getByText(/PIT on the 2nd night of a back-to-back/)).toBeInTheDocument();
     expect(within(card).getByText("COL −1.5")).toBeInTheDocument();
+    // Each row says what the bet is, so the puck line price is not read as the moneyline.
+    expect(within(card).getByText("to win")).toBeInTheDocument();
+    expect(within(card).getByText("−1.5: win by 2+")).toBeInTheDocument();
     expect(within(card).getByText(/Silovs 62% · Blackwood 81%/)).toBeInTheDocument();
     expect(within(card).getAllByText(/^Value/)).toHaveLength(1); // the totals' positive EV is never badged
   });

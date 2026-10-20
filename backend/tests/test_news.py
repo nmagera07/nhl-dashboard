@@ -193,3 +193,101 @@ def test_feed_text_is_unescaped_even_when_double_encoded():
     <description>It&amp;#8217;s &amp;amp; more</description></item></channel></rss>"""
     (item,) = news.parse_rss(rss, "Sportsnet")
     assert item["title"] == "Tkachuk isn’t ready" and item["summary"] == "It’s & more"
+
+
+ROTOWIRE_RSS = """<rss><channel>
+<item><guid>nhl1</guid><title>Jesper Wallstedt: Slated to face Oilers</title>
+<link>https://www.rotowire.com//hockey/player/jesper-wallstedt-6464</link>
+<description>Wallstedt is expected to guard the road crease Tuesday.
+
+        Visit RotoWire.com for more analysis on this update.</description>
+<pubDate>Tue, 20 Oct 2026 11:42:00 AM PDT</pubDate></item>
+<item><guid>nhl2</guid><title>No colon here</title><link>https://www.rotowire.com/x</link><pubDate>Tue, 20 Oct 2026 11:40:00 AM PDT</pubDate></item>
+<item><guid>nhl3</guid><title>T.J. Brodie: Back in lineup</title><link>https://www.rotowire.com/y</link><pubDate>Mon, 19 Oct 2026 07:05:00 PM EDT</pubDate></item>
+</channel></rss>"""
+
+
+def _rotowire(text):
+    return lambda url: type("R", (), {"text": text})()
+
+
+class TestFantasy:
+    @pytest.fixture(autouse=True)
+    def offline(self, monkeypatch):
+        news.clear_cache()
+        news._updates.clear()
+        monkeypatch.setattr(news, "_get", _rotowire(ROTOWIRE_RSS))
+        monkeypatch.setattr(news, "FANTASY_SOURCES", {"DobberHockey": lambda: [], "RotoBaller": lambda: []})
+        yield
+        news._updates.clear()
+
+    def test_parses_player_updates_and_their_non_standard_dates(self):
+        updates = news.parse_rotowire(ROTOWIRE_RSS)
+        assert [u["player"] for u in updates] == ["Jesper Wallstedt", "T.J. Brodie"]
+        first = updates[0]
+        assert first["title"] == "Slated to face Oilers" and first["published"] == "2026-10-20T18:42:00Z"
+        assert first["summary"] == "Wallstedt is expected to guard the road crease Tuesday."
+        assert first["url"] == "https://www.rotowire.com/hockey/player/jesper-wallstedt-6464"
+        assert updates[1]["published"] == "2026-10-19T23:05:00Z"
+
+    def test_polling_keeps_a_running_list_and_drops_old_updates(self, monkeypatch):
+        assert news.poll_fantasy_updates(now=datetime(2026, 10, 21, tzinfo=timezone.utc)) == 2
+        assert news.poll_fantasy_updates(now=datetime(2026, 10, 21, tzinfo=timezone.utc)) == 0
+        later = ROTOWIRE_RSS.replace("nhl1", "nhl9").replace("Slated to face Oilers", "Starting Thursday")
+        monkeypatch.setattr(news, "_get", _rotowire(later))
+        news.poll_fantasy_updates(now=datetime(2026, 10, 21, tzinfo=timezone.utc))
+        assert len(news._updates) == 3  # the feed moved on; the old update stays
+        news.poll_fantasy_updates(now=datetime(2026, 10, 23, 12, tzinfo=timezone.utc))
+        assert set(news._updates) == {"nhl1", "nhl9"}  # Brodie's is more than 3 days old
+
+    def test_a_failed_poll_keeps_what_we_have(self, monkeypatch):
+        news.poll_fantasy_updates(now=datetime(2026, 10, 21, tzinfo=timezone.utc))
+        monkeypatch.setattr(news, "_get", lambda url: (_ for _ in ()).throw(ConnectionError("down")))
+        assert news.poll_fantasy_updates() is None and len(news._updates) == 2
+
+    def test_player_keys_match_across_spellings(self):
+        assert news.player_key("T.J. Brodie") == news.player_key("TJ Brodie") == "tj brodie"
+        assert news.player_key("Juraj Slafkovský") == "juraj slafkovsky"
+
+    def test_endpoint_tags_each_update_with_the_players_team(self, client, db_router, monkeypatch):
+        monkeypatch.setattr(news, "MAX_UPDATE_AGE", news.timedelta(days=3650))
+        db_router.when("from players", [{"first_name": "Jesper", "last_name": "Wallstedt", "team_abbrev": "MIN", "position_code": "G"},
+                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "CHI", "position_code": "D"},
+                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "TOR", "position_code": "D"}])
+        body = client.get("/fantasy").json()
+        assert [(u["player"], u["team"]) for u in body["updates"]] == [("Jesper Wallstedt", "MIN"), ("T.J. Brodie", None)]
+        assert body["sources"] == ["RotoWire", "DobberHockey", "RotoBaller"]
+
+    def test_endpoint_503s_when_every_source_is_down(self, client, monkeypatch):
+        monkeypatch.setattr(news, "_get", lambda url: (_ for _ in ()).throw(ConnectionError("down")))
+        monkeypatch.setattr(news, "FANTASY_SOURCES", {"DobberHockey": lambda: news._get("x")})
+        assert client.get("/fantasy").status_code == 503
+
+
+class TestGoalieReports:
+    GOALIES = {"Jesper Wallstedt": "MIN", "Devon Levi": "EDM", "Carter Hart": "VGK"}
+
+    @pytest.fixture(autouse=True)
+    def updates(self, monkeypatch):
+        rows = [
+            ("1", "Jesper Wallstedt", "Wallstedt is expected to guard the road crease Tuesday.", "2026-10-20T15:00:00Z"),
+            ("2", "Devon Levi", "Levi will patrol the home crease against Minnesota on Tuesday.", "2026-10-20T16:00:00Z"),
+            ("3", "Carter Hart", "Hart will start Tuesday's home matchup.", "2026-10-20T14:00:00Z"),
+            ("4", "Carter Hart", "Hart will get the night off Tuesday after all.", "2026-10-20T17:00:00Z"),
+            ("5", "Connor McDavid", "McDavid will start on the top line.", "2026-10-20T16:30:00Z"),
+            ("6", "Devon Levi", "Levi stopped 30 of 32 shots in Monday's win.", "2026-10-20T03:30:00Z"),  # 11:30 PM Monday ET
+            ("7", "Jesper Wallstedt", "Wallstedt will start Wednesday.", "2026-10-21T15:00:00Z"),
+        ]
+        monkeypatch.setattr(news, "_updates", {i: {"id": i, "player": p, "title": "", "summary": text, "published": when,
+                                                   "url": f"https://rw.test/{i}", "source": "RotoWire"} for i, p, text, when in rows})
+
+    def test_each_teams_latest_report_on_the_day(self):
+        from datetime import date
+        reports = news.goalie_reports(date(2026, 10, 20), self.GOALIES.get)
+        assert {t: (r["name"], r["status"]) for t, r in reports.items()} == {
+            "MIN": ("Jesper Wallstedt", "expected"), "EDM": ("Devon Levi", "confirmed")}  # Hart scratched late; McDavid isn't a goalie
+
+    def test_the_day_is_eastern(self):
+        from datetime import date
+        assert news.goalie_reports(date(2026, 10, 19), self.GOALIES.get) == {}  # the 11:30 PM recap isn't a start
+        assert news.goalie_reports(date(2026, 10, 21), self.GOALIES.get)["MIN"]["status"] == "confirmed"

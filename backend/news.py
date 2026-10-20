@@ -11,6 +11,8 @@ others):
   - Sportsnet RSS     sportsnet.ca/hockey/nhl/feed/
   - ESPN injuries     site.api.espn.com .../hockey/nhl/injuries
   - ESPN transactions site.api.espn.com .../hockey/nhl/transactions
+  - Fantasy: RotoWire player updates (RSS), DobberHockey and RotoBaller
+    articles (RSS)
 
 We show headlines, short summaries, and facts, credit the source, and link
 to the original. Each source is cached (NEWS_TTL etc.); if a refresh fails,
@@ -27,6 +29,7 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -37,6 +40,9 @@ ESPN_NEWS_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/news?l
 SPORTSNET_RSS_URL = "https://www.sportsnet.ca/hockey/nhl/feed/"
 ESPN_INJURIES_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries"
 ESPN_TRANSACTIONS_URL = "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/transactions"
+ROTOWIRE_RSS_URL = "https://www.rotowire.com/rss/news.php?sport=NHL"
+DOBBER_RSS_URL = "https://dobberhockey.com/feed/"
+ROTOBALLER_RSS_URL = "https://www.rotoballer.com/category/nhl/feed"
 HEADERS = {"User-Agent": "PuckPulse (puckpulse.io; headlines link to the original)"}
 
 NEWS_TTL = 15 * 60
@@ -86,6 +92,11 @@ _TEAM_PATTERNS = {
 def teams_mentioned(text):
     plain = _plain(text or "")
     return sorted(abbrev for abbrev, pattern in _TEAM_PATTERNS.items() if pattern.search(plain))
+
+
+def player_key(name):
+    """A player's name for matching across sources: accents, periods, and case off ("T.J. Brodie" = "TJ Brodie")."""
+    return " ".join(re.sub(r"[^a-z' -]", "", _plain(name or "").lower()).split())
 
 
 def team_from_name(display_name):
@@ -353,3 +364,141 @@ def transactions(team=None, limit=25):
     if team:
         rows = [r for r in rows if r["team"] == team]
     return {"source": "ESPN", "transactions": rows[:limit]}
+
+
+# --- fantasy ---------------------------------------------------------------
+#
+# RotoWire's feed is only its latest 5 player updates (one every few
+# minutes on a game day), so the API polls it (poll_fantasy_updates) and
+# keeps its own running list, the last few days' worth.
+
+FANTASY_ARTICLES_TTL = 30 * 60
+MAX_UPDATE_AGE = timedelta(days=3)
+MAX_UPDATES = 150
+_ROTOWIRE_ZONES = {"PDT": -7, "PST": -8, "EDT": -4, "EST": -5}
+_ROTOWIRE_PLUG = re.compile(r"\s*Visit RotoWire\.com for more analysis on this update\.\s*$")
+
+_updates: dict[str, dict] = {}  # RotoWire guid -> update
+_updates_lock = threading.Lock()
+
+
+def _rotowire_time(text):
+    """RotoWire's dates aren't RFC 822: "Tue, 20 Oct 2026 11:42:00 AM PDT"."""
+    stamp, _, zone = (text or "").strip().rpartition(" ")
+    when = datetime.strptime(stamp, "%a, %d %b %Y %I:%M:%S %p")
+    return when.replace(tzinfo=timezone(timedelta(hours=_ROTOWIRE_ZONES[zone])))
+
+
+def parse_rotowire(text):
+    """[{id, player, title, summary, url, published, source}] from RotoWire's "Player: update" items."""
+    out = []
+    for item in ET.fromstring(text).iter("item"):
+        player, _, title = _unescape(item.findtext("title")).partition(": ")
+        url = (item.findtext("link") or "").strip().replace("rotowire.com//", "rotowire.com/")
+        guid = (item.findtext("guid") or url).strip()
+        try:
+            published = _rotowire_time(item.findtext("pubDate"))
+        except (KeyError, ValueError):
+            continue
+        if not player or not title or not url.startswith("https://"):
+            continue
+        summary = _ROTOWIRE_PLUG.sub("", _clean_summary(item.findtext("description"), limit=400))
+        out.append({"id": guid, "player": player, "title": title, "summary": summary, "url": url,
+                    "published": _iso(published), "source": "RotoWire"})
+    return out
+
+
+def poll_fantasy_updates(now=None):
+    """Fetch RotoWire's latest updates into the running list. Returns how many were new, or None if it failed."""
+    try:
+        fresh = parse_rotowire(_get(ROTOWIRE_RSS_URL).text)
+    except Exception as exc:  # network, HTTP, or a changed format
+        logger.warning("RotoWire unavailable (%s)", type(exc).__name__)
+        return None
+    cutoff = _iso((now or datetime.now(timezone.utc)) - MAX_UPDATE_AGE)
+    with _updates_lock:
+        new = sum(1 for u in fresh if u["id"] not in _updates)
+        _updates.update({u["id"]: u for u in fresh})
+        keep = sorted((u for u in _updates.values() if u["published"] >= cutoff), key=lambda u: u["published"], reverse=True)
+        _updates.clear()
+        _updates.update({u["id"]: u for u in keep[:MAX_UPDATES]})
+    return new
+
+
+FANTASY_SOURCES = {
+    "DobberHockey": lambda: parse_rss(_get(DOBBER_RSS_URL).text, "DobberHockey"),
+    # Its premium posts are paywalled.
+    "RotoBaller": lambda: [i for i in parse_rss(_get(ROTOBALLER_RSS_URL).text, "RotoBaller")
+                           if "premium" not in i["title"].lower()],
+}
+
+
+def fantasy(team_of=None, limit=40):
+    """
+    Player updates (newest first, each with the player's team when
+    team_of(name) knows it) and fantasy articles.
+    """
+    with _updates_lock:
+        empty = not _updates
+    if empty:
+        poll_fantasy_updates()  # a fresh start: don't wait for the poller
+    with _updates_lock:
+        updates = sorted(_updates.values(), key=lambda u: u["published"], reverse=True)[:limit]
+    updates = [{**u, "team": team_of(u["player"]) if team_of else None} for u in updates]
+    articles = {name: _cached(f"fantasy:{name}", FANTASY_ARTICLES_TTL, fetch) for name, fetch in FANTASY_SOURCES.items()}
+    sources = (["RotoWire"] if updates else []) + [name for name, items in articles.items() if items is not None]
+    return {"updates": updates, "articles": merge_headlines(articles.values())[:20], "sources": sources}
+
+
+# --- starting goalies from fantasy updates --------------------------------
+#
+# Beat reporters name tonight's starter at morning skate, and RotoWire's
+# updates pass it on, often hours before NHL.com's projected lineups. The
+# wording says how sure: "Levi will patrol the home crease" is confirmed,
+# "is expected to guard the road crease" is expected, "will serve as the
+# backup" is sitting. Recaps ("stopped 30 shots") don't count.
+
+EASTERN = ZoneInfo("America/New_York")
+_GOALIE_START = re.compile(r"crease|in goal|between the pipes|\bstart(s|ing)?\b|the nod|\bguard|\bdefend|\bpatrol|\bface", re.I)
+_GOALIE_FUTURE = re.compile(r"\b(will|expected|slated|set to|scheduled|projected|likely|probable|in line|draws?|gets?|getting|tabbed|named|confirmed)\b", re.I)
+_GOALIE_UNSURE = re.compile(r"\b(expected|slated|projected|likely|probable|in line|should|presumably|appears|could|might|may)\b", re.I)
+_GOALIE_SITTING = re.compile(r"\b(backup|back up|backing up|night off|not start|won't start|not be in goal|rest(ed|ing)?|healthy scratch)\b", re.I)
+
+
+def goalie_start_status(update):
+    """'confirmed', 'expected', or 'sitting' for a goalie's pregame update; None if it isn't one."""
+    text = update.get("summary") or update.get("title") or ""
+    if not _GOALIE_FUTURE.search(text):
+        return None
+    if _GOALIE_SITTING.search(text):
+        return "sitting"
+    if not _GOALIE_START.search(text):
+        return None
+    return "expected" if _GOALIE_UNSURE.search(text) else "confirmed"
+
+
+def goalie_reports(day, goalie_team):
+    """
+    {team: {name, status, source, published, url}}: each team's latest
+    starting-goalie update posted on `day` (Eastern). goalie_team(name) is
+    the team a goalie is rostered on, or None for skaters and unknowns.
+    A team's latest update wins; one saying its reported starter is now
+    sitting (a late change) drops the report.
+    """
+    with _updates_lock:
+        updates = sorted(_updates.values(), key=lambda u: u["published"])
+    out = {}
+    for u in updates:
+        published = datetime.fromisoformat(u["published"].replace("Z", "+00:00"))
+        if published.astimezone(EASTERN).date() != day:
+            continue
+        team, status = goalie_team(u["player"]), goalie_start_status(u)
+        if not team or status is None:
+            continue
+        if status == "sitting":
+            if out.get(team, {}).get("name") == u["player"]:
+                del out[team]
+            continue
+        out[team] = {"name": u["player"], "status": status, "source": u["source"], "published": u["published"], "url": u["url"]}
+    return out
+

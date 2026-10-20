@@ -192,11 +192,25 @@ async def check_ingestion_freshness_loop():
         await asyncio.sleep(INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS)
 
 
+FANTASY_POLL_SECONDS = 3 * 60
+
+
+async def poll_fantasy_updates_loop():
+    """RotoWire's feed holds only its latest 5 updates; polling keeps news.py's running list complete."""
+    while True:
+        try:
+            await asyncio.to_thread(news.poll_fantasy_updates)
+        except Exception:
+            logger.error("Fantasy update poll failed", exc_info=True)
+        await asyncio.sleep(FANTASY_POLL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(check_ingestion_freshness_loop())
+    tasks = [asyncio.create_task(check_ingestion_freshness_loop()), asyncio.create_task(poll_fantasy_updates_loop())]
     yield
-    task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(
@@ -239,7 +253,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # browser for a few minutes, and served stale while it refreshes. Live data
 # (games, schedules, scenarios) is left alone.
 DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/playoff-line", "/players", "/teams", "/season-sim", "/predictions", "/digest",
-                       "/news", "/injuries", "/transactions")  # news is cached ~15 min upstream anyway
+                       "/news", "/injuries", "/transactions", "/fantasy")  # news is cached ~15 min upstream anyway
 DAILY_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600"
 
 
@@ -986,6 +1000,44 @@ def news_transactions(team: Optional[str] = TEAM_FILTER, limit: int = Query(25, 
     return result
 
 
+@daily_cached
+def _roster_players():
+    """
+    {news.player_key(name): (team, position code)} for players on a roster
+    now. A name two players share maps to None: we can't tell them apart.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT first_name, last_name, team_abbrev, position_code FROM players WHERE on_roster")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    players = {}
+    for r in rows:
+        key = news.player_key(f"{r['first_name']} {r['last_name']}")
+        players[key] = (r["team_abbrev"], r["position_code"]) if key not in players else None
+    return players
+
+
+def _roster_lookup():
+    try:
+        return _roster_players()
+    except Exception:
+        logger.warning("Couldn't load rosters for matching fantasy updates", exc_info=True)
+        return {}
+
+
+@app.get("/fantasy")
+def fantasy_news(limit: int = Query(40, ge=1, le=150)):
+    """Fantasy player updates (RotoWire) and fantasy articles (DobberHockey, RotoBaller), newest first. All link out."""
+    players = _roster_lookup()
+    result = news.fantasy(team_of=lambda name: (players.get(news.player_key(name)) or (None,))[0], limit=limit)
+    if not result["sources"]:
+        raise HTTPException(status_code=503, detail="Fantasy sources are unavailable right now.")
+    return result
+
+
 # --- Push notifications ------------------------------------------------------
 #
 # The only endpoints that write to the database. The API's role can change
@@ -1275,6 +1327,13 @@ def bets_for_day(day: date = Query(..., alias="date")):
                 [p["game_id"] for p in predictions],
                 pool.map(lambda p: _lineup(p["game_id"], p["away_abbrev"], p["home_abbrev"], day), predictions),
             ))
+        # Beat reporters' starters via RotoWire (news.py), usually ahead of NHL.com.
+        players = _roster_lookup()
+
+        def goalie_team(name):
+            hit = players.get(news.player_key(name))
+            return hit[0] if hit and hit[1] == "G" else None
+        reports = news.goalie_reports(day, goalie_team)
         games = {}
         for p in predictions:
             market = markets.get(p["game_id"])
@@ -1291,6 +1350,7 @@ def bets_for_day(day: date = Query(..., alias="date")):
             lineup = lineups.get(p["game_id"])
             board["nhl_starters"] = ({side: (lineup[side]["goalies"] or [None])[0] for side in ("home", "away")}
                                      if lineup else None)
+            board["reported_starters"] = {side: reports.get(p[f"{side}_abbrev"]) for side in ("home", "away")}
             games[str(p["game_id"])] = board
         return {"date": str(day), "games": games}
     except Exception:

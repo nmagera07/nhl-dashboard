@@ -97,9 +97,8 @@ function WinProbability({ away, home, date, gameId }) {
         </p>
       )}
       <p className="preview-note">
-        PuckPulse&apos;s model: each team&apos;s rating (its players, goals and expected goals), plus home ice and rest. Single games are
-        close to coin flips, so treat it as a lean, not a lock. For fun and insight, not betting advice.{" "}
-        <Link className="accent-link" to="/track-record">See how the model has done.</Link>
+        A lean, not a lock: single games are close to coin flips.{" "}
+        <Link className="accent-link" to="/track-record">How the model&apos;s done ›</Link>
       </p>
       <MarketView gameId={gameId} date={date} away={away} home={home} homeWin={homeWin} />
     </section>

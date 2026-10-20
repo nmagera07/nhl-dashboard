@@ -174,3 +174,12 @@ class TestEndpoints:
             {"displayName": "Pittsburgh Penguins", "injuries": []}]}})())
         assert client.get("/injuries?team=PIT").json() == {"source": "ESPN", "teams": {"PIT": []}}
         assert api._daily_cacheable("/injuries")
+
+
+def test_feed_text_is_unescaped_even_when_double_encoded():
+    import news
+    rss = """<rss><channel><item><title>Tkachuk isn&amp;#8217;t ready</title>
+    <link>https://www.sportsnet.ca/nhl/article/x</link><pubDate>Tue, 20 Oct 2026 12:00:00 GMT</pubDate>
+    <description>It&amp;#8217;s &amp;amp; more</description></item></channel></rss>"""
+    (item,) = news.parse_rss(rss, "Sportsnet")
+    assert item["title"] == "Tkachuk isn’t ready" and item["summary"] == "It’s & more"

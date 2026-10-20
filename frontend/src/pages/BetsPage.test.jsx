@@ -30,7 +30,7 @@ describe("BetsPage", () => {
     render(<MemoryRouter><BetsPage /></MemoryRouter>);
     const card = (await screen.findByRole("link", { name: /PIT @ COL/ })).closest("li");
     expect(within(card).getByText("DraftKings")).toBeInTheDocument();
-    expect(within(card).getByText("fair −194")).toBeInTheDocument();
+    expect(within(card).getByText("PuckPulse −194")).toBeInTheDocument();
     expect(within(card).getByText("Value +10%")).toBeInTheDocument();
     expect(within(card).getByText(/PIT on the 2nd night of a back-to-back/)).toBeInTheDocument();
     expect(within(card).getByText("COL −1.5")).toBeInTheDocument();

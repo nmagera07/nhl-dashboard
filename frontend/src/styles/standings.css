@@ -119,3 +119,5 @@
 }
 .playoff-in { background: var(--good-soft); color: var(--good); }
 .playoff-out { background: var(--neutral-soft); color: var(--text-dim); }
+
+.division-tab-short { display: none; }

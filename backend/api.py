@@ -1694,6 +1694,10 @@ def player_detail(player_id: int):
                 (player_id,),
             )
             player["advanced_stats"] = cur.fetchone()
+            player["advanced_percentiles"] = (
+                _advanced_percentiles(player["advanced_stats"], player.get("position_code"))
+                if player["advanced_stats"] and player.get("position_code") != "G" else None
+            )
             player["goalie_advanced_stats"] = _goalie_advanced(cur, player_id) if player.get("position_code") == "G" else None
 
             cur.execute(
@@ -1720,6 +1724,76 @@ def player_detail(player_id: int):
         raise
     finally:
         conn.close()
+
+
+def _ixg60(row):
+    """Individual expected goals per 60 minutes at 5-on-5."""
+    seconds = row.get("icetime_seconds") or 0
+    return float(row["individual_xgoals"]) * 3600 / seconds if seconds and row.get("individual_xgoals") is not None else None
+
+
+def _peer_stats(season_id):
+    """
+    {"F": [...], "D": [...]}: this season's skaters with enough 5-on-5 ice
+    time to compare (a third of the median), each {corsi, xg, ixg60}.
+    Cached: the advanced stats change once a day.
+    """
+    def load():
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT a.corsi_for_pct, a.xgoals_for_pct, a.individual_xgoals, a.icetime_seconds, p.position_code
+                    FROM player_advanced_stats a JOIN players p ON p.player_id = a.player_id
+                    WHERE a.season_id = %s AND p.position_code <> 'G' AND a.icetime_seconds > 0
+                    """,
+                    (season_id,),
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+        times = sorted(r["icetime_seconds"] for r in rows)
+        floor = times[len(times) // 2] / 3 if times else 0
+        groups = {"F": [], "D": []}
+        for r in rows:
+            if r["icetime_seconds"] >= floor:
+                groups["D" if r["position_code"] == "D" else "F"].append(
+                    {"corsi": r["corsi_for_pct"], "xg": r["xgoals_for_pct"], "ixg60": _ixg60(r)})
+        return {"floor_seconds": floor, **groups}
+    return daily_cache.get_or_compute(("peer_stats", season_id), load)
+
+
+def _percentile(value, values):
+    """Share of values below this one (ties count half), 0-100."""
+    values = [v for v in values if v is not None]
+    if value is None or not values:
+        return None
+    below = sum(v < value for v in values)
+    ties = sum(v == value for v in values)
+    return round(100 * (below + 0.5 * ties) / len(values))
+
+
+def _advanced_percentiles(stats, position_code):
+    """
+    Where a skater's 5-on-5 numbers rank among his position group this
+    season: {"group", "peers", "corsi", "xg", "ixg60", "ixg60_value"}, or
+    {"too_few_minutes": True} below the ice-time floor.
+    """
+    peers = _peer_stats(stats["season_id"])
+    if (stats.get("icetime_seconds") or 0) < peers["floor_seconds"]:
+        return {"too_few_minutes": True}
+    group = "D" if position_code == "D" else "F"
+    pool = peers[group]
+    ixg60 = _ixg60(stats)
+    return {
+        "group": "defensemen" if group == "D" else "forwards",
+        "peers": len(pool),
+        "corsi": _percentile(stats.get("corsi_for_pct"), [p["corsi"] for p in pool]),
+        "xg": _percentile(stats.get("xgoals_for_pct"), [p["xg"] for p in pool]),
+        "ixg60": _percentile(ixg60, [p["ixg60"] for p in pool]),
+        "ixg60_value": round(ixg60, 2) if ixg60 is not None else None,
+    }
 
 
 # Maps a ?sort_by= value to a safe SQL column expression -- never

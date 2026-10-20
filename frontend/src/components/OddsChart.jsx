@@ -93,7 +93,7 @@ function OddsChart({ dates, series, highlighted, onHighlight }) {
             <span> on {shortDateLabel(dates[readoutIndex])}</span>
           </>
         ) : (
-          <span>Tap a line or a team to follow its race</span>
+          <span>Tap a line to follow a team&apos;s race</span>
         )}
       </p>
       <svg

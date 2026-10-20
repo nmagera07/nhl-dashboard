@@ -82,8 +82,8 @@ describe("MyTeamCard", () => {
 });
 
 
-// Non-breaking spaces keep "95 pts" and "on pace for 84" together on a phone.
-const HEADLINE = /^≈ 95\spts to make it \(92–98\) · PIT\son\space\sfor\s84$/;
+// Non-breaking spaces keep "Need ~95 pts" and "PIT on pace for 84" together on a phone.
+const HEADLINE = /^Need\s~95\spts · PIT\son\space\sfor\s84$/;
 
 describe("PlayoffLine", () => {
   const today = new Date().toISOString().slice(0, 10);

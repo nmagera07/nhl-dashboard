@@ -50,13 +50,13 @@ function TeamCell({ row, favorite }) {
   );
 }
 
-function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard" }) {
+function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard", rankBy = "division_sequence" }) {
   const [favorite] = useFavoriteTeam();
   // Rows arrive already ordered by the API when a column sort is active
   // (?sort_by=... on GET /standings/latest) -- only fall back to the
   // default division-rank ordering when no custom sort is in effect.
   // Copy before sorting so this never mutates the rows prop in place.
-  const displayRows = sortBy ? rows : [...rows].sort((a, b) => a.division_sequence - b.division_sequence);
+  const displayRows = sortBy ? rows : [...rows].sort((a, b) => a[rankBy] - b[rankBy]);
   const advanced = view === "advanced";
   // rank + team + the view's stat columns
   const columnCount = 2 + (advanced ? 2 + ADVANCED_SORT_COLUMNS.length : 12);
@@ -109,7 +109,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           )}
           {displayRows.map((row) => (
             <tr key={row.team_abbrev} onClick={() => onSelectTeam(row.team_abbrev)}>
-              <td className="col-rank">{row.division_sequence}</td>
+              <td className="col-rank">{row[rankBy]}</td>
               <TeamCell row={row} favorite={favorite} />
               <td>{row.games_played}</td>
               {advanced ? (
@@ -153,7 +153,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           onClick={() => onSelectTeam(row.team_abbrev)}
         >
           <span className="standings-team-card-header">
-            <span className="standings-team-rank">{row.division_sequence}</span>
+            <span className="standings-team-rank">{row[rankBy]}</span>
             {row.logo_url && <img className="standings-team-logo" src={teamLogo(row.logo_url)} alt="" />}
             <span className="standings-team-identity"><strong>{row.team_name}{row.team_abbrev === favorite && <FavoriteStar />}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
             <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>

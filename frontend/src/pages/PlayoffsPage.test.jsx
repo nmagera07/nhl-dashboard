@@ -59,7 +59,7 @@ function renderPage() {
   );
 }
 
-const rowFor = (abbrev) => screen.getByRole("link", { name: abbrev }).closest("tr");
+const rowFor = (abbrev) => screen.getByText(abbrev, { selector: ".team-abbrev" }).closest("tr");
 
 describe("PlayoffsPage", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -74,7 +74,7 @@ describe("PlayoffsPage", () => {
     expect(within(rowFor("PIT")).getByText("42%")).toBeInTheDocument();
     expect(within(rowFor("PIT")).getByText("▲ 12")).toBeInTheDocument();
     expect(within(rowFor("BOS")).getByText("▼ 3")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "COL" })).not.toBeInTheDocument(); // other conference
+    expect(screen.queryByText("COL", { selector: ".team-abbrev" })).not.toBeInTheDocument(); // other conference
   });
 
   it("hides the 7d column until there's a snapshot from a week back", async () => {
@@ -99,8 +99,8 @@ describe("PlayoffsPage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Western" }));
 
-    expect(screen.getByRole("link", { name: "COL" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "PIT" })).not.toBeInTheDocument();
+    expect(screen.getByText("COL", { selector: ".team-abbrev" })).toBeInTheDocument();
+    expect(screen.queryByText("PIT", { selector: ".team-abbrev" })).not.toBeInTheDocument();
   });
 
   it("highlights a team's race when its row is picked", async () => {

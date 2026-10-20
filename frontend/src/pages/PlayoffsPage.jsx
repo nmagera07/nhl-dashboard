@@ -57,9 +57,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChang
               <td className="col-team">
                 <span className="team-cell">
                   <img className="team-cell-logo" src={teamLogo(row.logo_url)} alt="" />
-                  <Link className="team-abbrev race-team-link" to={`/teams/${row.team_abbrev}`} onClick={(e) => e.stopPropagation()}>
-                    {row.team_abbrev}
-                  </Link>
+                  <span className="team-abbrev">{row.team_abbrev}</span>
                   {row.team_abbrev === favorite && <FavoriteStar />}
                   {status && <span className={`race-badge race-badge-${status.tone}`} title={status.title}>{status.label}</span>}
                 </span>
@@ -81,6 +79,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChang
               <tr className="race-why-row">
                 <td colSpan={columns}>
                   <OddsWhy pct={teamOdds.pct} why={why.data.teams[row.team_abbrev]} teams={why.teamCount} status={why.status} />
+                  <Link className="accent-link race-team-page" to={`/teams/${row.team_abbrev}`}>{row.team_abbrev} team page ›</Link>
                 </td>
               </tr>
             )}
@@ -177,8 +176,9 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
         </div>
       </div>
 
-      <section className="race-card" aria-labelledby="race-chart-title">
-        <div className="race-card-header">
+      {/* Collapsed by default: the table is the page; the chart is for whoever wants the history. */}
+      <details className="race-card race-chart-details">
+        <summary className="race-card-header">
           <h2 id="race-chart-title">Odds over the season</h2>
           {seasons.length > 1 && (
             <div className="view-toggle" role="group" aria-label="Chart season">
@@ -198,7 +198,7 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
               })}
             </div>
           )}
-        </div>
+        </summary>
         {status === "error" || (showingOther && otherStatus === "error") ? (
           <p className="status-line status-error">Couldn't load playoff odds.</p>
         ) : chartLoading ? (
@@ -213,7 +213,7 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
         ) : (
           <OddsChart dates={chart.dates} series={chart.series} highlighted={highlighted} onHighlight={highlight} />
         )}
-      </section>
+      </details>
 
       <section className="race-card race-table-card" aria-labelledby="race-table-title">
         <div className="race-card-header">

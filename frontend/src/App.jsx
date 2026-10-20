@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import "./App.css";
-import { API_BASE, DIVISION_ORDER } from "./config.js";
+import { API_BASE, DIVISION_ORDER, LEAGUE_TAB } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
@@ -152,7 +152,7 @@ export default function NHLDashboard() {
           r.team_name.toLowerCase().includes(q) ||
           r.team_abbrev.toLowerCase().includes(q)
       );
-    } else if (activeDivision) {
+    } else if (activeDivision && activeDivision !== LEAGUE_TAB) {
       rows = rows.filter((r) => r.division === activeDivision);
     }
     return rows;
@@ -177,7 +177,7 @@ export default function NHLDashboard() {
             path="/standings"
             element={standingsGate || (
               <StandingsPage
-                divisions={divisions}
+                divisions={divisions.length ? [...divisions, LEAGUE_TAB] : divisions}
                 activeDivision={activeDivision}
                 onSelectDivision={setActiveDivision}
                 isSearching={isSearching}

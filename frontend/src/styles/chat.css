@@ -144,3 +144,7 @@
   font-size: 11px;
   text-align: center;
 }
+
+/* The floating Ask button sits over the bottom of the page; leave room so the
+   end of every page can scroll clear of it. */
+.app-content { padding-bottom: 72px; }

@@ -14,6 +14,7 @@ function player(overrides) {
     goals: 0,
     assists: 0,
     plus_minus: 0,
+    avg_toi_seconds: null,
     pim: 0,
     shots: 0,
     games_played: 0,
@@ -36,11 +37,11 @@ function playerRows() {
 const table = () => within(screen.getByRole("table"));
 const cardList = (group = "skaters") => within(screen.getByLabelText(`${group} player cards`));
 
-// The 19 fields GET /players/leaders?view=table returns (backend
+// The 20 fields GET /players/leaders?view=table returns (backend
 // PlayerLeaderTableRow). The panel must render from these alone.
 const TABLE_FIELDS = [
   "player_id", "first_name", "last_name", "position_code", "team_abbrev", "team_logo_url",
-  "points", "goals", "assists", "plus_minus", "pim", "shots", "games_played",
+  "points", "goals", "assists", "plus_minus", "pim", "shots", "games_played", "avg_toi_seconds",
   "wins", "losses", "ot_losses", "goals_against_avg", "save_pctg", "shutouts",
 ];
 
@@ -213,5 +214,16 @@ describe("LeaderboardPanel", () => {
 
       expect(cardList().getByText("No players match your search.")).toBeInTheDocument();
     });
+  });
+});
+
+
+describe("time on ice", () => {
+  it("shows each skater's average TOI as minutes:seconds, in the table and on phone cards", () => {
+    const rows = [player({ player_id: 1, first_name: "Erik", last_name: "Karlsson", team_abbrev: "PIT", position_code: "D",
+                           points: 9, avg_toi_seconds: 1403 })];
+    render(<LeaderboardPanel players={rows} onSelectPlayer={vi.fn()} />);
+    expect(table().getByText("23:23")).toBeInTheDocument();
+    expect(cardList().getByText("23:23")).toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import { teamLogo } from "../utils/teamLogo.js";
 import { useState, useMemo } from "react";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
+import { formatToi } from "../utils/format.js";
 
 // The Players page fetches /players/leaders?view=table, which returns only
 // the fields in backend PlayerLeaderTableRow (response_models/players.py).
@@ -14,6 +15,7 @@ const SKATER_COLUMNS = [
   { key: "plus_minus", label: "+/-" },
   { key: "pim", label: "PIM" },
   { key: "shots", label: "SHOTS" },
+  { key: "avg_toi_seconds", label: "TOI" },
   { key: "games_played", label: "GP" },
 ];
 
@@ -34,6 +36,7 @@ function formatStatValue(key, value) {
   if (value == null) return "—";
   if (key === "goals_against_avg") return Number(value).toFixed(2);
   if (key === "save_pctg") return Number(value).toFixed(3);
+  if (key === "avg_toi_seconds") return formatToi(value);
   return value;
 }
 
@@ -117,7 +120,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   const mobileColumns = columns.filter((col) =>
     (group === "goalies"
       ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts"]
-      : ["games_played", "goals", "assists", "points", "plus_minus"]
+      : ["games_played", "goals", "assists", "plus_minus", "avg_toi_seconds"]  // points is already the card's headline
     ).includes(col.key)
   );
 

@@ -220,8 +220,7 @@ export default function NHLDashboard() {
       </div>
 
       <footer className="app-footer">
-        PuckPulse · Data from the NHL and{" "}
-        <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>. Not affiliated with or endorsed by the NHL.
+        PuckPulse · Data from the NHL; expected goals are our own. Not affiliated with or endorsed by the NHL.
       </footer>
       <UpdateBanner />
       <TabBar />

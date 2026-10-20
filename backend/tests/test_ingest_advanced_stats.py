@@ -1,22 +1,14 @@
 """
-Pure-function tests for ingest_advanced_stats.py -- MoneyPuck CSV row
-parsing and the PDO calculation. Values in the "real-shaped" tests below
-are the actual PIT (team) and Sidney Crosby (player_id 8471675) 5-on-5
-rows fetched from MoneyPuck's real seasonSummary CSV during development,
-hand-verified against the raw CSV before this ingestion script existed.
+ingest_advanced_stats.py: building the advanced stats tables from our
+per-game 5-on-5 rows, the NHL's stats API, and goalie xG.
 """
 
 from datetime import date
 
-from ingest_advanced_stats import current_season_id, moneypuck_year, parse_skater_row, parse_team_row, _pdo
+import pytest
 
-
-class TestMoneypuckYear:
-    def test_extracts_start_year_from_season_id(self):
-        assert moneypuck_year(20252026) == 2025
-
-    def test_older_season(self):
-        assert moneypuck_year(20182019) == 2018
+import ingest_advanced_stats as ias
+from ingest_advanced_stats import _pdo, current_season_id
 
 
 class TestPdo:
@@ -36,107 +28,61 @@ class TestPdo:
         assert _pdo(goals_for=5, shots_for=100, goals_against=0, shots_against=0) is None
 
 
-class TestParseTeamRow:
-    def test_real_shaped_pit_5on5_row(self):
-        # The real PIT 5-on-5 row from moneypuck.com's 2025 teams.csv.
-        row = {
-            "team": "PIT", "season": "2025", "situation": "5on5", "games_played": "82",
-            "xGoalsPercentage": "0.51", "corsiPercentage": "0.5", "fenwickPercentage": "0.51",
-            "xGoalsFor": "181.35", "xGoalsAgainst": "174.06",
-            "goalsFor": "201.0", "goalsAgainst": "174.0",
-            "shotsOnGoalFor": "1807.0", "shotsOnGoalAgainst": "1751.0",
-        }
-
-        parsed = parse_team_row(row)
-
-        assert parsed["team_abbrev"] == "PIT"
-        assert parsed["games_played"] == 82
-        assert parsed["corsi_for_pct"] == 0.5
-        assert parsed["fenwick_for_pct"] == 0.51
-        assert parsed["xgoals_for_pct"] == 0.51
-        assert parsed["xgoals_for"] == 181.35
-        assert parsed["xgoals_against"] == 174.06
-        assert parsed["goals_for"] == 201
-        assert parsed["goals_against"] == 174
-        assert parsed["shots_on_goal_for"] == 1807
-        assert parsed["shots_on_goal_against"] == 1751
-        assert round(parsed["pdo"], 2) == 101.19
-
-
-class TestParseSkaterRow:
-    def test_real_shaped_crosby_5on5_row(self):
-        # The real Sidney Crosby (playerId 8471675) 5-on-5 row from
-        # moneypuck.com's 2025 skaters.csv.
-        row = {
-            "playerId": "8471675", "season": "2025", "situation": "5on5", "games_played": "68",
-            "icetime": "61928.0",
-            "onIce_corsiPercentage": "0.5", "onIce_fenwickPercentage": "0.51",
-            "onIce_xGoalsPercentage": "0.5",
-            "OnIce_F_xGoals": "45.78", "OnIce_A_xGoals": "46.48",
-            "I_F_xGoals": "10.75",
-            "OnIce_F_goals": "44.0", "OnIce_F_shotsOnGoal": "437.0",
-            "OnIce_A_goals": "45.0", "OnIce_A_shotsOnGoal": "451.0",
-        }
-
-        parsed = parse_skater_row(row)
-
-        assert parsed["player_id"] == 8471675
-        assert parsed["games_played"] == 68
-        assert parsed["icetime_seconds"] == 61928
-        assert parsed["corsi_for_pct"] == 0.5
-        assert parsed["fenwick_for_pct"] == 0.51
-        assert parsed["xgoals_for_pct"] == 0.5
-        assert parsed["xgoals_for"] == 45.78
-        assert parsed["xgoals_against"] == 46.48
-        assert parsed["individual_xgoals"] == 10.75
-        assert parsed["pdo"] is not None
-
-    def test_missing_onice_shot_counts_yields_none_pdo_not_a_crash(self):
-        # A call-up with almost no 5v5 icetime can have on-ice shot counts
-        # of literally 0 -- parse_skater_row must not blow up on that.
-        row = {
-            "playerId": "8500000", "season": "2025", "situation": "5on5", "games_played": "1",
-            "icetime": "45.0",
-            "onIce_corsiPercentage": "0.4", "onIce_fenwickPercentage": "0.4",
-            "onIce_xGoalsPercentage": "0.4",
-            "OnIce_F_xGoals": "0.02", "OnIce_A_xGoals": "0.03",
-            "I_F_xGoals": "0.01",
-            "OnIce_F_goals": "0.0", "OnIce_F_shotsOnGoal": "0.0",
-            "OnIce_A_goals": "0.0", "OnIce_A_shotsOnGoal": "0.0",
-        }
-
-        parsed = parse_skater_row(row)
-
-        assert parsed["pdo"] is None
-
-
-
 class TestCurrentSeasonId:
     def test_fall_is_the_season_starting_this_year(self):
-        assert current_season_id(date(2026, 10, 9)) == 20262027
+        assert current_season_id(date(2026, 10, 20)) == 20262027
 
     def test_spring_is_the_season_that_started_last_year(self):
         assert current_season_id(date(2027, 3, 1)) == 20262027
 
 
+class TestTeams:
+    def test_season_sums_become_shares_and_pdo(self):
+        (pit,) = ias.team_stats([("PIT", 10, 300, 200, 220, 180, 150, 100, 15, 10, 12.5, 7.5)])
+        assert pit["games_played"] == 10 and pit["corsi_for_pct"] == 0.6 and pit["fenwick_for_pct"] == 0.55
+        assert pit["xgoals_for_pct"] == 0.625 and pit["xgoals_for"] == 12.5 and pit["shots_on_goal_against"] == 100
+        assert pit["pdo"] == pytest.approx(100.0)  # 10% shooting, 90% save
+
+
+class TestSkaters:
+    NHL = {8471675: {"gamesPlayed": 10, "timeOnIcePerGame5v5": 900.0, "satFor": 120, "satAgainst": 80,
+                     "usatFor": 90, "usatAgainst": 60, "skaterShootingPlusSavePct5v5": 1.025},
+           8480000: {"gamesPlayed": 2, "timeOnIcePerGame5v5": 600.0, "satFor": 5, "satAgainst": 5, "usatFor": 4, "usatAgainst": 4},
+           8480001: {"gamesPlayed": 0}}
+
+    def test_nhl_shares_with_our_xg(self):
+        rows = {r["player_id"]: r for r in ias.skater_stats(self.NHL, {8471675: (3.2, 8.0, 2.0)})}
+        crosby = rows[8471675]
+        assert crosby["icetime_seconds"] == 9000 and crosby["corsi_for_pct"] == 0.6 and crosby["fenwick_for_pct"] == 0.6
+        assert crosby["xgoals_for_pct"] == 0.8 and crosby["individual_xgoals"] == 3.2 and crosby["pdo"] == 102.5
+        assert 8480001 not in rows  # no games
+
+    def test_a_skater_without_our_rows_gets_no_xg(self):
+        rookie = next(r for r in ias.skater_stats(self.NHL, {}) if r["player_id"] == 8480000)
+        assert rookie["xgoals_for_pct"] is None and rookie["individual_xgoals"] is None and rookie["pdo"] is None
+        assert rookie["corsi_for_pct"] == 0.5
+
+
 class TestGoalies:
-    def test_parses_the_all_situations_goalie_row(self):
-        import ingest_advanced_stats as ias
+    def test_nhl_games_and_shots_with_our_xg(self):
+        nhl = [{"playerId": 1, "gamesPlayed": 12, "timeOnIce": 43000, "shotsAgainst": 330},
+               {"playerId": 2, "gamesPlayed": 1, "timeOnIce": 3600, "shotsAgainst": 20}]
+        (g,) = ias.goalie_stats(nhl, {1: (30, 33.5, 40, 9, 11.2)})
+        assert g == {"player_id": 1, "games_played": 12, "icetime_seconds": 43000, "shots_faced": 330, "goals_allowed": 30,
+                     "xgoals_against": 33.5, "high_danger_shots": 40, "high_danger_goals": 9, "high_danger_xgoals": 11.2}
 
-        row = {"playerId": "8478406", "games_played": "5", "icetime": "18000.0", "ongoal": "150", "goals": "10",
-               "xGoals": "13.5", "highDangerShots": "30", "highDangerGoals": "5", "highDangerxGoals": "6.2"}
-        assert ias.parse_goalie_row(row) == {
-            "player_id": 8478406, "games_played": 5, "icetime_seconds": 18000, "shots_faced": 150,
-            "goals_allowed": 10, "xgoals_against": 13.5, "high_danger_shots": 30, "high_danger_goals": 5,
-            "high_danger_xgoals": 6.2,
-        }
 
-    def test_a_failure_is_logged_not_raised(self, monkeypatch):
-        import ingest_advanced_stats as ias
-        import requests
+class CoverageCursor:
+    def __init__(self, scored, with_5v5):
+        self.counts = [scored, with_5v5]
 
-        def down(year, kind):
-            raise requests.ConnectionError("moneypuck down")
+    def execute(self, sql, params=None):
+        pass
 
-        monkeypatch.setattr(ias, "fetch_csv_rows", down)
-        assert ias.ingest_goalies(20262027, 2026) == 0
+    def fetchone(self):
+        return (self.counts.pop(0),)
+
+
+def test_coverage_is_the_share_of_scored_games_with_5v5_rows():
+    assert ias.coverage(CoverageCursor(100, 96), 20262027) == 0.96
+    assert ias.coverage(CoverageCursor(0, 0), 20262027) == 0.0

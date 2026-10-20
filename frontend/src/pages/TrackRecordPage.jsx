@@ -137,7 +137,7 @@ export default function TrackRecordPage() {
         </ul>
       </section>
       <p className="data-credit">
-        Expected goals (xG) courtesy of <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+        Expected goals (xG) are PuckPulse&apos;s own, built from NHL play-by-play.
       </p>
     </main>
   );

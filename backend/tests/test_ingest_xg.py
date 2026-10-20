@@ -43,7 +43,7 @@ class FakeCursor:
     def fetchall(self):
         if "starting_goalie_id IS NULL" in self.sql[-1]:
             return self.missing_starters
-        return self.missing_goalies if "NOT EXISTS" in self.sql[-1] else self.stored
+        return self.missing_goalies if "LEFT JOIN team_game_5v5" in self.sql[-1] else self.stored
 
 
 def test_update_scores_only_new_finished_games_through_yesterday():
@@ -62,7 +62,7 @@ def test_update_scores_only_new_finished_games_through_yesterday():
     cur = FakeCursor(stored=[(2026020001, date(2026, 10, 12))])
     added = ix.update(cur, 20262027, today=date(2026, 10, 14), get=get, model=MODEL)
 
-    assert added == 1 and len(cur.inserted) == 2  # game 2, both teams
+    assert added == 1 and len(cur.inserted) == 2 + 2  # game 2, both teams: xG and 5-on-5 rows (no shift chart here)
     assert any("GRANT SELECT ON team_game_xg" in s for s in cur.sql)
     assert sum("/play-by-play" in u for u in asked) == 1
     assert asked[0].endswith("/score/2026-10-11")  # one day before the latest stored date
@@ -112,7 +112,8 @@ GOALIE_PBP = {"id": 2026020005, "homeTeam": {"id": 1, "abbrev": "PIT"}, "awayTea
 def test_goalie_totals_charge_each_goalie_his_shots_against():
     each = xm.predict(xm.shots_from_game(GOALIE_PBP)[0], MODEL)
     by_goalie = {g["goalie"]: g for g in ix.goalie_totals(GOALIE_PBP, MODEL)}
-    assert by_goalie[900] == {"goalie": 900, "team": "WSH", "xg_against": round(2 * each, 3), "goals_against": 1, "shots_against": 2}
+    assert by_goalie[900] == {"goalie": 900, "team": "WSH", "xg_against": round(2 * each, 3), "goals_against": 1, "shots_against": 2,
+                              "hd_shots": 0, "hd_goals": 0, "hd_xg": 0.0}  # each shot ~0.119: under the 0.20 line
     assert (by_goalie[800]["team"], by_goalie[800]["goals_against"], by_goalie[800]["shots_against"]) == ("PIT", 0, 1)
 
 
@@ -122,10 +123,66 @@ def test_new_games_store_their_goalies():
     assert sorted((p[1], p[2], p[6]) for p in cur.inserted) == [(800, "PIT", 0), (900, "WSH", 1)]
 
 
-def test_games_stored_before_goalie_xg_get_filled_in():
+def _shift(pid, team, period, start, end):
+    return {"playerId": pid, "teamId": team, "period": period, "startTime": start, "endTime": end}
+
+
+ROSTER = [{"playerId": p, "teamId": t, "positionCode": pos} for p, t, pos in
+          ((11, 1, "C"), (12, 1, "D"), (21, 2, "C"), (22, 2, "D"), (800, 1, "G"), (900, 2, "G"))]
+SHIFTS = [_shift(11, 1, 1, "00:00", "00:30"), _shift(12, 1, 1, "00:20", "01:00"),   # 11 off at 0:30, 12 on at 0:20
+          _shift(21, 2, 1, "00:00", "01:00"), _shift(22, 2, 1, "00:50", "01:00"),
+          _shift(800, 1, 1, "00:00", "20:00")] * 50  # padded past MIN_SHIFTS; duplicates change nothing
+
+
+def test_team_5v5_counts_attempts_including_blocks_for_the_shooter():
+    blocked = {"typeDescKey": "blocked-shot", "timeInPeriod": "00:30", "situationCode": "1551",
+               "periodDescriptor": {"number": 1, "periodType": "REG"},
+               "details": {"eventOwnerTeamId": 2, "shootingPlayerId": 11, "blockingPlayerId": 21}}
+    pp_goal = {**_goalie_shot("goal", 45, 1, -80, 900), "situationCode": "1541"}  # a power play: not 5-on-5
+    pbp = {**GOALIE_PBP, "rosterSpots": ROSTER, "plays": GOALIE_PBP["plays"] + [blocked, pp_goal]}
+    pit, wsh = (ix.team_5v5(pbp, MODEL)[t] for t in ("PIT", "WSH"))
+    assert (pit["cf"], pit["ff"], pit["sf"], pit["gf"]) == (3, 2, 2, 1)     # the block counts as PIT's attempt
+    assert (pit["ca"], pit["fa"], pit["ga"]) == (2, 2, 1) and wsh["cf"] == 2
+    each = xm.predict(xm.shots_from_game(GOALIE_PBP)[0], MODEL)
+    assert pit["xgf"] == round(2 * each, 3)
+
+
+def test_player_5v5_credits_whoever_was_on_the_ice():
+    pbp = {**GOALIE_PBP, "rosterSpots": ROSTER}
+    rows = ix.player_5v5(pbp, SHIFTS, MODEL)
+    each = xm.predict(xm.shots_from_game(GOALIE_PBP)[0], MODEL)
+    # PIT shoots at 0:05 and 0:20: 11 is on; 12's shift starts at 0:20, so not yet. WSH shoots at 0:40
+    # and 0:50: 12 and 21 are on; 22's shift starts at 0:50, so not yet.
+    assert rows[11]["onice_xgf"] == round(2 * each, 3) and rows[11]["onice_xga"] == 0
+    assert rows[12]["onice_xgf"] == 0 and rows[12]["onice_xga"] == round(2 * each, 3)
+    assert rows[21]["onice_xgf"] == round(2 * each, 3) and rows[21]["ixg"] == 0  # shooters here are team-only ids
+    assert 22 not in rows and 800 not in rows  # 22 never on for a shot; goalies aren't skaters
+
+
+def test_without_a_shift_chart_teams_and_own_xg_are_stored_but_not_on_ice_xg():
+    pbp = {**GOALIE_PBP, "rosterSpots": ROSTER,
+           "plays": [{**p, "details": {**p["details"], "shootingPlayerId": 11}} if p["details"]["eventOwnerTeamId"] == 1 else p
+                     for p in GOALIE_PBP["plays"]]}
+    cur = FakeCursor()
+    assert not ix.store_5v5(cur, 2026020005, 20262027, 2, pbp, SHIFTS[:5], MODEL)
+    teams = [p for p in cur.inserted if len(p) == 15]
+    players = [p for p in cur.inserted if len(p) == 8]
+    assert len(teams) == 2 and all(p[-1] is False for p in teams)
+    assert players == [(2026020005, 11, "PIT", 20262027, 2, round(2 * xm.predict(xm.shots_from_game(pbp)[0], MODEL), 3), None, None)]
+    cur = FakeCursor()
+    assert ix.store_5v5(cur, 2026020005, 20262027, 2, pbp, SHIFTS, MODEL)
+    assert len(cur.inserted) == 2 + 3  # two teams, three skaters with on-ice xG
+
+
+def test_stored_games_without_5v5_rows_get_filled_in():
     cur = FakeCursor(missing_goalies=[2026020005])
-    assert ix.fill_goalies(cur, 20262027, get=lambda url: GOALIE_PBP, model=MODEL) == 1
-    assert len(cur.inserted) == 2
+    pbp = {**GOALIE_PBP, "rosterSpots": ROSTER}
+    get = lambda url: {"data": SHIFTS} if "shiftcharts" in url else pbp  # noqa: E731
+    assert ix.fill_5v5(cur, 20262027, get=get, model=MODEL) == 1
+    assert len(cur.inserted) == 2 + 2 + 3  # goalies, teams, skaters
+    waiting = FakeCursor(missing_goalies=[2026020005])
+    assert ix.fill_5v5(waiting, 20262027, get=lambda url: {"data": []} if "shiftcharts" in url else pbp, model=MODEL) == 0
+    assert len(waiting.inserted) == 2 + 2  # goalies and teams still stored (no shooters in this fixture)
 
 
 def test_a_past_season_backfills_from_cached_play_by_play(tmp_path):

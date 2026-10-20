@@ -185,6 +185,29 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-19 — The report card: grading ourselves in public
+
+**What:** a `/report-card` page (linked from Bets) for the last 7 days and the season. It shows:
+- how often each side's favorite won
+- the Brier score for the moneyline, puck line, and total, ours next to the books' (at the
+  closing line)
+- how the value badges would have done as $100 bets
+- the games where we disagreed with the books most, and who was closer
+
+**What I learned:**
+- **Pick the metric people can feel, then the one that's right.** "Our favorite won 72%,
+  theirs 69%" lands with anyone. The Brier score is the honest one, and it still says the
+  books are ahead (0.221 vs. 0.213). The page shows both and highlights whichever side is
+  better, even when that's not us.
+- **The empty state is a feature.** Zero value badges so far reads as broken unless the page
+  says why: a badge needs real disagreement *and* a good price, on purpose.
+- **Grade the rules you run today, and say so.** The badges are re-graded with today's rules on
+  each game's last line before puck drop, and the page says that, so it doesn't pretend the
+  site showed them at the time.
+- A tiny one: `0.2135.toFixed(3)` is "0.213", because 0.2135 is really 0.21349999… in binary.
+
+---
+
 ## 2026-10-18 — Preview cards: making every shared link an ad
 
 **Why:** "we need users." The cheapest growth lever is making every share look good. A

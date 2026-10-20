@@ -4,13 +4,17 @@
     "exclude": [
       "/assets/*",
       "/images/*",
-      "*.{png,jpg,jpeg,gif,svg,ico,css,js,json,webmanifest,txt,map}",
+      "*.{png,jpg,jpeg,gif,svg,ico,css,js,json,webmanifest,txt,xml,map}",
       "/api/*"
     ]
   },
   "routes": [
     {
       "route": "/g/*",
+      "rewrite": "/api/share"
+    },
+    {
+      "route": "/t/*",
       "rewrite": "/api/share"
     },
     {

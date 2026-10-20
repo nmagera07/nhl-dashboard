@@ -36,3 +36,16 @@ def test_share_text_names_the_favorite_before_and_the_score_after():
 def test_light_team_colors_get_dark_text():
     assert og._text_on(og._rgb("#FCB514")) != (255, 255, 255)  # Pittsburgh gold
     assert og._text_on(og._rgb("#002654")) == (255, 255, 255)
+
+
+def test_team_share_text_leads_with_playoff_odds_and_record():
+    team = {"team_name": "Buffalo Sabres", "wins": 3, "losses": 3, "ot_losses": 0, "points": 6}
+    title, description = og.team_share_text("BUF", team, 0.177)
+    assert title == "Buffalo Sabres: 17.7% to make the playoffs"
+    assert description.startswith("3-3-0, 6 pts.")
+    assert og.team_share_text("BUF", team, 0.004)[0].endswith("<1% to make the playoffs")
+    assert og.team_share_text("BUF", team, 1.0)[0].endswith("100% to make the playoffs")
+    title, description = og.team_share_text("BUF", {"team_name": "Buffalo Sabres"})
+    assert title == "Buffalo Sabres on PuckPulse" and description.startswith("Playoff odds")
+    for text in (title, description):
+        assert "bet" not in text.lower()

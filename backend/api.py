@@ -510,6 +510,46 @@ def game_share(game_id: int = Path(..., gt=0)):
             "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/game/{game_id}.png"}
 
 
+@app.get("/teams/{team_abbrev}/share")
+def team_share(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
+    """Title and description for a team's link preview (served by the site's /t/{abbrev} share page)."""
+    abbrev = team_abbrev.upper()
+    if abbrev not in og_image.TEAM_COLORS:
+        raise HTTPException(status_code=404, detail="No such team")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT t.team_name, s.wins, s.losses, s.ot_losses, s.points
+                FROM teams t
+                LEFT JOIN standings_snapshots s ON s.team_abbrev = t.team_abbrev
+                    AND s.snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)
+                WHERE t.team_abbrev = %s
+                """,
+                (abbrev,),
+            )
+            team = cur.fetchone()
+            cur.execute(
+                """
+                SELECT playoff_pct FROM playoff_odds
+                WHERE team_abbrev = %s
+                  AND season_id = (SELECT MAX(season_id) FROM playoff_odds)
+                ORDER BY as_of_date DESC LIMIT 1
+                """,
+                (abbrev,),
+            )
+            odds = cur.fetchone()
+    finally:
+        conn.close()
+    if not team:
+        raise HTTPException(status_code=404, detail="No such team")
+    title, description = og_image.team_share_text(
+        abbrev, team, float(odds["playoff_pct"]) if odds and odds.get("playoff_pct") is not None else None
+    )
+    return {"title": title, "description": description, "url": f"https://puckpulse.io/teams/{abbrev}"}
+
+
 @app.get("/teams/{team_abbrev}/schedule")
 def team_schedule_summary(team_abbrev: str = Path(..., pattern=r"^[A-Za-z]{3}$")):
     """

@@ -40,6 +40,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: '/index.html',
+        // Files and share links the app shell must not answer for.
+        navigateFallbackDenylist: [/^\/(robots\.txt|sitemap\.xml)$/, /^\/api\//],
         cleanupOutdatedCaches: true,
         // Goal/final push notifications (public/push-sw.js).
         importScripts: ['push-sw.js'],

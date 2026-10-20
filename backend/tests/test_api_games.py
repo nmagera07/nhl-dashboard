@@ -91,3 +91,17 @@ class TestSharePreview:
         image = client.get("/og/game/2026020150.png")
         assert image.status_code == 200 and image.headers["content-type"] == "image/png"
         assert image.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+class TestTeamSharePreview:
+    def test_team_share_text(self, client, db_router):
+        db_router.when("from teams t", {"team_name": "Buffalo Sabres", "wins": 3, "losses": 3, "ot_losses": 0, "points": 6})
+        db_router.when("from playoff_odds", {"playoff_pct": 0.177})
+        body = client.get("/teams/buf/share").json()
+        assert body["url"] == "https://puckpulse.io/teams/BUF"
+        assert body["title"] == "Buffalo Sabres: 17.7% to make the playoffs"
+        assert "image" not in body  # the site's card image is used
+
+    def test_unknown_team_is_404(self, client):
+        assert client.get("/teams/XYZ/share").status_code == 404
+        assert client.get("/teams/BUFF/share").status_code == 422

@@ -113,7 +113,7 @@ def render_game(game, home_win_prob=None):
     elif home_win_prob is not None:
         big = (f"{round((1 - home_win_prob) * 100)}%", f"{round(home_win_prob * 100)}%")
         small = ("to win", "to win")
-        footer = "Win chances by PuckPulse · lines, goalies, and fair odds at puckpulse.io"
+        footer = "Win chances by PuckPulse · preview, lines, and goalies at puckpulse.io"
     else:
         big, small = (None, None), (None, None)
         footer = "Preview, lines, and goalies at puckpulse.io"
@@ -141,4 +141,20 @@ def share_text(game, home_win_prob=None):
     if home_win_prob is None:
         return title, "Preview, projected lines, and goalies on PuckPulse."
     fav, pct = (home, home_win_prob) if home_win_prob >= 0.5 else (away, 1 - home_win_prob)
-    return title, f"PuckPulse gives {fav} a {round(pct * 100)}% chance to win. Lines, goalies, and fair odds."
+    return title, f"PuckPulse gives {fav} a {round(pct * 100)}% chance to win. Preview, projected lines, and goalies."
+
+
+def team_share_text(abbrev, team, playoff_pct=None):
+    """(title, description) for a team's link preview. playoff_pct is the stored 0-1 fraction."""
+    name = (team or {}).get("team_name") or abbrev
+    wins, losses, otl = (team or {}).get("wins"), (team or {}).get("losses"), (team or {}).get("ot_losses")
+    record = f"{wins}-{losses}-{otl or 0}" if wins is not None and losses is not None else None
+    if playoff_pct is not None:
+        pct = playoff_pct * 100
+        shown = "<1" if 0 < pct < 1 else (">99" if 99 < pct < 100 else f"{pct:.1f}".rstrip("0").rstrip("."))
+        title = f"{name}: {shown}% to make the playoffs"
+    else:
+        title = f"{name} on PuckPulse"
+    parts = [f"{record}, {team['points']} pts." if record and team.get("points") is not None else None,
+             "Playoff odds, schedule, roster, and stats on PuckPulse."]
+    return title, " ".join(p for p in parts if p)

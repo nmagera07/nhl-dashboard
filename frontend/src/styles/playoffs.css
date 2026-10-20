@@ -73,7 +73,7 @@
 .odds-why-note { margin: 8px 0 0; font-size: 11px; color: var(--text-dim); }
 
 /* The chart card, collapsed by default. */
-.race-chart-details > summary { cursor: pointer; list-style: none; }
+.race-chart-details > summary { padding-bottom: 12px; cursor: pointer; list-style: none; }
 .race-chart-details > summary::-webkit-details-marker { display: none; }
 .race-chart-details > summary h2::after { content: " ▾"; color: var(--text-dim); font-size: 12px; }
 .race-chart-details:not([open]) > summary h2::after { content: " ▸"; }

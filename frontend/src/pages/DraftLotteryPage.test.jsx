@@ -17,6 +17,15 @@ const DATA = {
     { team: "LAK", position: 1, points: 2, games_played: 6, picks: picks(0.255, 0.188, 0.557) },
     { team: "PIT", position: 9, points: 7, games_played: 8, picks: [0.05, 0.05, 0.04, 0, 0, 0, 0, 0, 0.86, 0, 0, 0, 0, 0, 0, 0] },
   ],
+  mock: {
+    year: 2027,
+    sources: [{ name: "Daily Faceoff", url: "https://df.example", as_of: "2026-10-09" }, { name: "Tankathon", url: "https://tk.example", as_of: "2026-10-08" }],
+    projected: Array.from({ length: 32 }, (_, i) => ({
+      pick: i + 1, team: i === 0 ? "VAN" : `T${i}`,
+      prospect: { name: i === 0 ? "Landon DuPont" : `Prospect ${i + 1}`, pos: "D", team: "Michigan", league: "NCAA", ranks: { "Daily Faceoff": i + 1, Tankathon: null } },
+    })),
+    today: [{ pick: 1, team: "LAK", prospect: { name: "Sergei Skvortsov", pos: "LW", team: "Torpedo", league: null, ranks: {} } }],
+  },
 };
 
 describe("DraftLotteryPage", () => {
@@ -28,7 +37,7 @@ describe("DraftLotteryPage", () => {
   it("shows the projected chances for the 2027 draft, skipping near-certain playoff teams", async () => {
     render(<MemoryRouter><DraftLotteryPage /></MemoryRouter>);
     expect(await screen.findByText(/No. 1 pick in the 2027 NHL Draft/)).toBeInTheDocument();
-    const van = screen.getByText("VAN").closest("tr");
+    const van = within(screen.getByRole("table")).getByText("VAN").closest("tr");
     expect(within(van).getByText("15.0%")).toBeInTheDocument();
     expect(within(van).getByText("91.0%")).toBeInTheDocument();
     expect(screen.queryByText("COL")).not.toBeInTheDocument();
@@ -37,16 +46,32 @@ describe("DraftLotteryPage", () => {
   it("if the season ended today: exact odds, standings, and the likeliest pick", async () => {
     render(<MemoryRouter><DraftLotteryPage /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "If the season ended today" }));
-    const lak = screen.getByText("LAK").closest("tr");
+    const lak = within(screen.getByRole("table")).getByText("LAK").closest("tr");
     expect(within(lak).getByText("25.5%")).toBeInTheDocument();    // at No. 1
     expect(within(lak).getByText("100%")).toBeInTheDocument();     // always top 3
-    const pit = screen.getByText("PIT").closest("tr");
+    const pit = within(screen.getByRole("table")).getByText("PIT").closest("tr");
     expect(pit.lastChild).toHaveTextContent("9");                  // likeliest: stays 9th
+  });
+
+  it("shows a mock draft for the chosen view, lottery picks first", async () => {
+    render(<MemoryRouter><DraftLotteryPage /></MemoryRouter>);
+    const first = (await screen.findByText("Landon DuPont")).closest("li");
+    expect(within(first).getByText("VAN")).toBeInTheDocument();
+    expect(within(first).getByText("D · Michigan (NCAA)")).toBeInTheDocument();
+    expect(screen.queryByText("Prospect 17")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show picks 17-32" }));
+    expect(screen.getByText("Prospect 17")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tankathon" })).toHaveAttribute("href", "https://tk.example");
+
+    await userEvent.click(screen.getByRole("button", { name: "If the season ended today" }));
+    expect(screen.getByText("Sergei Skvortsov").closest("li")).toHaveTextContent("LAK");
+    expect(screen.queryByText("Landon DuPont")).not.toBeInTheDocument();
   });
 
   it("highlights your team", async () => {
     localStorage.setItem("nhl-dash:favorite-team", "PIT");
     render(<MemoryRouter><DraftLotteryPage /></MemoryRouter>);
-    expect((await screen.findByText("PIT")).closest("tr")).toHaveClass("lottery-row-favorite");
+    await screen.findByRole("table");
+    expect(within(screen.getByRole("table")).getByText("PIT").closest("tr")).toHaveClass("lottery-row-favorite");
   });
 });

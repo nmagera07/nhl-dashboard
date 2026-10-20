@@ -58,6 +58,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import draft_board
 import lottery
 import report_card
 import og_image
@@ -1366,6 +1367,25 @@ def _today_lottery(rows):
              "picks": [round(p, 5) for p in chances[r["team_abbrev"]]]} for i, r in enumerate(missed)]
 
 
+def _mock_draft(projected, today, standings):
+    """
+    The first round of a mock draft (draft_board.py) for each lottery view,
+    or None before the draft's board exists. A season's draft is the next
+    June: in October 2026, the 2027 draft.
+    """
+    now = date.today()
+    board = draft_board.load(now.year + 1 if now.month >= 7 else now.year)
+    if not board:
+        return None
+    prospects = draft_board.consensus(board)
+    return {
+        "year": board["draft_year"],
+        "sources": [{k: s[k] for k in ("name", "url", "as_of")} for s in board["sources"]],
+        "projected": draft_board.mock_draft(draft_board.projected_order(projected, standings), prospects) if projected else [],
+        "today": draft_board.mock_draft(draft_board.today_order(today, standings), prospects) if today else [],
+    }
+
+
 @app.get("/draft-lottery")
 @daily_cached
 def draft_lottery():
@@ -1399,14 +1419,17 @@ def draft_lottery():
                 conn.rollback()  # the daily job hasn't created it yet
                 projected = []
         picks = lambda value: value if isinstance(value, list) else json.loads(value)  # noqa: E731
+        projected_rows = sorted(
+            ({"team": r["team_abbrev"], "missed_playoffs": float(r["missed_playoffs_pct"]), "picks": picks(r["pick_chances"])}
+             for r in projected if float(r["missed_playoffs_pct"]) > 0),
+            key=lambda t: -t["picks"][0])
+        today = _today_lottery(standings)
         return {
             "as_of": str(projected[0]["as_of_date"]) if projected else None,
             "standings_date": str(standings[0]["snapshot_date"]) if standings else None,
-            "projected": sorted(
-                ({"team": r["team_abbrev"], "missed_playoffs": float(r["missed_playoffs_pct"]), "picks": picks(r["pick_chances"])}
-                 for r in projected if float(r["missed_playoffs_pct"]) > 0),
-                key=lambda t: -t["picks"][0]),
-            "today": _today_lottery(standings),
+            "projected": projected_rows,
+            "today": today,
+            "mock": _mock_draft(projected_rows, today, standings),
         }
     except Exception:
         logger.error("Failed to build the draft lottery odds", exc_info=True)

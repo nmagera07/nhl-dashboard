@@ -6,3 +6,12 @@
 .lottery-row-favorite th, .lottery-row-favorite td { background: var(--accent-soft); }
 .playoffs-lottery-link { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .playoffs-page .page-header { justify-content: space-between; }
+.lottery-mock { margin-top: 16px; }
+.lottery-mock-title { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+.lottery-mock-list { margin: 0; padding: 0; list-style: none; }
+.lottery-mock-list li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-top: 1px solid var(--border); }
+.lottery-mock-list .team-cell { flex: 0 0 64px; }
+.lottery-mock-player { display: flex; flex-direction: column; min-width: 0; font-size: 14px; }
+.lottery-mock-meta { overflow: hidden; color: var(--text-dim); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.lottery-mock-list li.lottery-row-favorite { background: var(--accent-soft); }
+.lottery-mock-more { margin-top: 8px; font-size: 13px; font-weight: 600; }

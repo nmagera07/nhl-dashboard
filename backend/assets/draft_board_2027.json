@@ -1,0 +1,445 @@
+{
+ "draft_year": 2027,
+ "sources": [
+  {
+   "name": "Daily Faceoff",
+   "url": "https://www.dailyfaceoff.com/news/2027-nhl-draft-rankings-early-season-top-40-dupont-skvortsov-privalov-zhilkin-meyer",
+   "as_of": "2026-10-09",
+   "ranks": [
+    "Landon DuPont",
+    "Sergei Skvortsov",
+    "Nazar Privalov",
+    "Dima Zhilkin",
+    "Carter Meyer",
+    "Brock England",
+    "Jonah Neuenschwander",
+    "Brock Cripps",
+    "Alexis Joseph",
+    "Milan Sundström",
+    "Andrei Pustovoy",
+    "Sammy Nelson",
+    "Jaxon Jacobson",
+    "Jaakko Wycisk",
+    "Noah Davidson",
+    "Kayden Stroeder",
+    "Diego Gutiérrez",
+    "Luca Santala",
+    "Bosse Meijer",
+    "Levi Harper",
+    "Shaeffer Gordon-Carroll",
+    "Yevgeni Yakunin",
+    "Petr Tomek",
+    "Timothy Kazda",
+    "Nolan Fitzhenry",
+    "Malik L’Italien",
+    "Aleks Kulemin",
+    "Jamie Glance",
+    "Roberts Naudiņš",
+    "Max Calce",
+    "Gunnar Conboy",
+    "Vladimir Shtyrkhunov",
+    "Ryerson Edgar",
+    "Cooper McAslan",
+    "James Scantlebury",
+    "Douglas Johnsson",
+    "Michal Hartl",
+    "Gavin Burcar",
+    "Boston Tait",
+    "Kohyn Eshkawkogan"
+   ]
+  },
+  {
+   "name": "Tankathon",
+   "url": "https://www.tankathon.com/nhl/big-board",
+   "as_of": "2026-10-08",
+   "ranks": [
+    "Landon DuPont",
+    "Nazar Privalov",
+    "Sergei Skvortsov",
+    "Alexis Joseph",
+    "Carter Meyer",
+    "Milan Sundström",
+    "Dima Zhilkin",
+    "Jonah Neuenschwander",
+    "Sammy Nelson",
+    "Brock England",
+    "Brock Cripps",
+    "Andrei Pustovoy",
+    "Jaxon Jacobson",
+    "Yevgeni Yakunin",
+    "Bosse Meijer",
+    "Jaakko Wycisk",
+    "Noah Davidson",
+    "Jamie Glance",
+    "Timothy Kazda",
+    "Shaeffer Gordon-Carroll",
+    "Luca Santala",
+    "Nolan Fitzhenry",
+    "Malik L’Italien",
+    "Petr Tomek",
+    "Diego Gutiérrez",
+    "Roberts Naudiņš",
+    "Vladimir Shtyrkhunov",
+    "Ryerson Edgar",
+    "Tomas Selic",
+    "Levi Harper",
+    "Douglas Johnsson",
+    "Gunnar Conboy",
+    "Kayden Stroeder",
+    "Max Calce",
+    "Aleks Kulemin",
+    "Boston Tait",
+    "Gavin Burcar",
+    "Kohyn Eshkawkogan",
+    "Maxmilian Mares",
+    "Dorian Eklund Aspe",
+    "Johnny McLaughlin",
+    "Cooper McAslan",
+    "Ben Geiger",
+    "Daniil Yermolov",
+    "James Scantlebury",
+    "David Huk",
+    "Lenni Kokkonen",
+    "Oliver Botka",
+    "Filip Kovalcik",
+    "Oskars Lūks",
+    "Eric Tu",
+    "Roni Kuukasjärvi",
+    "Jake Prunty",
+    "Michal Hartl",
+    "Daniil Savin",
+    "Lukas Kachlir",
+    "Ilya Kolmakov",
+    "Jonas Schwarz",
+    "Cam Warren",
+    "Loui Karlsson",
+    "Benjamin Nyström",
+    "Oliver Sundberg",
+    "Kaden McGregor",
+    "Brenner Lammens"
+   ]
+  }
+ ],
+ "prospects": {
+  "Landon DuPont": {
+   "pos": "D",
+   "team": "University of Michigan",
+   "league": "NCAA"
+  },
+  "Sergei Skvortsov": {
+   "pos": "LW",
+   "team": "Torpedo Nizhny Novgorod",
+   "league": "KHL"
+  },
+  "Nazar Privalov": {
+   "pos": "LW",
+   "team": "CSKA Moskva",
+   "league": "KHL"
+  },
+  "Dima Zhilkin": {
+   "pos": "C",
+   "team": "Saginaw Spirit",
+   "league": "OHL"
+  },
+  "Carter Meyer": {
+   "pos": "C",
+   "team": "Québec Remparts",
+   "league": null
+  },
+  "Brock England": {
+   "pos": "C",
+   "team": "Seattle Thunderbirds",
+   "league": "WHL"
+  },
+  "Jonah Neuenschwander": {
+   "pos": "C",
+   "team": "EHC Biel-Bienne",
+   "league": "NL"
+  },
+  "Brock Cripps": {
+   "pos": "D",
+   "team": "Prince Albert Raiders",
+   "league": "WHL"
+  },
+  "Alexis Joseph": {
+   "pos": "C",
+   "team": "Saint John Sea Dogs",
+   "league": "QMJHL"
+  },
+  "Milan Sundström": {
+   "pos": "C",
+   "team": "MoDo",
+   "league": "Allsvenskan"
+  },
+  "Andrei Pustovoy": {
+   "pos": "C",
+   "team": "Lokomotiv Yaroslavl",
+   "league": "KHL"
+  },
+  "Sammy Nelson": {
+   "pos": "C",
+   "team": "University of Notre Dame",
+   "league": "NCAA"
+  },
+  "Jaxon Jacobson": {
+   "pos": "C",
+   "team": "Brandon Wheat Kings",
+   "league": "WHL"
+  },
+  "Jaakko Wycisk": {
+   "pos": "C",
+   "team": "Guelph Storm",
+   "league": "OHL"
+  },
+  "Noah Davidson": {
+   "pos": "C",
+   "team": "Medicine Hat Tigers",
+   "league": "WHL"
+  },
+  "Kayden Stroeder": {
+   "pos": "C",
+   "team": "Edmonton Oil Kings",
+   "league": "WHL"
+  },
+  "Diego Gutiérrez": {
+   "pos": "D",
+   "team": "USNTDP",
+   "league": null
+  },
+  "Luca Santala": {
+   "pos": "RW",
+   "team": "Kitchener Rangers",
+   "league": "OHL"
+  },
+  "Bosse Meijer": {
+   "pos": "C",
+   "team": "Frölunda HC",
+   "league": "SHL"
+  },
+  "Levi Harper": {
+   "pos": "D",
+   "team": "Saginaw Spirit",
+   "league": "OHL"
+  },
+  "Shaeffer Gordon-Carroll": {
+   "pos": "C",
+   "team": "Medicine Hat Tigers",
+   "league": "WHL"
+  },
+  "Yevgeni Yakunin": {
+   "pos": "C",
+   "team": "MHK Spartak Moskva",
+   "league": "MHL"
+  },
+  "Petr Tomek": {
+   "pos": "C",
+   "team": "HC Energie Karlovy Vary",
+   "league": "Czechia"
+  },
+  "Timothy Kazda": {
+   "pos": "RW",
+   "team": "Guelph Storm",
+   "league": "OHL"
+  },
+  "Nolan Fitzhenry": {
+   "pos": "C",
+   "team": "USNTDP",
+   "league": null
+  },
+  "Malik L’Italien": {
+   "pos": "D",
+   "team": "Halifax Mooseheads",
+   "league": "QMJHL"
+  },
+  "Aleks Kulemin": {
+   "pos": "C",
+   "team": "Kingston Frontenacs",
+   "league": "OHL"
+  },
+  "Jamie Glance": {
+   "pos": "RW",
+   "team": "Saint John Sea Dogs",
+   "league": "QMJHL"
+  },
+  "Roberts Naudiņš": {
+   "pos": "LW",
+   "team": "Penticton Vees",
+   "league": "WHL"
+  },
+  "Max Calce": {
+   "pos": "C",
+   "team": "Adler Mannheim",
+   "league": "DEL"
+  },
+  "Gunnar Conboy": {
+   "pos": "C",
+   "team": "Green Bay Gamblers",
+   "league": "USHL"
+  },
+  "Vladimir Shtyrkhunov": {
+   "pos": "D",
+   "team": "Shawinigan Cataractes",
+   "league": null
+  },
+  "Ryerson Edgar": {
+   "pos": "C",
+   "team": "Niagara IceDogs",
+   "league": "OHL"
+  },
+  "Cooper McAslan": {
+   "pos": "D",
+   "team": "London Knights",
+   "league": "OHL"
+  },
+  "James Scantlebury": {
+   "pos": "C",
+   "team": "Québec Remparts",
+   "league": "QMJHL"
+  },
+  "Douglas Johnsson": {
+   "pos": "D",
+   "team": "Skellefteå AIK",
+   "league": "Sweden U-20"
+  },
+  "Michal Hartl": {
+   "pos": "RW",
+   "team": "HC Kometa Brno",
+   "league": "Czechia"
+  },
+  "Gavin Burcar": {
+   "pos": "C",
+   "team": "Spokane Chiefs",
+   "league": "WHL"
+  },
+  "Boston Tait": {
+   "pos": "D",
+   "team": "Wenatchee Wild",
+   "league": "WHL"
+  },
+  "Kohyn Eshkawkogan": {
+   "pos": "D",
+   "team": "Ottawa 67’s",
+   "league": "OHL"
+  },
+  "Tomas Selic": {
+   "pos": "RW",
+   "team": "HC Kometa Brno",
+   "league": null
+  },
+  "Maxmilian Mares": {
+   "pos": "F",
+   "team": "Rimouski",
+   "league": null
+  },
+  "Dorian Eklund Aspe": {
+   "pos": "F",
+   "team": "Djurgårdens IF",
+   "league": null
+  },
+  "Johnny McLaughlin": {
+   "pos": "F",
+   "team": "Windsor",
+   "league": null
+  },
+  "Ben Geiger": {
+   "pos": "D",
+   "team": "USDP",
+   "league": null
+  },
+  "Daniil Yermolov": {
+   "pos": "F",
+   "team": "Krasnaya Armiya",
+   "league": null
+  },
+  "David Huk": {
+   "pos": "C",
+   "team": "Tri-City (WHL)",
+   "league": null
+  },
+  "Lenni Kokkonen": {
+   "pos": "D",
+   "team": "Kärpät",
+   "league": null
+  },
+  "Oliver Botka": {
+   "pos": "D",
+   "team": "HK Nitra",
+   "league": null
+  },
+  "Filip Kovalcik": {
+   "pos": "D",
+   "team": "Drummondville",
+   "league": null
+  },
+  "Oskars Lūks": {
+   "pos": "D",
+   "team": "Prince Albert",
+   "league": null
+  },
+  "Eric Tu": {
+   "pos": "G",
+   "team": "Calgary",
+   "league": null
+  },
+  "Roni Kuukasjärvi": {
+   "pos": "D",
+   "team": "Ilves",
+   "league": null
+  },
+  "Jake Prunty": {
+   "pos": "D",
+   "team": "USDP",
+   "league": null
+  },
+  "Daniil Savin": {
+   "pos": "C",
+   "team": "SKA-1946",
+   "league": null
+  },
+  "Lukas Kachlir": {
+   "pos": "D",
+   "team": "Liberec",
+   "league": null
+  },
+  "Ilya Kolmakov": {
+   "pos": "LW",
+   "team": "Sherbrooke",
+   "league": null
+  },
+  "Jonas Schwarz": {
+   "pos": "RW/C",
+   "team": "Lukko",
+   "league": null
+  },
+  "Cam Warren": {
+   "pos": "F",
+   "team": "North Bay",
+   "league": null
+  },
+  "Loui Karlsson": {
+   "pos": "RW",
+   "team": "Leksands IF",
+   "league": null
+  },
+  "Benjamin Nyström": {
+   "pos": "F",
+   "team": "Luleå HF",
+   "league": null
+  },
+  "Oliver Sundberg": {
+   "pos": "RW",
+   "team": "Djurgårdens IF",
+   "league": null
+  },
+  "Kaden McGregor": {
+   "pos": "C",
+   "team": "Brantford",
+   "league": null
+  },
+  "Brenner Lammens": {
+   "pos": "C",
+   "team": "Sarnia",
+   "league": null
+  }
+ }
+}

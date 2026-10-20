@@ -26,6 +26,52 @@ function Team({ abbrev, teams }) {
   );
 }
 
+const shortDate = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" });
+const LOTTERY_PICKS = 16;
+
+// The first round, each team taking the best player left on the consensus
+// board. The lottery picks show; the playoff teams' picks open on a tap.
+function MockDraft({ mock, picks, teams, rowClass }) {
+  const [showAll, setShowAll] = useState(false);
+  if (!picks?.length) return null;
+  const shown = showAll ? picks : picks.slice(0, LOTTERY_PICKS);
+  const sources = mock.sources;
+  return (
+    <section className="pickem-card lottery-mock">
+      <h2 className="lottery-mock-title">Mock draft</h2>
+      <ol className="lottery-mock-list">
+        {shown.map(({ pick, team, prospect }) => (
+          <li key={pick} className={rowClass(team)}>
+            <span className="lottery-rank">{pick}</span>
+            <Team abbrev={team} teams={teams} />
+            <span className="lottery-mock-player" title={sources.map((s) => `${s.name}: ${prospect.ranks[s.name] ?? "unranked"}`).join(" · ")}>
+              <strong>{prospect.name}</strong>
+              <span className="lottery-mock-meta">
+                {prospect.pos} · {prospect.team}{prospect.league ? ` (${prospect.league})` : ""}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {picks.length > LOTTERY_PICKS && (
+        <button type="button" className="link-button lottery-mock-more" onClick={() => setShowAll(!showAll)}>
+          {showAll ? "Show the lottery picks only" : `Show picks ${LOTTERY_PICKS + 1}-${picks.length}`}
+        </button>
+      )}
+      <p className="pickem-hint">
+        Each team takes the best player left on PuckPulse&apos;s board: the average of{" "}
+        {sources.map((s, i) => (
+          <span key={s.name}>
+            {i > 0 && (i === sources.length - 1 ? " and " : ", ")}
+            <a className="accent-link" href={s.url} target="_blank" rel="noreferrer">{s.name}</a> ({shortDate(s.as_of)})
+          </span>
+        ))}
+        {" "}rankings. No lottery jumps; picks {LOTTERY_PICKS + 1}-{picks.length} go by record, though really they go by playoff results.
+      </p>
+    </section>
+  );
+}
+
 export default function DraftLotteryPage({ standings = [] }) {
   const { data, status } = useFetchWithStatus(`${API_BASE}/draft-lottery`);
   const [view, setView] = useState("projected");
@@ -97,6 +143,8 @@ export default function DraftLotteryPage({ standings = [] }) {
           <p className="pickem-hint">The 16 teams out of a playoff spot today, worst first, with the lottery&apos;s exact odds.</p>
         </section>
       )}
+
+      {data?.mock && <MockDraft key={view} mock={data.mock} picks={data.mock[view]} teams={teams} rowClass={rowClass} />}
 
       <section className="bets-about">
         <h2>How the lottery works</h2>

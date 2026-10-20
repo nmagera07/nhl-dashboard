@@ -18,6 +18,7 @@ its last good copy is used for up to MAX_STALE_SECONDS.
 """
 
 import email.utils
+import html
 import logging
 import re
 import threading
@@ -143,8 +144,13 @@ def _iso(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _unescape(text):
+    """Feed text without HTML entities: some feeds double-encode them, so "isn't" arrives as "isn&#8217;t"."""
+    return html.unescape(html.unescape(text or "")).strip()
+
+
 def _clean_summary(text, limit=220):
-    text = re.sub(r"<[^>]+>", "", text or "").replace("\xa0", " ").replace("\\+", "").strip()
+    text = _unescape(re.sub(r"<[^>]+>", "", text or "")).replace("\xa0", " ").replace("\\+", "").strip()
     text = re.sub(r"\s+", " ", text)
     return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
@@ -178,7 +184,7 @@ def parse_nhl_stories(data):
         ids = [int(t["slug"].split("-", 1)[1]) for t in item.get("tags", [])
                if str(t.get("slug", "")).startswith("teamid-") and t["slug"].split("-", 1)[1].isdigit()]
         out.append({
-            "title": headline, "url": f"https://www.nhl.com/news/{slug}", "source": "NHL.com",
+            "title": _unescape(headline), "url": f"https://www.nhl.com/news/{slug}", "source": "NHL.com",
             "published": item["contentDate"], "summary": _clean_summary(item.get("summary")),
             "teams": sorted({TEAM_BY_ID[i] for i in ids if i in TEAM_BY_ID}) or teams_mentioned(headline),
             **_nhl_images(item),
@@ -189,7 +195,7 @@ def parse_nhl_stories(data):
 def parse_rss(text, source, link_must_contain=None):
     out = []
     for item in ET.fromstring(text).iter("item"):
-        title, link, published = (item.findtext("title") or "").strip(), (item.findtext("link") or "").strip(), item.findtext("pubDate")
+        title, link, published = _unescape(item.findtext("title")), (item.findtext("link") or "").strip(), item.findtext("pubDate")
         if not title or not link.startswith("https://") or not published:
             continue
         if link_must_contain and link_must_contain not in link:
@@ -215,7 +221,7 @@ def parse_espn_news(data):
         if article.get("premium") or article.get("type") in ESPN_SKIP_TYPES:
             continue  # ESPN+ paywalled stories and videos
         url = ((article.get("links") or {}).get("web") or {}).get("href") or ""
-        title, published = article.get("headline"), article.get("published")
+        title, published = _unescape(article.get("headline")), article.get("published")
         if not title or not url or not published:
             continue
         teams = sorted({t for c in article.get("categories", []) if c.get("type") == "team"

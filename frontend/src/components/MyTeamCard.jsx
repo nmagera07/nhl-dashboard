@@ -83,14 +83,14 @@ export function PlayoffLine({ data, team }) {
   const pace = pointsPace(data.cutline?.[row.conference], { ...row, clinch_indicator: team.clinch_indicator }, data.season_games);
   if (!pace) return null;
 
-  const range = pace.low !== pace.high ? ` (${pts(pace.low)}–${pts(pace.high)})` : "";
-  // Name the team ("You" read as the viewer, not the team they follow). The
-  // label above already says "Playoff line" and the card shows the points,
-  // so: what it takes, and where the team is headed. Non-breaking spaces
-  // keep "96 pts" and "on pace for 84" together on a phone.
+  // One clean line: what it takes, and where the team is headed (named, since
+  // "You" read as the viewer). The likely range of the line is in the details.
   const nb = (text) => text.replace(/ /g, "\u00a0");
-  const where = pace.pace != null ? nb(`${team.team_abbrev} on pace for ${pace.pace}`) : nb(`${team.team_abbrev} at ${pace.pts} pts`);
-  const headline = `≈ ${nb(`${pts(pace.cutline)} pts`)} to make it${range} · ${where}`;
+  const where = pace.pace != null ? nb(`${team.team_abbrev} on pace for ${pace.pace}`) : nb(`${team.team_abbrev} at ${pace.pts}`);
+  const headline = `${nb(`Need ~${pts(pace.cutline)} pts`)} · ${where}`;
+  const range = pace.low !== pace.high
+    ? <p className="my-team-line-range">The line usually lands between {pts(pace.low)} and {pts(pace.high)} points.</p>
+    : null;
 
   let body;
   if (pace.state === "clinched") body = <p className="my-team-line-status my-team-line-in">Clinched ✓</p>;
@@ -123,6 +123,7 @@ export function PlayoffLine({ data, team }) {
         <span className="my-team-line-headline">{headline}</span>
       </summary>
       {body}
+      {range}
     </details>
   );
 }

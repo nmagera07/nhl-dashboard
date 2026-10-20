@@ -57,7 +57,7 @@ class TestPlayerLeaders:
         response = client.get("/players/leaders?view=table")
 
         assert response.status_code == 200
-        assert len(LEADER_TABLE_FIELDS) == 19
+        assert len(LEADER_TABLE_FIELDS) == 20  # +avg_toi_seconds (the Players page TOI column)
         for row in response.json():
             assert set(row) == set(LEADER_TABLE_FIELDS)
 

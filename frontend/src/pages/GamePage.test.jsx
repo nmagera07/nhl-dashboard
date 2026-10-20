@@ -203,7 +203,7 @@ describe("GamePage", () => {
     renderGame(upcoming, { standings: [], playoffOddsByTeam: { NSH: 0.31, TOR: 0.82 } }, sim);
 
     expect(await screen.findByRole("img", { name: /NSH \d+% chance to win, TOR \d+%/ })).toBeInTheDocument();
-    expect(screen.getByText(/not betting advice/i)).toBeInTheDocument();
+    expect(screen.getByText(/a lean, not a lock/i)).toBeInTheDocument();
     expect(screen.getByText("2-3-0", { selector: ".game-team-record" })).toBeInTheDocument();  // record under the logo
     expect(screen.getByText("4.00 (2nd)")).toHaveClass("preview-better");                  // better stat highlighted
     expect(screen.getByText("82%")).toBeInTheDocument();                                     // playoff odds

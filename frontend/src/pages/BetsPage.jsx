@@ -65,20 +65,20 @@ function BetCard({ game, board }) {
         <table className="bets-table">
           <tbody>
             <tr>
-              <th scope="row">Moneyline</th>
+              <th scope="row">Moneyline<span className="bets-row-hint">to win</span></th>
               <Side label={away} side={board.moneyline.away} showBook open={open} />
               <Side label={home} side={board.moneyline.home} showBook open={open} />
             </tr>
             {pl && pl.home.price != null && (
               <tr>
-                <th scope="row">Puck line</th>
+                <th scope="row">Puck line<span className="bets-row-hint">−1.5: win by 2+</span></th>
                 <Side label={`${away} ${formatSpread(-pl.home_spread)}`} side={pl.away} open={open} />
                 <Side label={`${home} ${formatSpread(pl.home_spread)}`} side={pl.home} open={open} />
               </tr>
             )}
             {total && total.over.price != null && (
               <tr>
-                <th scope="row">Total <span className="bets-exp">beta</span></th>
+                <th scope="row">Total<span className="bets-row-hint">both teams&apos; goals</span><span className="bets-exp">beta</span></th>
                 <Side label={`Over ${total.line}`} side={total.over} open={open} />
                 <Side label={`Under ${total.line}`} side={total.under} open={open} />
               </tr>

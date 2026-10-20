@@ -734,8 +734,7 @@ def goalie_prior(season_id):
 
     start = season_id // 10000
     try:
-        last = pv.season_goalies(pv.fetch_csv(pv.MONEYPUCK_GOALIES_URL, start - 1))
-        before_last = pv.season_goalies(pv.fetch_csv(pv.MONEYPUCK_GOALIES_URL, start - 2))
+        last, before_last = (goalie_season(y, stored_goalie_xg(y * 10000 + y + 1)) for y in (start - 1, start - 2))
         rosters = load_rosters(goalies=True)
         # Same injured-reserve gap as skaters. A flat value makes every goalie
         # with GOALIE_LOOKUP_MIN_GP+ starts last season worth a lookup.
@@ -746,6 +745,44 @@ def goalie_prior(season_id):
         logger.warning(f"Couldn't compute goaltending ({exc}); prior has no goalie part today")
         return {}
     return {t: round(GOALIE_WEIGHT * v, 4) for t, v in strength.items()}
+
+
+def goalie_season(year, faced):
+    """
+    pv.season_goalies()'s shape for the regular season starting in `year`:
+    from our own xG (`faced`, stored_goalie_xg()) when every game is
+    stored, else MoneyPuck's. Ours matched MoneyPuck's GSAx at r = 0.88-0.97
+    per goalie (2022-23 to 2025-26) and backtested slightly better (Brier
+    0.1085 vs 0.1091 over those four seasons).
+    """
+    import player_values as pv
+
+    season_id = year * 10000 + year + 1
+    games = sum(gp for _, gp in pv.fetch_nhl_team_goals(year).values()) / 2
+    if faced and faced["games"] >= games - 2:  # a game or two short is noise, not a missing week
+        return pv.our_season_goalies(pv.fetch_nhl_goalies(year), faced["goalies"])
+    logger.info(f"Goalie xG for {season_id}: {faced['games'] if faced else 0} of {games:.0f} games stored; using MoneyPuck's")
+    return pv.season_goalies(pv.fetch_csv(pv.MONEYPUCK_GOALIES_URL, year))
+
+
+def stored_goalie_xg(season_id):
+    """{"games": regular-season games stored, "goalies": {player_id: (xG against, goals against)}}, or None."""
+    try:
+        with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute("SELECT COUNT(DISTINCT game_id) FROM goalie_game_xg WHERE season_id = %s AND game_type = 2", (season_id,))
+            games = cur.fetchone()[0]
+            cur.execute(
+                """
+                SELECT goalie_id, SUM(xg_against), SUM(goals_against)
+                FROM goalie_game_xg WHERE season_id = %s AND game_type = 2 GROUP BY goalie_id
+                """,
+                (season_id,),
+            )
+            rows = cur.fetchall()
+    except psycopg2.Error as exc:  # no table yet, or a DB hiccup: MoneyPuck stands in
+        logger.warning(f"Couldn't read goalie xG for {season_id} ({type(exc).__name__})")
+        return None
+    return {"games": games, "goalies": {r[0]: (float(r[1]), int(r[2])) for r in rows}} if rows else None
 
 
 def missing_player_teams(values, last, rosters, get=nhl_get):

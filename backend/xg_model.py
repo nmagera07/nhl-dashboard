@@ -111,6 +111,7 @@ def shots_from_game(pbp):
             shots.append({
                 "game_id": pbp.get("id"), "period": number, "time": t,
                 "shooter": d.get("shootingPlayerId") or d.get("scoringPlayerId"), "team_is_home": is_home,
+                "goalie": d.get("goalieInNetId"),  # None into an empty net
                 "distance": distance, "angle": angle,
                 "shot_type": d.get("shotType") or "wrist",
                 "rebound": rebound, "rush": rush,

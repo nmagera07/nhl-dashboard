@@ -214,3 +214,16 @@ class TestRosterStrength:
         rosters = {**{i: "DEEP" for i in range(8)}, 99: "NONE"}
         strength = pv.team_roster_strength({**values, 99: {"pos": "C", "value": 0.0}}, {**last, 99: {"gp": 82}}, rosters)
         assert strength["DEEP"] - strength["NONE"] == pytest.approx(6 * 0.06, abs=1e-3)
+
+
+class TestOurGoalies:
+    def test_gsax_is_xg_against_minus_goals_with_nhl_games_and_last_team(self):
+        rows = [{"playerId": 1, "goalieFullName": "A", "teamAbbrevs": "ANA,BUF", "gamesPlayed": 24, "timeOnIce": 7200},
+                {"playerId": 2, "goalieFullName": "B", "teamAbbrevs": "PIT", "gamesPlayed": 1, "timeOnIce": 0},
+                {"playerId": 3, "goalieFullName": "C", "teamAbbrevs": "PIT", "gamesPlayed": 1, "timeOnIce": 600}]
+        season = pv.our_season_goalies(rows, {1: (10.0, 8), 2: (1.0, 0)}, scale=1.1)
+        assert season == {1: {"name": "A", "team": "BUF", "gp": 24, "games": 2.0, "gsax": pytest.approx(3.0)}}  # 2: no ice time; 3: no shots
+
+    def test_xg_scale_puts_league_goals_over_league_xg(self):
+        assert pv.xg_scale({1: (10.0, 11), 2: (10.0, 9)}) == 1.0
+        assert pv.xg_scale({1: (8.0, 10)}) == 1.25 and pv.xg_scale({}) == 1.0

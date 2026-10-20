@@ -37,16 +37,20 @@ describe("BetsPage", () => {
     // Each row says what the bet is, so the puck line price is not read as the moneyline.
     expect(within(card).getByText("to win")).toBeInTheDocument();
     expect(within(card).getByText("−1.5: win by 2+")).toBeInTheDocument();
-    expect(within(card).getByText(/Silovs 62% · Blackwood 81%/)).toBeInTheDocument();
+    expect(within(card).getByText("In net").parentElement).toHaveTextContent("In net Silovs 62% · Blackwood 81%");
     expect(within(card).getAllByText(/^Value/)).toHaveLength(1); // the totals' positive EV is never badged
   });
 
-  it("shows NHL.com's starters once its lineups are posted", async () => {
-    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: { ...BOARD, nhl_starters: { away: "Sergei Murashov", home: "Scott Wedgewood" } } });
+  it("names each starter by the best word so far: reporters, then NHL.com, then ours", async () => {
+    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: {
+      ...BOARD,
+      nhl_starters: { away: "Sergei Murashov", home: "Scott Wedgewood" },
+      reported_starters: { away: { name: "Tristan Jarry", status: "confirmed", source: "RotoWire" }, home: null },
+    } });
     render(<MemoryRouter><BetsPage /></MemoryRouter>);
-    expect(await screen.findByText(/Murashov · Wedgewood/)).toBeInTheDocument();
-    expect(screen.getByText("In net (NHL.com projects)")).toBeInTheDocument();
-    expect(screen.queryByText(/Silovs 62%/)).not.toBeInTheDocument();
+    const line = (await screen.findByText("In net", { selector: ".bets-goalies-label" })).parentElement;
+    expect(line).toHaveTextContent("In net Jarry confirmed · Wedgewood NHL.com");
+    expect(screen.getByRole("link", { name: "RotoWire" })).toBeInTheDocument();
   });
 
   it("drops the badges once a game starts", async () => {

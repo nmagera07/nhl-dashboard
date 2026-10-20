@@ -81,6 +81,10 @@ class TestBetsRoute:
             {"game_id": 7, "team_abbrev": "COL", "goalie_name": "Scott Wedgewood", "start_prob": 0.19},
             {"game_id": 7, "team_abbrev": "PIT", "goalie_name": "Arturs Silovs", "start_prob": 0.62}])
         db_router.when("from season_sim_inputs", [{"games": [["2026-10-16", "COL", "PIT", False, True]]}])
+        db_router.when("from players", [{"first_name": "Tristan", "last_name": "Jarry", "team_abbrev": "PIT", "position_code": "G"}])
+        monkeypatch.setattr(api.news, "_updates", {"n1": {
+            "id": "n1", "player": "Tristan Jarry", "title": "Starting Friday", "summary": "Jarry will guard the road crease Friday.",
+            "url": "https://www.rotowire.com/j", "published": "2026-10-16T15:00:00Z", "source": "RotoWire"}})
         body = client.get("/bets?date=2026-10-16").json()
         game = body["games"]["7"]
         assert game["snapshot"] == "close" and game["b2b"] == {"home": False, "away": True}
@@ -88,6 +92,10 @@ class TestBetsRoute:
         assert game["goalies"]["home"] == [{"name": "Mackenzie Blackwood", "prob": 0.81}, {"name": "Scott Wedgewood", "prob": 0.19}]
         assert game["goalies"]["away"] == [{"name": "Arturs Silovs", "prob": 0.62}]
         assert game["nhl_starters"] == {"home": "Mackenzie Blackwood", "away": "Arturs Silovs"}
+        # The beat reporter (via RotoWire) beat NHL.com to the change in net.
+        assert game["reported_starters"]["home"] is None
+        assert game["reported_starters"]["away"] == {"name": "Tristan Jarry", "status": "confirmed", "source": "RotoWire",
+                                                     "published": "2026-10-16T15:00:00Z", "url": "https://www.rotowire.com/j"}
         query = next(q for q, _ in db_router.calls if "from market_odds" in q.lower())
         assert "source = 'sportsbooks'" in query and "captured = 'close'" in query
 

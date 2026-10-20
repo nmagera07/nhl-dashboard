@@ -17,7 +17,7 @@ function Side({ label, side, showBook, open }) {
       <span className="bets-label">{label}</span>
       <strong className="bets-price">{formatPrice(side.price)}</strong>
       {showBook && side.book && <span className="bets-book">{side.book}</span>}
-      <span className="bets-fair">fair {formatPrice(side.fair)}</span>
+      <span className="bets-fair">PuckPulse {formatPrice(side.fair)}</span>
       {side.value && open && <span className="bets-badge">Value {formatEv(side.ev)}</span>}
     </td>
   );
@@ -60,7 +60,7 @@ function BetCard({ game, board }) {
         </p>
       ) : null}
       {!hasMarket ? (
-        <p className="bets-note">No lines yet. PuckPulse: {home} {formatPct(board.moneyline.home.ours)} (fair {formatPrice(board.moneyline.home.fair)}).</p>
+        <p className="bets-note">No lines yet. PuckPulse: {home} {formatPct(board.moneyline.home.ours)} ({formatPrice(board.moneyline.home.fair)}).</p>
       ) : (
         <table className="bets-table">
           <tbody>
@@ -105,8 +105,8 @@ export default function BetsPage() {
     <main className="page bets-page">
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
-        Today&apos;s lines next to PuckPulse&apos;s fair odds. <strong>Value</strong> means a price that returns at
-        least 2% by our fair odds. <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
+        The best price for each side, with PuckPulse&apos;s own odds under it. <strong>Value</strong> means the price
+        beats ours by enough to matter. <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
       </p>
       {status === "error" ? (
         <p className="bets-note">Couldn&apos;t load today&apos;s lines.</p>
@@ -123,7 +123,7 @@ export default function BetsPage() {
         <h2>How to read this</h2>
         <ul>
           <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
-          <li><strong>Fair</strong>: the price we think is right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
+          <li><strong>PuckPulse</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
           <li><strong>In net</strong>: NHL.com&apos;s projected starters once its lineups are posted (a few hours before puck drop); before that, our projection, with each goalie&apos;s chance, from who&apos;s been starting and back-to-backs (teams usually give the backup the second night). Teams confirm at puck drop. In our tests the starter mattered less to who wins than rest did, so it isn&apos;t in our odds.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>

@@ -368,6 +368,16 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
     load().catch((requestError) => setError(requestError.message || "Could not load this box score."));
   }, [load]);
 
+  // The tab title names the game once it's loaded ("CAR @ VAN · Oct 20 | PuckPulse").
+  const awayAbbrev = game?.awayTeam?.abbrev;
+  const homeAbbrev = game?.homeTeam?.abbrev;
+  const gameDay = game?.gameDate;
+  useEffect(() => {
+    if (!awayAbbrev || !homeAbbrev) return;
+    const day = gameDay ? new Date(`${gameDay}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }) : "";
+    document.title = `${awayAbbrev} @ ${homeAbbrev}${day ? ` · ${day}` : ""} | PuckPulse`;
+  }, [awayAbbrev, homeAbbrev, gameDay]);
+
   const isLive = LIVE_STATES.has(game?.gameState);
   useEffect(() => {
     if (!isLive) return undefined;

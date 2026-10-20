@@ -752,7 +752,8 @@ def goalie_season(year, faced):
     pv.season_goalies()'s shape for the regular season starting in `year`:
     from our own xG (`faced`, stored_goalie_xg()) when every game is
     stored, else MoneyPuck's. Ours matched MoneyPuck's GSAx at r = 0.88-0.97
-    per goalie (2022-23 to 2025-26) and backtested slightly better.
+    per goalie (2022-23 to 2025-26) and backtested slightly better (Brier
+    0.1085 vs 0.1091 over those four seasons).
     """
     import player_values as pv
 

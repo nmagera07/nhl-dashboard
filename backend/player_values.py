@@ -237,7 +237,9 @@ def roster_strength_change(last, before_last, rosters):
 
 
 # Goalies: goals saved above expected (GSAx = xG against - goals against)
-# per 60 minutes, from MoneyPuck's goalie season summaries. Year to year it
+# per 60 minutes: from our own xG (our_season_goalies, the production
+# source since 2026-10: backtest Brier 0.1085 vs 0.1091 for MoneyPuck's
+# over 2022-23 to 2025-26), or MoneyPuck's goalie season summaries. Year to year it
 # barely repeats (r = 0.16 for 25+ GP, 2020-21 to 2025-26), so each goalie
 # is pulled hard toward the regular-goalie average, GOALIE_SHRINK_GAMES
 # pseudo-games of it. Fringe goalies (5-19 GP) run -0.217 per 60, and a

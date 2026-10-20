@@ -1,6 +1,6 @@
 requests==2.34.2
 psycopg2-binary==2.9.13
-pillow==12.3.0          # link preview images (og_image.py)
+pillow==13.0.0          # link preview images (og_image.py)
 python-dotenv==1.2.4
 fastapi==0.143.0
 uvicorn[standard]==0.54.0

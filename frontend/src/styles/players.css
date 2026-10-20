@@ -109,3 +109,17 @@
 .col-po { width: 48px; font-weight: 700; }
 .po-in { color: var(--good); }
 .po-out { color: var(--text-dim); }
+
+/* Player page: 5-on-5 numbers as ranked bars. */
+.adv-ranks { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.adv-rank { display: grid; gap: 5px; }
+.adv-rank-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.adv-rank-label { font-size: 14px; font-weight: 700; }
+.adv-rank-value { color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adv-rank-bar { height: 8px; border-radius: 999px; background: var(--neutral-soft); overflow: hidden; }
+.adv-rank-bar span { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+.adv-rank-bar .adv-high { background: var(--good); }
+.adv-rank-bar .adv-low { background: var(--bad); }
+.adv-rank-hint { color: var(--text-dim); font-size: 12px; }
+.adv-rank-hint strong { color: var(--text); }
+.adv-luck { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 13px; }

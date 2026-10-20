@@ -93,6 +93,9 @@ class TestPlayerDetail:
         db_router.when("where p.player_id = %s", player_bio_row)
         db_router.when("from player_season_stats where player_id", [player_season_stat_row])
         db_router.when("from player_advanced_stats where player_id", player_advanced_stat_row)
+        db_router.when("from player_advanced_stats a join players", [
+            {"corsi_for_pct": c, "xgoals_for_pct": x, "individual_xgoals": i, "icetime_seconds": 45200, "position_code": "C"}
+            for c, x, i in ((0.45, 0.44, 5.0), (0.50, 0.50, 8.0), (0.52, 0.51, 10.0), (0.574, 0.552, 12.63))])
         db_router.when("from player_career_totals where player_id", [])
         db_router.when("from player_season_history where player_id", [])
 
@@ -104,6 +107,10 @@ class TestPlayerDetail:
         assert body["season_stats"] == [player_season_stat_row]
         assert body["advanced_stats"]["corsi_for_pct"] == 0.574
         assert body["advanced_stats"]["pdo"] == 101.4
+        # Best of the four forwards on every measure (ties count half: his own row is one of the four).
+        pct = body["advanced_percentiles"]
+        assert pct["group"] == "forwards" and pct["peers"] == 4
+        assert pct["corsi"] == pct["xg"] == pct["ixg60"] == 88
 
     def test_player_with_no_season_or_advanced_stats_returns_empty_nested_lists(
         self, client, db_router, player_bio_row

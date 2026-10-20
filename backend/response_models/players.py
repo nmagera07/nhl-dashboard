@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -309,6 +309,10 @@ class PlayerDetail(PlayerBio):
     team_logo_url: Optional[str] = None
     season_stats: List[PlayerSeasonStat]
     advanced_stats: Optional[PlayerAdvancedStat] = None
+    # Where the 5-on-5 numbers rank among his position group this season
+    # (api._advanced_percentiles): group, peers, corsi, xg, ixg60 (0-100),
+    # ixg60_value; or {"too_few_minutes": true}.
+    advanced_percentiles: Optional[Dict[str, Any]] = None
     goalie_advanced_stats: Optional[GoalieAdvancedStat] = None
     career_totals: CareerTotals
     season_history: List[SeasonHistoryEntry]

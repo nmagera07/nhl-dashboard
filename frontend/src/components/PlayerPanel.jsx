@@ -82,6 +82,58 @@ function StatStrip({ stats, columns, label }) {
   );
 }
 
+// The 5-on-5 numbers as plain-language bars: what each means, his number,
+// and where it ranks among his position this season ("better than 94% of
+// forwards"), instead of raw totals like xGF-xGA that mean little alone.
+const ADVANCED_ROWS = [
+  { key: "corsi", label: "Controls play", hint: "Shot attempts for vs. against with him on the ice",
+    value: (s) => formatPct(s.corsi_for_pct), term: "CORSI%", short: "Corsi %" },
+  { key: "xg", label: "Wins the chance battle", hint: "Expected goals for vs. against with him on the ice",
+    value: (s) => formatPct(s.xgoals_for_pct), term: "xG%", short: "xG %" },
+  { key: "ixg60", label: "Creates his own chances", hint: "Expected goals from his own shots, per 60 minutes",
+    value: (s, r) => (r?.ixg60_value != null ? formatDecimal(r.ixg60_value, 2) : "—"), term: "IND_XG", short: "ixG/60" },
+];
+
+function luck(pdo) {
+  if (pdo == null) return null;
+  const value = Number(pdo);
+  if (value >= 103) return `PDO ${formatDecimal(value, 1)}: running hot (shooting and goaltending above normal), likely to cool off.`;
+  if (value <= 97) return `PDO ${formatDecimal(value, 1)}: running cold, likely to pick up.`;
+  return `PDO ${formatDecimal(value, 1)}: about normal luck.`;
+}
+
+function AdvancedRanks({ stats, ranks }) {
+  const ranked = ranks && !ranks.too_few_minutes;
+  return (
+    <>
+      <ul className="adv-ranks">
+        {ADVANCED_ROWS.map((row) => {
+          const pct = ranked ? ranks[row.key] : null;
+          return (
+            <li key={row.key} className="adv-rank">
+              <div className="adv-rank-head">
+                <span className="adv-rank-label">{row.label}</span>
+                <span className="adv-rank-value"><StatAbbr term={row.term}>{row.short}</StatAbbr> {row.value(stats, ranks)}</span>
+              </div>
+              {pct != null && (
+                <>
+                  <div className="adv-rank-bar" role="img" aria-label={`Better than ${pct}% of ${ranks.group}`}>
+                    <span style={{ width: `${Math.max(pct, 2)}%` }} className={pct >= 67 ? "adv-high" : pct <= 33 ? "adv-low" : undefined} />
+                  </div>
+                  <span className="adv-rank-hint">Better than <strong>{pct}%</strong> of {ranks.group} · {row.hint}</span>
+                </>
+              )}
+              {pct == null && <span className="adv-rank-hint">{row.hint}</span>}
+            </li>
+          );
+        })}
+      </ul>
+      {ranks?.too_few_minutes && <p className="player-card-note">Not enough 5-on-5 minutes yet to rank him against the league.</p>}
+      {luck(stats.pdo) && <p className="adv-luck">{luck(stats.pdo)}</p>}
+    </>
+  );
+}
+
 function Section({ title, aside, children }) {
   return (
     <section className="player-section">
@@ -225,24 +277,9 @@ function PlayerPanel({ player, onBack, backLabel }) {
       {!isGoalie && advancedStats && (
         <Section title="Advanced (5-on-5)">
           <div className="player-card">
-            <dl className="stat-strip">
-              {[
-                // xG % first: it's the one people quote now. Fenwick % (Corsi
-                // minus blocked shots) was dropped as near-duplicate noise.
-                ["xG %", formatPct(advancedStats.xgoals_for_pct), "xG%"],
-                ["Corsi %", formatPct(advancedStats.corsi_for_pct), "CORSI%"],
-                ["xGF–xGA", `${formatDecimal(advancedStats.xgoals_for, 1)}–${formatDecimal(advancedStats.xgoals_against, 1)}`, "ONICE_XG"],
-                ["Ind. xG", formatDecimal(advancedStats.individual_xgoals), "IND_XG"],
-                ["PDO", formatDecimal(advancedStats.pdo, 1), "PDO"],
-              ].map(([label, value, term]) => (
-                <div key={label} className="stat-strip-item">
-                  <dt><StatAbbr term={term}>{label}</StatAbbr></dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
+            <AdvancedRanks stats={advancedStats} ranks={player.advanced_percentiles} />
             <p className="player-card-note">
-              MoneyPuck.com, {formatSeasonLabel(advancedStats.season_id)} season
+              At 5-on-5. MoneyPuck.com, {formatSeasonLabel(advancedStats.season_id)} season
               {advancedStats.games_played != null ? ` (${advancedStats.games_played} GP)` : ""}.
             </p>
           </div>
@@ -292,8 +329,8 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </Section>
       )}
       <StatGlossary
-        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "ATOI", "xG%", "CORSI%", "ONICE_XG", "IND_XG", "PDO"]}
-        labels={{ ATOI: "TOI", "CORSI%": "Corsi %", "xG%": "xG %", ONICE_XG: "xGF–xGA", IND_XG: "Ind. xG", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "ATOI", "xG%", "CORSI%", "IND_XG", "PDO"]}
+        labels={{ ATOI: "TOI", "CORSI%": "Corsi %", "xG%": "xG %", IND_XG: "ixG/60", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
       />
     </main>
   );

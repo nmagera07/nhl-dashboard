@@ -149,6 +149,26 @@ def _clean_summary(text, limit=220):
     return text if len(text) <= limit else text[: limit - 1].rsplit(" ", 1)[0] + "…"
 
 
+NHL_IMAGE_SIZES = {"image": "t_ratio16_9-size40", "thumb": "t_ratio16_9-size20"}  # 832x468, 416x234
+
+
+def _nhl_images(item):
+    """{"image", "thumb"} URLs from an NHL.com story's photo template, or {}."""
+    template = (item.get("thumbnail") or {}).get("templateUrl") or ""
+    if "{formatInstructions}" not in template or not template.startswith("https://media.d3.nhle.com/"):
+        return {}
+    return {key: template.replace("{formatInstructions}", size) for key, size in NHL_IMAGE_SIZES.items()}
+
+
+def _espn_image(article):
+    """The article's first image URL (ESPN's CDN), or None."""
+    for image in article.get("images") or []:
+        url = image.get("url") or ""
+        if url.startswith("https://"):
+            return url
+    return None
+
+
 def parse_nhl_stories(data):
     out = []
     for item in data.get("items", []):
@@ -161,6 +181,7 @@ def parse_nhl_stories(data):
             "title": headline, "url": f"https://www.nhl.com/news/{slug}", "source": "NHL.com",
             "published": item["contentDate"], "summary": _clean_summary(item.get("summary")),
             "teams": sorted({TEAM_BY_ID[i] for i in ids if i in TEAM_BY_ID}) or teams_mentioned(headline),
+            **_nhl_images(item),
         })
     return out
 
@@ -201,7 +222,8 @@ def parse_espn_news(data):
                         for t in [team_from_name(c.get("description"))] if t})
         out.append({"title": title, "url": url.replace("http://", "https://", 1), "source": "ESPN",
                     "published": published, "summary": _clean_summary(article.get("description")),
-                    "teams": teams or teams_mentioned(title)})
+                    "teams": teams or teams_mentioned(title),
+                    **({"image": img, "thumb": img} if (img := _espn_image(article)) else {})})
     return out
 
 

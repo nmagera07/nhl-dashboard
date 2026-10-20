@@ -174,3 +174,13 @@ class TestEndpoints:
             {"displayName": "Pittsburgh Penguins", "injuries": []}]}})())
         assert client.get("/injuries?team=PIT").json() == {"source": "ESPN", "teams": {"PIT": []}}
         assert api._daily_cacheable("/injuries")
+
+
+def test_stories_carry_their_photo_in_two_sizes():
+    import news
+    story = {"items": [{"slug": "x", "headline": "H", "contentDate": "2026-10-20T12:00:00Z", "tags": [],
+                        "thumbnail": {"templateUrl": "https://media.d3.nhle.com/image/private/{formatInstructions}/prd/abc"}}]}
+    (item,) = news.parse_nhl_stories(story)
+    assert item["image"].endswith("/t_ratio16_9-size40/prd/abc") and item["thumb"].endswith("/t_ratio16_9-size20/prd/abc")
+    (bare,) = news.parse_nhl_stories({"items": [{**story["items"][0], "thumbnail": {"templateUrl": "https://evil.example/{formatInstructions}"}}]})
+    assert "image" not in bare  # only the NHL's own image host

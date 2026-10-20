@@ -251,9 +251,9 @@ class TestFantasy:
 
     def test_endpoint_tags_each_update_with_the_players_team(self, client, db_router, monkeypatch):
         monkeypatch.setattr(news, "MAX_UPDATE_AGE", news.timedelta(days=3650))
-        db_router.when("from players", [{"first_name": "Jesper", "last_name": "Wallstedt", "team_abbrev": "MIN"},
-                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "CHI"},
-                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "TOR"}])
+        db_router.when("from players", [{"first_name": "Jesper", "last_name": "Wallstedt", "team_abbrev": "MIN", "position_code": "G"},
+                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "CHI", "position_code": "D"},
+                                        {"first_name": "TJ", "last_name": "Brodie", "team_abbrev": "TOR", "position_code": "D"}])
         body = client.get("/fantasy").json()
         assert [(u["player"], u["team"]) for u in body["updates"]] == [("Jesper Wallstedt", "MIN"), ("T.J. Brodie", None)]
         assert body["sources"] == ["RotoWire", "DobberHockey", "RotoBaller"]
@@ -262,3 +262,32 @@ class TestFantasy:
         monkeypatch.setattr(news, "_get", lambda url: (_ for _ in ()).throw(ConnectionError("down")))
         monkeypatch.setattr(news, "FANTASY_SOURCES", {"DobberHockey": lambda: news._get("x")})
         assert client.get("/fantasy").status_code == 503
+
+
+class TestGoalieReports:
+    GOALIES = {"Jesper Wallstedt": "MIN", "Devon Levi": "EDM", "Carter Hart": "VGK"}
+
+    @pytest.fixture(autouse=True)
+    def updates(self, monkeypatch):
+        rows = [
+            ("1", "Jesper Wallstedt", "Wallstedt is expected to guard the road crease Tuesday.", "2026-10-20T15:00:00Z"),
+            ("2", "Devon Levi", "Levi will patrol the home crease against Minnesota on Tuesday.", "2026-10-20T16:00:00Z"),
+            ("3", "Carter Hart", "Hart will start Tuesday's home matchup.", "2026-10-20T14:00:00Z"),
+            ("4", "Carter Hart", "Hart will get the night off Tuesday after all.", "2026-10-20T17:00:00Z"),
+            ("5", "Connor McDavid", "McDavid will start on the top line.", "2026-10-20T16:30:00Z"),
+            ("6", "Devon Levi", "Levi stopped 30 of 32 shots in Monday's win.", "2026-10-20T03:30:00Z"),  # 11:30 PM Monday ET
+            ("7", "Jesper Wallstedt", "Wallstedt will start Wednesday.", "2026-10-21T15:00:00Z"),
+        ]
+        monkeypatch.setattr(news, "_updates", {i: {"id": i, "player": p, "title": "", "summary": text, "published": when,
+                                                   "url": f"https://rw.test/{i}", "source": "RotoWire"} for i, p, text, when in rows})
+
+    def test_each_teams_latest_report_on_the_day(self):
+        from datetime import date
+        reports = news.goalie_reports(date(2026, 10, 20), self.GOALIES.get)
+        assert {t: (r["name"], r["status"]) for t, r in reports.items()} == {
+            "MIN": ("Jesper Wallstedt", "expected"), "EDM": ("Devon Levi", "confirmed")}  # Hart scratched late; McDavid isn't a goalie
+
+    def test_the_day_is_eastern(self):
+        from datetime import date
+        assert news.goalie_reports(date(2026, 10, 19), self.GOALIES.get) == {}  # the 11:30 PM recap isn't a start
+        assert news.goalie_reports(date(2026, 10, 21), self.GOALIES.get)["MIN"]["status"] == "confirmed"

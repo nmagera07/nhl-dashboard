@@ -25,10 +25,21 @@ function Side({ label, side, showBook, open }) {
 
 const lastName = (name) => name.split(" ").slice(1).join(" ") || name;
 
-// "Silovs 62%": a team's likeliest starter by our projection, by last name.
-function goalieLabel(goalies) {
-  const top = goalies?.[0];
-  return top ? `${lastName(top.name)} ${formatPct(top.prob)}` : null;
+// A team's starter by the best word so far: a beat reporter's (via
+// RotoWire: "confirmed" or "expected"), then NHL.com's projected lineup,
+// then our projection with its chance. {name, note} or null.
+function starter(board, side) {
+  const reported = board.reported_starters?.[side];
+  if (reported) return { name: lastName(reported.name), note: reported.status };
+  const nhl = board.nhl_starters?.[side];
+  if (nhl) return { name: lastName(nhl), note: "NHL.com" };
+  const top = board.goalies?.[side]?.[0];
+  return top ? { name: lastName(top.name), note: formatPct(top.prob) } : null;
+}
+
+function Starter({ goalie }) {
+  if (!goalie) return "?";
+  return <>{goalie.name} <span className="bets-goalie-note">{goalie.note}</span></>;
 }
 
 function BetCard({ game, board }) {
@@ -39,6 +50,7 @@ function BetCard({ game, board }) {
   const pl = board.puck_line;
   const total = board.total;
   const hasMarket = board.moneyline.home.price != null;
+  const goalies = { away: starter(board, "away"), home: starter(board, "home") };
   return (
     <li className={open ? "bets-card" : "bets-card bets-card-closed"}>
       <div className="bets-head">
@@ -48,17 +60,12 @@ function BetCard({ game, board }) {
         <span className="bets-time">{open ? startTime(game.startTimeUTC) : game.gameState === "LIVE" || game.gameState === "CRIT" ? "Live" : "Final"}</span>
       </div>
       {tired.length > 0 && <p className="bets-chip">{tired.join(" & ")} on the 2nd night of a back-to-back</p>}
-      {open && board.nhl_starters?.away && board.nhl_starters?.home ? (
+      {open && (goalies.away || goalies.home) && (
         <p className="bets-goalies">
-          <span className="bets-goalies-label">In net (NHL.com projects)</span>{" "}
-          {lastName(board.nhl_starters.away)} · {lastName(board.nhl_starters.home)}
+          <span className="bets-goalies-label">In net</span>{" "}
+          <Starter goalie={goalies.away} /> · <Starter goalie={goalies.home} />
         </p>
-      ) : open && (goalieLabel(board.goalies?.away) || goalieLabel(board.goalies?.home)) ? (
-        <p className="bets-goalies">
-          <span className="bets-goalies-label">In net (projected)</span>{" "}
-          {goalieLabel(board.goalies?.away) || "?"} · {goalieLabel(board.goalies?.home) || "?"}
-        </p>
-      ) : null}
+      )}
       {!hasMarket ? (
         <p className="bets-note">No lines yet. PuckPulse: {home} {formatPct(board.moneyline.home.ours)} ({formatPrice(board.moneyline.home.fair)}).</p>
       ) : (
@@ -125,7 +132,10 @@ export default function BetsPage() {
           <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
           <li><strong>PuckPulse</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
-          <li><strong>In net</strong>: NHL.com&apos;s projected starters once its lineups are posted (a few hours before puck drop); before that, our projection, with each goalie&apos;s chance, from who&apos;s been starting and back-to-backs (teams usually give the backup the second night). Teams confirm at puck drop. In our tests the starter mattered less to who wins than rest did, so it isn&apos;t in our odds.</li>
+          <li><strong>In net</strong>: <em>confirmed</em> or <em>expected</em> is the word from beat reporters at morning skate, via{" "}
+            <a className="accent-link" href="https://www.rotowire.com/hockey/" target="_blank" rel="noreferrer">RotoWire</a>. Before that, <em>NHL.com</em> is its
+            projected lineup, and a percentage is our own projection from who&apos;s been starting and back-to-backs (teams usually give the
+            backup the second night). In our tests the starter mattered less to who wins than rest did, so it isn&apos;t in our odds.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>
         </ul>
         <p className="bets-legal">

@@ -1001,31 +1001,38 @@ def news_transactions(team: Optional[str] = TEAM_FILTER, limit: int = Query(25, 
 
 
 @daily_cached
-def _roster_teams():
-    """{accent-free lowercase "first last": team} for players on a roster now; a name two players share is left out."""
+def _roster_players():
+    """
+    {news.player_key(name): (team, position code)} for players on a roster
+    now. A name two players share maps to None: we can't tell them apart.
+    """
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT first_name, last_name, team_abbrev FROM players WHERE on_roster")
+            cur.execute("SELECT first_name, last_name, team_abbrev, position_code FROM players WHERE on_roster")
             rows = cur.fetchall()
     finally:
         conn.close()
-    teams = {}
+    players = {}
     for r in rows:
         key = news.player_key(f"{r['first_name']} {r['last_name']}")
-        teams[key] = r["team_abbrev"] if key not in teams else None
-    return teams
+        players[key] = (r["team_abbrev"], r["position_code"]) if key not in players else None
+    return players
+
+
+def _roster_lookup():
+    try:
+        return _roster_players()
+    except Exception:
+        logger.warning("Couldn't load rosters for matching fantasy updates", exc_info=True)
+        return {}
 
 
 @app.get("/fantasy")
 def fantasy_news(limit: int = Query(40, ge=1, le=150)):
     """Fantasy player updates (RotoWire) and fantasy articles (DobberHockey, RotoBaller), newest first. All link out."""
-    try:
-        teams = _roster_teams()
-    except Exception:
-        logger.warning("Couldn't load roster teams for fantasy updates", exc_info=True)
-        teams = {}
-    result = news.fantasy(team_of=lambda name: teams.get(news.player_key(name)), limit=limit)
+    players = _roster_lookup()
+    result = news.fantasy(team_of=lambda name: (players.get(news.player_key(name)) or (None,))[0], limit=limit)
     if not result["sources"]:
         raise HTTPException(status_code=503, detail="Fantasy sources are unavailable right now.")
     return result
@@ -1320,6 +1327,13 @@ def bets_for_day(day: date = Query(..., alias="date")):
                 [p["game_id"] for p in predictions],
                 pool.map(lambda p: _lineup(p["game_id"], p["away_abbrev"], p["home_abbrev"], day), predictions),
             ))
+        # Beat reporters' starters via RotoWire (news.py), usually ahead of NHL.com.
+        players = _roster_lookup()
+
+        def goalie_team(name):
+            hit = players.get(news.player_key(name))
+            return hit[0] if hit and hit[1] == "G" else None
+        reports = news.goalie_reports(day, goalie_team)
         games = {}
         for p in predictions:
             market = markets.get(p["game_id"])
@@ -1336,6 +1350,7 @@ def bets_for_day(day: date = Query(..., alias="date")):
             lineup = lineups.get(p["game_id"])
             board["nhl_starters"] = ({side: (lineup[side]["goalies"] or [None])[0] for side in ("home", "away")}
                                      if lineup else None)
+            board["reported_starters"] = {side: reports.get(p[f"{side}_abbrev"]) for side in ("home", "away")}
             games[str(p["game_id"])] = board
         return {"date": str(day), "games": games}
     except Exception:

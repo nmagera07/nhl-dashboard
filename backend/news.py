@@ -29,6 +29,7 @@ import unicodedata
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -447,4 +448,57 @@ def fantasy(team_of=None, limit=40):
     articles = {name: _cached(f"fantasy:{name}", FANTASY_ARTICLES_TTL, fetch) for name, fetch in FANTASY_SOURCES.items()}
     sources = (["RotoWire"] if updates else []) + [name for name, items in articles.items() if items is not None]
     return {"updates": updates, "articles": merge_headlines(articles.values())[:20], "sources": sources}
+
+
+# --- starting goalies from fantasy updates --------------------------------
+#
+# Beat reporters name tonight's starter at morning skate, and RotoWire's
+# updates pass it on, often hours before NHL.com's projected lineups. The
+# wording says how sure: "Levi will patrol the home crease" is confirmed,
+# "is expected to guard the road crease" is expected, "will serve as the
+# backup" is sitting. Recaps ("stopped 30 shots") don't count.
+
+EASTERN = ZoneInfo("America/New_York")
+_GOALIE_START = re.compile(r"crease|in goal|between the pipes|\bstart(s|ing)?\b|the nod|\bguard|\bdefend|\bpatrol|\bface", re.I)
+_GOALIE_FUTURE = re.compile(r"\b(will|expected|slated|set to|scheduled|projected|likely|probable|in line|draws?|gets?|getting|tabbed|named|confirmed)\b", re.I)
+_GOALIE_UNSURE = re.compile(r"\b(expected|slated|projected|likely|probable|in line|should|presumably|appears|could|might|may)\b", re.I)
+_GOALIE_SITTING = re.compile(r"\b(backup|back up|backing up|night off|not start|won't start|not be in goal|rest(ed|ing)?|healthy scratch)\b", re.I)
+
+
+def goalie_start_status(update):
+    """'confirmed', 'expected', or 'sitting' for a goalie's pregame update; None if it isn't one."""
+    text = update.get("summary") or update.get("title") or ""
+    if not _GOALIE_FUTURE.search(text):
+        return None
+    if _GOALIE_SITTING.search(text):
+        return "sitting"
+    if not _GOALIE_START.search(text):
+        return None
+    return "expected" if _GOALIE_UNSURE.search(text) else "confirmed"
+
+
+def goalie_reports(day, goalie_team):
+    """
+    {team: {name, status, source, published, url}}: each team's latest
+    starting-goalie update posted on `day` (Eastern). goalie_team(name) is
+    the team a goalie is rostered on, or None for skaters and unknowns.
+    A team's latest update wins; one saying its reported starter is now
+    sitting (a late change) drops the report.
+    """
+    with _updates_lock:
+        updates = sorted(_updates.values(), key=lambda u: u["published"])
+    out = {}
+    for u in updates:
+        published = datetime.fromisoformat(u["published"].replace("Z", "+00:00"))
+        if published.astimezone(EASTERN).date() != day:
+            continue
+        team, status = goalie_team(u["player"]), goalie_start_status(u)
+        if not team or status is None:
+            continue
+        if status == "sitting":
+            if out.get(team, {}).get("name") == u["player"]:
+                del out[team]
+            continue
+        out[team] = {"name": u["player"], "status": status, "source": u["source"], "published": u["published"], "url": u["url"]}
+    return out
 

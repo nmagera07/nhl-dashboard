@@ -53,7 +53,7 @@ def v1_simulate(standings, schedule, trials, rng):
     made = defaultdict(int)
     for _ in range(trials):
         trial = {t: {"points": s["points"], "wins": s["wins"]} for t, s in standings.items()}
-        for home, away in schedule:
+        for home, away, *_ in schedule:  # (home, away, home_b2b, away_b2b): v1 ignores rest
             home_wins = rng.random() < p_home(pct[home], pct[away])
             winner, loser = (home, away) if home_wins else (away, home)
             trial[winner]["points"] += 2
@@ -170,6 +170,17 @@ def blended_standings(standings, xgd_totals, weight):
 
 ROSTER_BETAS = (1.0,)
 _roster_change = {}
+NHL_SKATERS_DIR = None  # --nhl-skaters-dir: skater values from NHL stats files instead of MoneyPuck's
+
+
+def load_skaters(skaters_dir, year):
+    """season_game_scores() for a season: MoneyPuck's skaters_{year}.csv, or
+    with --nhl-skaters-dir the NHL stats API's nhl_skaters_{year}.json."""
+    if NHL_SKATERS_DIR:
+        with open(os.path.join(NHL_SKATERS_DIR, f"nhl_skaters_{year}.json")) as f:
+            return player_values_mod.nhl_game_scores(json.load(f))
+    with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
+        return player_values_mod.season_game_scores(f.read())
 
 
 def roster_change(skaters_dir, start):
@@ -180,11 +191,28 @@ def roster_change(skaters_dir, start):
     slightly; most moves are summer moves.)"""
     if start not in _roster_change:
         def load(year):
-            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
-                return player_values_mod.season_game_scores(f.read())
+            return load_skaters(skaters_dir, year)
         rosters = {pid: p["team"] for pid, p in load(start).items()}
         _roster_change[start] = player_values_mod.roster_strength_change(load(start - 1), load(start - 2), rosters)
     return _roster_change[start]
+
+
+OUR_GOALIES_DIR = None  # --our-goalies-dir: goalie GSAx from our xG instead of MoneyPuck's
+GOALIE_XG_SCALE = False  # --goalie-xg-scale: scale our xG so the league's GSAx is zero each season
+
+
+def load_goalies(skaters_dir, year):
+    """season_goalies() for a season: MoneyPuck's goalies_{year}.csv, or with
+    --our-goalies-dir our xG's faced_{year}.json plus the NHL's nhl_goalies_{year}.json."""
+    if OUR_GOALIES_DIR:
+        with open(os.path.join(OUR_GOALIES_DIR, f"faced_{year}.json")) as f:
+            faced = {int(pid): tuple(v) for pid, v in json.load(f).items()}
+        with open(os.path.join(OUR_GOALIES_DIR, f"nhl_goalies_{year}.json")) as f:
+            rows = json.load(f)
+        scale = player_values_mod.xg_scale(faced) if GOALIE_XG_SCALE else 1.0
+        return player_values_mod.our_season_goalies(rows, faced, scale)
+    with open(os.path.join(skaters_dir, f"goalies_{year}.csv")) as f:
+        return player_values_mod.season_goalies(f.read())
 
 
 GOALIE_WEIGHTS = ()
@@ -200,8 +228,7 @@ def goalie_strength(skaters_dir, start, shrink, mode):
     key = (start, shrink, mode)
     if key not in _goalies:
         def load(year):
-            with open(os.path.join(skaters_dir, f"goalies_{year}.csv")) as f:
-                return player_values_mod.season_goalies(f.read())
+            return load_goalies(skaters_dir, year)
         last, before = load(start - 1), load(start - 2)
         rates = player_values_mod.goalie_rates(last, before, shrink)
         now = player_values_mod.team_goalie_strength(rates, last, {pid: g["team"] for pid, g in load(start).items()})
@@ -230,8 +257,7 @@ def roster_strength_as_of(skaters_dir, start):
     seasons before, the roster each skater's team that season."""
     if start not in _roster_rating:
         def load(year):
-            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
-                return player_values_mod.season_game_scores(f.read())
+            return load_skaters(skaters_dir, year)
         last, before = load(start - 1), load(start - 2)
         values = player_values_mod.player_values(last, before)
         rosters = {pid: p["team"] for pid, p in load(start).items()}
@@ -267,8 +293,7 @@ def goalie_strength_as_of(skaters_dir, logs_dir, start, as_of, prior_starts):
     """Team goalie strength with expected starts as of a checkpoint: last
     season's split worth `prior_starts` games, plus this season's starts."""
     def load(year):
-        with open(os.path.join(skaters_dir, f"goalies_{year}.csv")) as f:
-            return player_values_mod.season_goalies(f.read())
+        return load_goalies(skaters_dir, year)
     last, before = load(start - 1), load(start - 2)
     rosters = {pid: g["team"] for pid, g in load(start).items()}
     by_team = goalie_starts_as_of(logs_dir, start * 10000 + start + 1, as_of)
@@ -288,8 +313,7 @@ def team_aging_as_of(skaters_dir, start):
             ages = {r["playerId"]: player_values_mod.age_on_feb1(r["birthDate"], start)
                     for r in json.load(f)["data"] if r.get("birthDate")}
         def load(year):
-            with open(os.path.join(skaters_dir, f"skaters_{year}.csv")) as f:
-                return player_values_mod.season_game_scores(f.read())
+            return load_skaters(skaters_dir, year)
         rosters = {pid: p["team"] for pid, p in load(start).items()}
         _aging[start] = player_values_mod.team_aging(load(start - 1), rosters, ages)
     return _aging[start]
@@ -320,10 +344,17 @@ def main():
                         help="Score separate finishing/goaltending weights (needs --xg-file)")
     parser.add_argument("--skaters-dir", default=None,
                         help="Folder of MoneyPuck skaters_{year}.csv files to score roster-aware priors (needs --xg-file)")
+    parser.add_argument("--nhl-skaters-dir", default=None,
+                        help="nhl_skaters_{year}.json files (player_values.fetch_nhl_skaters): skater values from NHL data")
+    parser.add_argument("--our-goalies-dir", default=None,
+                        help="faced_{year}.json + nhl_goalies_{year}.json: goalie GSAx from our xG")
+    parser.add_argument("--goalie-xg-scale", action="store_true", help="With --our-goalies-dir: league GSAx at zero each season")
     parser.add_argument("--goalie-logs", default=None,
                         help="Folder of NHL goalie game logs ({id}_{season}.json) to score start-weighted goalies")
     parser.add_argument("--only-production", action="store_true", help="Skip the v2 grid; score v1, production, and xG variants")
     args = parser.parse_args()
+    global NHL_SKATERS_DIR, OUR_GOALIES_DIR, GOALIE_XG_SCALE
+    NHL_SKATERS_DIR, OUR_GOALIES_DIR, GOALIE_XG_SCALE = args.nhl_skaters_dir, args.our_goalies_dir, args.goalie_xg_scale
 
     brier_by = defaultdict(dict)    # model -> {(season, checkpoint date): brier}
     pairs_by = defaultdict(list)    # model -> [(predicted, actual)] for calibration

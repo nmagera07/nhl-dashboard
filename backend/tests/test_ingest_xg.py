@@ -28,9 +28,10 @@ def test_game_totals_add_each_teams_shots():
 
 
 class FakeCursor:
-    def __init__(self, stored=(), missing_starters=()):
+    def __init__(self, stored=(), missing_starters=(), missing_goalies=()):
         self.stored, self.inserted, self.sql = list(stored), [], []
         self.missing_starters, self.updated = [(g,) for g in missing_starters], []
+        self.missing_goalies = [(g, 2) for g in missing_goalies]
 
     def execute(self, sql, params=None):
         self.sql.append(sql)
@@ -40,7 +41,9 @@ class FakeCursor:
             self.updated.append(params)
 
     def fetchall(self):
-        return self.missing_starters if "starting_goalie_id IS NULL" in self.sql[-1] else self.stored
+        if "starting_goalie_id IS NULL" in self.sql[-1]:
+            return self.missing_starters
+        return self.missing_goalies if "NOT EXISTS" in self.sql[-1] else self.stored
 
 
 def test_update_scores_only_new_finished_games_through_yesterday():
@@ -90,3 +93,69 @@ def test_games_stored_before_starters_were_recorded_get_filled_in():
     cur = FakeCursor(missing_starters=[2026020009])
     assert ix.fill_starters(cur, 20262027, get=lambda url: _pbp_with_goalies()) == 1
     assert sorted(cur.updated) == [(800, 2026020009, "PIT"), (900, 2026020009, "CBJ")]
+
+
+def _goalie_shot(kind, t, team, x, goalie):
+    shot = _shot(kind, t, team, x)
+    shot["details"]["goalieInNetId"] = goalie
+    return shot
+
+
+GOALIE_PBP = {"id": 2026020005, "homeTeam": {"id": 1, "abbrev": "PIT"}, "awayTeam": {"id": 2, "abbrev": "WSH"}, "plays": [
+    _goalie_shot("shot-on-goal", 5, 1, -70, 900),   # PIT shoots on WSH's goalie
+    _goalie_shot("goal", 20, 1, -80, 900),
+    _goalie_shot("missed-shot", 40, 2, 60, 800),     # WSH shoots on PIT's goalie
+    _goalie_shot("goal", 50, 2, 60, None),           # into an empty net: no goalie charged
+]}
+
+
+def test_goalie_totals_charge_each_goalie_his_shots_against():
+    each = xm.predict(xm.shots_from_game(GOALIE_PBP)[0], MODEL)
+    by_goalie = {g["goalie"]: g for g in ix.goalie_totals(GOALIE_PBP, MODEL)}
+    assert by_goalie[900] == {"goalie": 900, "team": "WSH", "xg_against": round(2 * each, 3), "goals_against": 1, "shots_against": 2}
+    assert (by_goalie[800]["team"], by_goalie[800]["goals_against"], by_goalie[800]["shots_against"]) == ("PIT", 0, 1)
+
+
+def test_new_games_store_their_goalies():
+    cur = FakeCursor()
+    ix.store_goalies(cur, 2026020005, 20262027, 2, GOALIE_PBP, MODEL)
+    assert sorted((p[1], p[2], p[6]) for p in cur.inserted) == [(800, "PIT", 0), (900, "WSH", 1)]
+
+
+def test_games_stored_before_goalie_xg_get_filled_in():
+    cur = FakeCursor(missing_goalies=[2026020005])
+    assert ix.fill_goalies(cur, 20262027, get=lambda url: GOALIE_PBP, model=MODEL) == 1
+    assert len(cur.inserted) == 2
+
+
+def test_a_past_season_backfills_from_cached_play_by_play(tmp_path):
+    import gzip
+    import json
+    (tmp_path / "20252026").mkdir()
+    for game_id, game_type in ((2025020001, 2), (2025030001, 3)):
+        with gzip.open(tmp_path / "20252026" / f"{game_id}.json.gz", "wt") as f:
+            json.dump({**GOALIE_PBP, "id": game_id, "gameType": game_type}, f)
+    cur = FakeCursor()
+    assert ix.backfill_goalies_from_cache(cur, 20252026, str(tmp_path), model=MODEL) == 1  # the playoff game is skipped
+    assert {p[0] for p in cur.inserted} == {2025020001} and all(p[3] == 20252026 for p in cur.inserted)
+
+
+class TestGoalieSeason:
+    ROWS = [{"playerId": 900, "goalieFullName": "Logan Thompson", "teamAbbrevs": "WSH", "gamesPlayed": 50, "timeOnIce": 3600 * 48}]
+
+    def _patch(self, monkeypatch, games):
+        import player_values as pv
+        monkeypatch.setattr(pv, "fetch_nhl_team_goals", lambda year: {"AAA": (0, games), "BBB": (0, games)})
+        monkeypatch.setattr(pv, "fetch_nhl_goalies", lambda year: self.ROWS)
+        monkeypatch.setattr(pv, "fetch_csv", lambda url, year: "moneypuck")
+        monkeypatch.setattr(pv, "season_goalies", lambda text: {"from": text})
+
+    def test_ours_when_every_game_is_stored(self, monkeypatch):
+        self._patch(monkeypatch, games=82)
+        season = sim.goalie_season(2025, faced={"games": 82, "goalies": {900: (130.0, 120)}})
+        assert season == {900: {"name": "Logan Thompson", "team": "WSH", "gp": 50, "games": 48.0, "gsax": 10.0}}
+
+    def test_moneypucks_when_games_are_missing(self, monkeypatch):
+        self._patch(monkeypatch, games=82)
+        assert sim.goalie_season(2025, faced={"games": 70, "goalies": {900: (130.0, 120)}}) == {"from": "moneypuck"}
+        assert sim.goalie_season(2025, faced=None) == {"from": "moneypuck"}

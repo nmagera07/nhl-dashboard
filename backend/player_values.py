@@ -9,7 +9,8 @@ season_scenarios.roster_change() replays the season with those ratings.
 How a value is built:
   1. Game Score (Dom Luszczyszyn's box-score composite): goals, assists,
      shots, blocks, penalties, faceoffs, plus 5-on-5 on-ice shot attempts
-     and goals, from MoneyPuck's skater season summaries.
+     and even-strength on-ice goals, from the NHL's stats API (it matches
+     MoneyPuck's version at r = 0.999 per player, 2018-19 to 2025-26).
   2. Per game, blended over this season and last, pulled toward
      replacement level by SHRINK_GAMES pseudo-games, so six hot games don't
      make a star.
@@ -18,7 +19,7 @@ How a value is built:
      per point of team Game Score per game.
 
 GS_TO_GOALS and the replacement levels come from `--calibrate` (3 seasons,
-96 team-seasons; team Game Score tracks goal differential at r = 0.86).
+96 team-seasons; team Game Score tracks goal differential at r = 0.87).
 Tried first and dropped: relative 5-on-5 xG alone, which rated Crosby and
 Makar below average and third-pair defensemen among the league's best.
 
@@ -38,13 +39,11 @@ from collections import defaultdict
 
 import requests
 
-MONEYPUCK_SKATERS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/skaters.csv"
-MONEYPUCK_TEAMS_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/teams.csv"
 MONEYPUCK_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
 
-# From --calibrate, 2023-24 to 2025-26.
-GS_TO_GOALS = 0.194                         # team GD/game per team Game Score/game
-REPLACEMENT_GS = {"F": 0.183, "D": 0.165}   # Game Score/game of fringe (5-29 GP) players
+# From --calibrate on NHL stats, 2023-24 to 2025-26 (MoneyPuck's data gave 0.194 and D 0.165).
+GS_TO_GOALS = 0.200                         # team GD/game per team Game Score/game
+REPLACEMENT_GS = {"F": 0.183, "D": 0.168}   # Game Score/game of fringe (5-29 GP) players
 SHRINK_GAMES = 10                           # pseudo-games of replacement level
 FRINGE_GP = (5, 30)
 
@@ -71,7 +70,7 @@ def position_group(position):
 
 
 def season_game_scores(csv_text):
-    """{player_id: {"name", "team", "pos", "gp", "gs"}} from a MoneyPuck skaters CSV."""
+    """{player_id: {"name", "team", "pos", "gp", "gs"}} from a MoneyPuck skaters CSV (the backtest's old cache)."""
     by_player = defaultdict(dict)
     for row in csv.DictReader(io.StringIO(csv_text)):
         by_player[int(row["playerId"])][row["situation"]] = row
@@ -84,6 +83,61 @@ def season_game_scores(csv_text):
             out[pid] = {"name": rows["all"]["name"], "team": rows["all"]["team"], "pos": rows["all"]["position"],
                         "gp": gp, "gs": game_score(rows["all"], rows["5on5"])}
     return out
+
+
+# The same Game Score inputs from the NHL's own stats API (api.nhle.com),
+# one report each. Its on-ice goals are even strength (5-on-5 plus 4-on-4
+# and 3-on-3) where MoneyPuck's are 5-on-5 only; --calibrate refits for it.
+NHL_SKATER_URL = "https://api.nhle.com/stats/rest/en/skater/{report}?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId=2"
+NHL_SKATER_REPORTS = ("scoringpergame", "penalties", "faceoffwins", "summaryshooting", "goalsForAgainst")
+
+
+def fetch_nhl_skaters(year):
+    """[row]: each skater's regular season (starting in `year`), the NHL reports merged by player."""
+    season = f"{year}{year + 1}"
+    merged = defaultdict(dict)
+    for report in NHL_SKATER_REPORTS:
+        response = requests.get(NHL_SKATER_URL.format(report=report, season=season), timeout=60)
+        response.raise_for_status()
+        for row in response.json()["data"]:
+            merged[row["playerId"]].update(row)
+    return list(merged.values())
+
+
+def nhl_game_scores(rows):
+    """season_game_scores()'s shape from fetch_nhl_skaters() rows. A traded player's team is his last."""
+    out = {}
+    for row in rows:
+        gp = int(row.get("gamesPlayed") or 0)
+        if not gp:
+            continue
+        all_row = {"I_F_goals": row.get("goals"), "I_F_primaryAssists": row.get("totalPrimaryAssists"),
+                   "I_F_secondaryAssists": row.get("totalSecondaryAssists"), "I_F_shotsOnGoal": row.get("shots"),
+                   "shotsBlockedByPlayer": row.get("blockedShots"), "penaltiesDrawn": row.get("penaltiesDrawn"),
+                   "penalties": row.get("penalties"), "faceoffsWon": row.get("totalFaceoffWins"),
+                   "faceoffsLost": row.get("totalFaceoffLosses")}
+        ev_row = {"OnIce_F_shotAttempts": row.get("satFor"), "OnIce_A_shotAttempts": row.get("satAgainst"),
+                  "OnIce_F_goals": row.get("evenStrengthGoalsFor"), "OnIce_A_goals": row.get("evenStrengthGoalsAgainst")}
+        out[int(row["playerId"])] = {"name": row.get("skaterFullName"), "team": (row.get("teamAbbrevs") or "").split(",")[-1],
+                                     "pos": row.get("positionCode"), "gp": gp, "gs": game_score(all_row, ev_row)}
+    return out
+
+
+def season_skaters(year):
+    """This module's skater input for the season starting in `year`, from the NHL."""
+    return nhl_game_scores(fetch_nhl_skaters(year))
+
+
+NHL_TEAM_SUMMARY_URL = "https://api.nhle.com/stats/rest/en/team/summary?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId=2"
+NHL_TEAMS_URL = "https://api.nhle.com/stats/rest/en/team"
+
+
+def fetch_nhl_team_goals(year):
+    """{team: (goal differential, games played)} for the regular season starting in `year`."""
+    codes = {t["id"]: t["triCode"] for t in requests.get(NHL_TEAMS_URL, timeout=60).json()["data"]}
+    response = requests.get(NHL_TEAM_SUMMARY_URL.format(season=f"{year}{year + 1}"), timeout=60)
+    response.raise_for_status()
+    return {codes[r["teamId"]]: (r["goalsFor"] - r["goalsAgainst"], r["gamesPlayed"]) for r in response.json()["data"]}
 
 
 def fetch_csv(url, year):
@@ -183,7 +237,9 @@ def roster_strength_change(last, before_last, rosters):
 
 
 # Goalies: goals saved above expected (GSAx = xG against - goals against)
-# per 60 minutes, from MoneyPuck's goalie season summaries. Year to year it
+# per 60 minutes: from our own xG (our_season_goalies, the production
+# source since 2026-10: backtest Brier 0.1085 vs 0.1091 for MoneyPuck's
+# over 2022-23 to 2025-26), or MoneyPuck's goalie season summaries. Year to year it
 # barely repeats (r = 0.16 for 25+ GP, 2020-21 to 2025-26), so each goalie
 # is pulled hard toward the regular-goalie average, GOALIE_SHRINK_GAMES
 # pseudo-games of it. Fringe goalies (5-19 GP) run -0.217 per 60, and a
@@ -204,6 +260,42 @@ def season_goalies(csv_text):
             continue
         out[int(row["playerId"])] = {"name": row["name"], "team": row["team"], "gp": int(_f(row, "games_played")),
                                      "games": games, "gsax": _f(row, "xGoals") - _f(row, "goals")}
+    return out
+
+
+# The same from our own xG: each goalie's xG and goals against on the
+# unblocked shots he faced (team_game_xg's play-by-play, xg_model.py), with
+# games and teams from the NHL's goalie report.
+NHL_GOALIE_URL = "https://api.nhle.com/stats/rest/en/goalie/summary?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId=2"
+
+
+def fetch_nhl_goalies(year):
+    """[row]: each goalie's regular season (starting in `year`) from the NHL's goalie summary."""
+    response = requests.get(NHL_GOALIE_URL.format(season=f"{year}{year + 1}"), timeout=60)
+    response.raise_for_status()
+    return response.json()["data"]
+
+
+def xg_scale(faced):
+    """League goals over league xG on the shots goalies faced: our xG's level that season (1.0 = right on)."""
+    xga = sum(x for x, _ in faced.values())
+    return sum(g for _, g in faced.values()) / xga if xga else 1.0
+
+
+def our_season_goalies(nhl_rows, faced, scale=1.0):
+    """
+    season_goalies()'s shape from our xG: faced is {player_id: (xG against,
+    goals against)}; xG is multiplied by `scale` (xg_scale() to put the
+    league's GSAx at zero). A traded goalie's team is his last.
+    """
+    out = {}
+    for row in nhl_rows:
+        pid, games = int(row["playerId"]), (row.get("timeOnIce") or 0) / 3600
+        if games <= 0 or pid not in faced:
+            continue
+        xga, ga = faced[pid]
+        out[pid] = {"name": row.get("goalieFullName"), "team": (row.get("teamAbbrevs") or "").split(",")[-1],
+                    "gp": int(row.get("gamesPlayed") or 0), "games": games, "gsax": scale * xga - ga}
     return out
 
 
@@ -357,11 +449,11 @@ def fetch_ages(season_start):
             for r in response.json()["data"] if r.get("birthDate")}
 
 
-def calibrate(years):
+def calibrate(years, skaters=season_skaters, team_goals=fetch_nhl_team_goals):
     """Refit GS_TO_GOALS (team GD/game on team Game Score/game) and the replacement levels."""
     xs, ys, fringe = [], [], defaultdict(lambda: [0.0, 0])
     for year in years:
-        players = season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, year))
+        players = skaters(year)
         team_gs = defaultdict(float)
         for p in players.values():
             team_gs[p["team"]] += p["gs"]
@@ -369,11 +461,9 @@ def calibrate(years):
                 group = fringe[position_group(p["pos"])]
                 group[0] += p["gs"]
                 group[1] += p["gp"]
-        for row in csv.DictReader(io.StringIO(fetch_csv(MONEYPUCK_TEAMS_URL, year))):
-            if row["situation"] == "all":
-                gp = _f(row, "games_played")
-                xs.append(team_gs[row["team"]] / gp)
-                ys.append((_f(row, "goalsFor") - _f(row, "goalsAgainst")) / gp)
+        for team, (gd, gp) in team_goals(year).items():
+            xs.append(team_gs[team] / gp)
+            ys.append(gd / gp)
     n = len(xs)
     mx, my = sum(xs) / n, sum(ys) / n
     sxx = sum((x - mx) ** 2 for x in xs)
@@ -401,12 +491,11 @@ def main():
         print(calibrate([start - 3, start - 2, start - 1]))
     if args.calibrate_aging:
         years = range(start - 8, start)
-        seasons = {y: season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, y)) for y in years}
+        seasons = {y: season_skaters(y) for y in years}
         pairs = aging_pairs(seasons, {y: fetch_ages(y) for y in years})
         print({"pairs": len(pairs), "curve": [round(c, 5) for c in fit_aging_curve(pairs)]})
     if args.top:
-        values = player_values(season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, start)),
-                               season_game_scores(fetch_csv(MONEYPUCK_SKATERS_URL, start - 1)))
+        values = player_values(season_skaters(start), season_skaters(start - 1))
         for pid, v in sorted(values.items(), key=lambda kv: -kv[1]["value"])[: args.top]:
             print(f"{v['name']:24} {v['team']} {v['pos']}  {v['value']:+.3f} goals/game")
 

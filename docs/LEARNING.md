@@ -185,6 +185,35 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-20 — Swapping a data source without changing the answers
+
+**What happened:** The playoff model's roster ratings came from MoneyPuck's
+player files, which are free for **non-commercial** use only. Since PuckPulse
+is going all in on betting, I moved them to the NHL's own stats API: five
+official reports (scoring, penalties, faceoffs, 5-on-5 shot attempts, on-ice
+goals) give the same Game Score inputs.
+
+**What I learned:**
+- **Check the swap three ways before shipping it.** Per player, the NHL
+  version matched MoneyPuck's at r = 0.999 in all 8 seasons. Re-fitting the
+  constants on the new data barely moved them (0.194 → 0.200 goals per Game
+  Score point). The backtest, the test that counts, scored 0.1092 Brier on
+  both sources (0.1091 after the refit).
+- **Find the near-misses.** The NHL's on-ice goals are "even strength"
+  (5-on-5 plus 4-on-4 and 3-on-3), and MoneyPuck's are 5-on-5 only. It's close
+  enough to work, but it's why I re-fit the constants instead of reusing them.
+- **Old tools rot.** The backtest had been broken for weeks: schedule rows
+  grew from 2 fields to 4 when back-to-backs were added, and nothing ran the
+  old baseline. A tool you only run occasionally needs a smoke test too.
+- **Licensing is a product decision.** A free data source with a
+  non-commercial clause works for a hobby project and blocks a business.
+
+**Interview angle:** "How do you replace a dependency safely?" Match the
+outputs, re-fit what depends on them, and re-run the evaluation that decides
+whether the product is any good, all before switching.
+
+---
+
 ## 2026-10-20 — Pre-launch cleanup: making numbers mean something
 
 **What:** Nate walked the site like a new user and listed what felt off. It shipped as three

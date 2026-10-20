@@ -709,8 +709,7 @@ def roster_rating_prior(season_id):
 
     start = season_id // 10000
     try:
-        last = pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 1))
-        before_last = pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 2))
+        last, before_last = pv.season_skaters(start - 1), pv.season_skaters(start - 2)
         values = pv.player_values(last, before_last)
         rosters = load_rosters()
         rosters.update(missing_player_teams(values, last, rosters))
@@ -783,18 +782,14 @@ def with_roster_change(priors, change):
 def compute_player_values(season_id):
     """
     Skater values for roster-change scenarios. Best effort: the odds don't
-    depend on them, so a MoneyPuck or roster hiccup only costs the trade
+    depend on them, so an NHL stats or roster hiccup only costs the trade
     simulator a day.
     """
     import player_values as pv
 
     start = season_id // 10000
     try:
-        values = pv.player_values(
-            pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start)),
-            pv.season_game_scores(pv.fetch_csv(pv.MONEYPUCK_SKATERS_URL, start - 1)),
-            rosters=load_rosters(),
-        )
+        values = pv.player_values(pv.season_skaters(start), pv.season_skaters(start - 1), rosters=load_rosters())
     except Exception as exc:  # network, parse, or DB
         logger.warning(f"Couldn't compute player values ({exc}); roster-change scenarios unavailable today")
         return {}

@@ -32,6 +32,52 @@ class TestGameScore:
         assert pv.season_game_scores(text) == {1: {"name": "A B", "team": "DET", "pos": "C", "gp": 10, "gs": 3.75}}
 
 
+NHL_ROW = {"playerId": 8478402, "skaterFullName": "Connor McDavid", "teamAbbrevs": "EDM", "positionCode": "C", "gamesPlayed": 10,
+           "goals": 10, "totalPrimaryAssists": 10, "totalSecondaryAssists": 10, "shots": 100, "blockedShots": 20,
+           "penaltiesDrawn": 10, "penalties": 10, "totalFaceoffWins": 100, "totalFaceoffLosses": 100,
+           "satFor": 200, "satAgainst": 100, "evenStrengthGoalsFor": 10, "evenStrengthGoalsAgainst": 0}
+
+
+class TestNhlSource:
+    def test_the_nhl_reports_give_the_same_game_score(self):
+        scores = pv.nhl_game_scores([NHL_ROW, {**NHL_ROW, "playerId": 2, "gamesPlayed": 0}])
+        assert scores == {8478402: {"name": "Connor McDavid", "team": "EDM", "pos": "C", "gp": 10, "gs": pytest.approx(35.0)}}
+
+    def test_a_traded_player_counts_for_his_last_team(self):
+        assert pv.nhl_game_scores([{**NHL_ROW, "teamAbbrevs": "NYI,COL"}])[8478402]["team"] == "COL"
+
+    def test_missing_report_fields_count_as_zero(self):
+        row = {k: NHL_ROW[k] for k in ("playerId", "skaterFullName", "teamAbbrevs", "positionCode", "gamesPlayed", "goals")}
+        assert pv.nhl_game_scores([row])[8478402]["gs"] == pytest.approx(7.5)
+
+    def test_fetch_merges_each_report_by_player(self, monkeypatch):
+        reports = {"scoringpergame": {"goals": 5}, "penalties": {"penalties": 2}, "faceoffwins": {"totalFaceoffWins": 3},
+                   "summaryshooting": {"satFor": 40}, "goalsForAgainst": {"evenStrengthGoalsFor": 4}}
+        seen = []
+
+        def get(url, timeout):
+            report = url.split("/skater/")[1].split("?")[0]
+            seen.append(url)
+            return type("R", (), {"raise_for_status": lambda self: None,
+                                  "json": lambda self: {"data": [{"playerId": 1, **reports[report]}]}})()
+        monkeypatch.setattr(pv.requests, "get", get)
+        assert pv.fetch_nhl_skaters(2025) == [{"playerId": 1, "goals": 5, "penalties": 2, "totalFaceoffWins": 3,
+                                               "satFor": 40, "evenStrengthGoalsFor": 4}]
+        assert all("seasonId=20252026" in u for u in seen) and len(seen) == 5
+
+    def test_calibration_fits_team_goal_differential_on_team_game_score(self):
+        skaters = {y: {1: {"team": "AAA", "pos": "C", "gp": 82, "gs": 82 * 1.0},
+                       2: {"team": "BBB", "pos": "C", "gp": 82, "gs": 82 * 0.5},
+                       3: {"team": "BBB", "pos": "D", "gp": 10, "gs": 1.5}} for y in (2024, 2025)}
+        goals = {y: {"AAA": (82 * 0.2, 82), "BBB": (82 * 0.1 + 0.3, 82)} for y in (2024, 2025)}
+        fit = pv.calibrate([2024, 2025], skaters=skaters.get, team_goals=goals.get)
+        assert fit["team_seasons"] == 4 and fit["replacement_gs"] == {"D": 0.15}
+        # Two teams a season, so the fit is the slope between them: GD/gp over Game Score/gp.
+        x_aaa, x_bbb = 1.0, (82 * 0.5 + 1.5) / 82
+        y_aaa, y_bbb = 0.2, (82 * 0.1 + 0.3) / 82
+        assert fit["gs_to_goals"] == round((y_aaa - y_bbb) / (x_aaa - x_bbb), 3) and fit["r"] == 1.0
+
+
 class TestPlayerValues:
     def test_a_replacement_level_player_is_worth_zero(self):
         repl = pv.REPLACEMENT_GS["F"]

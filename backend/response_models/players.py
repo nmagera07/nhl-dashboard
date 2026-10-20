@@ -100,6 +100,7 @@ class PlayerLeaderTableRow(BaseModel):
     pim: Optional[int] = None
     shots: Optional[int] = None
     games_played: Optional[int] = None
+    avg_toi_seconds: Optional[int] = None  # average time on ice per game
     # goalie stats
     wins: Optional[int] = None
     losses: Optional[int] = None

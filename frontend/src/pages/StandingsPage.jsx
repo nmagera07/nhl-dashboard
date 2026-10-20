@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import DivisionTabs from "../components/DivisionTabs.jsx";
+import { LEAGUE_TAB } from "../config.js";
 import StandingsTable from "../components/StandingsTable.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 
@@ -56,6 +57,7 @@ function StandingsPage({
       </div>
       <StandingsTable
         rows={visibleRows}
+        rankBy={activeDivision === LEAGUE_TAB && !isSearching ? "league_sequence" : "division_sequence"}
         onSelectTeam={onSelectTeam}
         playoffOddsByTeam={playoffOddsByTeam}
         view={view}

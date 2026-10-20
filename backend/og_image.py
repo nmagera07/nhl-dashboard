@@ -113,7 +113,7 @@ def render_game(game, home_win_prob=None):
     elif home_win_prob is not None:
         big = (f"{round((1 - home_win_prob) * 100)}%", f"{round(home_win_prob * 100)}%")
         small = ("to win", "to win")
-        footer = "Win chances by PuckPulse · lines, goalies, and fair odds at puckpulse.io"
+        footer = "Win chances by PuckPulse · preview, lines, and goalies at puckpulse.io"
     else:
         big, small = (None, None), (None, None)
         footer = "Preview, lines, and goalies at puckpulse.io"
@@ -141,7 +141,7 @@ def share_text(game, home_win_prob=None):
     if home_win_prob is None:
         return title, "Preview, projected lines, and goalies on PuckPulse."
     fav, pct = (home, home_win_prob) if home_win_prob >= 0.5 else (away, 1 - home_win_prob)
-    return title, f"PuckPulse gives {fav} a {round(pct * 100)}% chance to win. Lines, goalies, and fair odds."
+    return title, f"PuckPulse gives {fav} a {round(pct * 100)}% chance to win. Preview, projected lines, and goalies."
 
 
 def team_share_text(abbrev, team, playoff_pct=None):

@@ -33,6 +33,14 @@ def test_share_text_names_the_favorite_before_and_the_score_after():
     assert og.share_text(PRE)[1].startswith("Preview")
 
 
+def test_game_share_text_has_no_betting_wording():
+    # Link previews land in subreddits and group chats that don't like betting promos;
+    # the in-app Bets tab keeps its wording.
+    for game, prob in ((PRE, 0.663), (PRE, None), (FINAL, None)):
+        for text in og.share_text(game, prob):
+            assert "odds" not in text.lower() and "bet" not in text.lower()
+
+
 def test_light_team_colors_get_dark_text():
     assert og._text_on(og._rgb("#FCB514")) != (255, 255, 255)  # Pittsburgh gold
     assert og._text_on(og._rgb("#002654")) == (255, 255, 255)

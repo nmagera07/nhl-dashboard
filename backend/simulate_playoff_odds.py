@@ -58,6 +58,7 @@ import psycopg2
 import requests
 from dotenv import load_dotenv
 
+import lottery
 from logging_config import setup_logging
 from seasons import current_season_id, previous_season_id  # noqa: F401 (re-exported for the model scripts)
 
@@ -565,12 +566,22 @@ def summarize_cutlines(samples):
     return out
 
 
-def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None):
+def lottery_order(trial_standings, playoff_teams):
+    """The non-playoff teams, worst first (the draft lottery's order; losing a tiebreak picks earlier)."""
+    missed = [t for t in trial_standings if t not in playoff_teams]
+    return sorted(missed, key=lambda a: _tiebreak_key(trial_standings[a]), reverse=True)
+
+
+def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None, lottery_out=None):
     """
     Monte Carlo playoff odds. If `cutline_out` is a dict, it's filled with
     the playoff line per conference ({conference: {p25, p50, p75}} in points)
-    from the same trials -- no extra simulation or queries.
+    from the same trials -- no extra simulation or queries. If
+    `lottery_out` is a dict, it's filled with each team's draft lottery
+    chances ({team: [chance of pick 1, ..., pick 16]}): in each trial the
+    non-playoff teams' order goes through the lottery's exact odds.
     """
+    lottery_sums = defaultdict(lambda: [0.0] * len(lottery.COMBINATIONS))
     cutline_samples = defaultdict(list)
     divisions = defaultdict(list)
     conferences = {}
@@ -614,9 +625,18 @@ def simulate(standings, schedule, trials, ratings, rng=random, cutline_out=None)
         if cutline_out is not None:
             for conf, pts in conference_cutlines(trial, divisions, conferences).items():
                 cutline_samples[conf].append(pts)
+        if lottery_out is not None:
+            order = lottery_order(trial, playoff_teams)
+            if len(order) == len(lottery.COMBINATIONS):
+                for team, chances in lottery.pick_chances(order).items():
+                    sums = lottery_sums[team]
+                    for k, p in enumerate(chances):
+                        sums[k] += p
 
     if cutline_out is not None:
         cutline_out.update(summarize_cutlines(cutline_samples))
+    if lottery_out is not None:
+        lottery_out.update({team: [round(v / trials, 5) for v in lottery_sums[team]] for team in standings})
 
     return {team: made_playoffs[team] / trials for team in standings}
 
@@ -808,6 +828,47 @@ def save_sim_inputs(payload):
         logger.warning(f"Couldn't save season simulator inputs ({exc}); odds were saved")
 
 
+LOTTERY_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS draft_lottery_odds (
+    season_id               INTEGER NOT NULL,
+    as_of_date              DATE NOT NULL,
+    team_abbrev             VARCHAR(3) NOT NULL,
+    missed_playoffs_pct     NUMERIC(6,5) NOT NULL,  -- in the lottery at all
+    first_pick_pct          NUMERIC(6,5) NOT NULL,
+    top_three_pct           NUMERIC(6,5) NOT NULL,
+    pick_chances            JSONB NOT NULL,         -- [chance of pick 1, ..., pick 16]
+    trials                  INTEGER NOT NULL,
+    computed_at             TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (season_id, as_of_date, team_abbrev)
+)
+"""
+
+
+def save_lottery(chances, season_id, as_of_date, trials):
+    """Each team's simulated draft lottery chances (lottery.py), one row per team per day. Best effort."""
+    import json
+
+    try:
+        with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+            cur.execute(LOTTERY_TABLE_SQL)
+            cur.execute("GRANT SELECT ON draft_lottery_odds TO nhl_api_readonly")
+            for team, picks in chances.items():
+                cur.execute(
+                    """
+                    INSERT INTO draft_lottery_odds (season_id, as_of_date, team_abbrev, missed_playoffs_pct,
+                                                    first_pick_pct, top_three_pct, pick_chances, trials, computed_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (season_id, as_of_date, team_abbrev) DO UPDATE SET
+                        missed_playoffs_pct = EXCLUDED.missed_playoffs_pct, first_pick_pct = EXCLUDED.first_pick_pct,
+                        top_three_pct = EXCLUDED.top_three_pct, pick_chances = EXCLUDED.pick_chances,
+                        trials = EXCLUDED.trials, computed_at = NOW()
+                    """,
+                    (season_id, as_of_date, team, min(sum(picks), 1.0), picks[0], sum(picks[:3]), json.dumps(picks), trials),
+                )
+    except psycopg2.Error as exc:
+        logger.warning(f"Couldn't save draft lottery odds ({exc}); playoff odds were saved")
+
+
 def save_odds(odds, season_id, as_of_date, trials):
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
@@ -873,17 +934,20 @@ def main():
     logger.info(f"{len(schedule)} remaining games to simulate across {args.trials} trials")
 
     started = time.time()
-    cutline = {}
-    odds = simulate(standings, schedule, args.trials, ratings, cutline_out=cutline)
+    cutline, lottery_chances = {}, {}
+    odds = simulate(standings, schedule, args.trials, ratings, cutline_out=cutline, lottery_out=lottery_chances)
     logger.info(f"Playoff line by conference: {cutline}")
     logger.info(f"Simulated in {time.time() - started:.1f}s")
 
     if not args.no_save:
         save_odds(odds, args.season, args.as_of, args.trials)
+        save_lottery(lottery_chances, args.season, args.as_of, args.trials)
         why = odds_explanations(ratings, parts, games, args.as_of)
         players = compute_player_values(args.season)
         save_sim_inputs(sim_inputs(standings, ratings, games, args.season, args.as_of, why=why, players=players, cutline=cutline))
 
+    best = sorted(lottery_chances.items(), key=lambda kv: -kv[1][0])[:5]
+    logger.info("Draft lottery, chance at No. 1: " + ", ".join(f"{t} {p[0] * 100:.1f}%" for t, p in best))
     for team, pct in sorted(odds.items(), key=lambda x: -x[1]):
         mean, _ = ratings[team]
         logger.info(f"{team}: {pct * 100:.1f}%  (rating {mean:+.2f} GD/game)")

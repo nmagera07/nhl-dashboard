@@ -1,0 +1,8 @@
+/* Draft lottery page. */
+.lottery-page .preview-lines-toggle { margin-top: 4px; }
+.lottery-teamcell { display: inline-flex; align-items: center; gap: 8px; }
+.lottery-rank { width: 18px; color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lottery-gp { display: block; font-size: 10px; }
+.lottery-row-favorite th, .lottery-row-favorite td { background: var(--accent-soft); }
+.playoffs-lottery-link { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.playoffs-page .page-header { justify-content: space-between; }

@@ -159,6 +159,7 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
     <main className="playoffs-page">
       <div className="page-header page">
         <h1>Playoff race</h1>
+        <Link className="accent-link playoffs-lottery-link" to="/draft-lottery">Draft lottery ›</Link>
       </div>
       <div className="race-controls">
         <div className="view-toggle" role="group" aria-label="Conference">

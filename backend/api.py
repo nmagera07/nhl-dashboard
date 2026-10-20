@@ -192,11 +192,25 @@ async def check_ingestion_freshness_loop():
         await asyncio.sleep(INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS)
 
 
+FANTASY_POLL_SECONDS = 3 * 60
+
+
+async def poll_fantasy_updates_loop():
+    """RotoWire's feed holds only its latest 5 updates; polling keeps news.py's running list complete."""
+    while True:
+        try:
+            await asyncio.to_thread(news.poll_fantasy_updates)
+        except Exception:
+            logger.error("Fantasy update poll failed", exc_info=True)
+        await asyncio.sleep(FANTASY_POLL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(check_ingestion_freshness_loop())
+    tasks = [asyncio.create_task(check_ingestion_freshness_loop()), asyncio.create_task(poll_fantasy_updates_loop())]
     yield
-    task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(
@@ -239,7 +253,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # browser for a few minutes, and served stale while it refreshes. Live data
 # (games, schedules, scenarios) is left alone.
 DAILY_DATA_PREFIXES = ("/standings", "/playoff-odds", "/playoff-line", "/players", "/teams", "/season-sim", "/predictions", "/digest",
-                       "/news", "/injuries", "/transactions")  # news is cached ~15 min upstream anyway
+                       "/news", "/injuries", "/transactions", "/fantasy")  # news is cached ~15 min upstream anyway
 DAILY_CACHE_CONTROL = "public, max-age=300, stale-while-revalidate=3600"
 
 
@@ -983,6 +997,37 @@ def news_transactions(team: Optional[str] = TEAM_FILTER, limit: int = Query(25, 
     result = news.transactions(_team_param(team), limit)
     if result is None:
         raise HTTPException(status_code=503, detail="Transaction data is unavailable right now.")
+    return result
+
+
+@daily_cached
+def _roster_teams():
+    """{accent-free lowercase "first last": team} for players on a roster now; a name two players share is left out."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT first_name, last_name, team_abbrev FROM players WHERE on_roster")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    teams = {}
+    for r in rows:
+        key = news.player_key(f"{r['first_name']} {r['last_name']}")
+        teams[key] = r["team_abbrev"] if key not in teams else None
+    return teams
+
+
+@app.get("/fantasy")
+def fantasy_news(limit: int = Query(40, ge=1, le=150)):
+    """Fantasy player updates (RotoWire) and fantasy articles (DobberHockey, RotoBaller), newest first. All link out."""
+    try:
+        teams = _roster_teams()
+    except Exception:
+        logger.warning("Couldn't load roster teams for fantasy updates", exc_info=True)
+        teams = {}
+    result = news.fantasy(team_of=lambda name: teams.get(news.player_key(name)), limit=limit)
+    if not result["sources"]:
+        raise HTTPException(status_code=503, detail="Fantasy sources are unavailable right now.")
     return result
 
 

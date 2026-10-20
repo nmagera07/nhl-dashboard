@@ -6,8 +6,9 @@ import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import NewsFeed from "../components/NewsFeed.jsx";
 import DailyDigest from "../components/DailyDigest.jsx";
 import InjuryList from "../components/InjuryList.jsx";
+import FantasyFeed from "../components/FantasyFeed.jsx";
 
-const VIEWS = ["Headlines", "Injuries", "Transactions"];
+const VIEWS = ["Headlines", "Fantasy", "Injuries", "Transactions"];
 
 function Status({ status, what, children }) {
   if (status === "error") return <p className="status-line status-error">Couldn't load {what}.</p>;
@@ -16,7 +17,8 @@ function Status({ status, what, children }) {
 }
 
 // The News tab: headlines from NHL.com, ESPN, and Sportsnet (linking out),
-// injuries by team, and recent transactions. Your team comes first.
+// fantasy updates and articles, injuries by team, and recent transactions.
+// Your team comes first.
 function NewsPage({ standings }) {
   const [view, setView] = useState("Headlines");
   const [favorite] = useFavoriteTeam();
@@ -26,6 +28,8 @@ function NewsPage({ standings }) {
   const { data: news, status: newsStatus } = useFetchWithStatus(newsUrl, { initialData: { headlines: [], sources: [] } });
   const { data: injuries, status: injuryStatus } = useFetchWithStatus(
     view === "Injuries" ? `${API_BASE}/injuries` : null, { initialData: { teams: {} } });
+  const { data: fantasy, status: fantasyStatus } = useFetchWithStatus(
+    view === "Fantasy" ? `${API_BASE}/fantasy` : null, { initialData: { updates: [], articles: [], sources: [] } });
   const { data: moves, status: moveStatus } = useFetchWithStatus(
     view === "Transactions" ? `${API_BASE}/transactions?limit=40` : null, { initialData: { transactions: [] } });
 
@@ -47,7 +51,7 @@ function NewsPage({ standings }) {
               className={v === view ? "view-toggle-btn view-toggle-btn-active" : "view-toggle-btn"}>{v}</button>
           ))}
         </div>
-        {view === "Headlines" && favorite && (
+        {(view === "Headlines" || view === "Fantasy") && favorite && (
           <label className="news-mine">
             <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} /> Only {favorite}
           </label>
@@ -64,6 +68,16 @@ function NewsPage({ standings }) {
             {news.sources?.length > 0 && <p className="data-credit">From {news.sources.join(", ")}. Stories open on their site.</p>}
           </Status>
         </section>
+      )}
+
+      {view === "Fantasy" && (
+        <Status status={fantasyStatus} what="fantasy news">
+          <FantasyFeed
+            updates={(fantasy.updates || []).filter((u) => !(mineOnly && favorite) || u.team === favorite)}
+            articles={fantasy.articles || []}
+          />
+          {fantasy.sources?.length > 0 && <p className="data-credit">From {fantasy.sources.join(", ")}. Updates and articles open on their site.</p>}
+        </Status>
       )}
 
       {view === "Injuries" && (

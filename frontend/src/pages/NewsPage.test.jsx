@@ -18,6 +18,14 @@ const INJURIES = { source: "ESPN", teams: {
   BOS: [],
 } };
 const MOVES = { source: "ESPN", transactions: [{ date: "2026-10-11", team: "VGK", description: "Placed LW Victor Olofsson on injured reserve." }] };
+const FANTASY = {
+  sources: ["RotoWire", "DobberHockey"],
+  updates: [
+    { id: "1", player: "Jesper Wallstedt", title: "Slated to face Oilers", summary: "Expected in goal Tuesday.", url: "https://rw.test/1", source: "RotoWire", published: new Date().toISOString(), team: "MIN" },
+    { id: "2", player: "Erik Karlsson", title: "Two assists", summary: "", url: "https://rw.test/2", source: "RotoWire", published: new Date().toISOString(), team: "PIT" },
+  ],
+  articles: [{ title: "Buying low on Brayden Point", url: "https://dobber.test/1", source: "DobberHockey", published: new Date().toISOString(), teams: [] }],
+};
 const STANDINGS = [
   { team_abbrev: "PIT", team_name: "Pittsburgh Penguins" }, { team_abbrev: "ANA", team_name: "Anaheim Ducks" },
 ];
@@ -25,7 +33,7 @@ const STANDINGS = [
 function mockApi() {
   return vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
     const u = String(url);
-    const body = u.includes("/injuries") ? INJURIES : u.includes("/transactions") ? MOVES : NEWS;
+    const body = u.includes("/injuries") ? INJURIES : u.includes("/transactions") ? MOVES : u.includes("/fantasy") ? FANTASY : NEWS;
     return Promise.resolve({ json: async () => body });
   });
 }
@@ -34,6 +42,23 @@ const renderIn = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe("News", () => {
   afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
+
+  it("fantasy: player updates with their team, articles, and your-team-only", async () => {
+    mockApi();
+    localStorage.setItem("nhl-dash:favorite-team", "PIT");
+    renderIn(<NewsPage standings={STANDINGS} />);
+    await userEvent.click(screen.getByRole("button", { name: "Fantasy" }));
+    const update = (await screen.findByText("Jesper Wallstedt")).closest("a");
+    expect(update).toHaveAttribute("href", "https://rw.test/1");
+    expect(update).toHaveTextContent("Slated to face Oilers");
+    expect(within(update).getByText("MIN")).toBeInTheDocument();
+    expect(screen.getByText("Buying low on Brayden Point").closest("a")).toHaveAttribute("href", "https://dobber.test/1");
+    expect(screen.getByText(/From RotoWire, DobberHockey/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Only PIT"));
+    expect(screen.queryByText("Jesper Wallstedt")).not.toBeInTheDocument();
+    expect(screen.getByText("Erik Karlsson")).toBeInTheDocument();
+  });
 
   it("lists headlines that open the original story, with source and summary", async () => {
     mockApi();

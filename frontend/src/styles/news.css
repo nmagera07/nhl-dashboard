@@ -69,3 +69,11 @@
 .feed-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--text-dim); font-size: 12px; }
 .feed-source { color: var(--text); font-weight: 600; }
 .feed-team { padding: 1px 6px; border-radius: 999px; background: var(--neutral-soft); font-size: 11px; font-weight: 600; }
+/* Fantasy view */
+.fantasy-updates { margin: 0; padding: 0; list-style: none; }
+.fantasy-updates li + li { border-top: 1px solid var(--border); }
+.fantasy-update { display: grid; gap: 4px; padding: 10px 0; color: var(--text); text-decoration: none; }
+.fantasy-update-title { font-size: 14px; line-height: 1.35; }
+.fantasy-update:hover .fantasy-update-title { color: var(--accent); }
+.fantasy-update-summary { color: var(--text-dim); font-size: 13px; line-height: 1.4; }
+.fantasy-articles-title { margin: 4px 0 8px; }

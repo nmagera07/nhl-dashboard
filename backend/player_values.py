@@ -261,6 +261,42 @@ def season_goalies(csv_text):
     return out
 
 
+# The same from our own xG: each goalie's xG and goals against on the
+# unblocked shots he faced (team_game_xg's play-by-play, xg_model.py), with
+# games and teams from the NHL's goalie report.
+NHL_GOALIE_URL = "https://api.nhle.com/stats/rest/en/goalie/summary?limit=-1&cayenneExp=seasonId={season}%20and%20gameTypeId=2"
+
+
+def fetch_nhl_goalies(year):
+    """[row]: each goalie's regular season (starting in `year`) from the NHL's goalie summary."""
+    response = requests.get(NHL_GOALIE_URL.format(season=f"{year}{year + 1}"), timeout=60)
+    response.raise_for_status()
+    return response.json()["data"]
+
+
+def xg_scale(faced):
+    """League goals over league xG on the shots goalies faced: our xG's level that season (1.0 = right on)."""
+    xga = sum(x for x, _ in faced.values())
+    return sum(g for _, g in faced.values()) / xga if xga else 1.0
+
+
+def our_season_goalies(nhl_rows, faced, scale=1.0):
+    """
+    season_goalies()'s shape from our xG: faced is {player_id: (xG against,
+    goals against)}; xG is multiplied by `scale` (xg_scale() to put the
+    league's GSAx at zero). A traded goalie's team is his last.
+    """
+    out = {}
+    for row in nhl_rows:
+        pid, games = int(row["playerId"]), (row.get("timeOnIce") or 0) / 3600
+        if games <= 0 or pid not in faced:
+            continue
+        xga, ga = faced[pid]
+        out[pid] = {"name": row.get("goalieFullName"), "team": (row.get("teamAbbrevs") or "").split(",")[-1],
+                    "gp": int(row.get("gamesPlayed") or 0), "games": games, "gsax": scale * xga - ga}
+    return out
+
+
 def goalie_rates(last, before_last, shrink=GOALIE_SHRINK_GAMES):
     """{player_id: GSAx per 60 over the last two seasons, shrunk toward average}."""
     rates = {}

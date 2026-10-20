@@ -58,6 +58,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import lottery
 import report_card
 import og_image
 import projected_lineups
@@ -1304,6 +1305,71 @@ def report_card_summary():
                 "season": report_card.summarize(games)}
     except Exception:
         logger.error("Failed to build the report card", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+def _today_lottery(rows):
+    """
+    The lottery "if the season ended today": rows are the latest standings
+    snapshot. The NHL's own ranks carry its tiebreakers: a team is in a
+    playoff spot if it's top 3 in its division or one of the 2 wild cards,
+    and the lottery order is the rest, worst league rank first.
+    """
+    missed = [r for r in rows if not (r["division_sequence"] <= 3 or r["wildcard_sequence"] in (1, 2))]
+    missed.sort(key=lambda r: -r["league_sequence"])
+    if len(missed) != len(lottery.COMBINATIONS):
+        return []
+    chances = lottery.pick_chances([r["team_abbrev"] for r in missed])
+    return [{"team": r["team_abbrev"], "position": i + 1, "points": r["points"], "games_played": r["games_played"],
+             "picks": [round(p, 5) for p in chances[r["team_abbrev"]]]} for i, r in enumerate(missed)]
+
+
+@app.get("/draft-lottery")
+@daily_cached
+def draft_lottery():
+    """
+    Draft lottery odds (lottery.py): "projected" from the daily season
+    simulation (where each team might finish, then the lottery), and
+    "today" if the season ended with the current standings. Each team's
+    picks are its chances at picks 1-16.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT team_abbrev, points, games_played, league_sequence, division_sequence, wildcard_sequence, snapshot_date
+                FROM standings_snapshots
+                WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM standings_snapshots)
+                """
+            )
+            standings = cur.fetchall()
+            try:
+                cur.execute(
+                    """
+                    SELECT team_abbrev, missed_playoffs_pct, pick_chances, as_of_date FROM draft_lottery_odds
+                    WHERE (season_id, as_of_date) = (SELECT season_id, MAX(as_of_date) FROM draft_lottery_odds
+                                                     GROUP BY season_id ORDER BY season_id DESC LIMIT 1)
+                    """
+                )
+                projected = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()  # the daily job hasn't created it yet
+                projected = []
+        picks = lambda value: value if isinstance(value, list) else json.loads(value)  # noqa: E731
+        return {
+            "as_of": str(projected[0]["as_of_date"]) if projected else None,
+            "standings_date": str(standings[0]["snapshot_date"]) if standings else None,
+            "projected": sorted(
+                ({"team": r["team_abbrev"], "missed_playoffs": float(r["missed_playoffs_pct"]), "picks": picks(r["pick_chances"])}
+                 for r in projected if float(r["missed_playoffs_pct"]) > 0),
+                key=lambda t: -t["picks"][0]),
+            "today": _today_lottery(standings),
+        }
+    except Exception:
+        logger.error("Failed to build the draft lottery odds", exc_info=True)
         raise
     finally:
         conn.close()

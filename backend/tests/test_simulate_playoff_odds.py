@@ -588,3 +588,17 @@ class TestBackToBacks:
         s = schedule_strength(ratings, tired, "2026-10-19")
         assert s["A"]["effect"] > s["B"]["effect"]
         assert s["A"]["effect"] - s["B"]["effect"] == pytest.approx(2 * HOME_EDGE + 2 * 0.530, abs=1e-3)
+
+
+def test_simulate_fills_draft_lottery_chances_for_teams_that_miss():
+    import random
+    import simulate_playoff_odds as sim
+    divisions = ["Atlantic", "Metropolitan", "Central", "Pacific"]
+    standings = {f"T{i:02d}": {"points": 40 + i, "wins": 20, "division": divisions[i % 4],
+                               "conference": "Eastern" if i % 4 < 2 else "Western"} for i in range(32)}
+    ratings = {t: (0.0, 0.1) for t in standings}
+    out = {}
+    sim.simulate(standings, [], 50, ratings, rng=random.Random(1), lottery_out=out)
+    assert out["T00"][0] == pytest.approx(0.255, abs=1e-3)  # with no games left, the worst team stays worst
+    assert sum(out["T31"]) == 0                              # the best team is never in the lottery
+    assert sum(sum(p) for p in out.values()) == pytest.approx(16)

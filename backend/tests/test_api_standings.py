@@ -221,3 +221,24 @@ class TestTeamSeasonHistory:
 
         assert response.status_code == 200
         assert response.json()[0]["team_abbrev"] == "ARI"
+
+
+class TestDraftLottery:
+    def test_projected_and_if_the_season_ended_today(self, client, db_router):
+        from datetime import date
+
+        import pytest
+        rows = [{"team_abbrev": f"T{i:02d}", "points": 40 - i, "games_played": 20, "league_sequence": 32 - i,
+                 "division_sequence": (i % 8) + 1, "wildcard_sequence": 1 if i % 8 == 3 else 0,
+                 "snapshot_date": date(2026, 10, 20)}
+                for i in range(32)]
+        # In: each division's top 3 (12 teams) plus 4 wild cards; the other 16 are in the lottery.
+        db_router.when("from standings_snapshots", rows)
+        db_router.when("from draft_lottery_odds", [
+            {"team_abbrev": "T00", "missed_playoffs_pct": 0.9, "pick_chances": [0.2] + [0.05] * 14 + [0.0], "as_of_date": date(2026, 10, 20)},
+            {"team_abbrev": "T09", "missed_playoffs_pct": 0.0, "pick_chances": [0.0] * 16, "as_of_date": date(2026, 10, 20)}])
+        body = client.get("/draft-lottery").json()
+        assert body["as_of"] == "2026-10-20" and [t["team"] for t in body["projected"]] == ["T00"]
+        today = body["today"]
+        assert len(today) == 16 and today[0]["position"] == 1
+        assert today[0]["picks"][0] == pytest.approx(0.255, abs=1e-3)

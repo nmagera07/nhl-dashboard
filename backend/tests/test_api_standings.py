@@ -15,6 +15,8 @@ team_season_history (.../seasons) was confirmed correct as-is and is left
 untouched -- always 200, never 404, even for a bogus abbreviation.
 """
 
+import pytest
+
 
 class TestLatestStandings:
     def test_happy_path(self, client, db_router, standings_row):
@@ -227,7 +229,6 @@ class TestDraftLottery:
     def test_projected_and_if_the_season_ended_today(self, client, db_router):
         from datetime import date
 
-        import pytest
         rows = [{"team_abbrev": f"T{i:02d}", "points": 40 - i, "games_played": 20, "league_sequence": 32 - i,
                  "division_sequence": (i % 8) + 1, "wildcard_sequence": 1 if i % 8 == 3 else 0,
                  "snapshot_date": date(2026, 10, 20)}
@@ -242,3 +243,17 @@ class TestDraftLottery:
         today = body["today"]
         assert len(today) == 16 and today[0]["position"] == 1
         assert today[0]["picks"][0] == pytest.approx(0.255, abs=1e-3)
+        # The mock draft: the first round for both views, best player left at each pick.
+        mock = body["mock"]
+        assert mock["year"] == 2027 and [s["name"] for s in mock["sources"]] == ["A", "B"]
+        assert [p["team"] for p in mock["today"][:2]] == [t["team"] for t in today[:2]]
+        assert [p["prospect"]["name"] for p in mock["today"][:3]] == ["Yu", "Xi", "Zo"]
+        assert len(mock["today"]) == 3 and mock["projected"][0]["team"] == "T00"
+
+    @pytest.fixture(autouse=True)
+    def board(self, monkeypatch):
+        import draft_board
+        board = {"draft_year": 2027, "prospects": {n: {"pos": "C", "team": "Club", "league": None} for n in ("Xi", "Yu", "Zo")},
+                 "sources": [{"name": "A", "url": "https://a.example", "as_of": "2026-10-01", "ranks": ["Xi", "Yu", "Zo"]},
+                             {"name": "B", "url": "https://b.example", "as_of": "2026-10-02", "ranks": ["Yu", "Zo", "Xi"]}]}
+        monkeypatch.setattr(draft_board, "load", lambda year: board)

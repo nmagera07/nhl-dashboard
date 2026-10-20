@@ -58,6 +58,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import report_card
 import og_image
 import projected_lineups
 import push
@@ -1252,6 +1253,57 @@ def bets_for_day(day: date = Query(..., alias="date")):
         return {"date": str(day), "games": games}
     except Exception:
         logger.error(f"Failed to build the bets board for {day}", exc_info=True)
+        raise
+    finally:
+        conn.close()
+
+
+@app.get("/report-card")
+@daily_cached
+def report_card_summary():
+    """
+    PuckPulse vs. the sportsbooks on finished games this season and in the
+    last 7 days (report_card.py): Brier scores for the moneyline, puck line,
+    and total, how the Bets tab's value badges would have done, and the
+    biggest disagreements.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT p.game_id, p.game_date, p.home_abbrev, p.away_abbrev, p.home_win_prob, p.home_goals,
+                       p.away_goals, p.home_score, p.away_score
+                FROM game_predictions p
+                WHERE p.home_won IS NOT NULL AND p.source = 'daily'
+                  AND p.season_id = (SELECT MAX(season_id) FROM game_predictions)
+                ORDER BY p.game_date
+                """
+            )
+            predictions = cur.fetchall()
+            try:
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (game_id) *
+                    FROM market_odds WHERE source = 'sportsbooks' AND game_id = ANY(%s)
+                    ORDER BY game_id, (captured = 'close') DESC
+                    """,
+                    ([p["game_id"] for p in predictions],),
+                )
+                markets = {r["game_id"]: dict(r) for r in cur.fetchall()}
+            except psycopg2.errors.UndefinedTable:
+                conn.rollback()
+                markets = {}
+        games = [{"game_date": p["game_date"], "home": p["home_abbrev"], "away": p["away_abbrev"],
+                  "home_win_prob": p["home_win_prob"], "home_goals": p["home_goals"], "away_goals": p["away_goals"],
+                  "home_score": p["home_score"], "away_score": p["away_score"], "market": markets.get(p["game_id"])}
+                 for p in predictions]
+        latest = max((g["game_date"] for g in games), default=None)
+        week = [g for g in games if latest and (latest - g["game_date"]).days < 7]
+        return {"as_of": str(latest) if latest else None, "week": report_card.summarize(week),
+                "season": report_card.summarize(games)}
+    except Exception:
+        logger.error("Failed to build the report card", exc_info=True)
         raise
     finally:
         conn.close()

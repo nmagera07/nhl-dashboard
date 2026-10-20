@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
-import HeadlineList from "../components/HeadlineList.jsx";
+import NewsFeed from "../components/NewsFeed.jsx";
 import DailyDigest from "../components/DailyDigest.jsx";
 import InjuryList from "../components/InjuryList.jsx";
 
@@ -58,9 +58,9 @@ function NewsPage({ standings }) {
       {view === "Headlines" && <DailyDigest />}
 
       {view === "Headlines" && (
-        <section className="news-card" aria-label="Headlines">
+        <section aria-label="Headlines">
           <Status status={newsStatus} what="headlines">
-            <HeadlineList headlines={news.headlines || []} showSummary />
+            <NewsFeed headlines={news.headlines || []} />
             {news.sources?.length > 0 && <p className="data-credit">From {news.sources.join(", ")}. Stories open on their site.</p>}
           </Status>
         </section>

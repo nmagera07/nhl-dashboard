@@ -185,6 +185,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-20 — Pre-launch cleanup: making numbers mean something
+
+**What:** Nate walked the site like a new user and listed what felt off. It shipped as three
+PRs:
+- **Polish:** a cleaner My Team line, one-line game preview note, "PuckPulse" instead of "fair"
+  on Bets, a collapsible playoff chart, and team rows that do what the hint says.
+- **New views:** an NHL-wide standings tab, and TOI on the Players page.
+- **Redesigns:** News as a photo feed, and player advanced stats as percentile bars.
+
+**What I learned:**
+- **A raw stat is not information.** "xGF–xGA 7.4–8.0" or "Ind. xG 2.41" mean nothing without a
+  reference point. The same data as "Creates his own chances: better than 89% of forwards"
+  reads instantly. Percentiles are computed among the same position, with a minimum of 5-on-5
+  minutes so tiny samples don't skew the scale. The plain-language label does the explaining
+  the old glossary tried to do.
+- **Hints must match behavior.** "Tap a team to see why" was true for the row, but the team's
+  name inside it was a link, and that's what people tap. One element, one action.
+- **Small print is clutter.** A four-line disclaimer under every win probability became one
+  line: "A lean, not a lock". The responsible-gambling note stays where the betting numbers are
+  (the Market view, the Bets tab).
+- **Name collisions are silent.** A new `_plain()` helper quietly replaced an existing `_plain()`
+  in the same module, and team-name matching broke. The test suite caught it. A linter rule for
+  redefinitions would catch it sooner.
+- **Feeds are messy.** Sportsnet double-encodes apostrophes ("isn&#8217;t"), so unescaping
+  once isn't enough.
+
+---
+
 ## 2026-10-20 — Draft lottery odds: rules as code, checked against the official table
 
 **What:** a `/draft-lottery` page (linked from the Playoffs page) with two views:

@@ -39,7 +39,8 @@ describe("News", () => {
     mockApi();
     renderIn(<NewsPage standings={STANDINGS} />);
 
-    const link = await screen.findByRole("link", { name: "Rangers lean on Garand" });
+    // Each story is one link (the whole card): its name starts with the title.
+    const link = await screen.findByRole("link", { name: /^Rangers lean on Garand/ });
     expect(link).toHaveAttribute("href", "https://espn.test/1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(screen.getByText("Two days after losing Shesterkin.")).toBeInTheDocument();

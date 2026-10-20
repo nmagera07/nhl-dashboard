@@ -135,3 +135,24 @@ describe("PlayerPanel", () => {
     expect(card.getByText(/10 goals allowed on shots worth 13.5 expected/)).toBeInTheDocument();
   });
 });
+
+describe("PlayerPanel advanced stats", () => {
+  const advanced = { season_id: 20262027, games_played: 8, icetime_seconds: 8197, corsi_for_pct: 0.48, fenwick_for_pct: 0.47,
+                     xgoals_for_pct: 0.48, xgoals_for: 7.4, xgoals_against: 8.0, individual_xgoals: 2.41, pdo: 104.2 };
+
+  it("ranks each number among his position in plain words, with a luck note", () => {
+    renderPanel(skater({ advanced_stats: advanced,
+      advanced_percentiles: { group: "forwards", peers: 398, corsi: 43, xg: 41, ixg60: 89, ixg60_value: 1.11 } }));
+    expect(screen.getByText("Controls play")).toBeInTheDocument();
+    expect(screen.getByText("Creates his own chances")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Better than 89% of forwards" })).toBeInTheDocument();
+    expect(screen.getByText(/running hot/)).toBeInTheDocument();          // PDO 104.2
+    expect(screen.queryByText(/xGF–xGA/)).not.toBeInTheDocument();         // the raw totals are gone
+  });
+
+  it("says when there aren't enough minutes to rank yet", () => {
+    renderPanel(skater({ advanced_stats: advanced, advanced_percentiles: { too_few_minutes: true } }));
+    expect(screen.getByText(/Not enough 5-on-5 minutes yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /Better than/ })).not.toBeInTheDocument();
+  });
+});

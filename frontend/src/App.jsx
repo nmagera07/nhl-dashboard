@@ -6,6 +6,7 @@ import IntelligencePanel from "./components/IntelligencePanel.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
 import { useScrollToTop } from "./hooks/useScrollToTop.js";
+import usePageTitle from "./hooks/usePageTitle.js";
 import { useTheme } from "./hooks/useTheme.js";
 import { cachedResponse } from "./utils/responseCache.js";
 import TopNav from "./components/TopNav.jsx";
@@ -28,6 +29,11 @@ function ShareRedirect() {
   const { gameId } = useParams();
   return <Navigate to={`/games/${gameId}`} replace />;
 }
+
+function TeamShareRedirect() {
+  const { teamAbbrev } = useParams();
+  return <Navigate to={`/teams/${teamAbbrev.toUpperCase()}`} replace />;
+}
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";
 import NewsPage from "./pages/NewsPage.jsx";
 
@@ -46,6 +52,7 @@ export default function NHLDashboard() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  usePageTitle();
   useScrollToTop();
   // Held here, not in the header, so a switch re-renders the whole page
   // (team logos pick their version by theme as they render).
@@ -204,6 +211,8 @@ export default function NHLDashboard() {
           {/* A shared link (puckpulse.io/g/{id}): the server answers it with the preview card and a redirect,
               but an installed app's service worker serves the app shell instead, so forward it here too. */}
           <Route path="/g/:gameId" element={<ShareRedirect />} />
+          {/* Same for a shared team, puckpulse.io/t/{abbrev}. */}
+          <Route path="/t/:teamAbbrev" element={<TeamShareRedirect />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

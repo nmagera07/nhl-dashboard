@@ -15,3 +15,6 @@ export const INTELLIGENCE_BASE = (
 ).replace(/\/+$/, "");
 
 export const DIVISION_ORDER = ["Atlantic", "Metropolitan", "Central", "Pacific"];
+
+// The standings tab for all 32 teams, ranked league-wide (next to the four divisions).
+export const LEAGUE_TAB = "NHL";

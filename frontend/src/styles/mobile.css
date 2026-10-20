@@ -87,8 +87,11 @@
   .standings-team-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; }
   .standings-team-card-stats { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
   .standings-controls .view-toggle { display: none; }
-  .standings-controls .division-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; }
+  .standings-controls .division-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 100%; }
   .standings-controls .division-tab { padding: 7px 2px; font-size: 10px; letter-spacing: 0.02em; }
+  /* Five tabs in a row: METROPOLITAN shortens to METRO. */
+  .division-tab-long { display: none; }
+  .division-tab-short { display: inline; }
   .intelligence-toggle { padding: 10px 14px; }
   .intelligence-toggle-full { display: none; }
   .intelligence-toggle-short { display: inline; }

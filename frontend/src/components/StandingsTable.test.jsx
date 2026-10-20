@@ -48,6 +48,14 @@ describe("StandingsTable", () => {
     }),
   ];
 
+  it("ranks league-wide when told to (the NHL tab)", () => {
+    const league = [team({ ...rows[0], league_sequence: 4 }), team({ ...rows[1], league_sequence: 9 })];
+    render(<StandingsTable rows={league} rankBy="league_sequence" onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+    const rendered = dataRows();
+    expect(within(rendered[0]).getByText("COL")).toBeInTheDocument();
+    expect(within(rendered[0]).getByText("4")).toBeInTheDocument();
+  });
+
   it("defaults to division_sequence order when no sort is active", () => {
     render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
 

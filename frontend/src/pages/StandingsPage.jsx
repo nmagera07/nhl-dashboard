@@ -67,9 +67,8 @@ function StandingsPage({
       />
       <p className="data-credit">
         {view === "advanced"
-          ? "5-on-5 advanced stats (xG%, xGF, xGA, shots, PDO) courtesy of "
-          : "Playoff odds (PO%) blend goals with expected goals (xG) courtesy of "}
-        <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+          ? "5-on-5 advanced stats (xG%, xGF, xGA, shots, PDO) from PuckPulse's own expected goals (xG), built from NHL play-by-play."
+          : "Playoff odds (PO%) blend goals with PuckPulse's own expected goals (xG), built from NHL play-by-play."}
         {view === "standard" && <> <Link to="/playoffs">See the playoff race →</Link></>}
       </p>
       <StatGlossary terms={view === "advanced" ? ADVANCED_TERMS : STANDARD_TERMS} labels={TERM_LABELS} />

@@ -267,7 +267,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
               {goalieAdvanced.goals_allowed != null && goalieAdvanced.xgoals_against != null
                 ? `${goalieAdvanced.goals_allowed} goals allowed on shots worth ${formatDecimal(goalieAdvanced.xgoals_against, 1)} expected. `
                 : ""}
-              MoneyPuck.com, {formatSeasonLabel(goalieAdvanced.season_id)} season
+              PuckPulse xG, {formatSeasonLabel(goalieAdvanced.season_id)} season
               {goalieAdvanced.games_played != null ? ` (${goalieAdvanced.games_played} GP)` : ""}.
             </p>
           </div>
@@ -279,7 +279,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
           <div className="player-card">
             <AdvancedRanks stats={advancedStats} ranks={player.advanced_percentiles} />
             <p className="player-card-note">
-              At 5-on-5. MoneyPuck.com, {formatSeasonLabel(advancedStats.season_id)} season
+              At 5-on-5. PuckPulse xG and NHL stats, {formatSeasonLabel(advancedStats.season_id)} season
               {advancedStats.games_played != null ? ` (${advancedStats.games_played} GP)` : ""}.
             </p>
           </div>

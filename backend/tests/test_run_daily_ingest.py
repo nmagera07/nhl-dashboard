@@ -31,8 +31,8 @@ class TestRunAll:
         assert run_all(runner=runner) == []
         assert [cmd[-1] for cmd in calls] == [
             "ingest_standings.py",
-            "ingest_advanced_stats.py",
             "ingest_xg.py",  # before the odds, which use it
+            "ingest_advanced_stats.py",  # after ingest_xg, whose 5-on-5 rows it sums
             "simulate_playoff_odds.py",
             "game_predictions.py",  # after the odds, whose ratings it logs
             "goalie_starts.py",  # after ingest_xg, whose starters it reads

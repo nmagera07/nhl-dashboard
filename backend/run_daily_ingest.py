@@ -4,10 +4,12 @@ Entry point for the daily Azure Container Apps Job (nhl-standings-ingest).
 Runs each ingestion script in its own process, in order:
   1. ingest_standings.py      -- standings snapshot (also sets the current
                                  season that player stats are scoped to)
-  2. ingest_advanced_stats.py -- 5-on-5 xG/Corsi/PDO from MoneyPuck (free
-                                 for non-commercial use, credited in the UI)
-  3. ingest_xg.py             -- PuckPulse xG for each finished game (NHL
-                                 play-by-play), which the odds step uses
+  2. ingest_xg.py             -- PuckPulse xG for each finished game (NHL
+                                 play-by-play), which the odds step uses,
+                                 plus per-game goalie and 5-on-5 rows
+  3. ingest_advanced_stats.py -- 5-on-5 xG/Corsi/PDO and goalie GSAx for the
+                                 Standings page and player cards (step 2's
+                                 rows plus the NHL stats API)
   4. simulate_playoff_odds.py -- Monte Carlo playoff odds (v2) from today's
                                  standings
   5. game_predictions.py      -- logs today's game predictions (from the
@@ -52,8 +54,8 @@ HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
 
 SCRIPTS = [
     "ingest_standings.py",
-    "ingest_advanced_stats.py",
     "ingest_xg.py",
+    "ingest_advanced_stats.py",
     "simulate_playoff_odds.py",
     "game_predictions.py",
     "goalie_starts.py",

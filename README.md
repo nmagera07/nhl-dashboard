@@ -11,7 +11,7 @@ It's backed by its own models: an expected-goals model, a team rating and playof
 **Live:** https://puckpulse.io (installable as a phone app)
 
 *Formerly "NHL Dashboard"; the repo and Azure resources keep their original names. Data from the
-NHL, MoneyPuck.com, and The Odds API. Not affiliated with or endorsed by the NHL. Betting
+NHL and The Odds API. Not affiliated with or endorsed by the NHL. Betting
 information is for entertainment and research, not advice. 21+. Gambling problem? Call
 1-800-GAMBLER.*
 
@@ -108,7 +108,7 @@ why the Bets tab blends toward the market. It takes several hundred games to kno
                       │ Function (Flex Consumption): live notifier + closing odds ─┼──────┘
                       └────────────────────────────────────────────────────────────┘
    Sources: NHL API (scores, play-by-play, shift charts, rosters) · NHL.com content API (lineups,
-   news) · MoneyPuck CSVs · The Odds API · Kalshi · ESPN/Sportsnet news
+   news) · NHL stats API · The Odds API · Kalshi · ESPN/Sportsnet/RotoWire/DobberHockey news
 ```
 
 - **Frontend:** React 19 + Vite on Azure Static Web Apps.
@@ -140,7 +140,7 @@ The daily job, in order (`backend/run_daily_ingest.py`):
 | Step | What it does |
 |---|---|
 | `ingest_standings.py` | Today's standings, all 32 teams |
-| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG/PDO from MoneyPuck's CSVs (team and skater) |
+| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG/PDO (team and skater) and goalie GSAx, from our per-game rows plus the NHL stats API |
 | `ingest_xg.py` | PuckPulse xG for each finished game from NHL play-by-play, plus each team's starting goalie |
 | `simulate_playoff_odds.py` | Team ratings and Monte Carlo playoff odds (v2.6) |
 | `game_predictions.py` | Logs today's win probabilities and expected goals (write-once), and grades finished games |
@@ -185,10 +185,12 @@ Also:
 ## Data sources and credits
 
 - **NHL:** `api-web.nhle.com` (scores, play-by-play, rosters, stats, schedules),
-  `api.nhle.com/stats/rest` (shift charts), and NHL.com's content API (projected lineups, news).
+  `api.nhle.com/stats/rest` (shift charts; skater and goalie season stats for the player ratings
+  and advanced stats), and NHL.com's content API (projected lineups, news).
   No key needed. Reference: https://github.com/Zmalski/NHL-API-Reference
-- **MoneyPuck.com:** advanced stats and playoff odds, from its public season CSVs (free for
-  non-commercial use, with credit).
+- **MoneyPuck.com:** its published playoff odds, logged next to ours as a benchmark (not shown).
+  Its season files are a fallback only if our goalie data for a past season is incomplete. Since
+  2026-10, every number on the site is ours or the NHL's.
 - **The Odds API:** sportsbook odds (`ODDS_API_KEY`, free tier: about 310 of 500 credits a
   month). Best prices are shown only from state-licensed US books.
 - **Kalshi:** public market prices, logged and graded but not displayed.

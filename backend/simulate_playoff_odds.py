@@ -937,13 +937,15 @@ def main():
         return
     logger.info(f"Loaded standings for {len(standings)} teams as of {args.as_of}")
 
-    xg_inputs = xg_model_inputs(args.season)  # MoneyPuck: the fallback xG, and last season's
     ours = puckpulse_xgd(args.season, standings)
+    roster = roster_rating_prior(args.season)
+    # MoneyPuck only as a fallback: its xG if ours is missing a game, and
+    # last season's xG as the prior if the roster ratings failed.
+    xg_inputs = None if ours and roster else xg_model_inputs(args.season)
     if ours or xg_inputs is not None:
         current_xgd = ours or xg_inputs[0]
         last_season_xg = xg_inputs[1] if xg_inputs else {}
         logger.info(f"Using the goals + {'PuckPulse' if ours else 'MoneyPuck'} xG model")
-        roster = roster_rating_prior(args.season)
         goalies = goalie_prior(args.season)
         # v2.4: the prior is the roster plus its goalies. Without roster
         # ratings (MoneyPuck or DB hiccup), last season's xG stands in.

@@ -19,7 +19,7 @@ export const GLOSSARY = {
   PACE: { name: "Points pace", detail: "Points the team would finish with at its current rate over a full season." },
   "7D": { name: "7-day change", detail: "How much the playoff odds moved over the last week, in percentage points." },
 
-  // Advanced (MoneyPuck, 5-on-5)
+  // Advanced (5-on-5; PuckPulse xG, NHL stats)
   "xG%": { name: "Expected goals share", detail: "xGF ÷ (xGF + xGA) at 5-on-5. Above 50% means a team creates better chances than it allows." },
   xGF: { name: "Expected goals for", detail: "How many goals a team's shots should produce, based on shot location, type, and situation." },
   xGA: { name: "Expected goals against", detail: "How many goals the shots a team allows should produce." },
@@ -30,10 +30,10 @@ export const GLOSSARY = {
   "IND_XG": { name: "Individual expected goals", detail: "Expected goals from the player's own shots." },
   "ONICE_XG": { name: "On-ice expected goals", detail: "Expected goals for and against while the player was on the ice, 5-on-5." },
 
-  // Goalies (MoneyPuck, all situations)
+  // Goalies (all situations; PuckPulse xG)
   GSAX: { name: "Goals saved above expected", detail: "Expected goals against minus goals allowed: how many more goals an average goalie would have given up on the same shots. Above 0 is better than average." },
   GSAX60: { name: "GSAx per 60", detail: "Goals saved above expected per 60 minutes, so goalies with different workloads compare fairly." },
-  HD_GSAX: { name: "High-danger GSAx", detail: "GSAx on shots from the slot and crease, the hardest saves." },
+  HD_GSAX: { name: "High-danger GSAx", detail: "GSAx on shots worth 0.20 expected goals or more, mostly from the slot and crease: the hardest saves." },
 
   // Skaters
   G: { name: "Goals" },

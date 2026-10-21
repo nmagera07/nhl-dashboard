@@ -253,8 +253,7 @@ function PlayoffsPage({ standings, standingsStatus = "ready" }) {
       <StatGlossary terms={showChange ? ["GP", "TEAM_PTS", "PACE", "PO%", "7D"] : ["GP", "TEAM_PTS", "PACE", "PO%"]} labels={{ TEAM_PTS: "PTS", PACE: "Pace", "7D": "7d" }} />
       <p className="data-credit">
         Odds from 10,000 simulations of the rest of the season, blending goals with PuckPulse&apos;s own expected goals
-        (xG, from NHL play-by-play) and each roster&apos;s players. Player and goalie data courtesy of{" "}
-        <a href="https://moneypuck.com" target="_blank" rel="noreferrer">MoneyPuck.com</a>.
+        (xG, from NHL play-by-play) and each roster&apos;s players and goalies, rated from NHL stats and the same xG.
         {" "}<Link className="accent-link" to="/track-record">How accurate is the model?</Link>
       </p>
     </main>

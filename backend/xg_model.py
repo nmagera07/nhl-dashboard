@@ -118,6 +118,7 @@ def shots_from_game(pbp):
                 "since_last": min(since, 99), "moved": moved, "angle_change": min(angle_change, 180.0),
                 "prev_kind": prev_kind, "prev_same_team": prev_same_team,
                 "strength": strength(play.get("situationCode"), is_home),
+                "situation": str(play.get("situationCode") or "1551").zfill(4),  # "1551" = 5-on-5
                 "lead": max(-3, min(3, lead)),
                 "goal": 1 if kind == "goal" else 0,
             })

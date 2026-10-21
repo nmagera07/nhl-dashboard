@@ -25,16 +25,15 @@ function renderView(view) {
 }
 
 describe("StandingsPage", () => {
-  // MoneyPuck's data is free for non-commercial use on condition of credit.
-  it("credits MoneyPuck wherever its advanced stats are shown", () => {
+  it("says where the advanced stats come from", () => {
     renderView("advanced");
-    expect(screen.getByRole("link", { name: "MoneyPuck.com" })).toHaveAttribute("href", "https://moneypuck.com");
+    expect(screen.getByText(/advanced stats .* from PuckPulse's own expected goals/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "MoneyPuck.com" })).not.toBeInTheDocument();
   });
 
-  it("credits MoneyPuck on the standard view too, since playoff odds use its xG", () => {
+  it("says the playoff odds use our own xG on the standard view", () => {
     renderView("standard");
-    expect(screen.getByText(/playoff odds \(PO%\) blend goals with expected goals/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "MoneyPuck.com" })).toBeInTheDocument();
+    expect(screen.getByText(/playoff odds \(PO%\) blend goals with PuckPulse's own expected goals/i)).toBeInTheDocument();
   });
 
   it("links to the playoff race from the standard view", () => {

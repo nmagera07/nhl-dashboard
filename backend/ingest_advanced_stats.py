@@ -1,100 +1,49 @@
 """
-Advanced Stats (Corsi/Fenwick/xG/PDO) Ingestion Script
+Advanced stats (Corsi/Fenwick/xG/PDO, goalie GSAx) for the Standings page
+and player cards, from PuckPulse's own xG and the NHL's stats API.
 
-Pulls team- and skater-level advanced stats from MoneyPuck's public
-seasonSummary CSVs:
+  - Teams, 5-on-5: sums of team_game_5v5 (ingest_xg.py, from play-by-play):
+    shot attempts, unblocked attempts, shots, goals, and our xG.
+  - Skaters, 5-on-5: Corsi/Fenwick, PDO, and ice time from the NHL stats
+    API (skater/summaryshooting and skater/percentages); his own xG and
+    on-ice xG from player_game_5v5 (our xG, on-ice from shift charts).
+  - Goalies, all situations: xG and goals against, and high-danger shots
+    (xG of 0.20 or more), from goalie_game_xg; games, ice time, and shots
+    on goal faced from the NHL's goalie summary.
 
-    https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/teams.csv
-    https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/skaters.csv
+Replaced MoneyPuck's season files (free for non-commercial use only) in
+2026-10. Checked against them on 2025-26: team shot, goal, and attempt
+counts match exactly; xG% correlates at r = 0.978 (team) and 0.961
+(skater, on-ice), since the xG model is ours.
 
-MoneyPuck's own site and directory listings (e.g. browsing
-.../seasonSummary/ itself) sit behind a Cloudflare bot-check demanding a
-paid data license -- confirmed by fetching that URL directly and getting
-back an HTML "please get a data license" page instead of a listing. The
-individual CSV files are NOT behind that check, though -- fetching the
-exact file path above returns the real CSV with a normal 200, no license
-required. This replaces an earlier, much more expensive approach that
-recomputed Corsi/Fenwick from scratch out of the NHL API's own
-play-by-play + shift-chart endpoints (one HTTP call pair per game, times
-~1300 games/season) specifically because MoneyPuck was believed to block
-all automated access -- it only blocks the directory/website UI, not the
-raw data files themselves.
-
-Both CSVs contain multiple rows per team/player, one per "situation"
-(all, 5on5, 4on5, 5on4, other). Only the "5on5" rows are ingested here --
-5-on-5 is the standard reference frame the industry quotes CF%/FF%/xG% in,
-since special-teams shot attempts (a team's power play, a bad penalty kill)
-otherwise swamp the even-strength signal. Goalies are not included in
-player_advanced_stats -- on-ice possession shares aren't a meaningful
-goalie stat the way they are for skaters.
-
-PDO (on-ice shooting% + on-ice save%, expressed as a sum of two
-percentages so a "normal" value sits around 100) isn't a column MoneyPuck
-publishes directly -- it's computed here from the underlying goals/shots
-columns, the same "derive the rate stat from raw counts" approach already
-used elsewhere in this codebase (see _combine_season_entries() in
-ingest_player_stats.py for the GAA/save_pctg equivalent).
-
-Setup:
-    pip install requests psycopg2-binary python-dotenv
-
-Environment variables expected (put these in a .env file):
-    DATABASE_URL=postgresql://user:password@host:port/dbname
+Runs after ingest_xg.py, which stores the per-game rows. A table whose
+games aren't nearly all stored yet (MIN_COVERAGE) is left as it was, so a
+backfill in progress never shows partial seasons.
 
 Usage:
     python ingest_advanced_stats.py                # current season
-    python ingest_advanced_stats.py --season 20242025
+    python ingest_advanced_stats.py --season 20252026
 """
 
 import argparse
-import csv
-import io
 import os
+from collections import defaultdict
 
 import psycopg2
 import requests
 from dotenv import load_dotenv
 
+import player_values as pv
 from logging_config import setup_logging
 from seasons import current_season_id
 
 load_dotenv()
 
-CSV_URL = "https://moneypuck.com/moneypuck/playerData/seasonSummary/{year}/regular/{kind}.csv"
 DATABASE_URL = os.environ["DATABASE_URL"]
-SITUATION = "5on5"
-# MoneyPuck's data is free for non-commercial use with credit
-# (moneypuck.com/data.htm). Identify honestly rather than posing as a
-# browser; the published CSV links accept this.
-REQUEST_HEADERS = {"User-Agent": "nhl-dashboard (personal, non-commercial; credits MoneyPuck.com)"}
-
-
+MIN_COVERAGE = 0.95  # share of the season's games (team_game_xg) with 5-on-5 rows before a table is rebuilt
+NHL_SKATER_5V5_REPORTS = ("summaryshooting", "percentages")
 
 logger = setup_logging("ingest_advanced_stats")
-
-
-def moneypuck_year(season_id):
-    """20252026 -> 2025 -- MoneyPuck's CSV paths use the season's start year only."""
-    return int(str(season_id)[:4])
-
-
-def fetch_csv_rows(year, kind):
-    url = CSV_URL.format(year=year, kind=kind)
-    response = requests.get(url, headers=REQUEST_HEADERS, timeout=30)
-    response.raise_for_status()
-    return list(csv.DictReader(io.StringIO(response.text)))
-
-
-def _float(value):
-    if value is None or value == "":
-        return None
-    return float(value)
-
-
-def _int(value):
-    if value is None or value == "":
-        return None
-    return int(float(value))
 
 
 def _pdo(goals_for, shots_for, goals_against, shots_against):
@@ -105,61 +54,86 @@ def _pdo(goals_for, shots_for, goals_against, shots_against):
     return (shooting_pct + save_pct) * 100
 
 
-def parse_team_row(row):
-    goals_for = _float(row["goalsFor"])
-    shots_for = _float(row["shotsOnGoalFor"])
-    goals_against = _float(row["goalsAgainst"])
-    shots_against = _float(row["shotsOnGoalAgainst"])
-    return {
-        "team_abbrev": row["team"],
-        "games_played": _int(row["games_played"]),
-        "corsi_for_pct": _float(row["corsiPercentage"]),
-        "fenwick_for_pct": _float(row["fenwickPercentage"]),
-        "xgoals_for_pct": _float(row["xGoalsPercentage"]),
-        "xgoals_for": _float(row["xGoalsFor"]),
-        "xgoals_against": _float(row["xGoalsAgainst"]),
-        "goals_for": _int(goals_for),
-        "goals_against": _int(goals_against),
-        "shots_on_goal_for": _int(shots_for),
-        "shots_on_goal_against": _int(shots_against),
-        "pdo": _pdo(goals_for, shots_for, goals_against, shots_against),
-    }
+def _pct(for_, against):
+    return for_ / (for_ + against) if (for_ or 0) + (against or 0) else None
 
 
-def parse_skater_row(row):
-    onice_goals_for = _float(row["OnIce_F_goals"])
-    onice_shots_for = _float(row["OnIce_F_shotsOnGoal"])
-    onice_goals_against = _float(row["OnIce_A_goals"])
-    onice_shots_against = _float(row["OnIce_A_shotsOnGoal"])
-    return {
-        "player_id": int(row["playerId"]),
-        "games_played": _int(row["games_played"]),
-        "icetime_seconds": _int(row["icetime"]),
-        "corsi_for_pct": _float(row["onIce_corsiPercentage"]),
-        "fenwick_for_pct": _float(row["onIce_fenwickPercentage"]),
-        "xgoals_for_pct": _float(row["onIce_xGoalsPercentage"]),
-        "xgoals_for": _float(row["OnIce_F_xGoals"]),
-        "xgoals_against": _float(row["OnIce_A_xGoals"]),
-        "individual_xgoals": _float(row["I_F_xGoals"]),
-        "pdo": _pdo(onice_goals_for, onice_shots_for, onice_goals_against, onice_shots_against),
-    }
+def coverage(cur, season_id):
+    """Share of the season's scored regular-season games (team_game_xg) that have 5-on-5 rows."""
+    cur.execute("SELECT COUNT(DISTINCT game_id) FROM team_game_xg WHERE season_id = %s AND game_type = 2", (season_id,))
+    games = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(DISTINCT game_id) FROM team_game_5v5 WHERE season_id = %s AND game_type = 2", (season_id,))
+    return cur.fetchone()[0] / games if games else 0.0
 
 
-GOALIE_SITUATION = "all"  # goaltending is judged on every shot faced, not just 5-on-5
+def team_stats(rows):
+    """team_advanced_stats rows from [(team, games, cf, ca, ff, fa, sf, sa, gf, ga, xgf, xga)] season sums."""
+    out = []
+    for team, games, cf, ca, ff, fa, sf, sa, gf, ga, xgf, xga in rows:
+        xgf, xga = float(xgf), float(xga)
+        out.append({
+            "team_abbrev": team, "games_played": games,
+            "corsi_for_pct": _pct(cf, ca), "fenwick_for_pct": _pct(ff, fa), "xgoals_for_pct": _pct(xgf, xga),
+            "xgoals_for": round(xgf, 3), "xgoals_against": round(xga, 3),
+            "goals_for": gf, "goals_against": ga, "shots_on_goal_for": sf, "shots_on_goal_against": sa,
+            "pdo": _pdo(gf, sf, ga, sa),
+        })
+    return out
 
 
-def parse_goalie_row(row):
-    return {
-        "player_id": int(row["playerId"]),
-        "games_played": _int(row["games_played"]),
-        "icetime_seconds": _int(row["icetime"]),
-        "shots_faced": _int(row["ongoal"]),
-        "goals_allowed": _int(row["goals"]),
-        "xgoals_against": _float(row["xGoals"]),
-        "high_danger_shots": _int(row["highDangerShots"]),
-        "high_danger_goals": _int(row["highDangerGoals"]),
-        "high_danger_xgoals": _float(row["highDangerxGoals"]),
-    }
+def fetch_nhl_skaters_5v5(year):
+    """{player_id: row}: the NHL's 5-on-5 shot-attempt and percentage reports, merged."""
+    merged = defaultdict(dict)
+    for report in NHL_SKATER_5V5_REPORTS:
+        response = requests.get(pv.NHL_SKATER_URL.format(report=report, season=f"{year}{year + 1}"), timeout=60)
+        response.raise_for_status()
+        for row in response.json()["data"]:
+            merged[row["playerId"]].update(row)
+    return merged
+
+
+def skater_stats(nhl, ours):
+    """
+    player_advanced_stats rows: nhl from fetch_nhl_skaters_5v5(), ours
+    {player_id: (ixg, on-ice xgf, on-ice xga)} season sums. A skater
+    without our rows yet gets the NHL's numbers and no xG.
+    """
+    out = []
+    for pid, r in nhl.items():
+        gp = int(r.get("gamesPlayed") or 0)
+        if not gp:
+            continue
+        ixg, xgf, xga = ours.get(pid, (None, None, None))
+        pdo = r.get("skaterShootingPlusSavePct5v5")
+        out.append({
+            "player_id": pid, "games_played": gp,
+            "icetime_seconds": round((r.get("timeOnIcePerGame5v5") or 0) * gp),
+            "corsi_for_pct": _pct(r.get("satFor"), r.get("satAgainst")),
+            "fenwick_for_pct": _pct(r.get("usatFor"), r.get("usatAgainst")),
+            "xgoals_for_pct": _pct(xgf, xga) if xgf is not None else None,
+            "xgoals_for": xgf, "xgoals_against": xga, "individual_xgoals": ixg,
+            "pdo": round(pdo * 100, 2) if pdo is not None else None,
+        })
+    return out
+
+
+def goalie_stats(nhl_rows, ours):
+    """
+    goalie_advanced_stats rows: nhl_rows the NHL's goalie summary, ours
+    {player_id: (goals against, xg against, hd shots, hd goals, hd xg)}.
+    """
+    out = []
+    for r in nhl_rows:
+        pid = r["playerId"]
+        if pid not in ours:
+            continue
+        ga, xga, hd_shots, hd_goals, hd_xg = ours[pid]
+        out.append({
+            "player_id": pid, "games_played": r.get("gamesPlayed"), "icetime_seconds": r.get("timeOnIce"),
+            "shots_faced": r.get("shotsAgainst"), "goals_allowed": ga, "xgoals_against": xga,
+            "high_danger_shots": hd_shots, "high_danger_goals": hd_goals, "high_danger_xgoals": hd_xg,
+        })
+    return out
 
 
 def save_goalie_stats(cur, season_id, stats, valid_player_ids):
@@ -191,26 +165,6 @@ def save_goalie_stats(cur, season_id, stats, valid_player_ids):
             ),
         )
         saved += 1
-    return saved
-
-
-def ingest_goalies(season_id, year):
-    """
-    Goalie stats in their own transaction, best effort: a MoneyPuck hiccup
-    or the table not existing yet (schema.sql not applied) mustn't undo the
-    team and skater stats already saved.
-    """
-    try:
-        rows = fetch_csv_rows(year, "goalies")
-        stats = [parse_goalie_row(r) for r in rows if r["situation"] == GOALIE_SITUATION]
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cur:
-                saved = save_goalie_stats(cur, season_id, stats, fetch_valid_player_ids(cur))
-            conn.commit()
-    except (requests.RequestException, psycopg2.Error, KeyError, ValueError) as exc:
-        logger.warning(f"Goalie advanced stats skipped ({type(exc).__name__}: {exc})")
-        return 0
-    logger.info(f"{saved} goalies saved.")
     return saved
 
 
@@ -307,31 +261,51 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--season", type=int, default=None, help="Defaults to the current season")
     args = parser.parse_args()
+    season_id = args.season or current_season_id()
+    year = season_id // 10000
 
-    if args.season is None:
-        args.season = current_season_id()
-    year = moneypuck_year(args.season)
-    logger.info(f"Fetching MoneyPuck advanced stats for {year} (season_id={args.season})...")
-
-    team_rows = fetch_csv_rows(year, "teams")
-    team_stats = [parse_team_row(r) for r in team_rows if r["situation"] == SITUATION]
-    logger.info(f"Parsed {len(team_stats)} team rows (situation={SITUATION}).")
-
-    skater_rows = fetch_csv_rows(year, "skaters")
-    player_stats = [parse_skater_row(r) for r in skater_rows if r["situation"] == SITUATION]
-    logger.info(f"Parsed {len(player_stats)} skater rows (situation={SITUATION}).")
-
+    nhl_skaters = fetch_nhl_skaters_5v5(year)
+    nhl_goalies = pv.fetch_nhl_goalies(year)
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
-            valid_team_abbrevs = fetch_valid_team_abbrevs(cur)
-            valid_player_ids = fetch_valid_player_ids(cur)
+            share = coverage(cur, season_id)
+            if share < MIN_COVERAGE:
+                logger.warning(f"Only {share:.0%} of {season_id}'s games have 5-on-5 rows; keeping yesterday's advanced stats")
+                return
+            cur.execute(
+                """
+                SELECT team_abbrev, COUNT(*), SUM(cf), SUM(ca), SUM(ff), SUM(fa), SUM(sf), SUM(sa), SUM(gf), SUM(ga),
+                       SUM(xgf), SUM(xga)
+                FROM team_game_5v5 WHERE season_id = %s AND game_type = 2 GROUP BY team_abbrev
+                """,
+                (season_id,),
+            )
+            teams = team_stats(cur.fetchall())
+            cur.execute(
+                """
+                SELECT player_id, SUM(ixg), SUM(onice_xgf), SUM(onice_xga)
+                FROM player_game_5v5 WHERE season_id = %s AND game_type = 2 GROUP BY player_id
+                """,
+                (season_id,),
+            )
+            # SUM skips games without a shift chart: on-ice xG covers the games that have one.
+            ours = {r[0]: tuple(round(float(v), 3) if v is not None else None for v in r[1:]) for r in cur.fetchall()}
+            cur.execute(
+                """
+                SELECT goalie_id, SUM(goals_against), SUM(xg_against), SUM(hd_shots), SUM(hd_goals), SUM(hd_xg)
+                FROM goalie_game_xg WHERE season_id = %s AND game_type = 2 GROUP BY goalie_id
+                """,
+                (season_id,),
+            )
+            goalies = {r[0]: (int(r[1]), round(float(r[2]), 3), r[3], r[4], round(float(r[5]), 3) if r[5] is not None else None)
+                       for r in cur.fetchall()}
 
-            teams_saved = save_team_stats(cur, args.season, team_stats, valid_team_abbrevs)
-            players_saved = save_player_stats(cur, args.season, player_stats, valid_player_ids)
+            valid_players = fetch_valid_player_ids(cur)
+            teams_saved = save_team_stats(cur, season_id, teams, fetch_valid_team_abbrevs(cur))
+            players_saved = save_player_stats(cur, season_id, skater_stats(nhl_skaters, ours), valid_players)
+            goalies_saved = save_goalie_stats(cur, season_id, goalie_stats(nhl_goalies, goalies), valid_players)
         conn.commit()
-
-    logger.info(f"Done. {teams_saved} teams, {players_saved} players saved.")
-    ingest_goalies(args.season, year)
+    logger.info(f"Advanced stats for {season_id}: {teams_saved} teams, {players_saved} skaters, {goalies_saved} goalies")
 
 
 if __name__ == "__main__":

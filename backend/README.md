@@ -80,7 +80,7 @@ pytest -k playoff_teams                # tests matching a keyword
 tests/
   conftest.py                    # fake DB layer + shared fixtures (see below)
   test_simulate_playoff_odds.py  # pure-function tests: win_probability, determine_playoff_teams
-  test_ingest_advanced_stats.py  # pure-function tests: MoneyPuck CSV row parsing, PDO calc
+  test_ingest_advanced_stats.py  # building the advanced stats tables, PDO calc
   test_api_misc.py               # GET /, GET /teams, GET /playoff-odds (+ /history)
   test_api_roster.py             # GET /teams/{team}/roster
   test_api_players.py            # GET /players/leaders, GET /players/{id}
@@ -133,7 +133,7 @@ upserts, nothing duplicates.
 |---|---|---|
 | `ingest_standings.py` | Current standings, all 32 teams → one snapshot row per team per day | Daily |
 | `ingest_player_stats.py` | Current roster + season-to-date stats, all 32 teams | Weekly in-season (season totals don't need daily polling) |
-| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO, team- and skater-level, from MoneyPuck's public seasonSummary CSVs | Weekly in-season |
+| `ingest_advanced_stats.py` | 5-on-5 Corsi/Fenwick/xG%/PDO (team and skater) and goalie GSAx, from `ingest_xg.py`'s per-game rows and the NHL stats API | Daily, after `ingest_xg.py` |
 | `simulate_playoff_odds.py` | Monte Carlo playoff-odds simulation (`--as-of` for backtesting a past date) | Daily |
 | `daily_digest.py` | The morning digest: facts gathered here, written by NHL Intelligence (`/digest/write`), stored in `daily_digest`; set up once with `scripts/setup_daily_digest.py` | Daily (after playoff odds) |
 | `notify_live_games.py` | Goal and final-score push notifications for followed teams (the `puckpulse-live-notifier` Azure Function in `notifier_function/`, every minute during game hours; set up once with `scripts/setup_push_notifications.py`, then `scripts/setup_notifier_function.py`) | Every minute |
@@ -163,7 +163,7 @@ the top-level README for why.
 | `GET /playoff-odds/history?season_id=` | Every odds snapshot for a season (default: latest), for the playoff race chart |
 | `GET /teams/{team}/roster` | Current roster + season stats for one team |
 | `GET /players/leaders` | Every rostered player + season stats (league leaderboard) |
-| `GET /players/{id}` | Bio + season-by-season stats + career totals + this season's advanced stats (skaters only; `null` for goalies and for any player MoneyPuck hasn't covered yet) for one player |
+| `GET /players/{id}` | Bio + season-by-season stats + career totals + this season's advanced stats (skaters only; `null` for goalies and for any player without 5-on-5 stats yet) for one player |
 
 ## Schema
 
@@ -172,8 +172,8 @@ the top-level README for why.
 - `season_final_standings` — one row per team per completed season (last 5 years)
 - `players` — current roster snapshot, all 32 teams
 - `player_season_stats` — one row per player per season, refreshed each ingestion run
-- `team_advanced_stats` — 5-on-5 corsi/fenwick/xG%/PDO from MoneyPuck, one row per team per season
-- `player_advanced_stats` — same MoneyPuck source, one row per skater per season (goalies excluded)
+- `team_advanced_stats` — 5-on-5 corsi/fenwick/xG%/PDO from `team_game_5v5` (our xG), one row per team per season
+- `player_advanced_stats` — 5-on-5 Corsi/Fenwick/PDO from the NHL stats API, xG from `player_game_5v5`, one row per skater per season
 - `playoff_odds` — Monte Carlo simulation results, one row per team per as-of-date
 
 Full column definitions and comments are in `schema.sql`.

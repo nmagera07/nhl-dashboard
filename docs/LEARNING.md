@@ -185,6 +185,38 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-20 — An AI agent drifts when the app grows around it
+
+**What happened:** PuckPulse AI was built before the Bets, lineup, fantasy,
+and draft pages existed. Asked six questions about them, it answered none:
+five refusals, and one confident wrong answer ("no recent news on
+Wallstedt" when RotoWire had him starting). I added five tools, updated
+the instructions, and wrote evals for each.
+
+**What I learned:**
+- **Tools define what an agent knows.** The model didn't hallucinate. It
+  refused, because its tools had no path to the new data. The instruction
+  "you have no lineup data" was true when written and false a month later.
+- **Tool result shape changes answers.** Given a goalie as separate
+  name/status/source fields, the model paired the name with the wrong
+  source. As one sentence ("Merilainen: confirmed by beat reporters"), it
+  couldn't. Asked "any value bets?", it picked the closest price and
+  called it value, until the tool said up front "None right now."
+- **Evals rot too.** One eval checked for the old refusal, two rubrics
+  described last month's model, and one crashed on a schedule format
+  change. A failing eval can mean the answer is wrong or the rubric is,
+  so read the answer before fixing either one.
+- **Free tiers shape the design.** Every request carries every tool's
+  description. Five new tools pushed a two-call question near Groq's
+  tokens-per-minute cap, so the descriptions had to get shorter.
+
+**Interview angle:** "How do you keep an LLM feature working as the
+product changes?" Tests for the tools, evals that compute today's right
+answer from live data, and a habit of re-asking it real questions after
+every feature ships.
+
+---
+
 ## 2026-10-20 — Swapping a data source without changing the answers
 
 **What happened:** The playoff model's roster ratings came from MoneyPuck's

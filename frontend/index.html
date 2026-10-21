@@ -30,6 +30,22 @@
     <meta name="apple-mobile-web-app-title" content="PuckPulse" />
     <!-- Umami analytics (cookieless; tracker self-hosted from cloud.umami.is/script.js). Counts only on puckpulse.io, and not for Do Not Track browsers. -->
     <script defer src="/stats.js" data-website-id="d3520f7b-ccb8-429c-89e0-1d558d9826e6" data-domains="puckpulse.io,www.puckpulse.io" data-do-not-track="true"></script>
+    <!-- Who's behind the site, for search engines (a data block: never executed, so the CSP doesn't apply). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "PuckPulse",
+        "url": "https://puckpulse.io/",
+        "description": "NHL scores, playoff odds, and an AI hockey analyst.",
+        "creator": {
+          "@type": "Person",
+          "name": "Nate Magera",
+          "url": "https://www.linkedin.com/in/nate-magera",
+          "sameAs": ["https://www.linkedin.com/in/nate-magera", "https://x.com/natemagera", "https://github.com/nmagera07"]
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

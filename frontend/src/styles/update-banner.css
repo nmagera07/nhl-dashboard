@@ -32,3 +32,11 @@
 
 .app-footer { margin: 32px var(--gutter) 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
 .app-footer a { color: var(--text-dim); }
+.app-footer p { margin: 0; }
+.footer-credit { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin-bottom: 8px !important; color: var(--text); font-size: 12px; }
+.footer-credit > span > a { color: var(--text); font-weight: 600; text-decoration: none; }
+.footer-credit > span > a:hover { color: var(--accent); }
+.footer-social { display: inline-flex; gap: 4px; }
+.footer-social a { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--text-dim); }
+.footer-social a:hover { background: var(--neutral-soft); color: var(--text); }
+.footer-social svg { width: 16px; height: 16px; fill: currentColor; }

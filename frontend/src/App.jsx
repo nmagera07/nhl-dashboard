@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-
 import "./App.css";
 import { API_BASE, DIVISION_ORDER, LEAGUE_TAB } from "./config.js";
 import IntelligencePanel from "./components/IntelligencePanel.jsx";
+import SiteFooter from "./components/SiteFooter.jsx";
 import { useFetchWithStatus } from "./hooks/useFetchWithStatus.js";
 import { useFavoriteTeam } from "./hooks/useFavoriteTeam.js";
 import { useScrollToTop } from "./hooks/useScrollToTop.js";
@@ -236,9 +237,7 @@ export default function NHLDashboard() {
         </Routes>
       </div>
 
-      <footer className="app-footer">
-        PuckPulse · Data from the NHL; expected goals are our own. Not affiliated with or endorsed by the NHL.
-      </footer>
+      <SiteFooter />
       <UpdateBanner />
       <TabBar />
     </div>

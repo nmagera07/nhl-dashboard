@@ -1020,6 +1020,38 @@ def season_sim_roster_change(
     return result
 
 
+@app.get("/season-sim/injury")
+@limiter.limit(EXPENSIVE_RATE_LIMIT)
+def season_sim_injury(
+    request: Request,
+    player: int = Query(..., gt=0, description="The injured player's NHL id"),
+    back: Optional[date] = Query(None, description="His expected return date; without it, only healthy vs. out for the season"),
+):
+    """
+    What an injured player's return is worth: his team's playoff odds
+    healthy now, back on `back` (missing the games before it), and out for
+    the rest of the season (season_scenarios.injury_return). Not a trade:
+    see /season-sim/roster-change for that.
+    """
+    payload = _latest_sim_inputs()
+    key = (payload["as_of_date"], "injury", player, str(back) if back else None)
+    if key in _SCENARIO_CACHE:
+        _SCENARIO_CACHE.move_to_end(key)
+        return _SCENARIO_CACHE[key]
+    try:
+        result = season_scenarios.injury_return(payload, player, str(back) if back else None)
+    except season_scenarios.UnknownPlayer as exc:
+        raise HTTPException(status_code=404, detail=f"No value for player {exc} (a goalie, or not on an NHL team).") from exc
+    except season_scenarios.UnknownTeam as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown team '{exc}'.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _SCENARIO_CACHE[key] = result
+    while len(_SCENARIO_CACHE) > _SCENARIO_CACHE_SIZE:
+        _SCENARIO_CACHE.popitem(last=False)
+    return result
+
+
 # --- News ------------------------------------------------------------------
 #
 # Headlines (NHL.com, ESPN, Sportsnet), injuries, and transactions (ESPN),

@@ -785,6 +785,9 @@ def stored_goalie_xg(season_id):
     return {"games": games, "goalies": {r[0]: (float(r[1]), int(r[2])) for r in rows}} if rows else None
 
 
+_landing_teams = {}  # player_id -> current team (or None) from his landing page, this run
+
+
 def missing_player_teams(values, last, rosters, get=nhl_get):
     """
     {player_id: team} for last season's regulars missing from today's
@@ -798,13 +801,14 @@ def missing_player_teams(values, last, rosters, get=nhl_get):
         played = min(last.get(pid, {}).get("gp", 0) / 82, 1.0)
         if pid in rosters or abs(v["value"] * played) < MISSING_LOOKUP_MIN:
             continue
-        try:
-            team = get(PLAYER_LANDING_URL.format(player_id=pid)).get("currentTeamAbbrev")
-        except Exception as exc:  # one player's page failing shouldn't cost the rest
-            logger.warning(f"No landing page for {v['name']} ({exc}); counting him as gone")
-            continue
-        if team:
-            found[pid] = team
+        if pid not in _landing_teams:  # the prior and the player values both ask; look each up once a run
+            try:
+                _landing_teams[pid] = get(PLAYER_LANDING_URL.format(player_id=pid)).get("currentTeamAbbrev")
+            except Exception as exc:  # one player's page failing shouldn't cost the rest
+                logger.warning(f"No landing page for {v['name']} ({exc}); counting him as gone")
+                continue
+        if _landing_teams[pid]:
+            found[pid] = _landing_teams[pid]
     if found:
         logger.info(f"{len(found)} players off the current-roster feed but still signed (injured reserve, etc.)")
     return found
@@ -818,7 +822,8 @@ def with_roster_change(priors, change):
 
 def compute_player_values(season_id):
     """
-    Skater values for roster-change scenarios. Best effort: the odds don't
+    Skater values for roster-change and injury-return scenarios, injured
+    players included. Best effort: the odds don't
     depend on them, so an NHL stats or roster hiccup only costs the trade
     simulator a day.
     """
@@ -826,7 +831,12 @@ def compute_player_values(season_id):
 
     start = season_id // 10000
     try:
-        values = pv.player_values(pv.season_skaters(start), pv.season_skaters(start - 1), rosters=load_rosters())
+        current, last = pv.season_skaters(start), pv.season_skaters(start - 1)
+        rosters = load_rosters()
+        # Injured reserve isn't on the current-roster feed; without this an
+        # injured player had no value, so "what's his return worth?" failed.
+        rosters.update(missing_player_teams(pv.player_values(current, last), last, rosters))
+        values = pv.player_values(current, last, rosters=rosters)
     except Exception as exc:  # network, parse, or DB
         logger.warning(f"Couldn't compute player values ({exc}); roster-change scenarios unavailable today")
         return {}

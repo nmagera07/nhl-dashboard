@@ -331,6 +331,29 @@ async def best_goalie(api) -> Truth:
                         "explains GSAx in plain words."}
 
 
+async def injury_return(api) -> Truth:
+    import httpx
+
+    leaders = {f"{p['first_name']} {p['last_name']}": p for p in await api("/players/leaders") if p.get("position_code") != "G"}
+    hurt = [(team, i) for team, rows in (await api("/injuries"))["teams"].items() for i in rows
+            if i.get("expected_return") and i.get("player") in leaders]
+    for team, i in hurt:
+        try:
+            result = await api(f"/season-sim/injury?player={leaders[i['player']]['player_id']}&back={i['expected_return'][:10]}")
+        except httpx.HTTPStatusError:
+            continue  # no value for him (too few games)
+        s = result["scenarios"]
+        pts = round(s["back_on_return_date"]["avg_points"] - s["out_for_season"]["avg_points"], 1)
+        return {"question": f"How much does {i['player']} coming back help {team}?", "tool": ("simulate_injury_return", None),
+                "facts": [i["player"].split()[-1]],
+                "rubric": f"{i['player']} ({team}) is out, expected back {i['expected_return'][:10]}. Back then, {team} projects "
+                          f"to {s['back_on_return_date']['avg_points']} points vs {s['out_for_season']['avg_points']} if he "
+                          f"missed the rest of the season (+{pts}); playoff odds {s['back_on_return_date']['playoff_pct']:.1%} vs "
+                          f"{s['out_for_season']['playoff_pct']:.1%}. Pass if the answer treats it as an injury return (not a "
+                          "trade), gives the effect in the right direction, and calls it an estimate."}
+    return {"skip": "no injured skater with an expected return and a value"}
+
+
 async def report_card(api) -> Truth:
     card = await api("/report-card")
     ml = (card.get("season") or {}).get("moneyline") or {}
@@ -392,5 +415,6 @@ CASES = [
     Case("report_card", "How have PuckPulse's odds done against the sportsbooks this season?", report_card),
     Case("last_night", "Who won last night?", last_night),
     Case("best_goalie", "Who's the best goalie in the league this season?", best_goalie),
+    Case("injury_return", "(an injured player on today's report)", injury_return),
     Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

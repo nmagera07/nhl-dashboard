@@ -66,12 +66,19 @@ TOOLS = [
          "ot_losses": {"type": "integer", "minimum": 0, "maximum": 30, "description": "Losses in overtime/shootout (still a point). Default 0."}},
         ["team", "games", "wins"]),
     _fn("simulate_roster_change",
-        "Simulate a hypothetical trade or a player missing the rest of the season with the playoff-odds model: each "
-        "affected team's playoff odds with and without the move, from the player's value in goals/game. Use for "
-        "'what if they traded X', 'what if X goes to Y', 'X for Y', or 'what if X is out for the season'. Skaters only.",
+        "Simulate a hypothetical trade with the playoff-odds model: each affected team's playoff odds with and without "
+        "the move, from the player's value in goals/game. Use for 'what if they traded X', 'what if X goes to Y', or "
+        "'X for Y'. Not for injuries (use simulate_injury_return). Skaters only.",
         {"player": {"type": "string", "description": "The player who moves, e.g. 'Dylan Larkin'."},
-         "to_team": {"type": "string", "description": "Optional team he goes to. Leave out if unknown or he's just out."},
+         "to_team": {"type": "string", "description": "Optional team he goes to. Leave out if traded for an unknown return."},
          "player_back": {"type": "string", "description": "Optional player coming back in the trade (he joins the first player's team)."}},
+        ["player"]),
+    _fn("simulate_injury_return",
+        "What a player's return from injury is worth to his team (not a trade: he stays put): its playoff odds healthy, "
+        "back on his expected return date (from the injury report), and out for the rest of the season. Also for "
+        "'what if X is out until <date>' or 'for the season'. Skaters only.",
+        {"player": {"type": "string", "description": "e.g. 'Seth Jarvis'."},
+         "return_date": {"type": "string", "description": "Optional YYYY-MM-DD, for a hypothetical; default his expected return."}},
         ["player"]),
     _fn("playoff_path",
         "What a team needs: its playoff odds for every possible record over its next games (e.g. 0-10 up to 10-0), from the model.",
@@ -136,6 +143,7 @@ LABELS = {
     "simulate_scenario": ("Simulating 2,000 seasons", "Season simulation (playoff-odds model)"),
     "simulate_roster_change": ("Simulating the trade", "Season simulation with the roster change (playoff-odds model)"),
     "playoff_path": ("Simulating every record", "Season simulation (playoff-odds model)"),
+    "simulate_injury_return": ("Simulating his return", "Season simulation with and without the player (playoff-odds model)"),
     "get_recent_results": ("Checking recent results", "Recent results"),
     "get_game": ("Pulling up the box score", "NHL game box score"),
     "find_player": ("Looking up the player", "Player profile and stats"),
@@ -472,6 +480,56 @@ class ToolRunner:
                            "replacement-level player; a player who arrives is assumed to replace one. It's the rest "
                            "of the season, a rough estimate that ignores line chemistry and the salary cap: say so.",
         }
+
+    async def _tool_simulate_injury_return(self, player: str, return_date: str | None = None):
+        matches = await self._match_players(player)
+        if len(matches) > 1:
+            return self._ambiguous(matches)
+        who = matches[0]
+        name = compact._name(who).lower()
+        report, feed = await asyncio.gather(self._get("/injuries"), self._get("/fantasy?limit=150"))
+        injury = next((compact._clean(i) for rows in (report.get("teams") or {}).values() for i in rows
+                       if (i.get("player") or "").lower() == name), None)
+        latest = next((u for u in feed.get("updates", []) if (u.get("player") or "").lower() == name), None)
+        if return_date:
+            try:
+                back, basis = str(_parse_date(return_date)), "the date asked about"
+            except ValueError as exc:
+                raise ToolError("return_date must be YYYY-MM-DD") from exc
+        elif injury and injury.get("expected_return"):
+            back, basis = injury["expected_return"][:10], "his expected return on the injury report"
+        elif injury:
+            back, basis = None, "on the injury report with no expected return"
+        else:
+            back, basis = _today(), "not on the injury report, so available now"
+        query = f"/season-sim/injury?player={who['player_id']}" + (f"&back={back}" if back else "")
+        try:
+            result = await self.dashboard._get(query)
+        except DashboardUnavailable as exc:
+            cause = exc.__cause__
+            if isinstance(cause, httpx.HTTPStatusError) and cause.response.status_code < 500:
+                raise ToolError(cause.response.json().get("detail", "That player can't be simulated.")) from exc
+            raise
+        pct = {k: round(v["playoff_pct"] * 100, 1) for k, v in result["scenarios"].items()}
+        pts = {k: v["avg_points"] for k, v in result["scenarios"].items()}
+        with_him = pct.get("back_on_return_date", pct["healthy_now"])
+        with_him_pts = pts.get("back_on_return_date", pts["healthy_now"])
+        return compact._clean({
+            "player": result["player"], "team": result["team"], "return_date": back, "return_date_basis": basis,
+            "injury_report": injury, "latest_update": {"update": latest["title"], "detail": latest.get("summary"),
+                                                       "published": latest["published"][:16]} if latest else None,
+            "team_games_missed_before_return": result.get("team_games_missed_before_return"),
+            "playoff_odds_pct": pct,
+            "worth_to_team_pct_points": round(with_him - pct["out_for_season"], 1),
+            "projected_standings_points": pts,
+            "worth_to_team_standings_points": round(with_him_pts - pts["out_for_season"], 1),
+            "value_goals_per_game": result["value_goals_per_game"],
+            "how_to_read": "healthy_now is the published playoff odds: the model already counts injured players as "
+                           "healthy. What his return is worth = his team's odds (and projected standings points) with him "
+                           "back on the return date minus out_for_season. When the odds are near 0% or 100% they barely "
+                           "move, so lead with standings points. A simulation from his value over a replacement player; "
+                           "say it's an estimate.",
+        })
 
     async def _tool_get_injuries(self, player: str | None = None, team: str | None = None):
         if player:

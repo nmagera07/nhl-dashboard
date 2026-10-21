@@ -209,3 +209,62 @@ def test_rate_limits_key_on_the_client_the_proxy_saw():
     assert client_ip(request("203.0.113.7")) == "203.0.113.7"
     assert client_ip(request("1.2.3.4, 203.0.113.7")) == "203.0.113.7"  # a made-up left entry is ignored
     assert client_ip(request()) == "100.100.0.55"
+
+
+@pytest.mark.asyncio
+class TestAnswerCache:
+    """The same fresh question on the same page costs the free tiers once; a recent answer covers for busy providers."""
+
+    async def service_and_clock(self, client, behavior, calls):
+        now = [1000.0]
+        service = IntelligenceService(settings(), dashboard=DashboardClient("https://dashboard.test", client),
+                                      chain=chain(behavior, calls), clock=lambda: now[0])
+        return service, now
+
+    def client(self):
+        transport = httpx.MockTransport(lambda request: httpx.Response(200, json={"first_name": "Player", "last_name": "One"}))
+        return httpx.AsyncClient(base_url="https://dashboard.test", transport=transport)
+
+    def ask(self, text, history=()):
+        return ChatRequest(message=text, context=ChatContext(page="player", player_id=7), history=list(history))
+
+    async def test_a_repeat_question_costs_no_model_calls(self):
+        calls = []
+        async with self.client() as client:
+            service, now = await self.service_and_clock(client, "Fine season.", calls)
+            first = await service.answer(self.ask("How is he doing?"))
+            again = await service.answer(self.ask("  how is he DOING  "))  # same words, different case and spacing
+            assert (first.answer, again.answer, len(calls)) == ("Fine season.", "Fine season.", 1)
+            now[0] += 181  # past fresh: asks the model again
+            await service.answer(self.ask("How is he doing?"))
+            assert len(calls) == 2
+
+    async def test_follow_ups_are_never_cached(self):
+        calls = []
+        async with self.client() as client:
+            service, _ = await self.service_and_clock(client, "Sure.", calls)
+            history = [{"role": "user", "content": "How's PIT?"}, {"role": "assistant", "content": "3-6-1."}]
+            await service.answer(self.ask("And their next game?", history))
+            await service.answer(self.ask("And their next game?", history))
+            assert len(calls) == 2
+
+    async def test_a_recent_answer_covers_for_busy_providers(self):
+        async with self.client() as client:
+            service, now = await self.service_and_clock(client, "Fine season.", [])
+            await service.answer(self.ask("How is he doing?"))
+            service.chain = chain(rate_limited())
+            now[0] += 600  # stale, but under half an hour
+            result = await service.answer(self.ask("How is he doing?"))
+            assert result.answer == "Fine season." and result.model.endswith("from a few minutes ago")
+            events = [json.loads(e[6:]) async for e in service.answer_stream(self.ask("How is he doing?"))]
+            assert [e["type"] for e in events] == ["delta", "done"]
+            now[0] += 1800  # too old to trust
+            with pytest.raises(HTTPException) as error:
+                await service.answer(self.ask("How is he doing?"))
+            assert error.value.headers["Retry-After"] == "20"
+
+    async def test_busy_with_nothing_cached_tells_the_app_when_to_retry(self):
+        async with self.client() as client:
+            service, _ = await self.service_and_clock(client, rate_limited(), [])
+            events = [json.loads(e[6:]) async for e in service.answer_stream(self.ask("How is he doing?"))]
+            assert events[-1] == {"type": "error", "message": ALL_BUSY, "retry_after": 20}

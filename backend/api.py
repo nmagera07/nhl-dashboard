@@ -1796,6 +1796,48 @@ def _goalie_advanced(cur, player_id):
     return row
 
 
+@app.get("/goalies/advanced")
+@daily_cached
+def goalies_advanced():
+    """
+    This season's goalies by goals saved above expected (GSAx = xG against
+    minus goals allowed, from PuckPulse's xG), best first, with per-60 and
+    high-danger GSAx. For PuckPulse AI's "who's the best goalie?"
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    SELECT g.player_id, p.first_name, p.last_name, p.team_abbrev, g.games_played, g.icetime_seconds,
+                           g.shots_faced, g.goals_allowed, g.xgoals_against, g.high_danger_goals, g.high_danger_xgoals
+                    FROM goalie_advanced_stats g JOIN players p USING (player_id)
+                    WHERE g.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                    """
+                )
+                rows = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                return {"goalies": []}
+    finally:
+        conn.close()
+    goalies = []
+    for r in rows:
+        if r["xgoals_against"] is None or r["goals_allowed"] is None:
+            continue
+        gsax = float(r["xgoals_against"]) - r["goals_allowed"]
+        hours = (r["icetime_seconds"] or 0) / 3600
+        goalies.append({
+            "player_id": r["player_id"], "name": f"{r['first_name']} {r['last_name']}", "team": r["team_abbrev"],
+            "games_played": r["games_played"], "gsax": round(gsax, 2), "gsax_per_60": round(gsax / hours, 2) if hours else None,
+            "high_danger_gsax": round(float(r["high_danger_xgoals"]) - r["high_danger_goals"], 2)
+            if r["high_danger_xgoals"] is not None and r["high_danger_goals"] is not None else None,
+            "save_pct": round(1 - r["goals_allowed"] / r["shots_faced"], 3) if r["shots_faced"] else None,
+        })
+    goalies.sort(key=lambda g: -g["gsax"])
+    return {"goalies": goalies}
+
+
 @app.get("/players/{player_id}", response_model=PlayerDetail)
 def player_detail(player_id: int):
     """

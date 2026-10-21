@@ -17,6 +17,15 @@ class TestProvidersFromEnv:
 
         assert [p.name for p in providers_from_env(env)] == ["groq", "gemini"]
 
+    def test_one_key_can_back_several_models(self):
+        env = {"AI_PROVIDERS": "gemini,gemini:gemini-2.5-flash-lite,groq:qwen/qwen3.8-27b,cloudflare:x",
+               "GEMINI_API_KEY": "g", "GROQ_API_KEY": "q"}
+        chain = providers_from_env(env)
+        assert [(p.name, p.model) for p in chain] == [("gemini", "gemini-flash-lite-latest"),
+                                                      ("gemini:gemini-2.5-flash-lite", "gemini-2.5-flash-lite"),
+                                                      ("groq:qwen/qwen3.8-27b", "qwen/qwen3.8-27b")]  # no Cloudflare key
+        assert chain[1].api_key == "g" and chain[1].label == "Google Gemini (gemini-2.5-flash-lite)"
+
     def test_default_order_is_free_providers_only(self):
         env = {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "q", "OPENAI_API_KEY": "paid"}
 

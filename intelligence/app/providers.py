@@ -16,7 +16,8 @@ Environment:
     OPENAI_API_KEY          paid fallback, off unless listed (OPENAI_MODEL)
 
 A provider without its key/URL is skipped. Model names change often, so
-every default can be overridden with its *_MODEL variable.
+every default can be overridden with its *_MODEL variable, or per entry in
+AI_PROVIDERS as name:model (e.g. "gemini,gemini:gemini-2.5-flash-lite,groq").
 """
 
 import logging
@@ -73,8 +74,16 @@ def providers_from_env(env: Mapping[str, str] = os.environ) -> list[Provider]:
             "openai", "OpenAI", None, get("OPENAI_API_KEY"), get("OPENAI_MODEL", "gpt-5.6-luna"),
         )
 
-    order = [n.strip() for n in get("AI_PROVIDERS", DEFAULT_ORDER).split(",") if n.strip()]
-    return [available[name] for name in order if name in available]
+    # An entry can name a model too ("gemini:gemini-2.5-flash-lite"). Free
+    # quotas are per model, so one key can back several links in the chain.
+    chain = []
+    for entry in (e.strip() for e in get("AI_PROVIDERS", DEFAULT_ORDER).split(",")):
+        name, _, model = entry.partition(":")
+        if name not in available:
+            continue
+        base = available[name]
+        chain.append(Provider(entry, f"{base.label} ({model})", base.base_url, base.api_key, model) if model else base)
+    return chain
 
 
 class AllProvidersFailed(Exception):

@@ -148,3 +148,4 @@
 /* The floating Ask button sits over the bottom of the page; leave room so the
    end of every page can scroll clear of it. */
 .app-content { padding-bottom: 72px; }
+.chat-divider { align-self: center; margin: 4px 0; padding: 2px 10px; border-radius: 999px; background: var(--neutral-soft); color: var(--text-dim); font-size: 11px; font-weight: 600; }

@@ -33,8 +33,8 @@ describe("RosterPanel", () => {
     await userEvent.click(screen.getByText("From the last game"));
 
     expect(await screen.findByText("Last game: Oct 13 @ CHI")).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "PIT forward lines" })).toHaveTextContent("Malkin – Novak – Chinakhov");
-    expect(screen.getByRole("list", { name: "PIT defense pairs" })).toHaveTextContent("Karlsson – Girard");
+    expect(screen.getByRole("list", { name: "PIT forward lines" })).toHaveTextContent(/1.*Malkin.*Novak.*Chinakhov/);
+    expect(screen.getByRole("list", { name: "PIT defense pairs" })).toHaveTextContent(/1.*Karlsson.*Girard/);
     vi.restoreAllMocks();
   });
 });

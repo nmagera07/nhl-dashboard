@@ -185,6 +185,39 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-21 — Rate limits behind a proxy: whose IP is it?
+
+**What happened:** In the pre-launch security audit I found that every rate
+limit in both services keyed on the wrong address. Behind Azure Container
+Apps, every request's socket address is the ingress proxy (two to four
+internal 100.100.x.x IPs per service in the logs), so all visitors shared a
+few buckets. PuckPulse AI's "30 a day" meant about 120 questions a day for
+the whole site, and pick'em's "5 sign-ups an hour" meant about 10 for
+everyone. One person could have
+locked everyone out on launch day.
+
+**What I learned:**
+- **Check what the server actually sees.** The rate limiter looked right in
+  code and passed its tests (the test client has one IP, so it can't catch
+  this). The access logs showed the truth.
+- **Trust the rightmost X-Forwarded-For entry, not the leftmost.** The proxy
+  appends the client's real address. Anything to the left of it is whatever
+  the client sent, so keying on the leftmost lets anyone dodge a limit by
+  making up a new value with each request. I wrote a test for exactly that.
+- **"No findings" needs a check too.** Semgrep printed nothing; rerunning
+  without `--quiet` confirmed it ran 255 rules on 158 files and found nothing,
+  rather than failing silently.
+- **Scanners flag; people decide.** Bandit flagged 9 "possible SQL
+  injection" spots. All of them interpolated code constants or values from an
+  allowlist, so none were real. It also flagged XML parsing of third-party
+  feeds, which was worth a cheap fix (defusedxml).
+
+**Interview angle:** "What's a bug that passed all its tests?" Rate limits
+keyed on a proxy's IP: correct in isolation, wrong in production, and only
+visible in the access logs.
+
+---
+
 ## 2026-10-20 — An AI agent drifts when the app grows around it
 
 **What happened:** PuckPulse AI was built before the Bets, lineup, fantasy,

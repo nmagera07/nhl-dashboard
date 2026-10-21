@@ -332,3 +332,16 @@ class TestSavedFantasyUpdates:
         monkeypatch.setattr(api, "get_connection", lambda: (_ for _ in ()).throw(RuntimeError("db down")))
         assert api.load_fantasy_updates() == 0
         api.store_fantasy_updates(news.parse_rotowire(ROTOWIRE_RSS))  # logs, doesn't raise
+
+
+def test_a_hostile_feed_is_refused_not_expanded():
+    """A compromised feed could send an entity bomb or point at local files; defusedxml refuses both."""
+    bomb = ('<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+            '<rss><channel><item><title>&b;</title></item></channel></rss>')
+    external = ('<?xml version="1.0"?><!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]>'
+                '<rss><channel><item><title>&x;</title></item></channel></rss>')
+    for feed in (bomb, external):
+        with pytest.raises(Exception, match="(?i)entit"):
+            news.parse_rss(feed, "Evil")
+        with pytest.raises(Exception, match="(?i)entit"):
+            news.parse_rotowire(feed)

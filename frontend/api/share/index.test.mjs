@@ -22,6 +22,20 @@ describe("share function", () => {
     expect(html).toContain('property="og:image" content="https://puckpulse.io/og-card.png"');
   });
 
+  it("never lets the API's response change where the link goes", async () => {
+    const { html } = await run("/g/2026020152", { title: "PHI @ BUF", description: "x", url: "https://evil.example/phish",
+                                                   image: "https://evil.example/x.png" });
+    expect(html).toContain('content="0; url=https://puckpulse.io/games/2026020152"');
+    expect(html).not.toContain("evil.example");
+    expect(html).toContain('property="og:title" content="PHI @ BUF"');
+  });
+
+  it("escapes text from the API", async () => {
+    const { html } = await run("/g/2026020152", { title: '"><script>alert(1)</script>', description: "a & b" });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&quot;&gt;&lt;script&gt;");
+  });
+
   it("falls back to the generic card for an unknown team, without calling the API", async () => {
     const { html, fetch } = await run("/t/XYZ");
     expect(fetch).not.toHaveBeenCalled();

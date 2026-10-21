@@ -195,3 +195,17 @@ def test_digest_endpoint_is_off_without_a_token(monkeypatch):
         assert client.post("/digest/write", json={"facts": FACTS}, headers={"X-Digest-Token": ""}).status_code == 503
     finally:
         client.__exit__(None, None, None)
+
+
+def test_rate_limits_key_on_the_client_the_proxy_saw():
+    from starlette.requests import Request
+
+    from app.main import client_ip
+
+    def request(xff=None):
+        headers = [(b"x-forwarded-for", xff.encode())] if xff else []
+        return Request({"type": "http", "headers": headers, "client": ("100.100.0.55", 51774)})
+
+    assert client_ip(request("203.0.113.7")) == "203.0.113.7"
+    assert client_ip(request("1.2.3.4, 203.0.113.7")) == "203.0.113.7"  # a made-up left entry is ignored
+    assert client_ip(request()) == "100.100.0.55"

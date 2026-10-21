@@ -10,6 +10,37 @@ test a clean window to start from.
 """
 
 
+class TestClientIp:
+    """Behind Azure's ingress every socket address is the proxy; limits must key on the real client."""
+
+    def _request(self, headers=None, peer="100.100.0.253"):
+        from starlette.requests import Request
+        raw = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
+        return Request({"type": "http", "headers": raw, "client": (peer, 40844)})
+
+    def test_the_proxys_appended_entry_is_the_client(self):
+        import api
+        assert api.client_ip(self._request({"X-Forwarded-For": "203.0.113.7"})) == "203.0.113.7"
+
+    def test_entries_a_client_made_up_are_ignored(self):
+        import api
+        # The client sent "1.2.3.4"; the proxy appended the real address after it.
+        assert api.client_ip(self._request({"X-Forwarded-For": "1.2.3.4, 203.0.113.7"})) == "203.0.113.7"
+
+    def test_without_the_header_it_falls_back_to_the_socket_address(self):
+        import api
+        assert api.client_ip(self._request()) == "100.100.0.253"
+
+    def test_two_visitors_behind_one_proxy_get_separate_limits(self, client, db_router, team_row):
+        db_router.when("from teams order by team_name", [team_row])
+        a, b = {"X-Forwarded-For": "203.0.113.7"}, {"X-Forwarded-For": "198.51.100.9"}
+        assert all(client.get("/teams", headers=a).status_code == 200 for _ in range(60))
+        assert client.get("/teams", headers=a).status_code == 429
+        assert client.get("/teams", headers=b).status_code == 200  # someone else isn't locked out
+        # Making up a new left-hand entry doesn't buy a fresh allowance.
+        assert client.get("/teams", headers={"X-Forwarded-For": "9.9.9.9, 203.0.113.7"}).status_code == 429
+
+
 class TestRateLimiting:
     def test_default_limit_allows_normal_burst_then_429s(self, client, db_router, team_row):
         # 60/minute default -- 60 requests should all succeed, the 61st

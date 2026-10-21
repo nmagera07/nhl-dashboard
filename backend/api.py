@@ -278,13 +278,28 @@ app = FastAPI(
 DEFAULT_RATE_LIMIT = "60/minute"
 EXPENSIVE_RATE_LIMIT = "20/minute"
 
+def client_ip(request: Request) -> str:
+    """
+    The caller's IP, for rate limits. Behind Azure Container Apps every
+    request arrives from the ingress proxy (100.100.x.x), so keying on the
+    socket address put every visitor in a handful of shared buckets (a few
+    people could use up everyone's AI and sign-up allowance). The proxy
+    appends the real client IP to X-Forwarded-For, so the rightmost entry is
+    the one to trust; anything left of it is whatever the client sent, and
+    keying on that would let anyone dodge limits by making it up.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    hops = [h.strip() for h in forwarded.split(",") if h.strip()]
+    return hops[-1] if hops else get_remote_address(request)
+
+
 # key_style="endpoint" (rather than slowapi's default "url") scopes each
 # limit bucket to the route *handler*, not the literal request path -- so
 # e.g. /standings/PIT and /standings/BOS share one bucket per client
 # instead of each path parameter value getting its own fresh allowance,
 # which would otherwise let someone bypass the limit just by cycling
 # through team abbreviations or player ids.
-limiter = Limiter(key_func=get_remote_address, default_limits=[DEFAULT_RATE_LIMIT], key_style="endpoint")
+limiter = Limiter(key_func=client_ip, default_limits=[DEFAULT_RATE_LIMIT], key_style="endpoint")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Added before CORSMiddleware so CORS ends up as the outermost layer

@@ -124,182 +124,218 @@
   "Landon DuPont": {
    "pos": "D",
    "team": "University of Michigan",
-   "league": "NCAA"
+   "league": "NCAA",
+   "ep": "701503/landon-dupont"
   },
   "Sergei Skvortsov": {
    "pos": "LW",
    "team": "Torpedo Nizhny Novgorod",
-   "league": "KHL"
+   "league": "KHL",
+   "ep": "993791/sergei-skvortsov"
   },
   "Nazar Privalov": {
    "pos": "LW",
    "team": "CSKA Moskva",
-   "league": "KHL"
+   "league": "KHL",
+   "ep": "993675/nazar-privalov"
   },
   "Dima Zhilkin": {
    "pos": "C",
    "team": "Saginaw Spirit",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "628093/dima-zhilkin"
   },
   "Carter Meyer": {
    "pos": "C",
    "team": "Québec Remparts",
-   "league": null
+   "league": null,
+   "ep": "978956/carter-meyer"
   },
   "Brock England": {
    "pos": "C",
    "team": "Seattle Thunderbirds",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "967191/brock-england"
   },
   "Jonah Neuenschwander": {
    "pos": "C",
    "team": "EHC Biel-Bienne",
-   "league": "NL"
+   "league": "NL",
+   "ep": "709625/jonah-neuenschwander"
   },
   "Brock Cripps": {
    "pos": "D",
    "team": "Prince Albert Raiders",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "701389/brock-cripps"
   },
   "Alexis Joseph": {
    "pos": "C",
    "team": "Saint John Sea Dogs",
-   "league": "QMJHL"
+   "league": "QMJHL",
+   "ep": "701451/alexis-joseph"
   },
   "Milan Sundström": {
    "pos": "C",
    "team": "MoDo",
-   "league": "Allsvenskan"
+   "league": "Allsvenskan",
+   "ep": "1010942/milan-sundstrom"
   },
   "Andrei Pustovoy": {
    "pos": "C",
    "team": "Lokomotiv Yaroslavl",
-   "league": "KHL"
+   "league": "KHL",
+   "ep": "996108/andrei-pustovoi"
   },
   "Sammy Nelson": {
    "pos": "C",
    "team": "University of Notre Dame",
-   "league": "NCAA"
+   "league": "NCAA",
+   "ep": "863816/sammy-nelson"
   },
   "Jaxon Jacobson": {
    "pos": "C",
    "team": "Brandon Wheat Kings",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "628056/jaxon-jacobson"
   },
   "Jaakko Wycisk": {
    "pos": "C",
    "team": "Guelph Storm",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "701479/jaakko-wycisk"
   },
   "Noah Davidson": {
    "pos": "C",
    "team": "Medicine Hat Tigers",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "871017/noah-davidson"
   },
   "Kayden Stroeder": {
    "pos": "C",
    "team": "Edmonton Oil Kings",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "966892/kayden-stroeder"
   },
   "Diego Gutiérrez": {
    "pos": "D",
    "team": "USNTDP",
-   "league": null
+   "league": null,
+   "ep": "701427/diego-gutierrez"
   },
   "Luca Santala": {
    "pos": "RW",
    "team": "Kitchener Rangers",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "1009106/luca-santala"
   },
   "Bosse Meijer": {
    "pos": "C",
    "team": "Frölunda HC",
-   "league": "SHL"
+   "league": "SHL",
+   "ep": "876780/bosse-meijer"
   },
   "Levi Harper": {
    "pos": "D",
    "team": "Saginaw Spirit",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "747321/levi-harper"
   },
   "Shaeffer Gordon-Carroll": {
    "pos": "C",
    "team": "Medicine Hat Tigers",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "860250/shaeffer-gordon-carroll"
   },
   "Yevgeni Yakunin": {
    "pos": "C",
    "team": "MHK Spartak Moskva",
-   "league": "MHL"
+   "league": "MHL",
+   "ep": "993672/yevgeni-yakunin"
   },
   "Petr Tomek": {
    "pos": "C",
    "team": "HC Energie Karlovy Vary",
-   "league": "Czechia"
+   "league": "Czechia",
+   "ep": "937109/petr-tomek"
   },
   "Timothy Kazda": {
    "pos": "RW",
    "team": "Guelph Storm",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "891171/timothy-kazda"
   },
   "Nolan Fitzhenry": {
    "pos": "C",
    "team": "USNTDP",
-   "league": null
+   "league": null,
+   "ep": "690041/nolan-fitzhenry"
   },
   "Malik L’Italien": {
    "pos": "D",
    "team": "Halifax Mooseheads",
-   "league": "QMJHL"
+   "league": "QMJHL",
+   "ep": "908578/malik-l-italien"
   },
   "Aleks Kulemin": {
    "pos": "C",
    "team": "Kingston Frontenacs",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "1092115/aleks-kulemin"
   },
   "Jamie Glance": {
    "pos": "RW",
    "team": "Saint John Sea Dogs",
-   "league": "QMJHL"
+   "league": "QMJHL",
+   "ep": "783136/jamie-glance"
   },
   "Roberts Naudiņš": {
    "pos": "LW",
    "team": "Penticton Vees",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "1008169/roberts-naudins"
   },
   "Max Calce": {
    "pos": "C",
    "team": "Adler Mannheim",
-   "league": "DEL"
+   "league": "DEL",
+   "ep": "879926/max-calce"
   },
   "Gunnar Conboy": {
    "pos": "C",
    "team": "Green Bay Gamblers",
-   "league": "USHL"
+   "league": "USHL",
+   "ep": "951205/gunnar-conboy"
   },
   "Vladimir Shtyrkhunov": {
    "pos": "D",
    "team": "Shawinigan Cataractes",
-   "league": null
+   "league": null,
+   "ep": "993668/vladimir-shtyrkhunov"
   },
   "Ryerson Edgar": {
    "pos": "C",
    "team": "Niagara IceDogs",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "1049432/ryerson-edgar"
   },
   "Cooper McAslan": {
    "pos": "D",
    "team": "London Knights",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "1022082/cooper-mcaslan"
   },
   "James Scantlebury": {
    "pos": "C",
    "team": "Québec Remparts",
-   "league": "QMJHL"
+   "league": "QMJHL",
+   "ep": "701457/james-scantlebury"
   },
   "Douglas Johnsson": {
    "pos": "D",
    "team": "Skellefteå AIK",
-   "league": "Sweden U-20"
+   "league": "Sweden U-20",
+   "ep": "1063798/douglas-johnsson"
   },
   "Michal Hartl": {
    "pos": "RW",
@@ -309,22 +345,26 @@
   "Gavin Burcar": {
    "pos": "C",
    "team": "Spokane Chiefs",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "956634/gavin-burcar"
   },
   "Boston Tait": {
    "pos": "D",
    "team": "Wenatchee Wild",
-   "league": "WHL"
+   "league": "WHL",
+   "ep": "966908/boston-tait"
   },
   "Kohyn Eshkawkogan": {
    "pos": "D",
    "team": "Ottawa 67’s",
-   "league": "OHL"
+   "league": "OHL",
+   "ep": "890491/kohyn-eshkawkogan"
   },
   "Tomas Selic": {
    "pos": "RW",
    "team": "HC Kometa Brno",
-   "league": null
+   "league": null,
+   "ep": "958777/tomas-selic"
   },
   "Maxmilian Mares": {
    "pos": "F",

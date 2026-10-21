@@ -42,6 +42,3 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
-
-# Personal notes, kept local
-docs/LEARNING.md

@@ -1,4 +1,5 @@
 requests==2.34.2
+defusedxml==0.7.1  # parsing third-party RSS feeds (news.py)
 psycopg2-binary==2.9.13
 pillow==13.0.0          # link preview images (og_image.py)
 python-dotenv==1.2.4

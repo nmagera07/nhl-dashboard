@@ -26,11 +26,12 @@ import re
 import threading
 import time
 import unicodedata
-import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+# Feeds are third-party XML: defusedxml refuses entity tricks (billion laughs, external entities).
+from defusedxml import ElementTree as ET
 import requests
 
 logger = logging.getLogger(__name__)

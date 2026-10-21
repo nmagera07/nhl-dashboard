@@ -38,6 +38,15 @@ function isTeamLink(req) {
   return /\/t\//.test(req.headers["x-ms-original-url"] || "") || Boolean(req.query && req.query.team);
 }
 
+// Only the preview's words and picture come from the API; where the link
+// goes (url) is always built here, so nothing upstream can redirect it.
+function previewText(data) {
+  const out = {};
+  for (const key of ["title", "description"]) if (typeof data[key] === "string") out[key] = data[key];
+  if (typeof data.image === "string" && data.image.startsWith(`${API}/og/`)) out.image = data.image;
+  return out;
+}
+
 function page({ title, description, image, url }) {
   const tags = [
     ["og:type", "website"], ["og:site_name", "PuckPulse"], ["og:title", title], ["og:description", description],
@@ -67,14 +76,14 @@ module.exports = async function (context, req) {
   if (team) {
     try {
       const response = await fetch(`${API}/teams/${team}/share`, { signal: AbortSignal.timeout(6000) });
-      if (response.ok) meta = { ...meta, ...(await response.json()) };
+      if (response.ok) meta = { ...meta, ...previewText(await response.json()) };
     } catch (error) {
       context.log.warn(`share team ${team}: ${error}`);
     }
   } else if (id) {
     try {
       const response = await fetch(`${API}/games/${id}/share`, { signal: AbortSignal.timeout(6000) });
-      if (response.ok) meta = { ...meta, ...(await response.json()) };
+      if (response.ok) meta = { ...meta, ...previewText(await response.json()) };
     } catch (error) {
       context.log.warn(`share ${id}: ${error}`); // the site's card still beats a bare link
     }

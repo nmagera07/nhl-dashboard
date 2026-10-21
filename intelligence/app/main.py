@@ -285,7 +285,18 @@ async def lifespan(app: FastAPI):
 
 settings = get_settings()
 app = FastAPI(title="PuckPulse AI (NHL Intelligence service)", version="0.1.0", lifespan=lifespan)
-limiter = Limiter(key_func=get_remote_address, default_limits=["30/minute"])
+def client_ip(request: Request) -> str:
+    """
+    The caller's IP, for rate limits: the rightmost X-Forwarded-For entry,
+    which Azure Container Apps' ingress appends (every request's socket
+    address is the proxy, so keying on it shared one allowance among all
+    visitors). Entries left of it come from the client and can't be trusted.
+    """
+    hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    return hops[-1] if hops else get_remote_address(request)
+
+
+limiter = Limiter(key_func=client_ip, default_limits=["30/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

@@ -487,3 +487,67 @@ class TestBettingLineupFantasyDraft:
         result = await self.call("get_draft_lottery", {})
         assert result["projected_top"][0]["team"] == "VAN" and result["mock_draft_first_10"][0]["prospect"] == "Landon DuPont"
         assert result["if_season_ended_today_top"][0]["no1_pick_pct"] == 25.5
+
+
+
+@pytest.mark.asyncio
+class TestScoresLeadersStandings:
+    @pytest.fixture(autouse=True)
+    def today(self, monkeypatch):
+        import app.tools
+        monkeypatch.setattr(app.tools, "_today", lambda: "2026-10-21")
+
+    async def call(self, name, args):
+        team = lambda a, s=None: {"abbrev": a, **({"score": s} if s is not None else {})}  # noqa: E731
+        goalie = lambda n, gp, sv, gaa: {"first_name": n, "last_name": n, "team_abbrev": "X", "position_code": "G",  # noqa: E731
+                                         "games_played": gp, "save_pctg": sv, "goals_against_avg": gaa, "wins": 1}
+        routes = {
+            "/standings/latest": STANDINGS, "/playoff-odds": ODDS,
+            "/games/date/2026-10-20": {"games": [
+                {"awayTeam": team("SJS", 4), "homeTeam": team("MTL", 3), "gameState": "OFF", "gameOutcome": {"lastPeriodType": "OT"}},
+                {"awayTeam": team("COL", 3), "homeTeam": team("NJD", 4), "gameState": "FINAL", "gameOutcome": {"lastPeriodType": "REG"}}]},
+            "/games/date/2026-10-21": {"games": [
+                {"awayTeam": team("PHI", 1), "homeTeam": team("BUF", 0), "gameState": "LIVE", "periodDescriptor": {"number": 2}},
+                {"awayTeam": team("FLA"), "homeTeam": team("OTT"), "gameState": "FUT", "startTimeUTC": "2026-10-21T23:30:00Z"}]},
+            "/games/date/2026-10-22": {"games": []},
+            "/players/leaders": [
+                {"first_name": "Connor", "last_name": "McDavid", "team_abbrev": "EDM", "position_code": "C", "games_played": 9, "assists": 20, "points": 26},
+                {"first_name": "Jack", "last_name": "Eichel", "team_abbrev": "VGK", "position_code": "C", "games_played": 11, "assists": 13, "points": 18},
+                goalie("Hot", 1, 0.990, 0.5), goalie("Ullmark", 7, 0.945, 1.33), goalie("Oettinger", 7, 0.940, 1.13)],
+            "/goalies/advanced": {"goalies": [{"name": "Lucky Night", "team": "X", "games_played": 1, "gsax": 3.0},
+                                              {"name": "Linus Ullmark", "team": "OTT", "games_played": 7, "gsax": 8.5, "gsax_per_60": 1.21}]},
+        }
+
+        def handler(request):
+            return httpx.Response(200, json=routes.get(request.url.path, {}))
+        async with httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler)) as client:
+            return json.loads(await ToolRunner(DashboardClient("https://dashboard.test", client)).run(name, json.dumps(args)))
+
+    async def test_last_nights_finals_with_ot(self):
+        result = await self.call("get_scores", {"date": "2026-10-20"})
+        assert result["games"] == [{"game": "SJS @ MTL", "score": "SJS 4, MTL 3", "status": "Final (OT)"},
+                                   {"game": "COL @ NJD", "score": "COL 3, NJD 4", "status": "Final"}]
+
+    async def test_tonights_games_live_and_upcoming(self):
+        result = await self.call("get_scores", {})
+        assert result["games"] == [{"game": "PHI @ BUF", "score": "PHI 1, BUF 0", "status": "Live, 2nd period"},
+                                   {"game": "FLA @ OTT", "status": "7:30 PM ET"}]
+        assert "No NHL games" in (await self.call("get_scores", {"date": "2026-10-22"}))["note"]
+
+    async def test_goalie_rate_stats_skip_one_hot_night(self):
+        save = (await self.call("get_leaders", {"category": "save_pct"}))["save_pct"]
+        assert [g["name"] for g in save] == ["Ullmark Ullmark", "Oettinger Oettinger"] and save[0]["save_pct"] == 0.945
+        gaa = (await self.call("get_leaders", {"category": "gaa"}))["gaa"]
+        assert [g["name"] for g in gaa] == ["Oettinger Oettinger", "Ullmark Ullmark"] and gaa[0]["gaa"] == 1.13
+        gsax = await self.call("get_leaders", {"category": "gsax"})
+        assert [g["name"] for g in gsax["gsax"]] == ["Linus Ullmark"] and "above 0" in gsax["note"]
+
+    async def test_assists_and_bad_categories(self):
+        assists = (await self.call("get_leaders", {"category": "assists"}))["assists"]
+        assert [(p["name"], p["a"]) for p in assists] == [("Connor McDavid", 20), ("Jack Eichel", 13)]
+        assert "category must be" in (await self.call("get_leaders", {"category": "hits"}))["error"]
+
+    async def test_league_standings_come_as_a_table_with_names(self):
+        result = await self.call("get_standings", {})
+        assert result["columns"][0] == "name" and result["columns"][1] == "team"
+        assert result["teams_best_first"][0][:2] == ["Colorado Avalanche", "COL"]

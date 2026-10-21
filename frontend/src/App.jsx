@@ -111,7 +111,18 @@ export default function NHLDashboard() {
     return { page: "standings" };
   }, [location.pathname]);
 
-  // Human-readable "Asking about: ..." for the chat drawer.
+  // Which part of the app the chat opens on, for its starter questions and its
+  // "On: ..." label (the service gets the same league context for all of them).
+  const chatTopic = useMemo(() => {
+    const path = location.pathname;
+    if (path.startsWith("/bets") || path.startsWith("/report-card")) return "bets";
+    if (path.startsWith("/news")) return "news";
+    if (path.startsWith("/standings")) return "standings";
+    if (path.startsWith("/playoffs") || path.startsWith("/draft-lottery")) return "playoffs";
+    if (path === "/players" || path.startsWith("/leaderboard")) return "players";
+    return "scores";
+  }, [location.pathname]);
+
   const intelligenceLabel = useMemo(() => {
     if (intelligenceContext.page === "team") {
       const team = standings.find((r) => r.team_abbrev === intelligenceContext.team_abbrev);
@@ -119,8 +130,14 @@ export default function NHLDashboard() {
     }
     if (intelligenceContext.page === "player") return "this player";
     if (intelligenceContext.page === "game") return "this game";
-    return "league standings & leaders";
-  }, [intelligenceContext, standings]);
+    return { bets: "Bets", news: "News", standings: "Standings", playoffs: "the playoff race", players: "Players" }[chatTopic] || "Scores";
+  }, [intelligenceContext, standings, chatTopic]);
+
+  // "Penguins", for starter questions about the reader's team.
+  const favoriteTeamName = useMemo(() => {
+    const row = standings.find((r) => r.team_abbrev === favoriteTeam);
+    return row ? row.common_name || row.team_name : null;
+  }, [standings, favoriteTeam]);
 
   const divisions = useMemo(() => {
     const set = new Set(standings.map((r) => r.division).filter(Boolean));
@@ -168,7 +185,7 @@ export default function NHLDashboard() {
   return (
     <div className="dashboard">
       <TopNav search={search} onSearchChange={setSearch} theme={theme} onToggleTheme={toggleTheme} />
-      <IntelligencePanel context={intelligenceContext} label={intelligenceLabel} />
+      <IntelligencePanel context={intelligenceContext} label={intelligenceLabel} topic={chatTopic} favoriteTeamName={favoriteTeamName} />
 
       <div className="app-content">
         <Routes>

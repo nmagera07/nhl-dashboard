@@ -431,6 +431,23 @@ CREATE TABLE IF NOT EXISTS season_sim_inputs (
     computed_at             TIMESTAMP DEFAULT NOW()
 );
 
+-- RotoWire's fantasy player updates (news.py), saved as the API polls them
+-- so a restart doesn't lose the last few days (its feed holds only the latest
+-- 5). The API writes it, so:
+--   GRANT SELECT, INSERT ON fantasy_updates TO nhl_api_readonly;
+CREATE TABLE IF NOT EXISTS fantasy_updates (
+    id                      TEXT PRIMARY KEY,          -- RotoWire's guid
+    player                  TEXT NOT NULL,
+    title                   TEXT NOT NULL,
+    summary                 TEXT,
+    url                     TEXT NOT NULL,
+    published               TIMESTAMPTZ NOT NULL,
+    source                  TEXT NOT NULL,
+    saved_at                TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fantasy_updates_published ON fantasy_updates (published);
+
 -- Web Push subscriptions (see push.py): one row per browser/device that
 -- turned on notifications, with the teams it follows. The API writes this
 -- table -- the only table its otherwise read-only role can change:

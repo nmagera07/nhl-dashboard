@@ -291,3 +291,44 @@ class TestGoalieReports:
         from datetime import date
         assert news.goalie_reports(date(2026, 10, 19), self.GOALIES.get) == {}  # the 11:30 PM recap isn't a start
         assert news.goalie_reports(date(2026, 10, 21), self.GOALIES.get)["MIN"]["status"] == "confirmed"
+
+
+class TestSavedFantasyUpdates:
+    @pytest.fixture(autouse=True)
+    def offline(self, monkeypatch):
+        news._updates.clear()
+        monkeypatch.setattr(news, "_get", _rotowire(ROTOWIRE_RSS))
+        monkeypatch.setattr(news, "MAX_UPDATE_AGE", news.timedelta(days=3650))
+        yield
+        news._updates.clear()
+
+    def test_a_poll_saves_only_the_new_updates(self):
+        saved = []
+        assert news.poll_fantasy_updates(store=saved.append) == 2
+        assert [u["id"] for u in saved[0]] == ["nhl1", "nhl3"]
+        assert news.poll_fantasy_updates(store=saved.append) == 0 and len(saved) == 1  # nothing new: no write
+
+    def test_startup_reloads_saved_updates_before_the_feed_moves_on(self, client, db_router, monkeypatch):
+        import api
+        from datetime import datetime
+        db_router.when("from fantasy_updates", [{"id": "nhl0", "player": "Jesper Wallstedt", "title": "Slated to face Oilers",
+                                                 "summary": "Expected in the road crease.", "url": "https://www.rotowire.com/w",
+                                                 "published": datetime(2026, 10, 20, 18, 42, tzinfo=timezone.utc), "source": "RotoWire"}])
+        assert api.load_fantasy_updates() == 1
+        assert news._updates["nhl0"]["published"] == "2026-10-20T18:42:00Z"
+        news.poll_fantasy_updates()  # the feed's 5 no longer include it; the reloaded one stays
+        assert {"nhl0", "nhl1", "nhl3"} <= set(news._updates)
+
+    def test_saving_inserts_each_new_update_once(self, client, db_router):
+        import api
+        db_router.when("insert into fantasy_updates", [])
+        api.store_fantasy_updates(news.parse_rotowire(ROTOWIRE_RSS))
+        inserts = [(q, p) for q, p in db_router.calls if "INSERT INTO fantasy_updates" in q]
+        assert len(inserts) == 2 and "ON CONFLICT (id) DO NOTHING" in inserts[0][0]
+        assert inserts[0][1][:2] == ("nhl1", "Jesper Wallstedt")
+
+    def test_a_database_problem_never_stops_the_poller(self, monkeypatch):
+        import api
+        monkeypatch.setattr(api, "get_connection", lambda: (_ for _ in ()).throw(RuntimeError("db down")))
+        assert api.load_fantasy_updates() == 0
+        api.store_fantasy_updates(news.parse_rotowire(ROTOWIRE_RSS))  # logs, doesn't raise

@@ -370,7 +370,9 @@ def transactions(team=None, limit=25):
 #
 # RotoWire's feed is only its latest 5 player updates (one every few
 # minutes on a game day), so the API polls it (poll_fantasy_updates) and
-# keeps its own running list, the last few days' worth.
+# keeps its own running list, the last few days' worth. api.py also saves
+# them to the database and reloads them on startup, so a deploy or restart
+# doesn't empty the list (or the starting goalies read from it).
 
 FANTASY_ARTICLES_TTL = 30 * 60
 MAX_UPDATE_AGE = timedelta(days=3)
@@ -408,21 +410,34 @@ def parse_rotowire(text):
     return out
 
 
-def poll_fantasy_updates(now=None):
-    """Fetch RotoWire's latest updates into the running list. Returns how many were new, or None if it failed."""
+def remember_fantasy_updates(updates, now=None):
+    """Add updates to the running list, dropping ones past MAX_UPDATE_AGE. Returns the ones that were new."""
+    cutoff = _iso((now or datetime.now(timezone.utc)) - MAX_UPDATE_AGE)
+    with _updates_lock:
+        new = [u for u in updates if u["id"] not in _updates]
+        _updates.update({u["id"]: u for u in updates})
+        keep = sorted((u for u in _updates.values() if u["published"] >= cutoff), key=lambda u: u["published"], reverse=True)
+        _updates.clear()
+        _updates.update({u["id"]: u for u in keep[:MAX_UPDATES]})
+    return new
+
+
+def poll_fantasy_updates(now=None, store=None):
+    """
+    Fetch RotoWire's latest updates into the running list. `store(new)`,
+    if given, saves the new ones (api.py: the fantasy_updates table, so a
+    restart doesn't lose them). Returns how many were new, or None if the
+    fetch failed.
+    """
     try:
         fresh = parse_rotowire(_get(ROTOWIRE_RSS_URL).text)
     except Exception as exc:  # network, HTTP, or a changed format
         logger.warning("RotoWire unavailable (%s)", type(exc).__name__)
         return None
-    cutoff = _iso((now or datetime.now(timezone.utc)) - MAX_UPDATE_AGE)
-    with _updates_lock:
-        new = sum(1 for u in fresh if u["id"] not in _updates)
-        _updates.update({u["id"]: u for u in fresh})
-        keep = sorted((u for u in _updates.values() if u["published"] >= cutoff), key=lambda u: u["published"], reverse=True)
-        _updates.clear()
-        _updates.update({u["id"]: u for u in keep[:MAX_UPDATES]})
-    return new
+    new = remember_fantasy_updates(fresh, now=now)
+    if new and store:
+        store(new)
+    return len(new)
 
 
 FANTASY_SOURCES = {

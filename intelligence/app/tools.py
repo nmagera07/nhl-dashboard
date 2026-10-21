@@ -49,7 +49,7 @@ TOOLS = [
         ["team"]),
     _fn("explain_odds",
         "Why the playoff-odds model rates a team the way it does: its rating split into this season's goals, this season's "
-        "expected goals (xG), and last season's carryover, plus how its remaining schedule helps or hurts. With an opponent, "
+        "expected goals (xG), its roster's players, and its goaltending, plus how its remaining schedule helps or hurts. With an opponent, "
         "also compares the two and gives the model's win probability for their next meeting. Use for any 'why are their odds "
         "X', 'why is the model high/low on them', or 'why is X favored over Y' question.",
         {"team": TEAM, "opponent": {"type": "string", "description": "Optional second team to compare, e.g. NYR."}},
@@ -99,6 +99,23 @@ TOOLS = [
         {"team": {"type": "string", "description": "Optional team abbreviation, e.g. PIT."}}),
     _fn("get_leaders", "League leaders: points, goals, or goalie wins.",
         {"category": {"type": "string", "enum": ["points", "goals", "goalie_wins"], "description": "Default: all three."}}),
+    _fn("get_bets",
+        "Today's betting board: best moneyline price and book, PuckPulse's fair odds and win chance, value flags; for one "
+        "team's game also the puck line, total, and starting goalies. Use for odds, lines, value, or who's favored.",
+        {"team": {"type": "string", "description": "Optional, e.g. PIT."},
+         "date": {"type": "string", "description": "Optional YYYY-MM-DD; default today."}}),
+    _fn("get_report_card", "How PuckPulse's odds have done against the sportsbooks (Brier score), last week and all season."),
+    _fn("get_lineup",
+        "A team's game today: starting goalie (reporters, NHL.com, or PuckPulse's projection) and NHL.com's projected "
+        "lines and scratches, or its last game's lines before those post.",
+        {"team": TEAM}, ["team"]),
+    _fn("get_fantasy_news",
+        "Fantasy news: RotoWire player updates (starts, injuries, line changes), newest first, plus fantasy articles.",
+        {"player": {"type": "string", "description": "Optional, e.g. 'Wallstedt'."},
+         "team": {"type": "string", "description": "Optional, e.g. MIN."}}),
+    _fn("get_draft_lottery",
+        "Draft lottery odds (No. 1 pick, top 3) and PuckPulse's mock first round, for one team or the top of the order.",
+        {"team": {"type": "string", "description": "Optional, e.g. PIT."}}),
 ]
 
 # What the chat shows while a tool runs, and the evidence label after.
@@ -118,6 +135,11 @@ LABELS = {
     "get_leaders": ("Checking the league leaders", "League leaders"),
     "get_injuries": ("Checking the injury report", "Injury report (ESPN)"),
     "get_news": ("Checking the latest news", "Headlines and transactions"),
+    "get_bets": ("Checking tonight's lines", "Betting board (best prices and PuckPulse odds)"),
+    "get_report_card": ("Checking the report card", "PuckPulse vs. the sportsbooks"),
+    "get_lineup": ("Checking the lineup", "Projected lineup and starting goalie"),
+    "get_fantasy_news": ("Checking fantasy news", "Fantasy updates (RotoWire) and articles"),
+    "get_draft_lottery": ("Checking the draft lottery", "Draft lottery odds and mock draft"),
 }
 
 MAX_RESULT_CHARS = 6000
@@ -468,6 +490,131 @@ class ToolRunner:
         leaders = compact.leaders(await self._get("/players/leaders"))
         return {category: leaders[category]} if category in leaders else leaders
 
+    # --- betting, lineups, fantasy, draft ----------------------------------------
+
+    async def _game_today(self, abbrev: str) -> dict | None:
+        """The team's game today (live or upcoming), from its schedule, or None."""
+        schedule = await self._get(f"/teams/{abbrev}/schedule")
+        today = _today()
+        for g in ([schedule["live"]] if schedule.get("live") else []) + schedule.get("upcoming", [])[:1]:
+            if g and g.get("date") == today:
+                return g
+        return None
+
+    async def _tool_get_bets(self, team: str | None = None, date: str | None = None):
+        abbrev = await self._team(team) if team else None
+        try:
+            day = str(_parse_date(date)) if date else _today()
+        except ValueError as exc:
+            raise ToolError("date must be YYYY-MM-DD") from exc
+        board, scores = await asyncio.gather(self._get(f"/bets?date={day}"), self._get(f"/games/date/{day}"))
+        games = {str(g["id"]): g for g in scores.get("games", [])}
+        out, started = [], []
+        for game_id, b in (board.get("games") or {}).items():
+            if abbrev and abbrev not in (b.get("home"), b.get("away")):
+                continue
+            g = games.get(game_id, {})
+            open_ = g.get("gameState") in ("FUT", "PRE")
+            if not abbrev and not open_:
+                started.append(f"{b.get('away')} @ {b.get('home')}")  # the slate is about what's still bettable
+                continue
+            out.append(compact._clean({
+                "game": f"{b.get('away')} @ {b.get('home')}", "start": _eastern_time(g.get("startTimeUTC")),
+                "state": "not started" if open_ else f"{g.get('gameState')} (these were the last lines before puck drop)",
+                "second_night_of_back_to_back": [t for t, side in ((b.get("away"), "away"), (b.get("home"), "home"))
+                                                 if (b.get("b2b") or {}).get(side)] or None,
+                # One team's game gets its goalies; the whole slate leaves them to get_lineup (size).
+                "goalies": {side: _starter(b, side) for side in ("away", "home")} if abbrev else None,
+                "moneyline": {b.get(side): _side(b["moneyline"].get(side)) for side in ("away", "home")} if b.get("moneyline") else None,
+                "puck_line": {f"{b.get(side)} {_spread(b['puck_line'], side)}": _side(b["puck_line"].get(side), book=False)
+                              for side in ("away", "home")} if (abbrev and (b.get("puck_line") or {}).get("home", {}).get("price") is not None) else None,
+                "total": {f"{k} {b['total'].get('line')}": _side(b["total"].get(k), book=False) for k in ("over", "under")}
+                         if (abbrev and (b.get("total") or {}).get("over", {}).get("price") is not None) else None,
+            }))
+        if abbrev and not out:
+            raise ToolError(f"{abbrev} has no game on {day}.")
+        # Stated up front: asked "any value?", a model picked the closest price and called it value.
+        flags = [f"{game['game']}: {name} {market.replace('_', ' ')} {side['best_price']}, {side['value']}"
+                 for game in out for market in ("moneyline", "puck_line", "total")
+                 for name, side in (game.get(market) or {}).items() if side and side.get("value")]
+        return compact._clean({"date": day, "value_flags": flags or "None right now: no price beats PuckPulse's fair odds by enough.",
+                               "games": out, "already_started": started or None, "note": BETS_NOTE})
+
+    async def _tool_get_report_card(self):
+        card = await self._get("/report-card")
+
+        def brief(period):
+            period = period or {}
+            return compact._clean({
+                "games": period.get("games"),
+                **{market: {"games": m.get("games"), "brier_puckpulse": m.get("brier_ours"), "brier_books": m.get("brier_books")}
+                   for market, m in period.items() if isinstance(m, dict) and "brier_ours" in m},
+                "value_bets": {k: v for k, v in (period.get("value_bets") or {}).items() if k != "list"} or None,
+            })
+        return {"as_of": card.get("as_of"), "last_week": brief(card.get("week")), "season": brief(card.get("season")),
+                "note": "Brier score: lower is better; 0.25 is a coin flip. Totals are a beta and never flagged."}
+
+    async def _tool_get_lineup(self, team: str):
+        abbrev = await self._team(team)
+        game = await self._game_today(abbrev)
+        if not game:
+            lines = await self._get(f"/teams/{abbrev}/lines")
+            return compact._clean({"team": abbrev, "game_today": None, "last_game_lines": _last_lines(lines),
+                                   "note": "No game today; these are its lines from its last game."})
+        side = "home" if game.get("home") else "away"
+        lineup, board = await asyncio.gather(self._get(f"/games/{game['id']}/lineup"), self._get(f"/bets?date={_today()}"))
+        bet = (board.get("games") or {}).get(str(game["id"])) or {}
+        out = {"team": abbrev, "game_today": f"{'vs' if side == 'home' else 'at'} {game.get('opponent')}, {_eastern_time(game.get('start_time_utc'))}",
+               "starting_goalie": _starter(bet, side) if bet else None}
+        if lineup.get("available"):
+            mine = lineup.get(side) or {}
+            # Its goalies are left out: starting_goalie already ranks NHL.com against the reporters.
+            out["nhl_com_projected_lineup"] = compact._clean({
+                "forward_lines": mine.get("forwards"), "defense_pairs": mine.get("defense"),
+                "scratched": mine.get("scratched"), "injured": mine.get("injured"), "published": (lineup.get("published") or "")[:16]})
+        else:
+            out["last_game_lines"] = _last_lines(await self._get(f"/teams/{abbrev}/lines"))
+            out["note"] = "NHL.com hasn't posted tonight's projected lineup yet (usually a few hours before puck drop)."
+        return compact._clean(out | {"caveat": "Lineups and starters can change until puck drop."})
+
+    async def _tool_get_fantasy_news(self, player: str | None = None, team: str | None = None):
+        abbrev = await self._team(team) if team else None
+        feed = await self._get("/fantasy?limit=150")
+        query = (player or "").strip().lower()
+        updates = [u for u in feed.get("updates", [])
+                   if (not query or query in (u.get("player") or "").lower()) and (not abbrev or u.get("team") == abbrev)]
+        out = {"updates_newest_first": [compact._clean({"player": u["player"], "team": u.get("team"), "update": u.get("title"),
+                                                        "detail": u.get("summary"), "published": (u.get("published") or "")[:16]})
+                                        for u in updates[:8]],
+               "sources": feed.get("sources")}
+        if not query and not abbrev:
+            out["articles"] = [{"title": a["title"], "source": a["source"]} for a in feed.get("articles", [])[:6]]
+        if query and not updates:
+            out["note"] = (f"No update on '{player}' in the last few days of RotoWire's feed. That's not the same as no news: "
+                           "the feed only covers recent updates.")
+        return compact._clean(out)
+
+    async def _tool_get_draft_lottery(self, team: str | None = None):
+        abbrev = await self._team(team) if team else None
+        data = await self._get("/draft-lottery")
+        pct = lambda p: round(p * 100, 1)  # noqa: E731
+        projected = [{"team": t["team"], "no1_pick_pct": pct(t["picks"][0]), "top3_pct": pct(sum(t["picks"][:3])),
+                      "in_lottery_pct": pct(t["missed_playoffs"])} for t in data.get("projected", [])]
+        today = [{"team": t["team"], "lottery_position": t["position"], "points": t["points"], "no1_pick_pct": pct(t["picks"][0])}
+                 for t in data.get("today", [])]
+        mock = data.get("mock") or {}
+        picks = [{"pick": p["pick"], "team": p["team"], "prospect": p["prospect"]["name"],
+                  "position": p["prospect"].get("pos"), "club": p["prospect"].get("team")}
+                 for p in mock.get("projected") or mock.get("today") or []]
+        if abbrev:
+            return compact._clean({
+                "team": abbrev, "projected": next((t for t in projected if t["team"] == abbrev), None),
+                "if_season_ended_today": next((t for t in today if t["team"] == abbrev), None),
+                "mock_draft_pick": [p for p in picks if p["team"] == abbrev] or None,
+                "note": "No entry means the team isn't in the lottery picture." + DRAFT_NOTE.format(year=mock.get("year"))})
+        return compact._clean({"projected_top": projected[:8], "if_season_ended_today_top": today[:8],
+                               "mock_draft_first_10": picks[:10], "note": DRAFT_NOTE.format(year=mock.get("year")).strip()})
+
 
 NEGLIGIBLE = 0.03  # goals/game; matches the app's "little effect"
 
@@ -525,6 +672,67 @@ def _breakdown(team: str, name: str | None, w: dict, playoff_pct: float | None, 
         "schedule": {"games_left": sched.get("games_left"), "rank": f"{_ordinal(sched.get('rank'))} easiest of {league_size}",
                      "effect": sched.get("effect"), "push": _push(sched.get("effect"))} if sched.get("games_left") else None,
     })
+
+
+BETS_NOTE = ("American odds: +150 pays $150 on $100; -150 risks $150 to win $100. Fair odds blend PuckPulse's model (30%) "
+             "and the books (70%). Value: the best price beats fair odds by 2%+ expected return; an estimate, not a sure "
+             "thing. Totals are a beta, never flagged. For entertainment, not betting advice. 21+.")
+DRAFT_NOTE = (" The mock draft is the most likely order with no lottery jumps; each team takes the best player left on "
+              "PuckPulse's consensus of public {year} rankings (Daily Faceoff, Tankathon), which change through the season.")
+
+
+def _side(side: dict | None, book: bool = True) -> dict | None:
+    """One side of a bet for the model: price, book, PuckPulse's fair price and chance, value."""
+    if not side or side.get("price") is None:
+        return None
+    return compact._clean({
+        "best_price": _american(side.get("price")), "book": side.get("book") if book else None,
+        "puckpulse_fair_price": _american(side.get("fair")),
+        "puckpulse_chance_pct": round(side["ours"] * 100, 1) if side.get("ours") is not None else None,
+        "value": f"yes, expected return {side['ev'] * 100:+.1f}%" if side.get("value") else None,
+    })
+
+
+def _american(price) -> str | None:
+    return None if price is None else f"{int(price):+d}"
+
+
+def _spread(puck_line: dict, side: str) -> str:
+    spread = puck_line.get("home_spread", -1.5) * (1 if side == "home" else -1)
+    return f"{spread:+.1f}"
+
+
+def _starter(board: dict, side: str) -> str | None:
+    """
+    The starter by the best word so far, like the Bets page: reporters,
+    NHL.com, then our projection. One sentence, so a model can't pair the
+    name with the wrong source (it did, given name/status/source fields).
+    """
+    reported = (board.get("reported_starters") or {}).get(side)
+    if reported:
+        return f"{reported['name']}: {reported['status']} by beat reporters (via RotoWire)"
+    nhl = (board.get("nhl_starters") or {}).get(side)
+    if nhl:
+        return f"{nhl}: projected by NHL.com's lineup"
+    top = ((board.get("goalies") or {}).get(side) or [None])[0]
+    if top:
+        return f"{top['name']}: PuckPulse's projection, {round(top['prob'] * 100)}% likely to start"
+    return None
+
+
+def _last_lines(lines: dict) -> dict | None:
+    if not lines or not lines.get("lines"):
+        return None
+    game = lines.get("game") or {}
+    return {"game": f"{game.get('date')} {'vs' if game.get('home') else 'at'} {game.get('opponent')}",
+            "lines_by_minutes_together": [l["players"] for l in lines["lines"]]}
+
+
+def _today() -> str:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
 
 def _odds_as_percent(value):

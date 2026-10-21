@@ -26,6 +26,10 @@ rounds per question.
 | `get_recent_results` | "How have the Penguins played lately?" |
 | `get_game` | "How did PIT do last night? Who scored?" (latest game, a date, or vs. an opponent) |
 | `find_player` / `get_leaders` | "How's Crosby doing?" / "Who leads in goals?" |
+| `get_bets` / `get_report_card` | "Any value tonight?" / "How has PuckPulse done against the books?" |
+| `get_lineup` | "Who's in goal for VAN tonight?", "What are the Canucks' lines?" |
+| `get_fantasy_news` | "What's the latest on Wallstedt?" |
+| `get_draft_lottery` | "Who do the Penguins take in the mock draft?" |
 
 The model decides *what to ask*; the numbers come from the dashboard API and
 the playoff-odds model's simulations (`GET /season-sim/scenario` and

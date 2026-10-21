@@ -1,0 +1,688 @@
+{
+  "started": "2026-10-21T01:49:40+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "The Carolina Hurricanes (CAR) are in first place in the Metropolitan Division with 15 points (a 7-2-1 record).",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins play next against the Florida Panthers at home on Thursday, October 22, 2026, at 7:00 PM ET.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":1,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'games': 1, 'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Florida Panthers'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If Pittsburgh goes 4-0 over their next 4 games, the playoff-odds model's simulations show their playoff odds increase from 16.9% to 25.8%, and their projected average points rise from 85.0 to 88.7.",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"games\":4,\"wins\":4,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'wins': 4, 'team': 'PIT'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~25.8%, answer has [16.9, 25.8]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "According to the playoff-odds model's simulations, Detroit needs a **10-0** record over its next 10 games to have a better-than-even chance (58.6%) at the playoffs. \n\nEven a perfect 10-0 start only brings them to 58.6%, as their playoff odds currently stand at 26.2%. Each overtime loss would add a single point to their total.",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"team\":\"DET\",\"games\":10})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'team': 'DET', 'games': 10})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '10-0'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "According to the playoff-odds model's simulations, Toronto's playoff odds at the start of the season (on October 8, 2026) were 22.1%.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_playoff_odds({'team': 'TOR'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~22.1%, answer has [22.1]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "In their last game on October 19, 2026, the Penguins lost 5-4 on the road against the Utah Hockey Club.",
+          "seconds": 1.8,
+          "model_calls": 2,
+          "tools": [
+            "get_recent_results({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_recent_results({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 4-5"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In their last game on October 19, 2026, against the Utah Mammoth, the goalscorers for Pittsburgh were:\n\n* **E. Karlsson** (assisted by B. Rust and T. Novak)\n* **R. Rakell** (assisted by B. Rust and E. Karlsson)\n* **E. Chinakhov** (assisted by A. Kuzmenko and S. Stastney)\n* **D. Carlile** (assisted by R. Rakell and K. Korczak)",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Karlsson'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 6 points (3 goals and 3 assists) in 10 games this season.",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '6 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "Connor McDavid of the Edmonton Oilers leads the NHL in points right now with 23 points (6 goals, 17 assists) in 8 games. \n\nFollowing him at the top of the league leaders:\n* **Jack Eichel** (VGK) \u2013 18 points\n* **Auston Matthews** (TOR) \u2013 16 points\n* **Nathan MacKinnon** (COL) \u2013 16 points\n* **Evan Bouchard** (EDM) \u2013 16 points",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({\"category\":\"points\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'McDavid'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "Based on the playoff-odds model, the team with the easiest remaining schedule in the Western Conference is the Los Angeles Kings (LAK), with an average opponent rating of -0.058. \n\nHowever, because the gaps between teams early in the season are quite small (the total spread from easiest to hardest is just 0.065 goals per game), differences like this are relatively negligible right now.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'LAK'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Names Los Angeles Kings as easiest schedule with appropriate caveat"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "Sidney Crosby's 5-on-5 PDO is 98.6, which is below the league-average benchmark of 100. \n\nThis metric combines on-ice shooting percentage and on-ice save percentage when he is on the ice. A reading below 100 means those percentages are running cold so far, which typically points to bad luck that tends to even out over the course of the season.",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Correctly notes 98.6 PDO is below 100 and attributes it to bad luck that should even out"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "Based on the playoff-odds model, Pittsburgh's playoff odds are actually sitting at 16.5% right now. Here is why the model rates them where it does:\n\n* **Roster talent:** The model looks at how good the roster's players were over the last two seasons compared to an average roster, and this factor pushes their rating up.\n* **Goaltending:** Their current goalies' saves above expected fall below an average tandem, which pulls their rating down.\n* **This season's goal and expected-goal differentials:** Both actual goal differential and expected-goal differential pull their rating down based on early-season results.\n* **Remaining schedule:** Their remaining schedule is ranked 22nd easiest of 32, which has a negligible effect on their rating.",
+          "seconds": 1.9,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Introduces roster talent and goaltending not in the breakdown and omits the last\u2011season factor"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "The playoff-odds model likes Carolina much more than the Rangers, giving the Hurricanes 99.0% playoff odds compared to New York's 70.4%. \n\nHere is why according to the model:\n\n* **Overall Rating:** Carolina ranks 1st in the league with a 1.0028 rating, while the Rangers rank 11th at 0.1491.\n* **Roster Strength:** Carolina's roster players provide a strong upward push (effect: 0.656), whereas the Rangers' roster pulls down slightly on their rating (effect: -0.0649).\n* **Expected Goals:** Both teams carry positive expected-goal differentials pushing them up, but Carolina's play driving is significantly stronger (xG diff: 17.1 vs. 5.2). \n* **Goal Differential & Goaltending:** Both teams have positive goal differentials pushing them upward, and goaltending has a negligible impact for Carolina while slightly helping the Rangers.",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"CAR\",\"opponent\":\"NYR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'CAR', 'opponent': 'NYR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Answer omits the required per\u2011game breakdown and adds unrelated factors, not matching the rubric"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "Based on the playoff-odds model's simulations, if the Red Wings traded away Dylan Larkin without getting a roster player back, their playoff odds would drop from 27.4% to 19.4% (a decrease of 8.0 percentage points), and their projected points would fall from 88.3 to 85.7. \n\n*Note: This is a rough estimate for the rest of the season that ignores line chemistry and the salary cap.*",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~19.4%, answer has [27.4, 19.4]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides the exact odds change, framed as a rough model estimate, and makes no claim of certainty"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "According to the playoff-odds model's simulations (which are rough estimates ignoring salary cap and line chemistry):\n\n* **Detroit (getting Auston Matthews):** Their playoff chances would edge slightly from 27.4% to 28.2%, with projected points ticking up from 88.3 to 88.6.\n* **Toronto (getting Dylan Larkin):** Their playoff chances would tick down from 23.9% to 22.9%, with projected points shifting from 87.6 to 87.3.",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"to_team\":\"TOR\",\"player\":\"Dylan Larkin\",\"player_back\":\"Auston Matthews\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'to_team': 'TOR', 'player': 'Dylan Larkin', 'player_back': 'Auston Matthews'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Matches the required percentages for both teams."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "As of the latest report, Ian Moore is on Injured Reserve with a lower-body injury. According to ESPN, head coach Joel Quenneville stated that he is still \"a ways from skating,\" with an expected return date around November 8, 2026.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Ian Moore\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Ian Moore'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Invented source and omitted team information"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on VAN's first line tonight?",
+          "answer": "According to NHL.com's projected lineup for tonight against Carolina, VAN's first forward line is Jake DeBrusk, Elias Pettersson, and Linus Karlsson. \n\nLineups and starters can change until puck drop.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_lineup({\"team\":\"VAN\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_lineup({'team': 'VAN'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'DeBrusk'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer includes the three players, cites NHL.com projection, and notes lineups can change before puck drop."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for VAN tonight?",
+          "answer": "According to NHL.com's projected lineup, Leevi Merilainen is projected to start in goal for Vancouver tonight against Carolina. \n\nPlease note that starting goalies and lineups can change until puck drop.",
+          "seconds": 1.9,
+          "model_calls": 2,
+          "tools": [
+            "get_lineup({\"team\":\"VAN\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_lineup({'team': 'VAN'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Merilainen'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Names Merilainen, cites NHL.com projection, and includes disclaimer"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "Here are the value bets flagged for tonight's games from PuckPulse's betting board:\n\n* **TBL @ VGK (10:30 PM ET):** Tampa Bay Lightning moneyline at -105 (DraftKings). PuckPulse's model and the books blend to a fair price of +101 (49.7% win chance).\n\n*Note: American odds mean +150 pays $150 on a $100 bet, while -105 risks $105 to win $100. PuckPulse's fair odds blend its model with the sportsbooks. Value flags mean the best price beats fair odds by 2%+ expected return, but this is an estimate, not a sure thing.*\n\nFor entertainment, not betting advice. 21+.",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "get_bets({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_bets({})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '21+'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: Answer flags a value bet, but rubric requires stating no value bets today"
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "Based on the PuckPulse mock draft, PIT is projected to take center Alexis Joseph from the Saint John Sea Dogs with the 6th pick. \n\n*Note: The mock draft reflects the most likely draft order without lottery jumps, where teams select the best available player from PuckPulse's consensus of public 2027 rankings.*",
+          "seconds": 1.9,
+          "model_calls": 2,
+          "tools": [
+            "get_draft_lottery({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_draft_lottery({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Joseph'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer correctly states PIT takes Alexis Joseph at No. 6 and frames it as a projection"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Brandon Montour?",
+          "answer": "According to the latest RotoWire fantasy update (as of October 21, 2026), Brandon Montour (lower body) is slated to play and is expected to be in the lineup against the Red Wings on Tuesday, per Sound of Hockey.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_fantasy_news({\"player\":\"Brandon Montour\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_fantasy_news({'player': 'Brandon Montour'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Montour'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides the required RotoWire update that Montour is slated to play"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "As of October 19, 2026, here is how PuckPulse\u2019s odds have performed against the sportsbooks this season (based on 54 total games tracked):\n\n* **Moneyline:** PuckPulse's Brier score is 0.2264 compared to the books' 0.2192 (lower is better, where 0.25 is a coin flip).\n* **Puck Line:** PuckPulse sits at 0.2265 versus the books' 0.2171 across 20 games.\n* **Totals:** PuckPulse holds a 0.2471 Brier score compared to 0.2523 for the books across 19 games.\n* **Value Bets:** There have been 0 value bets recorded so far this season.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_report_card({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_report_card({})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "groq: The answer gives the correct direction and plain explanation but cites 54 total games instead of the required 22 moneyline games, mismatching the rubric."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "**The Rangers defeated the Ducks 5\u20132 to highlight a four-game slate on Monday night.**\n\n### Last night\n- Rangers 5, Ducks 2\n- Flyers 3, Avalanche 2\n- Maple Leafs 3, Sharks 1\n- Mammoth 5, Penguins 4\n\n### Playoff race\n- Rangers rose from 63% to 69%\n- Maple Leafs rose from 20% to 24%\n- Ducks fell from 49% to 43%\n- Penguins fell from 22% to 18%\n\n### Tonight\n- The Red Wings face the Kraken at 9:40 PM ET, and the model gives the Kraken a 50% chance to win.",
+          "seconds": 0.9,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Rangers'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "9 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: All listed scores, winners, and playoff moves match the provided facts"
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

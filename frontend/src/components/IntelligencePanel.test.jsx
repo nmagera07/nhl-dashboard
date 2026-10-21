@@ -37,6 +37,7 @@ async function ask(text) {
 }
 
 describe("IntelligencePanel", () => {
+  beforeEach(() => sessionStorage.clear());
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -46,8 +47,8 @@ describe("IntelligencePanel", () => {
 
     const drawer = await open();
 
-    expect(within(drawer).getByText("Asking about: this game")).toBeInTheDocument();
-    expect(within(drawer).getByRole("button", { name: "What was the turning point?" })).toBeInTheDocument();
+    expect(within(drawer).getByText("On: this game")).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: "How did this game go?" })).toBeInTheDocument();
   });
 
   it("builds the answer from streamed pieces, dropping text the model took back", async () => {
@@ -97,10 +98,10 @@ describe("IntelligencePanel", () => {
     render(<IntelligencePanel context={{ page: "game", game_id: 1 }} label="this game" />);
     await open();
 
-    await userEvent.click(screen.getByRole("button", { name: "What was the turning point?" }));
+    await userEvent.click(screen.getByRole("button", { name: "How did this game go?" }));
 
     expect(await screen.findByText("It turned in the second.")).toBeInTheDocument();
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).message).toBe("What was the turning point?");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).message).toBe("How did this game go?");
   });
 
   it("sends earlier exchanges so follow-ups work", async () => {
@@ -133,8 +134,8 @@ describe("IntelligencePanel", () => {
     expect(screen.queryByText(/\*\*/)).not.toBeInTheDocument();
   });
 
-  it("starts a fresh conversation when the page changes", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(answer("Team answer."));
+  it("keeps the conversation across pages, marking where the next answers come from", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(answer("Team answer.")).mockResolvedValueOnce(answer("Boston answer."));
     const { rerender } = render(<IntelligencePanel context={{ page: "team", team_abbrev: "PIT" }} label="Pittsburgh" />);
     await open();
     await ask("Hi");
@@ -142,8 +143,50 @@ describe("IntelligencePanel", () => {
 
     rerender(<IntelligencePanel context={{ page: "team", team_abbrev: "BOS" }} label="Boston" />);
 
-    expect(screen.queryByText("Team answer.")).not.toBeInTheDocument();
-    expect(screen.getByText("Asking about: Boston")).toBeInTheDocument();
+    expect(screen.getByText("Team answer.")).toBeInTheDocument();
+    expect(screen.getByText("Now on: Boston")).toBeInTheDocument();
+    expect(screen.getByText("On: Boston")).toBeInTheDocument();
+    await ask("And them?");
+    await screen.findByText("Boston answer.");
+    const sent = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(sent.context).toEqual({ page: "team", team_abbrev: "BOS" });
+    expect(sent.history).toEqual([{ role: "user", content: "Hi" }, { role: "assistant", content: "Team answer." }]);  // no marker
+  });
+
+  it("survives a reload within the tab, and New chat clears it", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(answer("Saved answer."));
+    const first = render(<IntelligencePanel context={{ page: "standings" }} label="Scores" />);
+    await open();
+    await ask("Who won?");
+    await screen.findByText("Saved answer.");
+    first.unmount();
+
+    render(<IntelligencePanel context={{ page: "standings" }} label="Scores" />);
+    await open();
+    expect(screen.getByText("Saved answer.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+    expect(screen.queryByText("Saved answer.")).not.toBeInTheDocument();
+    expect(JSON.parse(sessionStorage.getItem("pp-chat-v1"))).toEqual([]);
+  });
+
+  it("when every provider is busy, counts down and tries once more", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, body: sseStream({ type: "error", message: "busy", retry_after: 1 }) })
+      .mockResolvedValueOnce(answer("Second try worked."));
+    render(<IntelligencePanel context={{ page: "standings" }} label="Scores" />);
+    await open();
+
+    await ask("Who won?");
+
+    expect(await screen.findByText(/busy right now\. Trying again in 1s/)).toBeInTheDocument();
+    expect(await screen.findByText("Second try worked.", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("starter questions fit the section and the reader's team", async () => {
+    render(<IntelligencePanel context={{ page: "standings" }} label="Bets" topic="bets" favoriteTeamName="Penguins" />);
+    await open();
+    expect(screen.getByRole("button", { name: "Any value bets tonight?" })).toBeInTheDocument();
   });
 
   it("shows the API's message when a request fails", async () => {

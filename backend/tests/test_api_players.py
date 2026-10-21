@@ -323,3 +323,22 @@ class TestGoalieAdvancedStats:
 
         assert client.get("/players/8477492").json()["goalie_advanced_stats"] is None
         assert not any("goalie_advanced_stats" in sql for sql, _ in db_router.calls)
+
+
+class TestGoaliesAdvanced:
+    def test_best_first_by_goals_saved_above_expected(self, client, db_router):
+        db_router.when("from goalie_advanced_stats g join players", [
+            {"player_id": 1, "first_name": "Linus", "last_name": "Ullmark", "team_abbrev": "OTT", "games_played": 7,
+             "icetime_seconds": 7 * 3600, "shots_faced": 200, "goals_allowed": 11, "xgoals_against": 19.5,
+             "high_danger_goals": 4, "high_danger_xgoals": 6.25},
+            {"player_id": 2, "first_name": "Tristan", "last_name": "Jarry", "team_abbrev": "PIT", "games_played": 6,
+             "icetime_seconds": 0, "shots_faced": 0, "goals_allowed": 20, "xgoals_against": 15.0,
+             "high_danger_goals": None, "high_danger_xgoals": None},
+            {"player_id": 3, "first_name": "No", "last_name": "Data", "team_abbrev": "BOS", "games_played": 1,
+             "icetime_seconds": 3600, "shots_faced": 10, "goals_allowed": None, "xgoals_against": None,
+             "high_danger_goals": None, "high_danger_xgoals": None}])
+        goalies = client.get("/goalies/advanced").json()["goalies"]
+        assert [g["name"] for g in goalies] == ["Linus Ullmark", "Tristan Jarry"]
+        assert goalies[0] == {"player_id": 1, "name": "Linus Ullmark", "team": "OTT", "games_played": 7, "gsax": 8.5,
+                              "gsax_per_60": 1.21, "high_danger_gsax": 2.25, "save_pct": 0.945}
+        assert goalies[1]["gsax_per_60"] is None and goalies[1]["save_pct"] is None

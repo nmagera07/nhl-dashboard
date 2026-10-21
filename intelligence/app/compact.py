@@ -164,6 +164,29 @@ def leaders(players: list[dict]) -> dict[str, list[dict]]:
     }
 
 
+# Leader categories beyond the defaults: (stat key, output field, best-first sort, goalies?).
+MORE_LEADERS = {
+    "assists": ("assists", "a", "desc", False),
+    "plus_minus": ("plus_minus", "plus_minus", "desc", False),
+    "power_play_points": ("power_play_points", "ppp", "desc", False),
+    "save_pct": ("save_pctg", "save_pct", "desc", True),
+    "gaa": ("goals_against_avg", "gaa", "asc", True),
+}
+
+
+def more_leaders(players: list[dict[str, Any]], category: str) -> list[dict[str, Any]]:
+    """The top players in one MORE_LEADERS category. Goalie rate stats need 40% of the busiest goalie's games (3+)."""
+    key, field, order, goalies = MORE_LEADERS[category]
+    pool = [p for p in players if (p.get("position_code") == "G") == goalies and p.get(key) is not None]
+    if goalies:
+        most = max((p.get("games_played") or 0 for p in pool), default=0)
+        pool = [p for p in pool if (p.get("games_played") or 0) >= max(3, round(0.4 * most))]
+    pool.sort(key=lambda p: p[key] if order == "asc" else -p[key])
+    line = goalie_line if goalies else skater_line
+    return [_clean({**{k: v for k, v in line(p).items() if k in LEADER_FIELDS}, field: _num(p.get(key), 3 if field == "save_pct" else 2) if goalies else p.get(key)})
+            for p in pool[:TOP_GOALIES if goalies else TOP_POINTS]]
+
+
 # --- contexts ---------------------------------------------------------------
 
 # League-wide rows (get_standings) keep only the most-asked columns; team

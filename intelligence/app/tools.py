@@ -23,6 +23,7 @@ from .dashboard import DashboardClient, DashboardUnavailable
 logger = logging.getLogger(__name__)
 
 SCOPES = ["league", "Eastern", "Western", "Atlantic", "Metropolitan", "Central", "Pacific"]
+LEADER_CATEGORIES = ["points", "goals", "assists", "plus_minus", "power_play_points", "goalie_wins", "save_pct", "gaa", "gsax"]
 TEAM = {"type": "string", "description": "Team abbreviation, e.g. PIT, TOR, VGK."}
 
 
@@ -97,8 +98,14 @@ TOOLS = [
         "Recent NHL headlines (NHL.com, ESPN, Sportsnet) with short summaries, plus recent transactions (signings, "
         "trades, recalls, IR moves). For one team, or the whole league if none is given.",
         {"team": {"type": "string", "description": "Optional team abbreviation, e.g. PIT."}}),
-    _fn("get_leaders", "League leaders: points, goals, or goalie wins.",
-        {"category": {"type": "string", "enum": ["points", "goals", "goalie_wins"], "description": "Default: all three."}}),
+    _fn("get_leaders",
+        "League leaders. Skaters: points, goals, assists, plus_minus, power_play_points. Goalies: goalie_wins, save_pct, "
+        "gaa, or gsax (goals saved above expected, PuckPulse xG: the best single measure of who's stopping the most).",
+        {"category": {"type": "string", "enum": LEADER_CATEGORIES, "description": "Default: points, goals, and goalie wins."}}),
+    _fn("get_scores",
+        "Every NHL game on a date: final scores (with OT/SO), live scores, or start times. Use for 'who won last night', "
+        "'scores', or 'what's on tonight'.",
+        {"date": {"type": "string", "description": "YYYY-MM-DD. Default today; yesterday for 'last night'."}}),
     _fn("get_bets",
         "Today's betting board: best moneyline price and book, PuckPulse's fair odds and win chance, value flags; for one "
         "team's game also the puck line, total, and starting goalies. Use for odds, lines, value, or who's favored.",
@@ -140,6 +147,7 @@ LABELS = {
     "get_lineup": ("Checking the lineup", "Projected lineup and starting goalie"),
     "get_fantasy_news": ("Checking fantasy news", "Fantasy updates (RotoWire) and articles"),
     "get_draft_lottery": ("Checking the draft lottery", "Draft lottery odds and mock draft"),
+    "get_scores": ("Checking the scores", "NHL scores and schedule"),
 }
 
 MAX_RESULT_CHARS = 6000
@@ -213,11 +221,20 @@ class ToolRunner:
         rows = [r for r in standings if scope == "league"
                 or (r.get("conference") or "").startswith(scope) or r.get("division") == scope]
         rows.sort(key=lambda r: r.get("league_sequence") or 99)
+        # A table (field names once, a row per team): as one dict per team, all
+        # 32 ran past MAX_RESULT_CHARS and the cut-off teams got filled in from
+        # the model's memory (Utah as the "Utah Hockey Club"). Names included
+        # for the same reason.
+        columns = ("name",) + compact.LEAGUE_ROW_FIELDS + ("xgoals_for_pct",)
+        table = []
+        for r in rows:
+            line = compact.standing_row(r, by_team.get(r.get("team_abbrev")))
+            table.append([r.get("team_name")] + [line.get(c) for c in columns[1:]])
         return {
             "as_of": str(standings[0]["snapshot_date"]) if standings else None,
             "playoff_odds_as_of": as_of,
-            "teams": [{k: v for k, v in compact.standing_row(r, by_team.get(r.get("team_abbrev"))).items()
-                       if k in compact.LEAGUE_ROW_FIELDS + ("xgoals_for_pct",)} for r in rows],
+            "columns": columns,
+            "teams_best_first": table,
         }
 
     async def _tool_get_team(self, team: str):
@@ -487,8 +504,28 @@ class ToolRunner:
         })
 
     async def _tool_get_leaders(self, category: str | None = None):
-        leaders = compact.leaders(await self._get("/players/leaders"))
-        return {category: leaders[category]} if category in leaders else leaders
+        if category and category not in LEADER_CATEGORIES:
+            raise ToolError(f"category must be one of {LEADER_CATEGORIES}")
+        if category == "gsax":
+            goalies = (await self._get("/goalies/advanced")).get("goalies", [])
+            qualified = [g for g in goalies if (g.get("games_played") or 0) >= _qualifying_games(goalies)]
+            return {"gsax": [compact._clean({k: g.get(k) for k in ("name", "team", "games_played", "gsax", "gsax_per_60", "save_pct")})
+                             for g in qualified[:compact.TOP_GOALIES]],
+                    "note": "GSAx: goals saved above expected (PuckPulse xG); above 0 is better than average."}
+        players = await self._get("/players/leaders")
+        if category in (None, "points", "goals", "goalie_wins"):
+            leaders = compact.leaders(players)
+            return {category: leaders[category]} if category else leaders
+        return {category: compact.more_leaders(players, category)}
+
+    async def _tool_get_scores(self, date: str | None = None):
+        try:
+            day = str(_parse_date(date)) if date else _today()
+        except ValueError as exc:
+            raise ToolError("date must be YYYY-MM-DD") from exc
+        games = (await self._get(f"/games/date/{day}")).get("games", [])
+        return compact._clean({"date": day, "games": [_score_line(g) for g in games],
+                               "note": None if games else f"No NHL games on {day}."})
 
     # --- betting, lineups, fantasy, draft ----------------------------------------
 
@@ -726,6 +763,30 @@ def _last_lines(lines: dict) -> dict | None:
     game = lines.get("game") or {}
     return {"game": f"{game.get('date')} {'vs' if game.get('home') else 'at'} {game.get('opponent')}",
             "lines_by_minutes_together": [l["players"] for l in lines["lines"]]}
+
+
+def _qualifying_games(goalies: list[dict]) -> int:
+    """Games a goalie needs to rank on a rate stat: 40% of the busiest goalie's, at least 3 (so one hot night can't lead)."""
+    most = max((g.get("games_played") or 0 for g in goalies), default=0)
+    return max(3, round(0.4 * most))
+
+
+def _score_line(g: dict) -> dict:
+    """One game as fans read it: 'PHI 2, BUF 3', 'Final (OT)', 'Live, 2nd period', or '7:30 PM ET'."""
+    away, home = g.get("awayTeam") or {}, g.get("homeTeam") or {}
+    state = g.get("gameState")
+    line = {"game": f"{away.get('abbrev')} @ {home.get('abbrev')}"}
+    if state in ("FINAL", "OFF"):
+        last = (g.get("gameOutcome") or {}).get("lastPeriodType")
+        line.update(score=f"{away.get('abbrev')} {away.get('score')}, {home.get('abbrev')} {home.get('score')}",
+                    status=f"Final{f' ({last})' if last in ('OT', 'SO') else ''}")
+    elif state in ("LIVE", "CRIT"):
+        period = (g.get("periodDescriptor") or {}).get("number")
+        line.update(score=f"{away.get('abbrev')} {away.get('score')}, {home.get('abbrev')} {home.get('score')}",
+                    status=f"Live, {_ordinal(period)} period" if period and period <= 3 else "Live, overtime")
+    else:
+        line["status"] = "Postponed" if state == "PPD" else _eastern_time(g.get("startTimeUTC"))
+    return line
 
 
 def _today() -> str:

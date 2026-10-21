@@ -22,7 +22,8 @@ const DATA = {
     sources: [{ name: "Daily Faceoff", url: "https://df.example", as_of: "2026-10-09" }, { name: "Tankathon", url: "https://tk.example", as_of: "2026-10-08" }],
     projected: Array.from({ length: 32 }, (_, i) => ({
       pick: i + 1, team: i === 0 ? "VAN" : `T${i}`,
-      prospect: { name: i === 0 ? "Landon DuPont" : `Prospect ${i + 1}`, pos: "D", team: "Michigan", league: "NCAA", ranks: { "Daily Faceoff": i + 1, Tankathon: null } },
+      prospect: { name: i === 0 ? "Landon DuPont" : `Prospect ${i + 1}`, pos: "D", team: "Michigan", league: "NCAA", ranks: { "Daily Faceoff": i + 1, Tankathon: null },
+                  ...(i === 0 ? { ep: "701503/landon-dupont" } : {}) },
     })),
     today: [{ pick: 1, team: "LAK", prospect: { name: "Sergei Skvortsov", pos: "LW", team: "Torpedo", league: null, ranks: {} } }],
   },
@@ -62,6 +63,10 @@ describe("DraftLotteryPage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Show picks 17-32" }));
     expect(screen.getByText("Prospect 17")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tankathon" })).toHaveAttribute("href", "https://tk.example");
+    const profile = screen.getByRole("link", { name: "Landon DuPont" });
+    expect(profile).toHaveAttribute("href", "https://www.eliteprospects.com/player/701503/landon-dupont");
+    expect(profile).toHaveAttribute("target", "_blank");
+    expect(screen.queryByRole("link", { name: "Prospect 2" })).not.toBeInTheDocument();  // no profile id: plain name
 
     await userEvent.click(screen.getByRole("button", { name: "If the season ended today" }));
     expect(screen.getByText("Sergei Skvortsov").closest("li")).toHaveTextContent("LAK");

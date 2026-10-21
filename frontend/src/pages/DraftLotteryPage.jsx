@@ -45,7 +45,11 @@ function MockDraft({ mock, picks, teams, rowClass }) {
             <span className="lottery-rank">{pick}</span>
             <Team abbrev={team} teams={teams} />
             <span className="lottery-mock-player" title={sources.map((s) => `${s.name}: ${prospect.ranks[s.name] ?? "unranked"}`).join(" · ")}>
-              <strong>{prospect.name}</strong>
+              {prospect.ep ? (
+                <a className="lottery-mock-link" href={`https://www.eliteprospects.com/player/${prospect.ep}`} target="_blank" rel="noopener noreferrer">
+                  {prospect.name}
+                </a>
+              ) : <strong>{prospect.name}</strong>}
               <span className="lottery-mock-meta">
                 {prospect.pos} · {prospect.team}{prospect.league ? ` (${prospect.league})` : ""}
               </span>
@@ -67,6 +71,8 @@ function MockDraft({ mock, picks, teams, rowClass }) {
           </span>
         ))}
         {" "}rankings. No lottery jumps; picks {LOTTERY_PICKS + 1}-{picks.length} go by record, though really they go by playoff results.
+        {" "}Tap a prospect for his profile and stats on{" "}
+        <a className="accent-link" href="https://www.eliteprospects.com" target="_blank" rel="noopener noreferrer">EliteProspects</a>.
       </p>
     </section>
   );

@@ -1,0 +1,166 @@
+{
+  "started": "2026-10-21T01:53:44+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model, Pittsburgh's playoff odds are driven by a mix of factors:\n\n* **Roster talent:** The model's evaluation of the roster's player quality from recent seasons pushes their rating up.\n* **Goaltending:** Current goaltending performance (saves above expected) pulls their rating down.\n* **Goals & expected goals:** Both actual goal differential and expected goal differential pull their rating down.\n* **Schedule:** The remaining schedule strength has a negligible effect on their rating. \n\nOdds also depend on the points the team has already banked so far.",
+          "seconds": 2.2,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Correctly lists factors with proper directions and treats schedule as negligible"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "The model likes Carolina significantly more than the Rangers, giving Carolina a much higher rating (1st in the league) and 99.0% playoff odds compared to New York's 70.4%. \n\nAccording to the playoff-odds model:\n* **Roster talent:** Carolina's roster has a major positive push (0.656 effect), whereas the Rangers' roster rating pulls them down (-0.065 effect).\n* **Expected goals (xG):** Both teams have positive expected goal differentials pushing their ratings up, but Carolina's chance creation and suppression (+17.1 xG diff) is much stronger than the Rangers' (+5.2 xG diff).\n* **Actual goals:** Both clubs have positive goal differentials pushing them up based on their early games.\n* **Goaltending and schedule:** Goaltending gives a slight edge to the Rangers, while the remaining schedules are a negligible factor for both.",
+          "seconds": 2.6,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'opponent': 'NYR', 'team': 'CAR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Meets rubric: correctly states model favors CAR and explains key differing factors with correct directions."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "As of the latest report, Ian Moore is listed on Injured Reserve due to a lower-body injury, with an expected return date of November 8, 2026.",
+          "seconds": 2.2,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Ian Moore\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Ian Moore'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer matches rubric"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "Tonight's betting board features two games:\n\n* **CAR @ VAN** (10:00 PM ET): Carolina is heavily favored at around -298 on DraftKings (PuckPulse fair price -277, 73.5% win chance), while Vancouver is +250 on BetRivers (fair price +277, 26.6% win chance).\n* **TBL @ VGK** (10:30 PM ET): A much closer matchup with Tampa Bay at -105 on DraftKings (fair price +101, 49.7% win chance) and Vegas at -110 on FanDuel (fair price -101, 50.3% win chance).\n\nThere are no value bets right now, as no price currently beats PuckPulse's fair odds by enough. \n\nFair odds blend PuckPulse's model with the sportsbooks. For entertainment, not betting advice. 21+.",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "get_bets({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_bets({})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '21+'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Answer correctly states no value bets, explains plainly, includes disclaimer and age limit"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "As of October 19, 2026, here is how PuckPulse's odds have performed against the sportsbooks this season across 54 total games:\n\n* **Moneyline:** PuckPulse's Brier score is 0.2264 compared to the books' 0.2192 (22 games).\n* **Puck Line:** PuckPulse's Brier score is 0.2265 compared to the books' 0.2171 (20 games).\n* **Totals:** PuckPulse's Brier score is 0.2471 compared to the books' 0.2523 (19 games).\n\n*(Note: Brier score measures accuracy; lower is better, and 0.25 represents a coin flip.)*",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "get_report_card({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_report_card({})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Provides correct moneyline Brier scores, direction (higher is worse), and plain explanation of the score"
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

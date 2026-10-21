@@ -344,3 +344,146 @@ class TestNewsTools:
         result = await self.call("get_news", {"team": "PIT"})
         assert result["headlines"][0] == {"title": "Penguins respond", "source": "NHL.com", "published": "2026-10-11T12:00"}
         assert result["transactions"][0]["description"] == "Recalled F X."
+
+
+SIDE = lambda price, fair, ours, **kw: {"price": price, "fair": fair, "ours": ours, "value": False, "ev": -0.02, **kw}  # noqa: E731
+BETS = {"date": "2026-10-20", "games": {"150": {
+    "home": "VAN", "away": "CAR", "b2b": {"home": False, "away": True},
+    "moneyline": {"home": SIDE(150, 135, 0.426, book="BetRivers", value=True, ev=0.064), "away": SIDE(-170, -135, 0.574, book="DraftKings")},
+    "puck_line": {"home_spread": 1.5, "home": SIDE(-160, -170, 0.63), "away": SIDE(135, 170, 0.37)},
+    "total": {"line": 6.5, "over": SIDE(-110, 105, 0.49), "under": SIDE(-110, -105, 0.51)},
+    "goalies": {"home": [{"name": "Kevin Lankinen", "prob": 0.62}], "away": [{"name": "Pyotr Kochetkov", "prob": 0.52}]},
+    "nhl_starters": {"home": "Kevin Lankinen", "away": "Pyotr Kochetkov"},
+    "reported_starters": {"home": {"name": "Leevi Merilainen", "status": "confirmed"}, "away": None},
+}}}
+LINEUP = {"available": True, "published": "2026-10-20T19:43:15.303Z",
+          "home": {"abbrev": "VAN", "forwards": [["Cotter", "Chytil", "Boeser"]], "defense": [["Hughes", "Hronek"]],
+                   "goalies": ["Kevin Lankinen", "Leevi Merilainen"], "scratched": ["Mancini"], "injured": []},
+          "away": {"abbrev": "CAR"}}
+FANTASY = {"sources": ["RotoWire", "DobberHockey"], "updates": [
+    {"player": "Jesper Wallstedt", "team": "MIN", "title": "Slated to face Oilers", "summary": "Expected in the road crease.",
+     "published": "2026-10-20T18:42:00Z"},
+    {"player": "Devon Levi", "team": "EDM", "title": "Guarding goal Tuesday", "summary": "", "published": "2026-10-20T18:35:00Z"}],
+    "articles": [{"title": "Buying low on Brayden Point", "source": "DobberHockey"}]}
+LOTTERY = {"projected": [{"team": "VAN", "missed_playoffs": 0.98, "picks": [0.15, 0.13, 0.12] + [0.04] * 13},
+                         {"team": "PIT", "missed_playoffs": 0.8, "picks": [0.05, 0.05, 0.05] + [0.05] * 13}],
+           "today": [{"team": "VAN", "position": 1, "points": 4, "picks": [0.255] + [0.05] * 15}],
+           "mock": {"year": 2027, "projected": [
+               {"pick": 1, "team": "VAN", "prospect": {"name": "Landon DuPont", "pos": "D", "team": "University of Michigan"}},
+               {"pick": 6, "team": "PIT", "prospect": {"name": "Alexis Joseph", "pos": "C", "team": "Saint John Sea Dogs"}}]}}
+CARD = {"as_of": "2026-10-19", "week": {"games": 51, "moneyline": {"games": 22, "brier_ours": 0.2264, "brier_books": 0.2192},
+                                        "value_bets": {"bets": 0, "wins": 0, "list": []}, "disagreements": [{"x": 1}]},
+        "season": {"games": 140, "moneyline": {"games": 80, "brier_ours": 0.23, "brier_books": 0.229}}}
+
+
+@pytest.mark.asyncio
+class TestBettingLineupFantasyDraft:
+    @pytest.fixture(autouse=True)
+    def today(self, monkeypatch):
+        import app.tools
+        monkeypatch.setattr(app.tools, "_today", lambda: "2026-10-20")
+
+    async def call(self, name, args, lineup=LINEUP):
+        van_schedule = {"team": "VAN", "live": None, "upcoming": [
+            {"id": 150, "date": "2026-10-20", "start_time_utc": "2026-10-21T02:00:00Z", "home": True, "opponent": "CAR"}], "recent": []}
+        routes = {"/standings/latest": STANDINGS + [{"team_abbrev": "VAN", "team_name": "Vancouver Canucks", "common_name": "Canucks"},
+                                                    {"team_abbrev": "CAR", "team_name": "Carolina Hurricanes", "common_name": "Hurricanes"},
+                                                    {"team_abbrev": "MIN", "team_name": "Minnesota Wild", "common_name": "Wild"}],
+                  "/bets": BETS, "/games/date/2026-10-20": {"games": [{"id": 150, "gameState": "PRE", "startTimeUTC": "2026-10-21T02:00:00Z"}]},
+                  "/teams/VAN/schedule": van_schedule, "/games/150/lineup": lineup, "/fantasy": FANTASY,
+                  "/draft-lottery": LOTTERY, "/report-card": CARD,
+                  "/teams/VAN/lines": {"team": "VAN", "game": {"date": "2026-10-17", "opponent": "TBL", "home": False},
+                                       "lines": [{"players": ["Cotter", "Chytil", "Boeser"]}]},
+                  "/teams/PIT/schedule": {"team": "PIT", "live": None, "upcoming": [{"id": 9, "date": "2026-10-22"}], "recent": []}}
+
+        def handler(request):
+            return httpx.Response(200, json=routes.get(request.url.path, {}))
+        async with httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler)) as client:
+            return json.loads(await ToolRunner(DashboardClient("https://dashboard.test", client)).run(name, json.dumps(args)))
+
+    async def test_bets_for_one_game_with_value_and_goalies(self):
+        result = await self.call("get_bets", {"team": "Canucks"})
+        (game,) = result["games"]
+        assert game["game"] == "CAR @ VAN" and game["start"] == "10:00 PM ET" and game["second_night_of_back_to_back"] == ["CAR"]
+        assert game["moneyline"]["VAN"] == {"best_price": "+150", "book": "BetRivers", "puckpulse_fair_price": "+135",
+                                            "puckpulse_chance_pct": 42.6, "value": "yes, expected return +6.4%"}
+        assert game["puck_line"]["VAN +1.5"]["best_price"] == "-160" and "total" in game
+        assert game["goalies"]["home"] == "Leevi Merilainen: confirmed by beat reporters (via RotoWire)"
+        assert game["goalies"]["away"] == "Pyotr Kochetkov: projected by NHL.com's lineup"
+        assert "21+" in result["note"] and "not a sure thing" in result["note"]
+        assert result["value_flags"] == ["CAR @ VAN: VAN moneyline +150, yes, expected return +6.4%"]
+
+    async def test_the_whole_slate_keeps_to_moneylines_for_games_not_started(self):
+        (game,) = (await self.call("get_bets", {}))["games"]
+        assert "puck_line" not in game and "total" not in game and "goalies" not in game
+        assert game["moneyline"]["CAR"]["best_price"] == "-170"
+
+    async def test_no_value_is_said_plainly(self, monkeypatch):
+        monkeypatch.setitem(BETS["games"]["150"]["moneyline"], "home", SIDE(150, 135, 0.426, book="BetRivers"))
+        assert (await self.call("get_bets", {}))["value_flags"].startswith("None right now")
+
+    async def test_games_already_started_are_only_listed_on_the_slate(self, monkeypatch):
+        live = {"games": [{"id": 150, "gameState": "LIVE", "startTimeUTC": "2026-10-21T02:00:00Z"}]}
+        monkeypatch.setitem(BETS, "date", "2026-10-20")
+        original = self.call
+
+        async def call(name, args):
+            import app.tools
+            async def fake_get(runner, path):
+                if path.startswith("/games/date/"):
+                    return live
+                return await real_get(runner, path)
+            real_get = app.tools.ToolRunner._get
+            monkeypatch.setattr(app.tools.ToolRunner, "_get", fake_get)
+            return await original(name, args)
+        slate = await call("get_bets", {})
+        assert "games" not in slate and slate["already_started"] == ["CAR @ VAN"]
+        one = await call("get_bets", {"team": "VAN"})
+        assert "last lines before puck drop" in one["games"][0]["state"]
+
+    async def test_bets_for_a_team_without_a_game(self):
+        assert "no game" in (await self.call("get_bets", {"team": "PIT"}))["error"]
+
+    async def test_report_card_drops_the_long_lists(self):
+        result = await self.call("get_report_card", {})
+        assert result["last_week"]["moneyline"] == {"games": 22, "brier_puckpulse": 0.2264, "brier_books": 0.2192}
+        assert result["last_week"]["value_bets"] == {"bets": 0, "wins": 0} and "disagreements" not in json.dumps(result)
+
+    async def test_lineup_with_the_reported_starter_and_nhl_lines(self):
+        result = await self.call("get_lineup", {"team": "VAN"})
+        assert result["game_today"] == "vs CAR, 10:00 PM ET" and result["starting_goalie"].startswith("Leevi Merilainen: confirmed")
+        assert "goalies" not in result["nhl_com_projected_lineup"]
+        assert result["nhl_com_projected_lineup"]["forward_lines"] == [["Cotter", "Chytil", "Boeser"]]
+        assert result["nhl_com_projected_lineup"]["scratched"] == ["Mancini"] and "puck drop" in result["caveat"]
+
+    async def test_lineup_before_nhl_com_posts_it_falls_back_to_last_games_lines(self):
+        result = await self.call("get_lineup", {"team": "VAN"}, lineup={"available": False})
+        assert result["last_game_lines"] == {"game": "2026-10-17 at TBL", "lines_by_minutes_together": [["Cotter", "Chytil", "Boeser"]]}
+        assert "hasn't posted" in result["note"]
+
+    async def test_lineup_without_a_game_today(self):
+        result = await self.call("get_lineup", {"team": "PIT"})
+        assert result["note"].startswith("No game today")
+
+    async def test_fantasy_news_for_a_player_and_an_honest_miss(self):
+        result = await self.call("get_fantasy_news", {"player": "wallstedt"})
+        assert result["updates_newest_first"] == [{"player": "Jesper Wallstedt", "team": "MIN", "update": "Slated to face Oilers",
+                                                   "detail": "Expected in the road crease.", "published": "2026-10-20T18:42"}]
+        assert "articles" not in result
+        missing = await self.call("get_fantasy_news", {"player": "Crosby"})
+        assert not missing.get("updates_newest_first") and "not the same as no news" in missing["note"]
+
+    async def test_fantasy_news_for_everything_includes_articles(self):
+        result = await self.call("get_fantasy_news", {})
+        assert len(result["updates_newest_first"]) == 2 and result["articles"] == [{"title": "Buying low on Brayden Point", "source": "DobberHockey"}]
+
+    async def test_draft_lottery_for_one_team(self):
+        result = await self.call("get_draft_lottery", {"team": "PIT"})
+        assert result["projected"] == {"team": "PIT", "no1_pick_pct": 5.0, "top3_pct": 15.0, "in_lottery_pct": 80.0}
+        assert result["mock_draft_pick"] == [{"pick": 6, "team": "PIT", "prospect": "Alexis Joseph", "position": "C", "club": "Saint John Sea Dogs"}]
+        assert "2027 rankings" in result["note"]
+
+    async def test_draft_lottery_top_of_the_order(self):
+        result = await self.call("get_draft_lottery", {})
+        assert result["projected_top"][0]["team"] == "VAN" and result["mock_draft_first_10"][0]["prospect"] == "Landon DuPont"
+        assert result["if_season_ended_today_top"][0]["no1_pick_pct"] == 25.5

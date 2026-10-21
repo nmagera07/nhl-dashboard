@@ -76,7 +76,7 @@ information is for entertainment and research, not advice. 21+. Gambling problem
 
 ## The models
 
-All of them are graded out of sample, and the write-ups are in [`docs/LEARNING.md`](docs/LEARNING.md).
+All of them are graded out of sample.
 
 | Model | What it does | How well (out of sample) |
 |---|---|---|
@@ -203,8 +203,6 @@ backend/        FastAPI app, daily ingest, models, backtests, tests
   notifier_function/   Azure Function: goal alerts + closing odds
 frontend/       React app (src/), Static Web Apps function (api/), PWA config
 intelligence/   PuckPulse AI: the tool-calling agent, its tools, and evals
-docs/           LEARNING.md: what was built, measured, and learned, with resume bullets
-HANDOFF.md      Current state and what's next
 ```
 
 ## Local development

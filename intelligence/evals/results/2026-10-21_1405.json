@@ -1,0 +1,3207 @@
+{
+  "started": "2026-10-21T17:29:43+00:00",
+  "api": "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io",
+  "runs": {
+    "gemini:gemini-3.5-flash-lite": {
+      "model": "gemini-3.5-flash-lite",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "The Carolina Hurricanes (CAR) are in first place in the Metropolitan Division with 17 points (an 8-2-1 record).",
+          "seconds": 2.8,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins play next on Thursday, October 22, 2026, at 7:00 PM ET at home against the Florida Panthers.",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\",\"games\":1})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT', 'games': 1})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Florida Panthers'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If Pittsburgh goes 4-0 over their next 4 games, the playoff-odds model's simulations show:\n\n* **Playoff Odds:** Increase from 16.8% to 26.4% (+9.6%).\n* **Projected Points:** Rise from an average of 85.3 to 88.9 points.",
+          "seconds": 2.8,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"games\":4,\"wins\":4,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'games': 4, 'wins': 4, 'team': 'PIT'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~26.4%, answer has [16.8, 26.4, 9.6]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "3 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "According to the playoff-odds model's simulations, Detroit currently has a baseline playoff probability of 26.0%. \n\nTo reach a better-than-even chance (>50%) over its next 10 games, Detroit needs a record of **9\u20131** (which yields 53.6% playoff odds) or **10\u20130** (61.2%). \n\n*(Note: Losses are counted as regulation losses in these simulations; each overtime loss would add a point.)*",
+          "seconds": 12.2,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"team\":\"DET\",\"games\":10})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'team': 'DET', 'games': 10})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '9-1'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "According to the playoff-odds model, Toronto's playoff odds at the start of the season were 22.1%.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_playoff_odds({'team': 'TOR'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~22.1%, answer has [22.1]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "In their last game on October 19, 2026, the Penguins lost 5\u20134 on the road against the Utah Hockey Club.",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "get_recent_results({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_recent_results({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 4-5"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In their last game on October 19, 2026, against the Utah Mammoth, the goalscorers for Pittsburgh were:\n\n* **E. Karlsson** (1st period)\n* **R. Rakell** (2nd period)\n* **E. Chinakhov** (3rd period)\n* **D. Carlile** (3rd period)",
+          "seconds": 2.5,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Karlsson'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 6 points (3 goals and 3 assists) in 10 games this season.",
+          "seconds": 2.8,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '6 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "Connor McDavid leads the NHL in points with 26 points (6 goals, 20 assists in 9 games) for the Edmonton Oilers. \n\nFollowing him are Auston Matthews (Toronto Maple Leafs), Evan Bouchard (Edmonton Oilers), and Jack Eichel (Vegas Golden Knights), who are tied for second with 18 points each.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({\"category\":\"points\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'McDavid'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "Based on the playoff-odds model, the Los Angeles Kings (LAK) have the easiest remaining schedule in the Western Conference, with an average opponent rating of -0.065.",
+          "seconds": 1.8,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "rank_schedule_strength({'conference': 'Western'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'LAK'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer names the Los Angeles Kings and appropriately qualifies it with 'Based on the playoff-odds model'."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "Sidney Crosby's 5-on-5 PDO is 100.0, which is about average (~100) and indicates no unusual luck either way in his start.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies the PDO as 100.0, notes it is average, and interprets it as indicating no unusual luck."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model, Pittsburgh's playoff odds are actually sitting at 16.7% as of October 21, 2026. Here is why the model rates them where it does:\n\n* **Roster talent:** The model's historical player ratings push their rating up, reflecting above-average talent on the roster compared to a league-average team.\n* **Goaltending:** Sub-par goaltending pulls their rating down, with the current tandem allowing more goals than expected compared to an average group.\n* **Goals and expected goals:** Both their actual goal differential and expected goal (xG) differential pull down their rating, as they have been outplayed and outscored so far.\n* **Remaining schedule:** Their remaining schedule rank (24th easiest) has a negligible effect on their overall outlook.",
+          "seconds": 2.2,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies the factors and their directions without crediting the negligible schedule factor."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "The model likes Carolina significantly more than the Rangers, giving Carolina a 99.3% playoff probability compared to 68.9% for the Rangers, per the playoff-odds model's simulations. \n\nAccording to the model's rating factors:\n* **Roster strength:** Carolina's roster is rated much higher, pushing its rating up strongly, whereas the Rangers' roster pulls their rating down slightly.\n* **Expected goals (xG):** Both teams are driven by positive play, but Carolina's expected goal differential is much stronger, pushing their rating up more.\n* **Actual goals:** Both teams boast positive goal differentials that push their ratings up.\n* **Goaltending:** The Rangers get a small positive push from their goaltending, while Carolina's impact here is negligible.",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'opponent': 'NYR', 'team': 'CAR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly states the model favors Carolina and accurately cites the key differing factors from the rubric."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "Based on the playoff-odds model's simulations, if the Red Wings traded away Dylan Larkin without getting a player back, their playoff odds would drop from 26.8% (baseline) down to 18.4%, and their projected average points would decrease from 88.2 to 85.2. \n\n*Note: This is a rough estimate for the rest of the season that ignores line chemistry and the salary cap.*",
+          "seconds": 3.4,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~18.4%, answer has [26.8, 18.4]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately states the model's odds change, frames it as a rough estimate, and does not claim knowledge of a real trade."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "According to the playoff-odds model's simulations, trading Dylan Larkin to Toronto for Auston Matthews would have these effects on their playoff chances for the rest of the season (ignoring line chemistry and salary cap):\n\n* **Detroit Red Wings:** Playoff odds would increase slightly from 26.8% (baseline 88.2 projected points) to 27.6% (88.5 projected points).\n* **Toronto Maple Leafs:** Playoff odds would edge down slightly from 27.4% (baseline 89.0 projected points) to 26.9% (88.7 projected points).",
+          "seconds": 2.6,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"to_team\":\"TOR\",\"player\":\"Dylan Larkin\",\"player_back\":\"Auston Matthews\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'to_team': 'TOR', 'player': 'Dylan Larkin', 'player_back': 'Auston Matthews'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately reports both teams' playoff odds changes according to the model."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "As of the latest report, Ian Moore is listed on Injured Reserve with a lower-body injury and an expected return around November 8, 2026.",
+          "seconds": 1.9,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Ian Moore\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_injuries({'player': 'Ian Moore'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Injured Reserve'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly provides the required injury status, injury type, and return date without inventing details."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "According to NHL.com's projected lineup, BUF's first forward line features:\n\n* Josh Doan\n* Jiri Kulich\n* Tage Thompson\n\nLineups and starters can change until puck drop.",
+          "seconds": 3.8,
+          "model_calls": 2,
+          "tools": [
+            "get_lineup({\"team\":\"BUF\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_lineup({'team': 'BUF'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Doan'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer names the correct players, references NHL.com's projection, and mentions that lineups can change before puck drop."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "Ukko-Pekka Luukkonen is expected to start in goal for BUF tonight, as reported by beat reporters (via RotoWire). \n\nLineups and starters can change until puck drop.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_lineup({\"team\":\"BUF\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_lineup({'team': 'BUF'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Luukkonen'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer names Ukko-Pekka Luukkonen, cites beat reporters via RotoWire, and appropriately frames it as expected rather than certain."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "According to the latest betting board, there are **no value bets** flagged for tonight's games, as no available price beats PuckPulse's fair odds by enough expected return. \n\nHere are the matchups and moneyline odds for tonight:\n* **PHI at BUF** (7:30 PM ET): Philadelphia is +155 (BetRivers) with a 38.2% win chance, while Buffalo is -182 (FanDuel) with a 61.8% win chance.\n* **FLA at OTT** (7:30 PM ET): Florida is -103 (BetRivers) with a 49.6% win chance, and Ottawa is -108 (DraftKings) with a 50.4% win chance.\n\nPuckPulse's fair odds blend its model with the sportsbooks. \n\nFor entertainment, not betting advice. 21+.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_bets({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_bets({})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '21+'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "4 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly states there are no value bets, explains it simply, avoids forbidden terminology, and includes the required disclaimer."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "The PuckPulse mock draft has the Penguins taking **Alexis Joseph**, a center from the Saint John Sea Dogs, with the 6th overall pick. \n\n*Note: The mock draft reflects the most likely draft order with no lottery jumps, using PuckPulse's consensus of public 2027 rankings, which change throughout the season.*",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_draft_lottery({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_draft_lottery({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Joseph'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies Alexis Joseph at No. 6 for PIT and includes a note that the mock draft reflects current rankings and changes throughout the season."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "According to the latest fantasy news (via RotoWire), Tyson Foerster (hand) is a game-time decision ahead of Wednesday's game against Buffalo, as reported by Jackie Spiegel of The Philadelphia Inquirer.",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_fantasy_news({\"player\":\"Tyson Foerster\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_fantasy_news({'player': 'Tyson Foerster'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Foerster'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly states that Tyson Foerster is a game-time decision due to a hand injury ahead of Wednesday's game against Buffalo."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "As of October 20, 2026, here is how PuckPulse's odds have performed against the sportsbooks this season across 65 total games tracked:\n\n* **Moneyline** (33 games): PuckPulse has a Brier score of 0.2356 compared to the sportsbooks' 0.2291.\n* **Puck Line** (31 games): PuckPulse has a Brier score of 0.1923 compared to the sportsbooks' 0.1887.\n* **Totals** (30 games): PuckPulse has a Brier score of 0.2613 compared to the sportsbooks' 0.2527.\n* **Value Bets** (1 bet): 0 wins and 1 loss, with a profit of -$100.\n\n*(Note: Brier score measures accuracy, where lower is better and 0.25 represents a coin flip.)*\n\nFor entertainment, not betting advice. 21+.",
+          "seconds": 2.4,
+          "model_calls": 2,
+          "tools": [
+            "get_report_card({})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_report_card({})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly states the moneyline Brier scores, notes that lower is better making PuckPulse worse, and explains the score in plain words."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "**Maple Leafs crush Blue Jackets 6-2 to highlight a busy Tuesday night across the NHL.**\n\n### Last night\n- Maple Leafs 6, Blue Jackets 2\n- Sharks 4, Canadiens 3 (OT)\n- Lightning 6, Golden Knights 2\n\n### Playoff race\n- Islanders playoff odds rose from 37% to 45%\n- Stars playoff odds rose from 69% to 74%\n- Jets playoff odds fell from 54% to 45%\n- Blue Jackets playoff odds fell from 30% to 24%\n\n### Tonight\n- Panthers at Senators, 7:30 PM ET; the model gives the Senators a 52% chance to win",
+          "seconds": 1.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Sharks'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "9 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: All included facts and scores match the provided data without any fabrications."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "gemini:gemini-3.1-flash-lite": {
+      "model": "gemini-3.1-flash-lite",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "",
+          "seconds": 0.9,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "",
+          "seconds": 0.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "",
+          "seconds": 1.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "",
+          "seconds": 1.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "",
+          "seconds": 0.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 0.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 1.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "",
+          "seconds": 1.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 1.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "",
+          "seconds": 8.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 0.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 1.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 0.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 1.4,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 1.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 1.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "**The Lightning dominated the Golden Knights 6-2 to highlight a high-scoring Tuesday night.**\n\n### Last night\n* Sharks 4, Canadiens 3 (OT); Devils 4, Avalanche 3; Islanders 3, Ducks 2.\n* Kings 5, Capitals 2; Maple Leafs 6, Blue Jackets 2; Blues 2, Jets 1.\n* Stars 3, Bruins 2 (OT); Oilers 4, Wild 3 (OT); Kraken 4, Red Wings 3 (SO).\n* Hurricanes 6, Canucks 3; Lightning 6, Golden Knights 2.\n\n### Playoff race\n* Islanders: from 37% to 45%.\n* Stars: from 69% to 74%.\n* Maple Leafs: from 24% to 29%.\n* Jets: from 54% to 45%; Blue Jackets: from 30% to 24%; Ducks: from 42% to 36%.\n\n### Tonight\n* The Panthers at Senators game is the game of the night, where the model gives the Senators a 52% chance to win.",
+          "seconds": 2.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Sharks'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "13 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer accurately reflects the provided facts without any invented information."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    },
+    "gemini:gemini-2.5-flash-lite": {
+      "model": "gemini-2.5-flash-lite",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "",
+          "seconds": 0.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "HTTPException: 503: PuckPulse AI is taking a breather (its free AI providers are busy). Try again in a minute."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "gemini:gemini-3.5-flash": {
+      "model": "gemini-3.5-flash",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "The **Carolina Hurricanes** (CAR) are in first place in the Metropolitan Division. \n\nThrough 11 games, they lead the division with **17 points** and an **8-2-1** record (62.5 xGF%), sitting two points ahead of the second-place New York Rangers (15 points, 7-3-1).",
+          "seconds": 5.4,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Pittsburgh Penguins play next on **Thursday, October 22, 2026, at 7:00 PM ET**. They host the Florida Panthers at home.",
+          "seconds": 4.2,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\",\"games\":1})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT', 'games': 1})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Florida Panthers'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If the Pittsburgh Penguins win their next 4 games (going 4-0-0), their playoff odds would rise from a baseline of **16.8%** up to **26.4%**\u2014an increase of nearly 10 percentage points\u2014according to the playoff-odds model's simulations.\n\nAdditionally, their projected point total for the season would jump from **85.3 points** to **88.9 points**.",
+          "seconds": 4.9,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"wins\":4,\"games\":4,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'wins': 4, 'games': 4, 'team': 'PIT'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~26.4%, answer has [16.8, 26.4]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "According to the playoff-odds model's simulations, Detroit currently has a **26.0%** chance of making the playoffs. \n\nTo reach a better-than-even chance (greater than 50%), the Red Wings need to go at least **9-1-0** (or secure 18 points) over their next 10 games.\n\nHere is how Detroit's projected playoff odds change based on their record over the next 10 games:\n\n* **10-0-0:** 61.2%\n* **9-1-0:** 53.6%\n* **8-2-0:** 44.8%\n* **7-3-0:** 34.2%\n* **6-4-0:** 26.4%\n* **5-5-0:** 23.0%\n\n*(Note: These projections treat non-wins as regulation losses; overtime or shootout losses would add extra points and slightly boost those odds.)*",
+          "seconds": 7.2,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"games\":10,\"team\":\"DET\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'games': 10, 'team': 'DET'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '9-1'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "8 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "At the start of the season (October 8, 2026), the Toronto Maple Leafs' playoff odds were **22.1%**, according to the playoff-odds model.",
+          "seconds": 6.5,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_playoff_odds({'team': 'TOR'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~22.1%, answer has [22.1]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "The Pittsburgh Penguins' last game was on Monday, October 19, 2026, when they lost **5\u20134** to Utah (UTA).",
+          "seconds": 5.9,
+          "model_calls": 2,
+          "tools": [
+            "get_recent_results({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_recent_results({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 4-5"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In Pittsburgh's most recent game on October 19, 2026\u2014a 5\u20134 loss to the Utah Mammoth\u2014the goal scorers for the Penguins were:\n\n- **E. Karlsson** (1st Period, power play)\n- **R. Rakell** (2nd Period, power play)\n- **E. Chinakhov** (3rd Period)\n- **D. Carlile** (3rd Period)",
+          "seconds": 5.9,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Karlsson'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has **6 points** (3 goals, 3 assists) in 10 games for the Pittsburgh Penguins so far this season.",
+          "seconds": 5.2,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '6 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 2.2,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({\"category\":\"points\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "",
+          "seconds": 4.7,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 3.2,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "",
+          "seconds": 6.3,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 3.8,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"player\":\"Dylan Larkin\",\"to_team\":\"TOR\",\"player_back\":\"Auston Matthews\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 1.8,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Ian Moore\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "HTTPException: 503: PuckPulse AI is taking a breather (its free AI providers are busy). Try again in a minute."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "gemini:gemini-2.5-flash": {
+      "model": "gemini-2.5-flash",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "The Carolina Hurricanes are in first place in the Metropolitan Division, as of October 21, 2026.",
+          "seconds": 1.6,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "The Penguins play next on Thursday, October 22, 2026, at 7:00 PM ET at home against the Florida Panthers.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_schedule({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Florida Panthers'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "If the Penguins win their next four games, their playoff odds would rise to 26.4%, up from their current 16.8%, according to the PuckPulse playoff-odds model's simulations. Their projected points would also increase from 85.3 to 88.9.",
+          "seconds": 3.7,
+          "model_calls": 2,
+          "tools": [
+            "simulate_scenario({\"team\":\"PIT\",\"games\":4,\"wins\":4})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_scenario({'team': 'PIT', 'games': 4, 'wins': 4})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~26.4%, answer has [26.4, 16.8]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "The Detroit Red Wings need to go 9-1 (9 wins, 1 loss) over their next 10 games to have a better-than-even chance at the playoffs, according to the playoff-odds model's simulations. This record would give them a 53.6% chance. Their current playoff odds are 26.0%.",
+          "seconds": 2.9,
+          "model_calls": 2,
+          "tools": [
+            "playoff_path({\"games\":10,\"team\":\"DET\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "playoff_path({'games': 10, 'team': 'DET'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '9-1'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "The Penguins lost to the Utah Mammoth 5-4 on October 19, 2026.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 4-5"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "In their last game on October 19 against the Utah Mammoth, the Penguins' goals were scored by:\n\n*   E. Karlsson (power play)\n*   R. Rakell (power play)\n*   E. Chinakhov\n*   D. Carlile",
+          "seconds": 4.9,
+          "model_calls": 2,
+          "tools": [
+            "get_game({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_game({'team': 'PIT'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Karlsson'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "Sidney Crosby has 6 points this season (3 goals, 3 assists) in 10 games played.",
+          "seconds": 3.3,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found '6 point'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "Connor McDavid of the Edmonton Oilers leads the NHL in points with 26 (6 goals, 20 assists) in 9 games.",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({\"category\":\"points\"})"
+          ],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'McDavid'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "Sidney Crosby's PDO is 100.0, which means he's experiencing about average luck this season, with no unusual highs or lows impacting his start.",
+          "seconds": 2.3,
+          "model_calls": 2,
+          "tools": [
+            "find_player({\"name\":\"Sidney Crosby\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "find_player({'name': 'Sidney Crosby'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer correctly identifies Crosby's PDO as 100.0 and interprets it as average luck with no unusual highs or lows."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "The PuckPulse model likes Carolina more than the Rangers. Here's why:\n\n**For Carolina:**\n*   **Offensive Production:** Carolina's actual goal differential of +15 (in 11 games) and expected goal differential of +20.9 significantly push up their rating.\n*   **Strong Roster:** Their roster, compared to an average team, pushes their rating up.\n*   **Goaltending:** Their goaltending is currently performing negligibly compared to an average tandem.\n\n**For the Rangers:**\n*   **Offensive Production:** The Rangers' actual goal differential of +9 (in 11 games) and expected goal differential of +5.2 push up their rating.\n*   **Roster:** Their roster's player value compared to an average team pulls their rating down.\n*   **Goaltending:** Their goaltending performs above average, pushing their rating up.\n\nFor their next meeting on November 22, the model gives Carolina a 53.8% chance to win against the Rangers, who have a 46.2% chance. The Rangers are at home, which typically gives a slight advantage.",
+          "seconds": 4.2,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'opponent': 'NYR', 'team': 'CAR'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'CAR'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": false,
+              "detail": "gemini: The answer attributes roster and goaltending effects to the wrong directions or invents generalities not supported by the rubric."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "If the Red Wings traded Dylan Larkin, and assuming he's replaced by a league-average player, their playoff odds would drop from 26.8% to 18.4%. Their projected points would also decrease from 88.2 to 85.2. This is based on PuckPulse's model simulations as of October 21, 2026, and is a rough estimate for the rest of the season.",
+          "seconds": 4.7,
+          "model_calls": 2,
+          "tools": [
+            "simulate_roster_change({\"to_team\":null,\"player\":\"Dylan Larkin\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "simulate_roster_change({'to_team': None, 'player': 'Dylan Larkin'})"
+            },
+            {
+              "name": "number",
+              "passed": true,
+              "detail": "expected ~18.4%, answer has [26.8, 18.4]"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "2 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: The answer provides the exact odds change, presents it as a model estimate, and does not claim any real trade occurred."
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 3.1,
+          "model_calls": 2,
+          "tools": [
+            "get_lineup({\"team\":\"BUF\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_fantasy_news({\"player\":\"Tyson Foerster\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "HTTPException: 503: PuckPulse AI is taking a breather (its free AI providers are busy). Try again in a minute."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "gemini:gemma-4-31b-it": {
+      "model": "gemma-4-31b-it",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "",
+          "seconds": 20.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "",
+          "seconds": 37.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "APITimeoutError: Request timed out."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 17.9,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 14.9,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "",
+          "seconds": 0.4,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "",
+          "seconds": 0.4,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 35.8,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "APITimeoutError: Request timed out."
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 27.3,
+          "model_calls": 2,
+          "tools": [
+            "get_bets({\"date\":\"2026-10-21\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 20.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 0.5,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "",
+          "seconds": 0.3,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "HTTPException: 503: PuckPulse AI is taking a breather (its free AI providers are busy). Try again in a minute."
+            }
+          ],
+          "passed": false
+        }
+      ]
+    },
+    "groq:qwen/qwen3.8-27b": {
+      "model": "qwen/qwen3.8-27b",
+      "results": [
+        {
+          "case": "division_leader",
+          "question": "Who's in first place in the Metropolitan Division?",
+          "answer": "",
+          "seconds": 1.7,
+          "model_calls": 2,
+          "tools": [
+            "get_standings({\"scope\":\"Metropolitan\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "next_game",
+          "question": "When do the Penguins play next?",
+          "answer": "",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "get_schedule({\"games\":1,\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "scenario",
+          "question": "What happens to Pittsburgh's playoff odds if they win their next 4 games?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "playoff_path",
+          "question": "What record does Detroit need over its next 10 games to have a better-than-even chance at the playoffs?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "odds_history",
+          "question": "What were Toronto's playoff odds at the start of the season?",
+          "answer": "",
+          "seconds": 1.2,
+          "model_calls": 2,
+          "tools": [
+            "get_playoff_odds({\"team\":\"TOR\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_result",
+          "question": "What was the score of the Penguins' last game?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "last_game_scorers",
+          "question": "Who scored for Pittsburgh in their last game?",
+          "answer": "",
+          "seconds": 1.0,
+          "model_calls": 2,
+          "tools": [
+            "get_recent_results({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "player_points",
+          "question": "How many points does Sidney Crosby have this season?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "points_leader",
+          "question": "Who leads the NHL in points right now?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "easiest_schedule",
+          "question": "Who has the easiest remaining schedule in the Western Conference?",
+          "answer": "",
+          "seconds": 1.3,
+          "model_calls": 2,
+          "tools": [
+            "rank_schedule_strength({\"conference\":\"Western\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "pdo_reading",
+          "question": "What does Sidney Crosby's PDO say about his start?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "",
+          "seconds": 0.2,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "why_favored",
+          "question": "Who does the model like more between Carolina and the Rangers, and why?",
+          "answer": "",
+          "seconds": 1.3,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"opponent\":\"NYR\",\"team\":\"CAR\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_away",
+          "question": "What if the Red Wings traded away Dylan Larkin? How would that affect their playoff odds?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "trade_swap",
+          "question": "What would a Larkin-for-Matthews trade do to Detroit's and Toronto's playoff chances?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "injury_status",
+          "question": "Is Ian Moore injured right now?",
+          "answer": "",
+          "seconds": 1.1,
+          "model_calls": 2,
+          "tools": [
+            "get_injuries({\"player\":\"Ian Moore\"})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "first_line",
+          "question": "Who's on BUF's first line tonight?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "goalie_tonight",
+          "question": "Who's starting in goal for BUF tonight?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "value_bets",
+          "question": "Any value bets on tonight's games?",
+          "answer": "",
+          "seconds": 2.1,
+          "model_calls": 2,
+          "tools": [
+            "get_bets({})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "mock_pick",
+          "question": "Who does the PuckPulse mock draft have PIT taking?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "fantasy_update",
+          "question": "What's the latest fantasy news on Tyson Foerster?",
+          "answer": "",
+          "seconds": 0.1,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "report_card",
+          "question": "How have PuckPulse's odds done against the sportsbooks this season?",
+          "answer": "",
+          "seconds": 1.6,
+          "model_calls": 2,
+          "tools": [
+            "get_report_card({})"
+          ],
+          "checks": [
+            {
+              "name": "answered",
+              "passed": false,
+              "detail": "AllProvidersFailed: "
+            }
+          ],
+          "passed": false
+        },
+        {
+          "case": "morning_digest",
+          "question": "(write the morning digest)",
+          "answer": "**The Maple Leafs routed the Blue Jackets 6-2.**\n\n### Last night\n*   Maple Leafs 6, Blue Jackets 2\n*   Sharks 4, Canadiens 3 (OT)\n*   Lightning 6, Golden Knights 2\n*   Kraken 4, Red Wings 3 (SO)\n\n### Playoff race\n*   Islanders: from 37% to 45%\n*   Stars: from 69% to 74%\n*   Maple Leafs: from 24% to 29%\n*   Jets: from 54% to 45%\n\n### Tonight\n*   Panthers at Senators, 7:30 PM ET; the model gives the Senators a 52% chance to win",
+          "seconds": 0.7,
+          "model_calls": 1,
+          "tools": [],
+          "checks": [
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Sharks'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "9 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "gemini: All included facts match the provided data without any fabrications."
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

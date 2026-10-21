@@ -195,11 +195,60 @@ async def check_ingestion_freshness_loop():
 FANTASY_POLL_SECONDS = 3 * 60
 
 
+FANTASY_UPDATE_COLUMNS = ("id", "player", "title", "summary", "url", "published", "source")
+
+
+def load_fantasy_updates():
+    """The last few days of saved RotoWire updates, into news.py's running list. Best effort."""
+    since = datetime.now(timezone.utc) - news.MAX_UPDATE_AGE
+    try:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT {', '.join(FANTASY_UPDATE_COLUMNS)} FROM fantasy_updates WHERE published >= %s", (since,))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning("Couldn't load saved fantasy updates; starting from RotoWire's latest", exc_info=True)
+        return 0
+    updates = [{**r, "published": news._iso(r["published"])} for r in rows]
+    news.remember_fantasy_updates(updates)
+    logger.info(f"Loaded {len(updates)} saved fantasy updates")
+    return len(updates)
+
+
+def store_fantasy_updates(updates):
+    """Save new RotoWire updates (fantasy_updates). Best effort: a failure only costs them on the next restart."""
+    try:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                for u in updates:
+                    cur.execute(
+                        f"""
+                        INSERT INTO fantasy_updates ({', '.join(FANTASY_UPDATE_COLUMNS)})
+                        VALUES ({', '.join(['%s'] * len(FANTASY_UPDATE_COLUMNS))})
+                        ON CONFLICT (id) DO NOTHING
+                        """,
+                        tuple(u[c] for c in FANTASY_UPDATE_COLUMNS),
+                    )
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning("Couldn't save fantasy updates", exc_info=True)
+
+
 async def poll_fantasy_updates_loop():
-    """RotoWire's feed holds only its latest 5 updates; polling keeps news.py's running list complete."""
+    """
+    RotoWire's feed holds only its latest 5 updates; polling keeps news.py's
+    running list complete. Saved updates load first, so a restart picks up
+    where the last one left off.
+    """
+    await asyncio.to_thread(load_fantasy_updates)
     while True:
         try:
-            await asyncio.to_thread(news.poll_fantasy_updates)
+            await asyncio.to_thread(news.poll_fantasy_updates, store=store_fantasy_updates)
         except Exception:
             logger.error("Fantasy update poll failed", exc_info=True)
         await asyncio.sleep(FANTASY_POLL_SECONDS)

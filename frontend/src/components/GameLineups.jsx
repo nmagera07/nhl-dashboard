@@ -1,28 +1,35 @@
 import { useState } from "react";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
-import TeamLines, { LineList } from "./TeamLines.jsx";
+import TeamLines from "./TeamLines.jsx";
+import LineupGrid from "./LineupGrid.jsx";
+import { lastName, rosterIndex } from "../utils/rosterIndex.js";
 
-// "Matthew Knies" -> "Knies", "Luca Del Bel Belluz" -> "Del Bel Belluz".
-const lastName = (name) => name.split(" ").slice(1).join(" ") || name;
 const postedTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
+// NHL.com's projected lineup gives names only; the roster adds headshots,
+// numbers, and player links.
 function ProjectedTeam({ team }) {
-  const [starter, ...others] = team.goalies;
+  const { data: roster } = useFetchWithStatus(`${API_BASE}/teams/${team.abbrev}/roster`);
+  const index = rosterIndex(roster);
+  const chip = (name) => ({ name: lastName(name), player: index.byName(name) });
+  const lines = (groups) => groups.map((g) => ({ players: g.map(chip) }));
   return (
     <div className="preview-lines-team">
-      <LineList items={team.forwards.map((l) => l.map(lastName))} prefix="L" label={`${team.abbrev} forward lines`} />
-      <LineList items={team.defense.map((l) => l.map(lastName))} prefix="D" label={`${team.abbrev} defense pairs`} />
-      {starter && (
-        <p className="preview-lines-goalies">
-          <span className="preview-lines-tag">G</span>
-          <span><strong>{starter}</strong> <span className="muted">projected starter</span>{others.length > 0 && ` · ${others.join(", ")}`}</span>
+      <LineupGrid
+        team={team.abbrev}
+        forwards={lines(team.forwards)}
+        defense={lines(team.defense)}
+        goalies={team.goalies.map((name) => ({ ...chip(name), badge: "Likely starter" }))}
+      />
+      {team.scratched.length > 0 && (
+        <p className="lineup-extra"><span className="lineup-extra-label">Scratched</span>
+          {team.scratched.map((name) => <span key={name} className="lineup-tag">{name}</span>)}
         </p>
       )}
-      {team.scratched.length > 0 && <p className="preview-lines-extra"><strong>Scratched:</strong> {team.scratched.join(", ")}</p>}
       {team.injured.length > 0 && (
-        <p className="preview-lines-extra">
-          <strong>Injured:</strong> {team.injured.map((p) => (p.detail ? `${p.name} (${p.detail})` : p.name)).join(", ")}
+        <p className="lineup-extra"><span className="lineup-extra-label">Injured</span>
+          {team.injured.map((p) => <span key={p.name} className="lineup-tag lineup-tag-hurt">{p.detail ? `${p.name} (${p.detail})` : p.name}</span>)}
         </p>
       )}
     </div>

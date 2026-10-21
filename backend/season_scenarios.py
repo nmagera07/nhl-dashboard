@@ -31,7 +31,7 @@ def _next_games(payload, team, n, played=frozenset()):
     return found[:n]
 
 
-def _simulate(payload, trials, seed, team, window, forced=None, shift=None, track=None):
+def _simulate(payload, trials, seed, team, window, forced=None, shift=None, track=None, shift_until=None):
     """
     Plays out the season `trials` times and returns `team`'s playoff odds
     and average final points. `window` is the team's next games.
@@ -41,7 +41,9 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
     with the same seed differ only because of the forced results -- the
     comparison isn't drowned in simulation noise.
     `shift` = {team: goals/game} moves teams' ratings (a roster change);
-    with `track` (a list of teams), returns results for each of them.
+    with `shift_until` (YYYY-MM-DD), only for games before that date (a
+    player out until he's back). With `track` (a list of teams), returns
+    results for each of them.
     """
     shift = shift or {}
     tracked = track or [team]
@@ -58,7 +60,8 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
     made, points = defaultdict(int), defaultdict(int)
 
     for _ in range(trials):
-        strength = {a: rng.gauss(t["rating"], t["rating_sd"]) + shift.get(a, 0.0) for a, t in teams.items()}
+        talent = {a: rng.gauss(t["rating"], t["rating_sd"]) for a, t in teams.items()}
+        shifted = {a: v + shift.get(a, 0.0) for a, v in talent.items()}
         rec = {a: {"points": t["points"], "wins": t["wins"], "regulation_wins": t["regulation_wins"], "row": t["row"]}
                for a, t in teams.items()}
         outcomes = None
@@ -68,9 +71,10 @@ def _simulate(payload, trials, seed, team, window, forced=None, shift=None, trac
             shuffle_rng.shuffle(outcomes)
             outcomes = dict(zip(window, outcomes))
 
-        for i, (_, home, away, *_) in enumerate(games):
+        for i, (day, home, away, *_) in enumerate(games):
             if home not in rec or away not in rec:
                 continue
+            strength = shifted if shift_until is None or day < shift_until else talent
             x = (strength[home] - strength[away] + margins[i]) / scale
             home_wins = rng.random() < 1 / (1 + 2.718281828459045 ** -x)
             went_ot = rng.random() < ot_p
@@ -205,3 +209,43 @@ def roster_change(payload, moves, trials=DEFAULT_TRIALS, seed=13):
         ],
         "trials": trials,
     }
+
+
+def injury_return(payload, player_id, back=None, trials=DEFAULT_TRIALS, seed=13):
+    """
+    What an injured player's return is worth to his team: its playoff odds
+    healthy now, back on `back` (YYYY-MM-DD, his expected return; he
+    misses the team's games before it), and out for the rest of the
+    season. Not a trade: he stays on his team throughout. While he's out,
+    his minutes go to a replacement-level player, like roster_change().
+
+    The daily odds count injured players as healthy (their value is in the
+    team's rating), so "healthy now" is the published number.
+    """
+    players = payload.get("players") or {}
+    if not players:
+        raise ValueError("Player values aren't available yet; they're computed each morning.")
+    player = players.get(str(player_id))
+    if player is None:
+        raise UnknownPlayer(str(player_id))
+    team = player["team"]
+    if team not in payload["teams"]:
+        raise UnknownTeam(team)
+    out = {team: -player["value"]}
+    healthy = _simulate(payload, trials, seed, team, [])
+    gone = _simulate(payload, trials, seed, team, [], shift=out)
+    scenarios = {"healthy_now": healthy, "out_for_season": gone}
+    missed = None
+    if back:
+        scenarios["back_on_return_date"] = _simulate(payload, trials, seed, team, [], shift=out, shift_until=back)
+        missed = sum(1 for day, home, away, *_ in payload["games"] if team in (home, away) and day < back)
+    return {
+        "as_of": payload["as_of_date"],
+        "player": player["name"], "position": player["pos"], "team": team,
+        "value_goals_per_game": player["value"], "games_this_season": player["gp"],
+        "expected_return": back, "team_games_missed_before_return": missed,
+        "scenarios": {k: {"playoff_pct": round(v["playoff_pct"], 3), "avg_points": round(v["avg_points"], 1)}
+                      for k, v in scenarios.items()},
+        "trials": trials,
+    }
+

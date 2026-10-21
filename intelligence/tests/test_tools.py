@@ -551,3 +551,59 @@ class TestScoresLeadersStandings:
         result = await self.call("get_standings", {})
         assert result["columns"][0] == "name" and result["columns"][1] == "team"
         assert result["teams_best_first"][0][:2] == ["Colorado Avalanche", "COL"]
+
+
+@pytest.mark.asyncio
+class TestInjuryReturnTool:
+    @pytest.fixture(autouse=True)
+    def today(self, monkeypatch):
+        import app.tools
+        monkeypatch.setattr(app.tools, "_today", lambda: "2026-10-21")
+
+    async def call(self, args, injured=True, seen=None):
+        scenarios = {"healthy_now": {"playoff_pct": 0.993, "avg_points": 112.0},
+                     "back_on_return_date": {"playoff_pct": 0.99, "avg_points": 111.2},
+                     "out_for_season": {"playoff_pct": 0.962, "avg_points": 106.9}}
+        routes = {
+            "/players/leaders": [{"player_id": 8482093, "first_name": "Seth", "last_name": "Jarvis", "team_abbrev": "CAR", "position_code": "R"}],
+            "/injuries": {"teams": {"CAR": [{"player": "Seth Jarvis", "status": "Injured Reserve", "injury": "Shoulder",
+                                             "expected_return": "2026-11-01"}] if injured else []}},
+            "/fantasy": {"updates": [{"player": "Seth Jarvis", "title": "Activated by Carolina", "summary": "Activated Wednesday.",
+                                      "published": "2026-10-21T21:58:00Z"}]},
+        }
+
+        def handler(request):
+            if seen is not None:
+                seen.append(f"{request.url.path}?{request.url.query.decode()}")
+            if request.url.path == "/season-sim/injury":
+                back = request.url.params.get("back")
+                body = {"player": "Seth Jarvis", "team": "CAR", "value_goals_per_game": 0.18, "expected_return": back,
+                        "team_games_missed_before_return": 5 if back and back > "2026-10-21" else 0,
+                        "scenarios": scenarios if back else {k: v for k, v in scenarios.items() if k != "back_on_return_date"}}
+                return httpx.Response(200, json=body)
+            return httpx.Response(200, json=routes.get(request.url.path, {}))
+        async with httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler)) as client:
+            return json.loads(await ToolRunner(DashboardClient("https://dashboard.test", client)).run("simulate_injury_return", json.dumps(args)))
+
+    async def test_still_out_uses_his_expected_return(self):
+        seen = []
+        result = await self.call({"player": "Jarvis"}, seen=seen)
+        assert any("player=8482093&back=2026-11-01" in s for s in seen)
+        assert result["return_date_basis"] == "his expected return on the injury report"
+        assert result["playoff_odds_pct"] == {"healthy_now": 99.3, "back_on_return_date": 99.0, "out_for_season": 96.2}
+        assert result["worth_to_team_pct_points"] == 2.8 and result["team_games_missed_before_return"] == 5
+        assert result["worth_to_team_standings_points"] == 4.3  # 111.2 back on Nov 1 vs 106.9 out
+        assert result["injury_report"]["injury"] == "Shoulder" and "already counts" in result["how_to_read"]
+
+    async def test_already_activated_counts_as_available_now(self):
+        seen = []
+        result = await self.call({"player": "Seth Jarvis"}, injured=False, seen=seen)
+        assert any("back=2026-10-21" in s for s in seen)
+        assert result["return_date_basis"] == "not on the injury report, so available now"
+        assert result["latest_update"]["update"] == "Activated by Carolina" and "injury_report" not in result
+
+    async def test_a_hypothetical_date(self):
+        seen = []
+        result = await self.call({"player": "Jarvis", "return_date": "2026-12-15"}, seen=seen)
+        assert any("back=2026-12-15" in s for s in seen) and result["return_date_basis"] == "the date asked about"
+        assert "return_date must be" in (await self.call({"player": "Jarvis", "return_date": "december"}))["error"]

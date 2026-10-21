@@ -186,3 +186,50 @@ class TestRosterChangeEndpoint:
         db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
 
         assert "players" not in client.get("/season-sim").json()
+
+
+class TestInjuryReturn:
+    def test_back_sooner_is_worth_more(self):
+        result = sc.injury_return(_with_players(), 8470001, back="2026-11-02", trials=600)
+        s = result["scenarios"]
+        assert result["team"] == "OTT" and result["player"] == "Star Center" and result["expected_return"] == "2026-11-02"
+        assert result["team_games_missed_before_return"] == 8  # every OTT game on Nov 1
+        assert s["healthy_now"]["avg_points"] > s["back_on_return_date"]["avg_points"] > s["out_for_season"]["avg_points"]
+
+    def test_the_return_date_only_cuts_the_games_before_it(self):
+        payload = _with_players()
+        before = sc.injury_return(payload, 8470001, back="2026-10-01", trials=200)["scenarios"]
+        after = sc.injury_return(payload, 8470001, back="2026-12-01", trials=200)["scenarios"]
+        assert before["back_on_return_date"] == before["healthy_now"]  # back before any game: no games missed
+        assert after["back_on_return_date"] == after["out_for_season"]  # back after the last game: all missed
+
+    def test_without_a_date_only_healthy_and_out(self):
+        result = sc.injury_return(_with_players(), 8470001, trials=50)
+        assert set(result["scenarios"]) == {"healthy_now", "out_for_season"} and result["team_games_missed_before_return"] is None
+
+    def test_unknown_players_and_missing_values(self):
+        with pytest.raises(sc.UnknownPlayer):
+            sc.injury_return(_with_players(), 8479999, trials=10)
+        with pytest.raises(ValueError, match="aren't available"):
+            sc.injury_return(_payload(), 8470001, trials=10)
+
+
+class TestInjuryEndpoint:
+    def test_simulates_and_caches(self, client, db_router, monkeypatch):
+        db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
+        calls = []
+        real = sc.injury_return
+        monkeypatch.setattr(sc, "injury_return", lambda *a, **k: calls.append(a) or real(*a, trials=20))
+
+        first = client.get("/season-sim/injury?player=8470001&back=2026-11-02")
+        second = client.get("/season-sim/injury?player=8470001&back=2026-11-02")
+
+        assert first.status_code == 200 and first.json() == second.json()
+        assert len(calls) == 1 and calls[0][1:] == (8470001, "2026-11-02")
+        assert set(first.json()["scenarios"]) == {"healthy_now", "back_on_return_date", "out_for_season"}
+
+    def test_bad_requests(self, client, db_router):
+        db_router.when("from season_sim_inputs", [{"payload": _with_players()}])
+        assert client.get("/season-sim/injury?player=8479999").status_code == 404
+        assert client.get("/season-sim/injury?player=8470001&back=soon").status_code == 422
+        assert client.get("/season-sim/injury").status_code == 422

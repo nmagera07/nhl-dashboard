@@ -1,0 +1,105 @@
+{
+  "started": "2026-10-21T17:49:10+00:00",
+  "api": "http://127.0.0.1:8000",
+  "runs": {
+    "gemini": {
+      "model": "gemini-flash-lite-latest",
+      "results": [
+        {
+          "case": "why_odds",
+          "question": "Why are Pittsburgh's playoff odds so high?",
+          "answer": "According to the playoff-odds model, Pittsburgh's playoff odds actually sit at 16.7% (with a -0.1693 rating, ranked 23rd in the league). Here is why the model rates them where it does:\n\n* **Roster talent:** The projected player roster pushes the rating up (+0.0433 effect), as the model trusts the talent on paper more than their early results.\n* **Early goal differential:** Their -5 goal differential pulls the rating down (-0.0625 effect).\n* **Expected goals (xG):** An xG differential of -2.9 pulls the rating down (-0.0367 effect), showing they are generating fewer quality chances than opponents.\n* **Goaltending:** Goaltending pulls the rating down (-0.1134 effect) due to below-average saves above expected.\n* **Schedule:** The remaining schedule effect (-0.024) is negligible.",
+          "seconds": 3.3,
+          "model_calls": 2,
+          "tools": [
+            "explain_odds({\"team\":\"PIT\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "explain_odds({'team': 'PIT'})"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "1 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Correctly lists all model factors with proper positive/negative directions and treats negligible schedule effect appropriately"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "last_night",
+          "question": "Who won last night?",
+          "answer": "Here are the final scores from last night's games (Tuesday, October 20, 2026):\n\n* **SJS 4, MTL 3** (Final, OT)\n* **NJD 4, COL 3** (Final)\n* **NYI 3, ANA 2** (Final)\n* **LAK 5, WSH 2** (Final)\n* **TOR 6, CBJ 2** (Final)\n* **STL 2, WPG 1** (Final)\n* **DAL 3, BOS 2** (Final, OT)\n* **EDM 4, MIN 3** (Final, OT)\n* **SEA 4, DET 3** (Final, SO)\n* **CAR 6, VAN 3** (Final)\n* **TBL 6, VGK 2** (Final)",
+          "seconds": 4.0,
+          "model_calls": 2,
+          "tools": [
+            "get_scores({\"date\":\"2026-10-20\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_scores({'date': '2026-10-20'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'SJS'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: All listed results match the required scores and winners"
+            }
+          ],
+          "passed": true
+        },
+        {
+          "case": "best_goalie",
+          "question": "Who's the best goalie in the league this season?",
+          "answer": "Based on PuckPulse's goals saved above expected (GSAx) metric\u2014our best single measure of who is stopping the most pucks\u2014the top goalie in the league this season is **Jake Oettinger** of the Dallas Stars with a league-leading 9.58 GSAx and a .945 save percentage across 7 games.",
+          "seconds": 2.0,
+          "model_calls": 2,
+          "tools": [
+            "get_leaders({\"category\":\"gsax\"})"
+          ],
+          "checks": [
+            {
+              "name": "tool",
+              "passed": true,
+              "detail": "get_leaders({'category': 'gsax'})"
+            },
+            {
+              "name": "facts",
+              "passed": true,
+              "detail": "found 'Oettinger'"
+            },
+            {
+              "name": "grounded",
+              "passed": true,
+              "detail": "0 percentage(s), all sourced"
+            },
+            {
+              "name": "judge",
+              "passed": true,
+              "detail": "groq: Names Jake Oettinger as GSAx leader and explains GSAx metric"
+            }
+          ],
+          "passed": true
+        }
+      ]
+    }
+  }
+}

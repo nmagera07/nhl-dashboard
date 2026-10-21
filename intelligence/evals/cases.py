@@ -305,6 +305,32 @@ async def fantasy_update(api) -> Truth:
                       "answer gives that update. Fail if it says there's no news on him."}
 
 
+async def last_night(api) -> Truth:
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    day = (datetime.now(ZoneInfo("America/New_York")) - timedelta(days=1)).strftime("%Y-%m-%d")
+    finals = [g for g in (await api(f"/games/date/{day}")).get("games", []) if g.get("gameState") in ("FINAL", "OFF")]
+    if not finals:
+        return {"skip": "no games last night"}
+    lines = [f"{g['awayTeam']['abbrev']} {g['awayTeam']['score']}, {g['homeTeam']['abbrev']} {g['homeTeam']['score']}" for g in finals]
+    winner = lambda g: g["homeTeam"]["abbrev"] if g["homeTeam"]["score"] > g["awayTeam"]["score"] else g["awayTeam"]["abbrev"]  # noqa: E731
+    return {"tool": ("get_scores", None), "facts": [winner(finals[0])],
+            "rubric": f"Last night's finals ({day}): " + "; ".join(lines) + ". Pass if the answer lists these results "
+                      "correctly (who won each), and fail if it says it can't see last night's scores."}
+
+
+async def best_goalie(api) -> Truth:
+    goalies = (await api("/goalies/advanced")).get("goalies", [])
+    if not goalies:
+        return {"skip": "no goalie stats yet"}
+    top = goalies[:3]
+    return {"tool": ("get_leaders", {"category": "gsax"}), "facts": [top[0]["name"].split()[-1]],
+            "rubric": "By goals saved above expected (GSAx), the top goalies are " + ", ".join(f"{g['name']} ({g['gsax']:+.2f})" for g in top)
+                      + ". Pass if the answer names the leader by GSAx (wins or save percentage alone isn't enough) and "
+                        "explains GSAx in plain words."}
+
+
 async def report_card(api) -> Truth:
     card = await api("/report-card")
     ml = (card.get("season") or {}).get("moneyline") or {}
@@ -364,5 +390,7 @@ CASES = [
     Case("mock_pick", "(the sixth pick in the mock draft)", mock_pick),
     Case("fantasy_update", "(the newest RotoWire update)", fantasy_update),
     Case("report_card", "How have PuckPulse's odds done against the sportsbooks this season?", report_card),
+    Case("last_night", "Who won last night?", last_night),
+    Case("best_goalie", "Who's the best goalie in the league this season?", best_goalie),
     Case("morning_digest", "(write the morning digest)", morning_digest, digest=True),
 ]

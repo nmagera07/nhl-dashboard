@@ -36,15 +36,20 @@ describe("PickemCard", () => {
     mockApi();
     renderIt(<PickemCard />);
     expect(await screen.findByText(/PuckPulse is 42-25/)).toBeInTheDocument();
-    expect(screen.getByText("Leaders: 1. agent00 (16) · 2. Nate (7) · 3. Mighty Ducks (1)")).toBeInTheDocument();
+    expect(screen.getByText("Can you beat PuckPulse?")).toBeInTheDocument();
+    expect(screen.getByLabelText("Leaderboard top three")).toHaveTextContent("1agent00 162Nate 73Mighty Ducks 1");
     expect(screen.getByRole("link")).toHaveAttribute("href", "/pickem");
+    expect(screen.getByText("Play ›")).toBeInTheDocument();
   });
 
   it("shows your picks and rank once you've joined", async () => {
     localStorage.setItem("puckpulse:pickem-key", "pp_saved");
     mockApi();
     renderIt(<PickemCard />);
-    expect(await screen.findByText(/You've picked 1 of 2 · 2nd of 4/)).toBeInTheDocument();
+    expect(await screen.findByText("1 of 2 picked")).toBeInTheDocument();
+    expect(screen.getByText("You're 2nd of 4 on the leaderboard")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+    expect(screen.getByText("Finish picks ›")).toBeInTheDocument();
   });
 
   it("stays hidden on a day without games", async () => {

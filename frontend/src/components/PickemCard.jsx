@@ -30,27 +30,49 @@ export default function PickemCard() {
   const rank = me ? players.findIndex((p) => p.name === me.name) : -1;
   const pp = board?.puckpulse;
 
-  let status;
+  const rankText = rank >= 0 ? `${ordinal(rank + 1)} of ${players.length}` : null;
+  let headline, detail, cta;
   if (!me) {
-    status = <>Pick tonight&apos;s winners{pp?.graded ? <> · PuckPulse is {pp.correct}-{pp.graded - pp.correct}</> : null}</>;
+    headline = "Can you beat PuckPulse?";
+    detail = <>Pick tonight&apos;s {games.length} winners{pp?.graded ? <> · PuckPulse is {pp.correct}-{pp.graded - pp.correct}</> : null}</>;
+    cta = "Play";
   } else if (open.length > 0) {
-    status = <>You&apos;ve picked {picked} of {games.length}{rank >= 0 && <> · {ordinal(rank + 1)} of {players.length}</>}</>;
+    headline = picked === games.length ? "You're all set tonight" : `${picked} of ${games.length} picked`;
+    detail = rankText ? <>You&apos;re {rankText} on the leaderboard</> : <>Results post minutes after each final</>;
+    cta = picked >= games.length ? "Leaderboard" : picked > 0 ? "Finish picks" : "Make picks";
   } else {
-    status = <>{record(me.record.correct, me.record.graded)}{rank >= 0 && <> · {ordinal(rank + 1)} of {players.length}</>}</>;
+    headline = record(me.record.correct, me.record.graded);
+    detail = rankText ? <>You&apos;re {rankText} on the leaderboard</> : <>Tonight&apos;s picks are locked</>;
+    cta = "Leaderboard";
   }
   const leaders = players.slice(0, 3);
 
   return (
-    <Link className="pickem-link" to="/pickem">
-      <span className="pickem-link-text">
-        <span><strong>Beat PuckPulse</strong> · {status}</span>
+    <Link className="pickem-promo" to="/pickem">
+      <span className="pickem-promo-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" /></svg>
+      </span>
+      <span className="pickem-promo-body">
+        <span className="pickem-promo-eyebrow">Pick&apos;em</span>
+        <strong className="pickem-promo-headline">{headline}</strong>
+        <span className="pickem-promo-detail">{detail}</span>
+        {me && open.length > 0 && (
+          <span className="pickem-promo-progress" role="progressbar" aria-label="Tonight's picks"
+                aria-valuemin={0} aria-valuemax={games.length} aria-valuenow={picked}>
+            <span style={{ width: `${(100 * picked) / games.length}%` }} />
+          </span>
+        )}
         {leaders.length > 0 && (
-          <span className="pickem-leaders">
-            Leaders: {leaders.map((p, i) => `${i + 1}. ${p.name} (${p.correct})`).join(" · ")}
+          <span className="pickem-promo-leaders" aria-label="Leaderboard top three">
+            {leaders.map((p, i) => (
+              <span key={p.name} className="pickem-promo-leader">
+                <span className={`pickem-medal pickem-medal-${i + 1}`}>{i + 1}</span>{p.name} <b>{p.correct}</b>
+              </span>
+            ))}
           </span>
         )}
       </span>
-      <span aria-hidden="true">›</span>
+      <span className="pickem-promo-cta">{cta} ›</span>
     </Link>
   );
 }

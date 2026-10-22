@@ -6,6 +6,7 @@ import ShareButton from "../components/ShareButton.jsx";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
+import WinProbability from "../components/WinProbability.jsx";
 import { nhlVideoUrl } from "../utils/highlights.js";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
@@ -447,6 +448,16 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
             <PeriodTable title="Shots" periods={shotsByPeriod} away={away} home={home} totals={shotTotals} />
           )}
         </section>
+      )}
+
+      {started && (
+        <WinProbability
+          gameId={game.id || gameId}
+          away={away?.abbrev}
+          home={home?.abbrev}
+          playoff={game.gameType === 3}
+          refreshKey={`${game.gameState}-${away?.score}-${home?.score}-${game.periodDescriptor?.number}-${game.clock?.timeRemaining}`}
+        />
       )}
 
       {started && (

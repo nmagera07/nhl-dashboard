@@ -176,6 +176,11 @@ def game_boxscore(game_id: int) -> dict[str, Any]:
     return _cache.get(f"boxscore/{game_id}", lambda: _fetch_game_boxscore(game_id), _boxscore_ttl)
 
 
+def game_play_by_play(game_id: int) -> dict[str, Any]:
+    """One game's play-by-play (cached like the box score), for the win probability chart."""
+    return _cache.get(f"pbp/{game_id}", lambda: _get(f"/gamecenter/{game_id}/play-by-play"), _boxscore_ttl)
+
+
 def _game_video(game: dict[str, Any]) -> dict[str, str]:
     """
     A finished game's recap and condensed-game links (nhl.com paths). The

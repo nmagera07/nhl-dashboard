@@ -64,3 +64,18 @@
 .share-button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .share-button:hover { border-color: var(--border-strong); }
 .share-button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.win-prob h2 { margin-bottom: 4px; }
+.win-prob-readout { margin: 0 0 6px; min-height: 18px; color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.win-prob-readout strong { color: var(--text); }
+.win-prob-chart { touch-action: pan-y; }
+.win-prob-chart svg { display: block; cursor: crosshair; }
+.win-prob-team { font-weight: 700; }
+.win-prob-line { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; }
+.win-prob-area { stroke: none; }
+.win-prob-area-home { fill: var(--accent-mid); }
+.win-prob-area-away { fill: var(--warn-soft); }
+.win-prob-goal { stroke: var(--card); stroke-width: 2; }
+.win-prob-goal-home { fill: var(--accent); }
+.win-prob-goal-away { fill: var(--warn); }
+.win-prob-swing { margin: 10px 0 0; color: var(--text-dim); font-size: 12px; }
+.win-prob-swing strong { color: var(--text); }

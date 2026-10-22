@@ -44,6 +44,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   ~50% lower monthly cost.
 
 **AI engineering**
+- Built a live in-game win probability model, validated before launch on 3,936 held-out
+  games: beat a score-and-clock baseline at every checkpoint and stayed calibrated
+  within ~2 points per decile.
 - Built a write-once prediction log for a live model: every game prediction stored before
   puck drop with its model version and inputs, graded automatically after the final, and
   scored by favorite win rate, Brier score vs. a coin flip, and calibration, served by a
@@ -182,6 +185,36 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-21 — Win probability: prove it before you chart it
+
+**What happened:** Built the in-game win probability chart (the "roller coaster" every
+hockey site has). The model starts from our pregame expected goals, nudged so puck drop
+equals our pregame win chance, then plays out the time left: Poisson goals, power plays,
+the pulled goalie in the last 90 seconds, then OT and the shootout. Before showing it, I
+replayed every 2023-26 regular-season game (3,936) at 11 checkpoints and graded it.
+
+**What I learned:**
+- **Grade against a real baseline, not a coin flip.** The bar was a lookup table of
+  how often teams with each lead at each minute went on to win, built from the *other*
+  seasons. The model beat it at every checkpoint (Brier 0.1327 vs 0.1358 overall),
+  most early in the game, when knowing who's better matters most.
+- **Calibration is the honest check.** When it said 70%, teams won 71%; 88% → 89%.
+- **The fit can overrule hockey intuition.** I assumed a "score effect" (trailing teams
+  push, leaders sit back). They do outshoot, but the data said goals don't follow:
+  every score effect I tried made predictions worse, so it's set to zero.
+- **Hold out like production.** Each season's pregame numbers came from a model that
+  never saw that season, so the grade isn't flattered by leakage.
+- **A bug in the test harness can bias the grade.** Shootout games silently dropped
+  out of the late checkpoints (their last event was the skipped shootout), removing
+  exactly the close games. Every checkpoint now has all 3,936 games.
+- Grid search across 6 CPU cores (fork, shared memory) took it from ~1.5 hours to ~15 minutes.
+
+**Interview angle:** "How do you know your model works?" Held-out backtest, a baseline
+that knows the score and clock, calibration by decile, and a feature that only shipped
+after it passed.
 
 ---
 

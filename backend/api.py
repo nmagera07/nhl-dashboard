@@ -65,13 +65,16 @@ import og_image
 import projected_lineups
 import push
 from daily_cache import cache as daily_cache, daily_cached
+import goal_model
 import season_scenarios
+import win_probability
 from seasons import season_games
 from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
-from nhl_games import NHLGamesUnavailable, game_boxscore, games_on_date, month_calendar, team_schedule, today_games
+from nhl_games import (NHLGamesUnavailable, game_boxscore, game_play_by_play, games_on_date, month_calendar,
+                       team_schedule, today_games)
 
 load_dotenv()
 
@@ -549,6 +552,51 @@ def game_lineup(game_id: int = Path(..., gt=0)):
         return {"available": False}
     return {"available": True, "source": "NHL.com", "url": found["url"], "published": found["published"],
             "away": {"abbrev": away, **found["away"]}, "home": {"abbrev": home, **found["home"]}}
+
+
+def _pregame_goals(game_id):
+    """(home win prob, home goals, away goals) logged before the game, or None."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT home_win_prob, home_goals, away_goals FROM game_predictions WHERE game_id = %s", (game_id,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    half = goal_model.LEAGUE_TOTAL / 2
+    return (float(row["home_win_prob"]), float(row["home_goals"] or half), float(row["away_goals"] or half))
+
+
+@app.get("/games/{game_id}/win-probability")
+def game_win_probability(game_id: int = Path(..., gt=0)):
+    """
+    The home team's chance to win through the game (win_probability.py):
+    {"available", "points": [[game second, P(home)]], "goals": [...],
+    "swing": the goal that moved it most}. Starts at the pregame chance we
+    logged; {"available": false} for games we didn't predict or that
+    haven't started. Updates with the play-by-play (cached 15s while live).
+    """
+    try:
+        pbp = game_play_by_play(game_id)
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if pbp.get("gameState") in ("FUT", "PRE") or not pbp.get("plays"):
+        return {"available": False}
+    pregame = daily_cache.get_or_compute(("pregame_goals", game_id), lambda: _pregame_goals(game_id))
+    if not pregame:
+        return {"available": False}
+
+    def compute():
+        prob, home_goals, away_goals = pregame
+        playoff = pbp.get("gameType") == 3
+        home_mu, away_mu = win_probability.anchor(home_goals, away_goals, prob, playoff)
+        curve = win_probability.series(pbp, home_mu, away_mu, playoff)
+        return {"available": True, "pregame": prob, **curve, "swing": win_probability.biggest_swing(curve["goals"])}
+
+    key = ("win_probability", game_id, pbp.get("gameState"), len(pbp["plays"]), pbp["plays"][-1].get("eventId"))
+    return daily_cache.get_or_compute(key, compute)
 
 
 def _share_game(game_id):

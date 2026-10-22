@@ -20,16 +20,20 @@ every default can be overridden with its *_MODEL variable, or per entry in
 AI_PROVIDERS as name:model (e.g. "gemini,gemini:gemini-2.5-flash-lite,groq").
 """
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Mapping
 
+import httpx
 from openai import AsyncOpenAI, OpenAIError
 
 logger = logging.getLogger(__name__)
 
+CONNECT_TIMEOUT = 5.0  # seconds to open a connection to a provider
+WARM_TIMEOUT = 10.0    # seconds for a warm-up call before giving up on it
 DEFAULT_ORDER = "gemini,groq,cloudflare,ollama"
 
 
@@ -93,8 +97,11 @@ class AllProvidersFailed(Exception):
 class ProviderChain:
     def __init__(self, providers: list[Provider], timeout: float = 20.0, client_factory=None):
         self.providers = providers
+        # A connection that can't open in 5s won't answer at all; give up on it
+        # fast rather than letting a fresh replica's first question hang for 20s.
+        limits = httpx.Timeout(timeout, connect=CONNECT_TIMEOUT)
         self._factory = client_factory or (
-            lambda p: AsyncOpenAI(api_key=p.api_key, base_url=p.base_url, timeout=timeout, max_retries=0)
+            lambda p: AsyncOpenAI(api_key=p.api_key, base_url=p.base_url, timeout=limits, max_retries=0)
         )
         self._clients: dict[str, object] = {}
 
@@ -105,6 +112,19 @@ class ProviderChain:
         if provider.name not in self._clients:
             self._clients[provider.name] = self._factory(provider)
         return self._clients[provider.name]
+
+    async def warm(self) -> None:
+        """
+        Open each provider's connection (DNS, TLS, the SDK's imports) with a
+        models listing, which costs no tokens, so a freshly started replica's
+        first question doesn't pay for it. Failures are ignored: it's a head start.
+        """
+        async def one(provider):
+            try:
+                await asyncio.wait_for(self._client(provider).models.list(), WARM_TIMEOUT)
+            except Exception as exc:  # noqa: BLE001 -- a warm-up must never take the service down
+                logger.info("Warming %s failed (%s); it'll connect on first use", provider.name, self._why(exc))
+        await asyncio.gather(*(one(p) for p in self.providers))
 
     @staticmethod
     def _why(exc: Exception) -> str:

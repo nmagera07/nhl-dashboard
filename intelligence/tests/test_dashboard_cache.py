@@ -49,3 +49,13 @@ class TestCache:
         client = DashboardClient("https://dashboard.test")
         assert client._http() is client._http()
         await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_warm_never_raises_when_the_api_is_down():
+    def down(request):
+        raise httpx.ConnectError("down")
+
+    client = DashboardClient("https://api.test", client=httpx.AsyncClient(transport=httpx.MockTransport(down),
+                                                                            base_url="https://api.test"))
+    await client.warm()

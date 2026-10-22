@@ -201,6 +201,11 @@ class IntelligenceService:
             f"\n\nDashboard data (JSON): {facts}"
         )
 
+    async def warm(self) -> None:
+        tasks = [self.chain.warm()] if self.chain else []
+        tasks.append(self.dashboard.warm())
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     async def _context(self, request: ChatRequest) -> ContextBundle:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
@@ -340,9 +345,14 @@ class IntelligenceService:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.intelligence = IntelligenceService(get_settings())
+    service = IntelligenceService(get_settings())
+    app.state.intelligence = service
+    # Connect to the AI providers and the API in the background, so the first
+    # question after a cold start doesn't pay for it (startup isn't held up).
+    warming = asyncio.create_task(service.warm())
     yield
-    await app.state.intelligence.dashboard.aclose()
+    warming.cancel()
+    await service.dashboard.aclose()
 
 
 settings = get_settings()

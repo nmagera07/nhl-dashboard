@@ -296,18 +296,42 @@ describe("GamePage", () => {
     expect(screen.getByText("4-1-0", { selector: ".game-team-record" })).toBeInTheDocument();
   });
 
+  it("charts win probability with the biggest swing once the game is on", async () => {
+    const curve = {
+      available: true, pregame: 0.55,
+      points: [[0, 0.55], [1500, 0.52], [1500, 0.31], [3600, 0.0]],
+      goals: [{ second: 1500, team: "away", scorer: "F. Forsberg", before: 0.52, after: 0.31 }],
+      swing: { second: 1500, team: "away", scorer: "F. Forsberg", before: 0.52, after: 0.31 },
+    };
+    renderGame(finalGame(), {}, null, { "/win-probability": curve });
+    await loaded();
+
+    expect(await screen.findByText("Win probability")).toBeInTheDocument();
+    expect(screen.getByText("F. Forsberg", { selector: ".win-prob-swing strong" })).toBeInTheDocument();
+    expect(screen.getByText(/2nd 5:00 · NSH 48% → 69%/)).toBeInTheDocument();
+  });
+
+  it("leaves win probability out for games we didn't predict", async () => {
+    renderGame(finalGame(), {}, null, { "/win-probability": { available: false } });
+    await loaded();
+    await act(() => Promise.resolve());
+
+    expect(screen.queryByText("Win probability")).not.toBeInTheDocument();
+  });
+
   it("shows the period and clock for a live game and refreshes it", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const live = finalGame({ gameState: "LIVE", periodDescriptor: REG(2), clock: { timeRemaining: "12:34", inIntermission: false } });
       renderGame(live);
 
+      const boxscoreCalls = () => globalThis.fetch.mock.calls.filter(([url]) => url.endsWith("/boxscore")).length;
       expect(await screen.findByText("2nd · 12:34")).toBeInTheDocument();
-      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(boxscoreCalls()).toBe(1);
 
       await act(() => vi.advanceTimersByTimeAsync(30000));
 
-      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(boxscoreCalls()).toBe(2);
     } finally {
       vi.useRealTimers();
     }

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { act, fireEvent } from "@testing-library/react";
 import IntelligencePanel from "./IntelligencePanel.jsx";
 import { keyboardInsets } from "../hooks/useKeepAboveKeyboard.js";
+import { resetWarmUp } from "../utils/warmUp.js";
 
 const URL = "https://nhl-intelligence.bravecoast-a5240643.westus2.azurecontainerapps.io/chat/stream";
 
@@ -181,6 +182,40 @@ describe("IntelligencePanel", () => {
     expect(await screen.findByText(/busy right now\. Trying again in 1s/)).toBeInTheDocument();
     expect(await screen.findByText("Second try worked.", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("wakes the AI service soon after the page loads", async () => {
+    vi.useFakeTimers();
+    try {
+      resetWarmUp();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true });
+      render(<IntelligencePanel context={{ page: "standings" }} label="Scores" />);
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(2000));
+
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/nhl-intelligence.*\/health$/), expect.anything());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says it's waking up when the first answer is slow", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
+        String(url).endsWith("/chat/stream") ? new Promise(() => {}) : Promise.resolve({ ok: true }));
+      render(<IntelligencePanel context={{ page: "standings" }} label="Scores" />);
+      await open();
+      await ask("Who won?");
+      expect(screen.getByText("Thinking…")).toBeInTheDocument();
+
+      await act(() => vi.advanceTimersByTimeAsync(4000));
+
+      expect(screen.getByText(/Waking up PuckPulse AI/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("starter questions fit the section and the reader's team", async () => {

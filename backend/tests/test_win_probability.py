@@ -101,3 +101,10 @@ def test_endpoint_is_unavailable_before_puck_drop_or_without_a_prediction(client
     monkeypatch.setattr(api, "game_play_by_play", lambda game_id: _game([_play("faceoff", 1, "00:00")]))
     db_router.when("from game_predictions", None)
     assert client.get("/games/2026020002/win-probability").json() == {"available": False}
+
+
+def test_clock_labels():
+    assert wp.clock_label(0) == "1st 0:00"
+    assert wp.clock_label(1200 + 754) == "2nd 12:34"
+    assert wp.clock_label(3600 + 133) == "OT 2:13"
+    assert wp.clock_label(3600 + 1200 + 60, playoff=True) == "2OT 1:00"

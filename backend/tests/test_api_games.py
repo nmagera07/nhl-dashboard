@@ -93,6 +93,35 @@ class TestSharePreview:
         assert image.content[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+    def test_live_game_preview_carries_the_curve(self, client, db_router, monkeypatch):
+        import api
+        live = {"gameState": "LIVE", "periodDescriptor": {"number": 2},
+                "awayTeam": {"abbrev": "FLA", "score": 1, "id": 13}, "homeTeam": {"abbrev": "OTT", "score": 2, "id": 9}}
+        pbp = {"gameType": 2, "gameState": "LIVE", "homeTeam": {"id": 9, "abbrev": "OTT", "score": 2},
+               "awayTeam": {"id": 13, "abbrev": "FLA", "score": 1}, "rosterSpots": [],
+               "plays": [{"typeDescKey": "goal", "timeInPeriod": "09:34", "eventId": 5, "details": {"eventOwnerTeamId": 9},
+                          "periodDescriptor": {"number": 2, "periodType": "REG"}}]}
+        monkeypatch.setattr(api, "game_boxscore", lambda game_id: live)
+        monkeypatch.setattr(api, "game_play_by_play", lambda game_id: pbp)
+        db_router.when("from game_predictions", {"home_win_prob": 0.52, "home_goals": 2.9, "away_goals": 2.8})
+        body = client.get("/games/2026020153/share").json()
+        assert body["description"].startswith("Biggest swing: OTT (OTT), 2nd 9:34 · OTT")
+        assert client.get("/og/game/2026020153.png").status_code == 200
+
+    def test_preview_survives_the_play_by_play_being_down(self, client, db_router, monkeypatch):
+        import api
+        final = {"gameState": "OFF", "awayTeam": {"abbrev": "FLA", "score": 1}, "homeTeam": {"abbrev": "OTT", "score": 3}}
+        monkeypatch.setattr(api, "game_boxscore", lambda game_id: final)
+
+        def down(game_id):
+            raise api.NHLGamesUnavailable("down")
+
+        monkeypatch.setattr(api, "game_play_by_play", down)
+        db_router.when("from game_predictions", {"home_win_prob": 0.52})
+        assert client.get("/games/2026020153/share").json()["description"] == "Box score and highlights on PuckPulse."
+        assert client.get("/og/game/2026020153.png").status_code == 200
+
+
 class TestTeamSharePreview:
     def test_team_share_text(self, client, db_router):
         db_router.when("from teams t", {"team_name": "Buffalo Sabres", "wins": 3, "losses": 3, "ot_losses": 0, "points": 6})

@@ -223,6 +223,18 @@ def series(pbp, home_mu, away_mu, playoff=None, at=None):
     return {"points": [(s, round(p, 4)) for s, p in points], "goals": goals}
 
 
+def clock_label(second, playoff=False):
+    """'2nd 12:30' (time elapsed in the period, like the play-by-play), or 'OT 1:45'."""
+    if second < REGULATION_SECONDS:
+        label, start = ("1st", "2nd", "3rd")[second // 1200], second // 1200 * 1200
+    else:
+        length = 1200 if playoff else OT_SECONDS
+        n = (second - REGULATION_SECONDS) // length
+        label, start = f"{n + 1}OT" if n else "OT", REGULATION_SECONDS + n * length
+    into = second - start
+    return f"{label} {into // 60}:{into % 60:02d}"
+
+
 def biggest_swing(goals):
     """The goal that moved the home team's chances the most, or None."""
     return max(goals, key=lambda g: abs(g["after"] - g["before"]), default=None)

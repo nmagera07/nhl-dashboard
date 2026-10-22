@@ -26,11 +26,12 @@ import math
 REGULATION_SECONDS = 3600
 OT_SECONDS = 300
 
-# Fit by backtest_win_probability.py --fit (2023-24 to 2025-26).
-SCORE_EFFECT = 0.10            # trailing team's rate x (1 + this); the leader's x (1 - this)
-PULL_SECONDS = 120             # when a team down one or two pulls its goalie
-PULL_GOALS_PER_HOUR = 12.0     # the trailing team's scoring at 6-on-5
-EMPTY_NET_GOALS_PER_HOUR = 24.0  # the leader's, into the empty net
+# Fit by backtest_win_probability.py --fit (2023-24 to 2025-26). Trailing teams
+# outshoot leaders, but goals don't follow: any score effect made it worse.
+SCORE_EFFECT = 0.0             # trailing team's rate x (1 + this); the leader's x (1 - this)
+PULL_SECONDS = 90              # when a team down one or two pulls its goalie
+PULL_GOALS_PER_HOUR = 10.0     # the trailing team's scoring at 6-on-5
+EMPTY_NET_GOALS_PER_HOUR = 20.0  # the leader's, into the empty net
 PP_GOALS_PER_HOUR = 6.3        # a team on a 5-on-4
 SH_GOALS_PER_HOUR = 0.6        # the team killing it
 # 2024-25: 72% of regular-season overtimes ended with a goal; home won 54% of OT and 53% of shootout decisions.

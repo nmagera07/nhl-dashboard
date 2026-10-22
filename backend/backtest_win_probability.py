@@ -21,6 +21,7 @@ import argparse
 import gzip
 import itertools
 import json
+import multiprocessing
 import os
 from collections import defaultdict
 
@@ -145,6 +146,17 @@ GRID = {
 }
 
 
+_SHARED = {}  # games and pregame expectations, inherited by the fit's forked workers
+
+
+def _score(combo):
+    effect, pull, (trailer, leader) = combo
+    wp.SCORE_EFFECT, wp.PULL_SECONDS = effect, pull
+    wp.PULL_GOALS_PER_HOUR, wp.EMPTY_NET_GOALS_PER_HOUR = trailer, leader
+    rows = predictions(_SHARED["games"], _SHARED["mus"])
+    return brier([(p, w) for _, cp, _, p, w in rows if cp > 0]), effect, pull, trailer, leader
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fit", action="store_true")
@@ -154,14 +166,12 @@ def main():
     games = load({s: data[s] for s in TESTED})
     print(f"{len(games)} games, {len(mus)} with held-out pregame expectations")
     if args.fit:
-        results = []
-        for effect, pull, (trailer, leader) in itertools.product(*GRID.values()):
-            wp.SCORE_EFFECT, wp.PULL_SECONDS = effect, pull
-            wp.PULL_GOALS_PER_HOUR, wp.EMPTY_NET_GOALS_PER_HOUR = trailer, leader
-            rows = predictions(games, mus)
-            score = brier([(p, w) for _, cp, _, p, w in rows if cp > 0])
-            results.append((score, effect, pull, trailer, leader))
-            print(f"  score effect {effect}, pull at {pull}s, 6v5 {trailer}/h, EN {leader}/h: {score:.5f}", flush=True)
+        _SHARED.update(games=games, mus=mus)
+        with multiprocessing.get_context("fork").Pool(6) as pool:
+            results = []
+            for score, effect, pull, trailer, leader in pool.imap_unordered(_score, itertools.product(*GRID.values())):
+                results.append((score, effect, pull, trailer, leader))
+                print(f"  score effect {effect}, pull at {pull}s, 6v5 {trailer}/h, EN {leader}/h: {score:.5f}", flush=True)
         best = min(results)
         print(f"best: SCORE_EFFECT = {best[1]}, PULL_SECONDS = {best[2]}, PULL_GOALS_PER_HOUR = {best[3]}, "
               f"EMPTY_NET_GOALS_PER_HOUR = {best[4]}")

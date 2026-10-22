@@ -57,3 +57,29 @@ def test_team_share_text_leads_with_playoff_odds_and_record():
     assert title == "Buffalo Sabres on PuckPulse" and description.startswith("Playoff odds")
     for text in (title, description):
         assert "bet" not in text.lower()
+
+
+CURVE = {"available": True, "playoff": False,
+         "points": [[0, 0.55], [600, 0.54], [600, 0.33], [3600, 0.4], [3733, 0.0]],
+         "goals": [{"second": 600, "team": "away", "scorer": "M. Celebrini", "before": 0.54, "after": 0.33},
+                   {"second": 3733, "team": "away", "scorer": "M. Celebrini", "before": 0.4, "after": 0.0}],
+         "swing": {"second": 3733, "team": "away", "scorer": "M. Celebrini", "before": 0.4, "after": 0.0}}
+
+
+def test_draws_the_win_probability_curve_once_the_game_is_on():
+    png = og.render_game(FINAL, 0.5, CURVE)
+    assert Image.open(io.BytesIO(png)).size == (1200, 630)
+    assert png != og.render_game(FINAL, 0.5)
+    assert og.render_game(PRE, 0.5, CURVE) == og.render_game(PRE, 0.5)  # not before puck drop
+    assert og.render_game(FINAL, 0.5, {"available": False}) == og.render_game(FINAL, 0.5)
+
+
+def test_share_text_names_the_biggest_swing():
+    _, description = og.share_text(FINAL, 0.5, CURVE)
+    assert description == "Biggest swing: M. Celebrini (SEA), OT 2:13 · SEA 60% → 100%. Box score and highlights on PuckPulse."
+
+
+def test_teams_that_look_alike_get_told_apart():
+    assert og._chart_colors("FLA", "OTT")[0] == og.DIM
+    assert og._chart_colors("SJS", "MTL") == (og._rgb("#006D75"), og._rgb("#AF1E2D"))
+    assert og._chart_colors("TOR", "BOS")[0] == (255, 255, 255)  # navy is too dark: its edge color

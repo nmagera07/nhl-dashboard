@@ -579,9 +579,14 @@ def game_win_probability(game_id: int = Path(..., gt=0)):
     haven't started. Updates with the play-by-play (cached 15s while live).
     """
     try:
-        pbp = game_play_by_play(game_id)
+        return _win_curve(game_id)
     except NHLGamesUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _win_curve(game_id):
+    """game_win_probability's result. Raises NHLGamesUnavailable."""
+    pbp = game_play_by_play(game_id)
     if pbp.get("gameState") in ("FUT", "PRE") or not pbp.get("plays"):
         return {"available": False}
     pregame = daily_cache.get_or_compute(("pregame_goals", game_id), lambda: _pregame_goals(game_id))
@@ -593,10 +598,21 @@ def game_win_probability(game_id: int = Path(..., gt=0)):
         playoff = pbp.get("gameType") == 3
         home_mu, away_mu = win_probability.anchor(home_goals, away_goals, prob, playoff)
         curve = win_probability.series(pbp, home_mu, away_mu, playoff)
-        return {"available": True, "pregame": prob, **curve, "swing": win_probability.biggest_swing(curve["goals"])}
+        return {"available": True, "pregame": prob, "playoff": playoff, **curve,
+                "swing": win_probability.biggest_swing(curve["goals"])}
 
     key = ("win_probability", game_id, pbp.get("gameState"), len(pbp["plays"]), pbp["plays"][-1].get("eventId"))
     return daily_cache.get_or_compute(key, compute)
+
+
+def _share_curve(game):
+    """The win probability curve for a live or final game's preview, or None (it's optional there)."""
+    if game.get("gameState") not in ("LIVE", "CRIT", "FINAL", "OFF"):
+        return None
+    try:
+        return _win_curve(game["id"])
+    except NHLGamesUnavailable:
+        return None
 
 
 def _share_game(game_id):
@@ -623,8 +639,10 @@ def _share_game(game_id):
 def game_preview_image(game_id: int = Path(..., gt=0)):
     """The game's link preview image (og_image.py): win chances before it, the score once it's on. 1200x630 PNG."""
     game, prob = _share_game(game_id)
-    key = ("og", game_id, game.get("gameState"), game["awayTeam"].get("score"), game["homeTeam"].get("score"), prob)
-    png = daily_cache.get_or_compute(key, lambda: og_image.render_game(game, prob))
+    curve = _share_curve({**game, "id": game_id})
+    last = curve["points"][-1] if curve and curve.get("points") else None
+    key = ("og", game_id, game.get("gameState"), game["awayTeam"].get("score"), game["homeTeam"].get("score"), prob, last)
+    png = daily_cache.get_or_compute(key, lambda: og_image.render_game(game, prob, curve))
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=600"})
 
 
@@ -632,7 +650,7 @@ def game_preview_image(game_id: int = Path(..., gt=0)):
 def game_share(game_id: int = Path(..., gt=0)):
     """Title, description, and image for a game's link preview (served by the site's /g/{id} share page)."""
     game, prob = _share_game(game_id)
-    title, description = og_image.share_text(game, prob)
+    title, description = og_image.share_text(game, prob, _share_curve({**game, "id": game_id}))
     return {"title": title, "description": description, "url": f"https://puckpulse.io/games/{game_id}",
             "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/game/{game_id}.png"}
 

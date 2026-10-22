@@ -25,3 +25,33 @@
 .pickem-board th { color: var(--text-dim); font-weight: 600; }
 .pickem-link { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); text-decoration: none; }
 .pickem-link span:last-child { color: var(--text-dim); }
+.game-pick-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 10px; }
+.game-pick-label { color: var(--text-dim); font-size: 13px; font-weight: 600; }
+.game-pick .pickem-team { padding: 8px; }
+.game-pick .pickem-hint { margin-top: 10px; }
+.pickem-hint .accent-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.pickem-hint .accent-link:hover { text-decoration: underline; }
+/* The Scores page's Beat PuckPulse card: a little louder than the cards around it. */
+.pickem-promo { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; margin-top: 14px; padding: 16px; overflow: hidden; border: 1px solid var(--accent-line); border-radius: 14px; background: linear-gradient(120deg, var(--accent-mid), var(--card-tint) 45%, var(--card)); color: var(--text); text-decoration: none; box-shadow: 0 6px 24px var(--accent-soft); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.pickem-promo:hover { transform: translateY(-1px); box-shadow: 0 10px 30px var(--accent-mid); }
+.pickem-promo-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); }
+.pickem-promo-icon svg { width: 26px; height: 26px; fill: none; stroke: var(--on-accent); stroke-width: 2; }
+.pickem-promo-body { display: grid; gap: 3px; min-width: 0; }
+.pickem-promo-eyebrow { color: var(--accent-strong); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.pickem-promo-headline { font-size: 18px; line-height: 1.2; }
+.pickem-promo-detail { color: var(--text-dim); font-size: 13px; }
+.pickem-promo-progress { display: block; height: 6px; margin-top: 6px; overflow: hidden; border-radius: 3px; background: var(--neutral-mid); }
+.pickem-promo-progress span { display: block; height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s ease; }
+.pickem-promo-leaders { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; }
+.pickem-promo-leader { display: inline-flex; align-items: center; gap: 5px; color: var(--text-dim); }
+.pickem-promo-leader b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pickem-medal { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: #1a1306; font-size: 10px; font-weight: 800; }
+.pickem-medal-1 { background: #f5c542; }
+.pickem-medal-2 { background: #c9d1dc; }
+.pickem-medal-3 { background: #d99a5b; }
+.pickem-promo-cta { padding: 9px 14px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 14px; font-weight: 800; white-space: nowrap; }
+@media (max-width: 640px) {
+  .pickem-promo { grid-template-columns: auto minmax(0, 1fr); }
+  .pickem-promo-cta { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) { .pickem-promo, .pickem-promo-progress span { transition: none; } .pickem-promo:hover { transform: none; } }

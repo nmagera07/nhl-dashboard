@@ -30,7 +30,8 @@
 }
 .update-banner-dismiss { padding: 4px 6px; border: 0; background: none; color: var(--text-dim); font: inherit; cursor: pointer; }
 
-.app-footer { margin: 32px var(--gutter) 0; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
+/* The bottom margin lets the end of every page scroll clear of the floating Ask button. */
+.app-footer { margin: 32px var(--gutter) 64px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; text-align: center; }
 .app-footer a { color: var(--text-dim); }
 .app-footer p { margin: 0; }
 .footer-credit { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin-bottom: 8px !important; color: var(--text); font-size: 12px; }

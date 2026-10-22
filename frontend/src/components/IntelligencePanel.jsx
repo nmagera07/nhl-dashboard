@@ -91,6 +91,10 @@ async function streamAnswer({ message, context, history, onStatus, onDelta, onRe
   consume(new Uint8Array());
 }
 
+const PAGE_WARM_DELAY_MS = 2000;
+const WAKING_UP_AFTER_MS = 4000;
+const WAKING_UP = "Waking up PuckPulse AI… the first answer takes a few extra seconds";
+
 export default function IntelligencePanel({ context, label, topic, favoriteTeamName }) {
   const [open, setOpen] = useState(false);
   // {id, role ("user" | "assistant" | "divider"), content, model, evidence, error, pending, retryIn}
@@ -116,6 +120,12 @@ export default function IntelligencePanel({ context, label, topic, favoriteTeamN
   }
 
   useEffect(() => save(messages), [messages]);
+
+  // Wake the AI service soon after the page loads, after the page's own data.
+  useEffect(() => {
+    const timer = setTimeout(() => warmUpChat(), PAGE_WARM_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -162,6 +172,8 @@ export default function IntelligencePanel({ context, label, topic, favoriteTeamN
       { id: newId(), role: "assistant", content: "", pending: true },
     ]);
     const timer = startChatTimer();
+    // A cold AI service takes a while to answer anything: say so, rather than a long "Thinking…".
+    const slow = setTimeout(() => updateLast((m) => (m.content || m.status ? {} : { status: WAKING_UP })), WAKING_UP_AFTER_MS);
     const ask = () => streamAnswer({
       message: question,
       context,
@@ -196,6 +208,7 @@ export default function IntelligencePanel({ context, label, topic, favoriteTeamN
       updateLast(() => ({ pending: false, retryIn: null, error: error.message || FALLBACK_ERROR }));
       timer.finish({ error: true });
     } finally {
+      clearTimeout(slow);
       setLoading(false);
     }
   };
@@ -218,6 +231,9 @@ export default function IntelligencePanel({ context, label, topic, favoriteTeamN
           aria-expanded={false}
           aria-label="Ask PuckPulse"
           onClick={() => setOpen(true)}
+          onPointerEnter={() => warmUpChat()}
+          onPointerDown={() => warmUpChat()}
+          onFocus={() => warmUpChat()}
         >
           <span aria-hidden="true">✦ </span>
           {/* Full label on desktop; just "Ask" on phones so it covers less content. */}

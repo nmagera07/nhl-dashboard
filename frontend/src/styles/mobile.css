@@ -115,7 +115,7 @@
   .team-summary-identity .playoff-badge { margin-left: 0; }
   .my-team-card { padding: 12px; }
   .update-banner { bottom: calc(var(--tabbar-height) + 12px + env(safe-area-inset-bottom, 0px)); }
-  .app-footer { margin-bottom: 64px; }  /* scroll clear of the floating Ask button */
+  .app-footer { margin-bottom: 48px; }  /* plus .dashboard's tab bar padding: just clear of the Ask button */
   .season-sim { padding: 14px; }
   .season-sim-header { align-items: flex-start; flex-direction: column; }
   .sim-button { width: 100%; }

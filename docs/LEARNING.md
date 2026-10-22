@@ -188,6 +188,52 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-22 — "Does the AI pick its own data, or get a fixed context?"
+
+**Question I was asked:** "Does Ask PuckPulse dynamically choose which data sources or
+functions to query based on the question, or do you retrieve a fixed set of context and
+let the model reason over it?"
+
+**Answer:** Both, and it changed over time.
+- **It started as fixed context only (Oct 8).** The page you were on decided what data
+  the model got. Cheap and predictable, but it couldn't answer anything that wasn't on
+  that page.
+- **It became a tool-calling agent (Oct 9).** Each question still starts with the
+  page's data (team, player, game, or a league summary), so simple questions take one
+  model call. On top of that, the model has 22 tools (schedules, odds, lineups, injury
+  and trade simulations, fantasy news) and chooses which to call based on the
+  question. Calls in the same round run in parallel, for up to three rounds, and then
+  it has to answer. Every answer lists the sources it used.
+
+**Paste-ready version:** "Both. Each question starts with a fixed set of context based
+on the page you're on, so simple questions are one call. On top of that, the model has
+22 tools and chooses which to call based on the question, running them in parallel for
+up to three rounds before it has to answer. Every answer lists the sources it used. It
+started as fixed context only and became a tool-calling agent once questions outgrew
+what any one page holds."
+
+**The follow-up: does that make it accurate?** Tools make accuracy *possible*, not
+guaranteed. A model can still pick the wrong tool, misread a result, or make up a number
+to fill a gap. What works against that:
+- **Real data, not memory:** every number comes from our API at the moment you ask.
+- **Results it can't easily misread:** evals caught models flipping directions and
+  mixing up field names, so tools return plain, already-interpreted results ("+3.4
+  standings points", not two raw numbers to subtract). That took the fallback model's
+  pass rate from 50% to 83%.
+- **An eval suite that measures it:** right tool, right facts, no made-up numbers,
+  and a second model grading the answer against live data.
+- **Visible sources** on every answer, so a user can check it.
+
+**The trade-off:** tools cost extra model calls, and each call carries the tool
+results. That's why Qwen on Groq's free tier failed every eval: the second call, with
+the results, went over its 8,000 tokens-per-minute cap.
+
+**Interview angle:** "Tools give it real data, and the eval suite is how I know it
+actually uses that data correctly." That second half is what separates "I built a
+chatbot" from "I built an agent and measured it."
+
+---
+
 ## 2026-10-21 — Win probability: prove it before you chart it
 
 **What happened:** Built the in-game win probability chart (the "roller coaster" every

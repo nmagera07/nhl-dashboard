@@ -114,3 +114,30 @@ async def test_a_malformed_tool_call_is_retried_once_on_the_same_provider():
 
     assert (message.content, used.name) == ("Second try", "groq")
     assert [name for name, _ in calls] == ["groq", "groq"]
+
+
+@pytest.mark.asyncio
+class TestWarm:
+    async def test_lists_models_on_every_provider_and_ignores_failures(self):
+        from types import SimpleNamespace
+
+        listed = []
+
+        def factory(p):
+            async def models_list():
+                listed.append(p.name)
+                if p.name == "groq":
+                    raise RuntimeError("down")
+                return []
+            return SimpleNamespace(models=SimpleNamespace(list=models_list))
+
+        chain = ProviderChain([provider("gemini"), provider("groq")], client_factory=factory)
+        await chain.warm()  # groq failing doesn't raise
+
+        assert sorted(listed) == ["gemini", "groq"]
+        assert chain._client(provider("gemini")) is chain._client(provider("gemini"))  # the warmed client is reused
+
+    async def test_real_clients_give_up_on_a_connection_after_five_seconds(self):
+        chain = ProviderChain([provider("gemini")])
+        timeout = chain._client(provider("gemini")).timeout
+        assert timeout.connect == 5.0 and timeout.read == 20.0

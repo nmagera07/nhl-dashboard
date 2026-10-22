@@ -1,6 +1,7 @@
 """A narrow, read-only client for the NHL dashboard public API."""
 
 import asyncio
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -9,6 +10,8 @@ from typing import Any
 import httpx
 
 from . import compact
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardUnavailable(Exception):
@@ -44,6 +47,13 @@ class DashboardClient:
         if self._shared is None:
             self._shared = httpx.AsyncClient(base_url=self.base_url, timeout=httpx.Timeout(25.0, connect=10.0))
         return self._shared
+
+    async def warm(self) -> None:
+        """Open the API connection and load the league summary (most first questions need it)."""
+        try:
+            await self.league_summary()
+        except Exception as exc:  # noqa: BLE001 -- a warm-up must never take the service down
+            logger.info("Warming the dashboard API failed (%s); it'll load on first use", type(exc).__name__)
 
     async def aclose(self):
         if self._shared is not None:

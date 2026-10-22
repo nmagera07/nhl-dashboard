@@ -6,9 +6,8 @@ import { winProbability } from "../utils/seasonSim.js";
 import { todayISO } from "../utils/dates.js";
 import { teamLogo } from "../utils/teamLogo.js";
 import { track } from "../utils/analytics.js";
-import { fetchMe, joinPickem, makePick, record, saveKey, savedKey } from "../utils/pickem.js";
+import { fetchMe, joinPickem, makePick, pickable, pickOpen, record, saveKey, savedKey } from "../utils/pickem.js";
 
-const NOT_STARTED = new Set(["FUT", "PRE"]);
 const startTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 function JoinForm({ onJoined }) {
@@ -69,7 +68,7 @@ function JoinForm({ onJoined }) {
 function GameRow({ game, pick, onPick, inputs }) {
   const away = game.awayTeam.abbrev;
   const home = game.homeTeam.abbrev;
-  const open = NOT_STARTED.has(game.gameState) && Date.now() < new Date(game.startTimeUTC).getTime();
+  const open = pickOpen(game);
   const a = inputs?.teams?.[away];
   const h = inputs?.teams?.[home];
   const row = (inputs?.games || []).find(([d, hm, aw]) => d === game.gameDate && hm === home && aw === away);
@@ -136,7 +135,7 @@ function PickemPage() {
   const today = todayISO();
   const { data: scoreboard } = useFetchWithStatus(`${API_BASE}/games/date/${today}`);
   const { data: inputs } = useFetchWithStatus(`${API_BASE}/season-sim`);
-  const games = (scoreboard?.games || []).filter((g) => g.gameType === 2 || g.gameType === 3);
+  const games = (scoreboard?.games || []).filter(pickable);
 
   const [reload, setReload] = useState(0);
 

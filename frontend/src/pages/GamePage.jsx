@@ -7,6 +7,7 @@ import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
 import WinProbability from "../components/WinProbability.jsx";
+import GamePick from "../components/GamePick.jsx";
 import { nhlVideoUrl } from "../utils/highlights.js";
 
 // Live games refetch on this interval so the score, clock, and stats stay current.
@@ -435,6 +436,8 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
         </div>
         <p>{game.venue?.default ? `${game.venue.default} · ` : ""}{game.gameDate}</p>
       </div>
+
+      {!started && <GamePick game={game} />}
 
       {!started && <GamePreview game={game} standingsByTeam={standingsByTeam} playoffOddsByTeam={playoffOddsByTeam} />}
 

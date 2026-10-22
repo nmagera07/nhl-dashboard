@@ -25,3 +25,11 @@
 .pickem-board th { color: var(--text-dim); font-weight: 600; }
 .pickem-link { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); text-decoration: none; }
 .pickem-link span:last-child { color: var(--text-dim); }
+.pickem-link-text { display: grid; gap: 4px; min-width: 0; }
+.pickem-leaders { color: var(--text-dim); font-size: 12px; }
+.game-pick-row { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 10px; }
+.game-pick-label { color: var(--text-dim); font-size: 13px; font-weight: 600; }
+.game-pick .pickem-team { padding: 8px; }
+.game-pick .pickem-hint { margin-top: 10px; }
+.pickem-hint .accent-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.pickem-hint .accent-link:hover { text-decoration: underline; }

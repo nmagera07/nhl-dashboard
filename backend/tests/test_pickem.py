@@ -20,6 +20,22 @@ def test_display_names(name, ok):
     assert (pickem.name_problem(name) is None) == ok
 
 
+@pytest.mark.parametrize("name", [
+    "n1gger", "NIIIGGER", "n.i.g.g.a", "Kike_Lover", "hitler fan", "H1tl3r", "HeilHitler", "Big Spic", "BigSpic",
+    "spic99", "kkk boys", "crew1488", "14 88 crew", "White Power", "gas the jews", "DirtyJew", "zog bot", "Chink",
+])
+def test_slurs_and_hate_are_blocked(name):
+    assert pickem.name_problem(name) == "Please pick a different name."
+
+
+@pytest.mark.parametrize("name", [
+    "MyAnusIsBleeding", "Conspicuous", "Raccoon Fan", "Knight Rider", "Japan Fan", "Jewel", "Night Owl",
+    "Spicy Wings", "Mighty Ducks", "agent00", "Skinny Pete", "Coonhound",
+])
+def test_ordinary_names_still_work(name):
+    assert pickem.name_problem(name) is None
+
+
 def test_keys_are_random_and_stored_hashed():
     a, b = pickem.new_key(), pickem.new_key()
     assert a != b and a.startswith("pp_") and len(a) > 30

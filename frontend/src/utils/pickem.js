@@ -40,6 +40,19 @@ export const joinPickem = (name) => post("/pickem/join", { name });
 export const fetchMe = (key, date) => post("/pickem/me", date ? { key, date } : { key });
 export const makePick = (key, gameId, team) => post("/pickem/pick", { key, game_id: gameId, team });
 
+const NOT_STARTED = new Set(["FUT", "PRE"]);
+
+// A pick'em game: a regular-season or playoff game. Picks lock at puck drop.
+export const pickable = (game) => game?.gameType === 2 || game?.gameType === 3;
+export const pickOpen = (game, now = Date.now()) =>
+  pickable(game) && NOT_STARTED.has(game.gameState) && now < new Date(game.startTimeUTC).getTime();
+
+export const ordinal = (n) => {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th";
+  return `${n}${suffix}`;
+};
+
 export function record(correct, graded) {
   if (!graded) return "No results yet";
   return `${correct}-${graded - correct} (${Math.round((100 * correct) / graded)}%)`;

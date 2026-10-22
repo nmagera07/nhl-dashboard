@@ -21,7 +21,9 @@ function ThemeToggle({ theme, toggle }) {
 
 function TopNav({ search, onSearchChange, theme = "dark", onToggleTheme = () => {} }) {
   const { pathname } = useLocation();
-  const active = sectionFor(pathname);
+  // Pick'em lives under Scores (and the phone tab bar), with its own link here on desktop.
+  const onPickem = pathname.startsWith("/pickem");
+  const active = onPickem ? "pickem" : sectionFor(pathname);
 
   return (
     <header className="topnav">
@@ -42,6 +44,9 @@ function TopNav({ search, onSearchChange, theme = "dark", onToggleTheme = () => 
               {section.label}
             </Link>
           ))}
+          <Link to="/pickem" className={onPickem ? "nav-tab nav-tab-active" : "nav-tab"} aria-current={onPickem ? "page" : undefined}>
+            Pick&apos;em
+          </Link>
         </nav>
         {pathname === "/standings" && (
           <input

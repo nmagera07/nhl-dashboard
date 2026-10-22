@@ -23,8 +23,19 @@ from datetime import datetime, timezone
 
 NAME_RE = re.compile(r"^[A-Za-z0-9 _.\-]{3,20}$")
 RESERVED = ("puckpulse", "admin", "moderator", "official")
-# A basic filter for public display names; not exhaustive.
-BLOCKED = ("fuck", "shit", "cunt", "nigg", "fag", "bitch", "whore", "slut", "rape", "nazi", "kike", "spic", "chink", "retard")
+# A filter for public display names, aimed at slurs and hate (not exhaustive).
+# BLOCKED terms match anywhere in the name; WORDS only as a whole word ("spic"
+# but not "Conspicuous"). Both are checked after undoing number swaps (n1gg3r)
+# and, for BLOCKED, also with repeated letters squeezed (niiigger -> niger).
+BLOCKED = (
+    "fuck", "shit", "cunt", "bitch", "whore", "slut", "rape", "retard",
+    "nigg", "nigga", "niga", "nigr", "niger", "fag", "kike", "kyke", "wetback", "beaner", "towelhead", "raghead",
+    "sandnig", "gook", "chingchong", "tranny",
+    "nazi", "hitler", "heil", "fuhrer", "reich", "kkk", "klan", "whitepower", "whitepride", "aryan", "holocaust",
+    "auschwitz", "gasthe", "ovens", "jewboy", "jewrat", "dirtyjew", "killjew", "hatejew", "fuckjew", "zog",
+)
+WORDS = ("spic", "spick", "chink", "coon", "jap", "paki", "gyp", "goy", "goyim", "yid", "kraut", "negro", "abo")
+LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "9": "g"})
 NOT_STARTED = {"FUT", "PRE"}
 
 TABLES_SQL = """
@@ -80,9 +91,21 @@ def name_problem(name):
     squashed = re.sub(r"[^a-z]", "", name.lower())
     if any(word in squashed for word in RESERVED):
         return "That name is reserved."
-    if any(word in squashed for word in BLOCKED):
+    if _offensive(name):
         return "Please pick a different name."
     return None
+
+
+def _offensive(name):
+    if "1488" in re.sub(r"[^0-9]", "", name):
+        return True
+    letters = re.sub(r"[^a-z]", "", name.lower().translate(LEET))
+    squeezed = re.sub(r"(.)\1+", r"\1", letters)
+    if any(term in letters or term in squeezed for term in BLOCKED):
+        return True
+    # Whole words: split on spaces and punctuation, and on capitals in CamelCase names.
+    words = re.findall(r"[A-Z]?[a-z0-9]+|[A-Z0-9]+(?![a-z])", name)
+    return any(re.sub(r"[^a-z]", "", form) in WORDS for w in words for form in (w.lower(), w.lower().translate(LEET)))
 
 
 def new_key():

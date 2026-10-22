@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
+import PickemCard from "../components/PickemCard.jsx";
 import TopHeadlines from "../components/TopHeadlines.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
@@ -57,6 +58,7 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
           Your team's card and the headlines follow; the morning digest lives on News. */}
       <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
       <Scoreboard key={date} date={isToday ? null : date} pinTeam={favorite || null} />
+      {isToday && <PickemCard />}
       {myTeam ? (
         <MyTeamCard team={myTeam} odds={playoffOddsByTeam[myTeam.team_abbrev]} teams={standings} onChangeTeam={setFavorite} />
       ) : standings.length > 0 && !favorite ? (
@@ -65,12 +67,6 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
           <span>Pin your team's next game, results, and playoff odds here.</span>
         </div>
       ) : null}
-      {isToday && (
-        <Link className="pickem-link" to="/pickem">
-          <span><strong>Beat PuckPulse</strong> · pick tonight&apos;s winners</span>
-          <span aria-hidden="true">›</span>
-        </Link>
-      )}
       {isToday && <TopHeadlines />}
     </main>
   );

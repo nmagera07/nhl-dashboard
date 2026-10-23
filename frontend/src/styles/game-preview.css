@@ -10,9 +10,10 @@
 .preview-compare .team-stats-label { text-align: center; color: var(--text-dim); font-size: 12px; white-space: nowrap; }
 .preview-form { display: grid; gap: 4px; }
 .team-stats-row > .preview-form:last-child { justify-items: end; }
+.team-stats-row > .preview-form:last-child ol { justify-content: flex-end; }
 .preview-form-record { font-size: 12px; }
-.preview-form ol { display: flex; gap: 3px; margin: 0; padding: 0; list-style: none; }
-.preview-result { width: 20px; padding: 2px 0; border-radius: 4px; background: var(--neutral-soft); font-size: 10px; font-weight: 800; text-align: center; }
+.preview-form ol { display: flex; flex-wrap: wrap; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.preview-result { min-width: 20px; padding: 2px 3px; box-sizing: border-box; border-radius: 4px; background: var(--neutral-soft); font-size: 10px; font-weight: 800; text-align: center; }
 .preview-result-w { color: var(--good); }
 .preview-result-l { color: var(--bad); }
 .preview-result-ot, .preview-result-so { color: var(--warn); }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
@@ -17,11 +18,18 @@ function PlayerPage() {
   // roster, which is always a sensible destination and doesn't depend on
   // browser history existing at all.
   const cameFromLeaderboard = location.state?.from === "leaderboard";
-  const backLabel = cameFromLeaderboard ? "Back to Players" : "Back to Roster";
+  const team = playerDetail?.team_abbrev;
+  const backLabel = cameFromLeaderboard ? "Back to Players" : team ? `Back to ${team} roster` : "Back to Players";
   const handleBack = () => {
     if (cameFromLeaderboard) navigate("/players");
-    else navigate(playerDetail?.team_abbrev ? `/teams/${playerDetail.team_abbrev}` : "/players");
+    else navigate(team ? `/teams/${team}` : "/players");
   };
+
+  // The tab names the player once loaded ("Connor McDavid (EDM) | PuckPulse"), like game pages.
+  const name = playerDetail ? `${playerDetail.first_name} ${playerDetail.last_name}` : null;
+  useEffect(() => {
+    if (name) document.title = `${name}${team ? ` (${team})` : ""} | PuckPulse`;
+  }, [name, team]);
 
   return (
     <>

@@ -52,13 +52,14 @@ describe("PlayerPage", () => {
     await waitFor(() => expect(screen.getByText("Couldn't load player details.")).toBeInTheDocument());
   });
 
-  it("deep link with no navigation state defaults to 'Back to Roster', navigating to the player's own team", async () => {
+  it("deep link with no navigation state goes back to his team's roster, and names the player in the tab", async () => {
     renderAt("/players/8477492"); // no state -- e.g. a bookmarked/shared URL
     await waitFor(() => screen.getByText(/mackinnon/i));
 
-    expect(screen.getByRole("button", { name: /back to roster/i })).toBeInTheDocument();
+    expect(document.title).toMatch(/^Nathan MacKinnon \(COL\) \| PuckPulse$/);
+    expect(screen.getByRole("button", { name: /back to col roster/i })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /back to roster/i }));
+    await userEvent.click(screen.getByRole("button", { name: /back to col roster/i }));
 
     expect(screen.getByText("Roster page")).toBeInTheDocument();
   });

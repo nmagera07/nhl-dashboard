@@ -209,6 +209,16 @@ describe("LeaderboardPanel", () => {
       expect(cardList("goalies").getByText("0.912")).toBeInTheDocument();
     });
 
+    it("shows WAR on skater and goalie cards", async () => {
+      render(<LeaderboardPanel players={[player({ war: 0.9 }), player({ ...goalie, war: 1.92 })]} onSelectPlayer={vi.fn()} />);
+      const skaterCard = within(cardList().getAllByRole("button")[0]);
+      expect(skaterCard.getByText("+0.90")).toBeInTheDocument();
+      expect(skaterCard.getByText("WAR")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "GOALIES" }));
+      expect(cardList("goalies").getByText("+1.92")).toBeInTheDocument();
+    });
+
     it("shows an empty message when the search matches nobody", async () => {
       render(<LeaderboardPanel players={skaters} onSelectPlayer={vi.fn()} />);
 

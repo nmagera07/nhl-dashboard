@@ -35,7 +35,7 @@ export default function PickemCard() {
   let headline, detail, cta;
   if (!me) {
     headline = "Can you beat PuckPulse?";
-    detail = <>Pick tonight&apos;s {games.length} winners{pp?.graded ? <> · PuckPulse is {pp.correct}-{pp.graded - pp.correct}</> : null}</>;
+    detail = <>Pick tonight&apos;s {games.length} winners{pp?.graded ? <> · <span className="nowrap">PuckPulse is {pp.correct}-{pp.graded - pp.correct}</span></> : null}</>;
     cta = "Play";
   } else if (open.length > 0) {
     headline = picked === games.length ? "You're all set tonight" : `${picked} of ${games.length} picked`;

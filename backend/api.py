@@ -1837,9 +1837,11 @@ def player_leaders(request: Request, view: Literal["full", "table"] = Query("ful
                        s.shorthanded_goals, s.shorthanded_points,
                        s.game_winning_goals, s.ot_goals,
                        s.wins, s.losses, s.ot_losses, s.goals_against_avg,
-                       s.save_pctg, s.shutouts, s.avg_toi_seconds
+                       s.save_pctg, s.shutouts, s.avg_toi_seconds, w.war
                 FROM players p
                 JOIN teams t ON t.team_abbrev = p.team_abbrev
+                LEFT JOIN player_war w ON w.player_id = p.player_id
+                     AND w.season_id = (SELECT MAX(season_id) FROM standings_snapshots)
                 LEFT JOIN LATERAL (
                     SELECT * FROM player_season_stats pss
                     WHERE pss.player_id = p.player_id
@@ -1861,6 +1863,63 @@ def player_leaders(request: Request, view: Literal["full", "table"] = Query("ful
         raise
     finally:
         conn.close()
+
+
+WAR_GROUP_LABELS = {"F": "forwards", "D": "defensemen", "G": "goalies"}
+
+
+def _war(cur, player_id):
+    """This season's WAR row with its rank in the position group, or None (none yet, or no table)."""
+    try:
+        cur.execute(
+            """
+            SELECT * FROM (
+                SELECT player_id, war, gar, games_played, position_group,
+                       RANK() OVER (PARTITION BY position_group ORDER BY war DESC) AS rank,
+                       COUNT(*) OVER (PARTITION BY position_group) AS of
+                FROM player_war WHERE season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+            ) ranked WHERE player_id = %s
+            """,
+            (player_id,),
+        )
+        row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        return None
+    if not row:
+        return None
+    return {"war": float(row["war"]), "gar": float(row["gar"]), "games_played": row["games_played"],
+            "group": WAR_GROUP_LABELS[row["position_group"]], "rank": row["rank"], "of": row["of"]}
+
+
+@app.get("/players/war")
+@daily_cached
+def war_leaders(position: Optional[Literal["F", "D", "G"]] = None, limit: int = Query(25, ge=1, le=100)):
+    """
+    This season's wins above replacement (war.py), best first, optionally
+    one position group (F, D, G). WAR is an estimate from box-score stats
+    and, for goalies, goals saved above PuckPulse's xG. Registered before
+    /players/{player_id} so the literal path wins.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(
+                    """
+                    SELECT player_id, name, team_abbrev, position_group, games_played, gar, war
+                    FROM player_war
+                    WHERE season_id = (SELECT MAX(season_id) FROM standings_snapshots)
+                      AND (%(position)s::text IS NULL OR position_group = %(position)s)
+                    ORDER BY war DESC LIMIT %(limit)s
+                    """,
+                    {"position": position, "limit": limit},
+                )
+                rows = cur.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                rows = []
+    finally:
+        conn.close()
+    return {"players": [{**r, "gar": float(r["gar"]), "war": float(r["war"])} for r in rows]}
 
 
 def _goalie_advanced(cur, player_id):
@@ -1986,6 +2045,7 @@ def player_detail(player_id: int):
                 if player["advanced_stats"] and player.get("position_code") != "G" else None
             )
             player["goalie_advanced_stats"] = _goalie_advanced(cur, player_id) if player.get("position_code") == "G" else None
+            player["war"] = _war(cur, player_id)
 
             cur.execute(
                 "SELECT * FROM player_career_totals WHERE player_id = %s",

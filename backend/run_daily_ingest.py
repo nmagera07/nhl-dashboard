@@ -56,6 +56,7 @@ SCRIPTS = [
     "ingest_standings.py",
     "ingest_xg.py",
     "ingest_advanced_stats.py",
+    "war.py",
     "simulate_playoff_odds.py",
     "game_predictions.py",
     "goalie_starts.py",

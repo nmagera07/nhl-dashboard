@@ -118,12 +118,12 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   const rangeStart = sorted.length === 0 ? 0 : startIdx + 1;
   const rangeEnd = Math.min(startIdx + LEADERBOARD_PAGE_SIZE, sorted.length);
 
-  // Mobile cards show the headline stat up top and five supporting stats below.
+  // Mobile cards show the headline stat up top and six supporting stats below.
   const headlineKey = group === "goalies" ? "wins" : "points";
   const mobileColumns = columns.filter((col) =>
     (group === "goalies"
-      ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts"]
-      : ["games_played", "goals", "assists", "plus_minus", "avg_toi_seconds"]  // points is already the card's headline
+      ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts", "war"]
+      : ["games_played", "goals", "assists", "plus_minus", "avg_toi_seconds", "war"]  // points is already the card's headline
     ).includes(col.key)
   );
 

@@ -553,3 +553,15 @@ CREATE TABLE IF NOT EXISTS player_war (
     PRIMARY KEY (season_id, player_id)
 );
 GRANT SELECT ON player_war TO nhl_api_readonly;
+
+-- Visitors' ideas and bug reports (feedback.py; POST /feedback). Insert-only for the API.
+CREATE TABLE IF NOT EXISTS feedback (
+    id          SERIAL PRIMARY KEY,
+    kind        VARCHAR(8) NOT NULL,
+    message     TEXT NOT NULL,
+    contact     VARCHAR(120),
+    page        VARCHAR(200),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+GRANT INSERT ON feedback TO nhl_api_readonly;
+GRANT USAGE ON SEQUENCE feedback_id_seq TO nhl_api_readonly;

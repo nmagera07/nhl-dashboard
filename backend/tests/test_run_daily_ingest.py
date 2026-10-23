@@ -25,7 +25,7 @@ def _fake_runner(exit_codes):
 class TestRunAll:
     def test_runs_standings_first_since_the_others_depend_on_it(self):
         runner, calls = _fake_runner(
-            {"ingest_standings.py": 0, "ingest_advanced_stats.py": 0, "ingest_xg.py": 0, "simulate_playoff_odds.py": 0, "game_predictions.py": 0, "goalie_starts.py": 0, "market_odds.py": 0, "daily_digest.py": 0, "ingest_player_stats.py": 0, "team_lines.py": 0, "moneypuck_odds.py": 0}
+            {"ingest_standings.py": 0, "ingest_advanced_stats.py": 0, "war.py": 0, "ingest_xg.py": 0, "simulate_playoff_odds.py": 0, "game_predictions.py": 0, "goalie_starts.py": 0, "market_odds.py": 0, "daily_digest.py": 0, "ingest_player_stats.py": 0, "team_lines.py": 0, "moneypuck_odds.py": 0}
         )
 
         assert run_all(runner=runner) == []
@@ -33,6 +33,7 @@ class TestRunAll:
             "ingest_standings.py",
             "ingest_xg.py",  # before the odds, which use it
             "ingest_advanced_stats.py",  # after ingest_xg, whose 5-on-5 rows it sums
+            "war.py",  # after ingest_xg, whose goalie xG it uses
             "simulate_playoff_odds.py",
             "game_predictions.py",  # after the odds, whose ratings it logs
             "goalie_starts.py",  # after ingest_xg, whose starters it reads
@@ -46,11 +47,11 @@ class TestRunAll:
 
     def test_a_failed_script_does_not_stop_the_next_one(self):
         runner, calls = _fake_runner(
-            {"ingest_standings.py": 0, "ingest_advanced_stats.py": 1, "ingest_xg.py": 0, "simulate_playoff_odds.py": 0, "game_predictions.py": 0, "goalie_starts.py": 0, "market_odds.py": 0, "daily_digest.py": 0, "ingest_player_stats.py": 0, "team_lines.py": 0, "moneypuck_odds.py": 0}
+            {"ingest_standings.py": 0, "ingest_advanced_stats.py": 1, "war.py": 0, "ingest_xg.py": 0, "simulate_playoff_odds.py": 0, "game_predictions.py": 0, "goalie_starts.py": 0, "market_odds.py": 0, "daily_digest.py": 0, "ingest_player_stats.py": 0, "team_lines.py": 0, "moneypuck_odds.py": 0}
         )
 
         assert run_all(runner=runner) == ["ingest_advanced_stats.py"]
-        assert len(calls) == 11
+        assert len(calls) == 12
 
 
 @pytest.fixture

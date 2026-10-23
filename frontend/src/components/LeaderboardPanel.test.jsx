@@ -159,12 +159,14 @@ describe("LeaderboardPanel", () => {
       goals_against_avg: 2.5,
       save_pctg: 0.912,
       shutouts: null,
+      war: 1.25,
     });
     render(<LeaderboardPanel players={[partial]} onSelectPlayer={vi.fn()} />);
     await userEvent.click(screen.getByRole("button", { name: "GOALIES" }));
 
     expect(table().getByText("2.50")).toBeInTheDocument();
     expect(table().getByText("0.912")).toBeInTheDocument();
+    expect(table().getByText("+1.25")).toBeInTheDocument();
     expect(table().getByText("—")).toBeInTheDocument();
   });
 

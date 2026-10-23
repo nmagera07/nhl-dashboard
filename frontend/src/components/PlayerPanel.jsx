@@ -1,4 +1,5 @@
 import { formatSigned, formatToi } from "../utils/format.js";
+import { ordinal } from "../utils/ordinal.js";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
@@ -134,6 +135,17 @@ function AdvancedRanks({ stats, ranks }) {
   );
 }
 
+// "WAR +0.77 · 1st of 459 forwards": this season's wins above replacement, ranked within the position.
+function WarLine({ war }) {
+  if (!war) return null;
+  return (
+    <p className="player-war">
+      <StatAbbr term="WAR">WAR</StatAbbr> <strong>{formatSigned(war.war, 2)}</strong>
+      <span> · {ordinal(war.rank)} of {war.of} {war.group}</span>
+    </p>
+  );
+}
+
 function Section({ title, aside, children }) {
   return (
     <section className="player-section">
@@ -241,7 +253,10 @@ function PlayerPanel({ player, onBack, backLabel }) {
             {seasonStats ? `${formatSeasonLabel(seasonStats.season_id)} season` : "This season"}
           </div>
           {seasonStats ? (
-            <StatStrip stats={seasonStats} columns={seasonColumns} label="This season" />
+            <>
+              <StatStrip stats={seasonStats} columns={seasonColumns} label="This season" />
+              <WarLine war={player.war} />
+            </>
           ) : (
             <p className="muted">No current-season stats are available yet.</p>
           )}
@@ -329,7 +344,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
         </Section>
       )}
       <StatGlossary
-        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "ATOI", "xG%", "CORSI%", "IND_XG", "PDO"]}
+        terms={isGoalie ? ["GP", "W", "L", "OTL", "GAA", "SV%", "SO", "GSAX", "GSAX60", "HD_GSAX", "WAR"] : ["GP", "G", "A", "PTS", "+/-", "SOG", "PIM", "ATOI", "WAR", "xG%", "CORSI%", "IND_XG", "PDO"]}
         labels={{ ATOI: "TOI", "CORSI%": "Corsi %", "xG%": "xG %", IND_XG: "ixG/60", GSAX: "GSAx", GSAX60: "GSAx/60", HD_GSAX: "High-danger GSAx" }}
       />
     </main>

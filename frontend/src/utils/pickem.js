@@ -47,12 +47,6 @@ export const pickable = (game) => game?.gameType === 2 || game?.gameType === 3;
 export const pickOpen = (game, now = Date.now()) =>
   pickable(game) && NOT_STARTED.has(game.gameState) && now < new Date(game.startTimeUTC).getTime();
 
-export const ordinal = (n) => {
-  const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? "th" : { 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th";
-  return `${n}${suffix}`;
-};
-
 export function record(correct, graded) {
   if (!graded) return "No results yet";
   return `${correct}-${graded - correct} (${Math.round((100 * correct) / graded)}%)`;

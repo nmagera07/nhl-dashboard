@@ -2,7 +2,7 @@ import { teamLogo } from "../utils/teamLogo.js";
 import { useState, useMemo } from "react";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
-import { formatToi } from "../utils/format.js";
+import { formatSigned, formatToi } from "../utils/format.js";
 
 // The Players page fetches /players/leaders?view=table, which returns only
 // the fields in backend PlayerLeaderTableRow (response_models/players.py).
@@ -16,6 +16,7 @@ const SKATER_COLUMNS = [
   { key: "pim", label: "PIM" },
   { key: "shots", label: "SHOTS" },
   { key: "avg_toi_seconds", label: "TOI" },
+  { key: "war", label: "WAR" },
   { key: "games_played", label: "GP" },
 ];
 
@@ -26,6 +27,7 @@ const GOALIE_COLUMNS = [
   { key: "goals_against_avg", label: "GAA" },
   { key: "save_pctg", label: "SV%" },
   { key: "shutouts", label: "SO" },
+  { key: "war", label: "WAR" },
   { key: "games_played", label: "GP" },
 ];
 
@@ -37,6 +39,7 @@ function formatStatValue(key, value) {
   if (key === "goals_against_avg") return Number(value).toFixed(2);
   if (key === "save_pctg") return Number(value).toFixed(3);
   if (key === "avg_toi_seconds") return formatToi(value);
+  if (key === "war") return formatSigned(value, 2);
   return value;
 }
 

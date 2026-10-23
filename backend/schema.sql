@@ -538,3 +538,18 @@ CREATE TABLE IF NOT EXISTS game_results (
     away_score              SMALLINT,
     recorded_at             TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Wins above replacement this season, one row per player (war.py, daily).
+CREATE TABLE IF NOT EXISTS player_war (
+    season_id       INTEGER NOT NULL,
+    player_id       INTEGER NOT NULL,
+    name            VARCHAR(64),
+    team_abbrev     VARCHAR(3),
+    position_group  CHAR(1) NOT NULL,   -- F, D, or G: WAR is ranked within these
+    games_played    SMALLINT NOT NULL,
+    gar             NUMERIC(6,2) NOT NULL,
+    war             NUMERIC(5,2) NOT NULL,
+    as_of_date      DATE NOT NULL,
+    PRIMARY KEY (season_id, player_id)
+);
+GRANT SELECT ON player_war TO nhl_api_readonly;

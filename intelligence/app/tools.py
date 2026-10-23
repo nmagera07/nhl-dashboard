@@ -23,7 +23,8 @@ from .dashboard import DashboardClient, DashboardUnavailable
 logger = logging.getLogger(__name__)
 
 SCOPES = ["league", "Eastern", "Western", "Atlantic", "Metropolitan", "Central", "Pacific"]
-LEADER_CATEGORIES = ["points", "goals", "assists", "plus_minus", "power_play_points", "goalie_wins", "save_pct", "gaa", "gsax"]
+LEADER_CATEGORIES = ["points", "goals", "assists", "plus_minus", "power_play_points", "goalie_wins", "save_pct", "gaa", "gsax",
+                     "war"]
 TEAM = {"type": "string", "description": "Team abbreviation, e.g. PIT, TOR, VGK."}
 
 
@@ -107,7 +108,8 @@ TOOLS = [
         {"team": {"type": "string", "description": "Optional team abbreviation, e.g. PIT."}}),
     _fn("get_leaders",
         "League leaders. Skaters: points, goals, assists, plus_minus, power_play_points. Goalies: goalie_wins, save_pct, "
-        "gaa, or gsax (goals saved above expected, PuckPulse xG: the best single measure of who's stopping the most).",
+        "gaa, or gsax (goals saved above expected, PuckPulse xG: the best single measure of who's stopping the most). "
+        "war: wins above replacement this season (PuckPulse's estimate), top forwards, defensemen, and goalies.",
         {"category": {"type": "string", "enum": LEADER_CATEGORIES, "description": "Default: points, goals, and goalie wins."}}),
     _fn("get_scores",
         "Every NHL game on a date: final scores (with OT/SO), live scores, or start times. Use for 'who won last night', "
@@ -570,6 +572,14 @@ class ToolRunner:
             return {"gsax": [compact._clean({k: g.get(k) for k in ("name", "team", "games_played", "gsax", "gsax_per_60", "save_pct")})
                              for g in qualified[:compact.TOP_GOALIES]],
                     "note": "GSAx: goals saved above expected (PuckPulse xG); above 0 is better than average."}
+        if category == "war":
+            groups = await asyncio.gather(*(self._get(f"/players/war?position={p}&limit=5") for p in "FDG"))
+            return {"war": {label: [compact._clean({k: r.get(k) for k in ("name", "team_abbrev", "games_played", "war")})
+                                    for r in g.get("players", [])]
+                            for label, g in zip(("forwards", "defensemen", "goalies"), groups)},
+                    "note": "WAR: wins added this season over a replacement-level player; PuckPulse's estimate from "
+                            "box-score stats (skaters) and saves above expected (goalies). Compare within a position: "
+                            "goalies swing the most wins. Say it's an estimate."}
         players = await self._get("/players/leaders")
         if category in (None, "points", "goals", "goalie_wins"):
             leaders = compact.leaders(players)

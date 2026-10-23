@@ -516,10 +516,15 @@ class TestScoresLeadersStandings:
                 goalie("Hot", 1, 0.990, 0.5), goalie("Ullmark", 7, 0.945, 1.33), goalie("Oettinger", 7, 0.940, 1.13)],
             "/goalies/advanced": {"goalies": [{"name": "Lucky Night", "team": "X", "games_played": 1, "gsax": 3.0},
                                               {"name": "Linus Ullmark", "team": "OTT", "games_played": 7, "gsax": 8.5, "gsax_per_60": 1.21}]},
+            "/players/war?position=F&limit=5": {"players": [{"player_id": 8478402, "name": "Connor McDavid", "team_abbrev": "EDM",
+                                                             "position_group": "F", "games_played": 9, "gar": 4.75, "war": 0.77}]},
+            "/players/war?position=G&limit=5": {"players": [{"player_id": 8475883, "name": "Jake Oettinger", "team_abbrev": "DAL",
+                                                             "position_group": "G", "games_played": 8, "gar": 11.1, "war": 1.81}]},
         }
 
         def handler(request):
-            return httpx.Response(200, json=routes.get(request.url.path, {}))
+            query = f"{request.url.path}?{request.url.query.decode()}" if request.url.query else request.url.path
+            return httpx.Response(200, json=routes.get(query, routes.get(request.url.path, {})))
         async with httpx.AsyncClient(base_url="https://dashboard.test", transport=httpx.MockTransport(handler)) as client:
             return json.loads(await ToolRunner(DashboardClient("https://dashboard.test", client)).run(name, json.dumps(args)))
 
@@ -541,6 +546,12 @@ class TestScoresLeadersStandings:
         assert [g["name"] for g in gaa] == ["Oettinger Oettinger", "Ullmark Ullmark"] and gaa[0]["gaa"] == 1.13
         gsax = await self.call("get_leaders", {"category": "gsax"})
         assert [g["name"] for g in gsax["gsax"]] == ["Linus Ullmark"] and "above 0" in gsax["note"]
+
+    async def test_war_leaders_by_position(self):
+        result = await self.call("get_leaders", {"category": "war"})
+        assert result["war"]["forwards"] == [{"name": "Connor McDavid", "team_abbrev": "EDM", "games_played": 9, "war": 0.77}]
+        assert result["war"]["goalies"][0]["name"] == "Jake Oettinger" and result["war"]["defensemen"] == []
+        assert "estimate" in result["note"] and "within a position" in result["note"]
 
     async def test_assists_and_bad_categories(self):
         assists = (await self.call("get_leaders", {"category": "assists"}))["assists"]

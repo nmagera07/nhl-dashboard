@@ -44,6 +44,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   ~50% lower monthly cost.
 
 **AI engineering**
+- Built Wins Above Replacement for 770+ NHL players, validated on held-out seasons (team WAR
+  tracks real wins at r = 0.885, 0.94 wins per WAR), and settled a choice the backtest couldn't
+  separate with a direct measurement.
 - Built a live in-game win probability model, validated before launch on 3,936 held-out
   games: beat a score-and-clock baseline at every checkpoint and stayed calibrated
   within ~2 points per decile.
@@ -185,6 +188,38 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-22 — WAR: when the backtest can't make the call
+
+**What happened:** Added Wins Above Replacement for every player.
+- **Skaters:** this season's Game Score above a replacement-level player, converted to goals.
+- **Goalies:** goals saved above our xG, plus the gap to a replacement-level goalie.
+- **Goals to wins:** both divided by 6.15 goals per win, fit from three seasons of standings (r = 0.94).
+
+**How I checked it:** with each season held out of the fit, every team's summed WAR tracked
+its real wins at r = 0.885, and 1 WAR was worth 0.94 actual wins (ideal: 1.0). A team of
+replacement players comes out at about 25 wins.
+
+**What I learned:**
+- **Some choices the backtest can't make.** Goalies filled 14 of last season's top 20. I tried
+  goalie replacement levels from -0.217 to 0 goals per 60, and the backtest barely moved (r
+  0.883-0.885), because every team plays a full season of goalie games: the level only shifts
+  every team's total. So I measured it directly instead: fringe goalies (3-19 games) really
+  do give up 0.15-0.25 extra goals per 60, so -0.217 stays.
+- **Present what the model can't compare.** An elite goalie's 30-40 goals saved is worth more
+  wins than any skater adds, and public WAR models show the same thing. So WAR is ranked
+  within forwards, defensemen, and goalies ("1st of 459 forwards"), not in one list.
+- **Use the same replacement definition everywhere.** Skaters and goalies both use "the
+  players who shuttle between the NHL and the minors", measured from data.
+- **Name the limits.** It's box-score based: linemates leak into the on-ice numbers, and
+  defense without the puck barely shows. The next step is RAPM (ridge regression on shift
+  data), which separates linemates.
+
+**Interview angle:** "How do you validate a stat with no ground truth?" Make the team totals
+add up to something real (wins), hold out seasons, and when a choice doesn't change the
+validation score, settle it with a direct measurement instead of the score.
 
 ---
 

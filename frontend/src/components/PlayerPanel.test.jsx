@@ -150,6 +150,12 @@ describe("PlayerPanel advanced stats", () => {
     expect(screen.queryByText(/xGF–xGA/)).not.toBeInTheDocument();         // the raw totals are gone
   });
 
+  it("shows this season's WAR and where it ranks in his position", () => {
+    renderPanel(skater({ war: { war: 0.77, gar: 4.75, games_played: 9, group: "forwards", rank: 1, of: 459 } }));
+    expect(screen.getByText("+0.77")).toBeInTheDocument();
+    expect(screen.getByText(/1st of 459 forwards/)).toBeInTheDocument();
+  });
+
   it("says when there aren't enough minutes to rank yet", () => {
     renderPanel(skater({ advanced_stats: advanced, advanced_percentiles: { too_few_minutes: true } }));
     expect(screen.getByText(/Not enough 5-on-5 minutes yet/)).toBeInTheDocument();

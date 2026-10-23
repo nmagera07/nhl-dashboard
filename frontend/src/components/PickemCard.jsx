@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { todayISO } from "../utils/dates.js";
-import { fetchMe, ordinal, pickable, pickOpen, record, savedKey } from "../utils/pickem.js";
+import { ordinal } from "../utils/ordinal.js";
+import { fetchMe, pickable, pickOpen, record, savedKey } from "../utils/pickem.js";
 
 // The Scores page's way into "Beat PuckPulse": where you stand tonight (or
 // PuckPulse's record, before you join) and the top of the leaderboard. Sits

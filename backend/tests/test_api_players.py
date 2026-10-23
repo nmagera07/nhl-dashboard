@@ -1,6 +1,14 @@
 """GET /players/leaders and GET /players/{player_id}."""
 
+import pytest
+
 from response_models import LEADER_TABLE_FIELDS, PlayerLeader
+
+
+@pytest.fixture(autouse=True)
+def no_war_yet(db_router):
+    """Player pages also ask for WAR (tests/test_war.py covers it); here there's none yet."""
+    db_router.when("from player_war", None)
 
 
 class TestPlayerLeaders:
@@ -38,7 +46,7 @@ class TestPlayerLeaders:
 
         body = client.get("/players/leaders").json()
 
-        assert len(PlayerLeader.model_fields) == 38
+        assert len(PlayerLeader.model_fields) == 39
         for row in body:
             assert set(row) == set(PlayerLeader.model_fields)
 
@@ -57,7 +65,7 @@ class TestPlayerLeaders:
         response = client.get("/players/leaders?view=table")
 
         assert response.status_code == 200
-        assert len(LEADER_TABLE_FIELDS) == 20  # +avg_toi_seconds (the Players page TOI column)
+        assert len(LEADER_TABLE_FIELDS) == 21  # +avg_toi_seconds (TOI column), +war (WAR column)
         for row in response.json():
             assert set(row) == set(LEADER_TABLE_FIELDS)
 

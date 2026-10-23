@@ -73,6 +73,7 @@ class PlayerLeader(PlayerBio, LatestSeasonStatsFields):
 
     team_name: str
     team_logo_url: Optional[str] = None
+    war: Optional[float] = None  # wins above replacement this season (war.py)
 
 
 class PlayerLeaderTableRow(BaseModel):
@@ -108,6 +109,7 @@ class PlayerLeaderTableRow(BaseModel):
     goals_against_avg: Optional[float] = None
     save_pctg: Optional[float] = None
     shutouts: Optional[int] = None
+    war: Optional[float] = None  # wins above replacement this season
 
 
 LEADER_TABLE_FIELDS = tuple(PlayerLeaderTableRow.model_fields)
@@ -315,5 +317,8 @@ class PlayerDetail(PlayerBio):
     # ixg60_value; or {"too_few_minutes": true}.
     advanced_percentiles: Optional[Dict[str, Any]] = None
     goalie_advanced_stats: Optional[GoalieAdvancedStat] = None
+    # Wins above replacement this season (war.py) and where it ranks among
+    # his position group (F, D, G): war, gar, games_played, group, rank, of.
+    war: Optional[Dict[str, Any]] = None
     career_totals: CareerTotals
     season_history: List[SeasonHistoryEntry]

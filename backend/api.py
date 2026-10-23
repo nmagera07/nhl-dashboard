@@ -69,6 +69,7 @@ import goal_model
 import season_scenarios
 import win_probability
 from seasons import season_games
+from response_models.feedback import FeedbackIn
 from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
@@ -1273,6 +1274,7 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
         conn.close()
 
 
+FEEDBACK_RATE_LIMIT = "5/hour"
 PICKEM_JOIN_RATE_LIMIT = "5/hour"
 PICKEM_RATE_LIMIT = "60/minute"
 
@@ -1290,6 +1292,37 @@ def _pickem_player(cur, key):
 
 def _pickem_tables_missing(exc):
     return isinstance(exc, (psycopg2.errors.UndefinedTable, psycopg2.errors.InsufficientPrivilege))
+
+
+@app.post("/feedback")
+@limiter.limit(FEEDBACK_RATE_LIMIT)
+def send_feedback(request: Request, body: FeedbackIn):
+    """
+    A visitor's idea or bug report, stored for Nate to read (feedback.py).
+    Never read back by the API. A filled-in honeypot gets the same "thanks"
+    without being stored, so bots can't tell they were caught.
+    """
+    import feedback
+
+    if body.website:
+        return {"ok": True}
+    message = feedback.clean(body.message, feedback.MAX_MESSAGE)
+    if not message or len(message) < 3:
+        raise HTTPException(status_code=400, detail="Tell us a little more.")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO feedback (kind, message, contact, page) VALUES (%s, %s, %s, %s)",
+                (body.kind, message, feedback.clean(body.contact, feedback.MAX_CONTACT), feedback.clean(body.page, 200)),
+            )
+        conn.commit()
+    except psycopg2.errors.UndefinedTable:
+        conn.rollback()
+        raise HTTPException(status_code=503, detail="Feedback isn't set up yet.")
+    finally:
+        conn.close()
+    return {"ok": True}
 
 
 @app.post("/pickem/join")

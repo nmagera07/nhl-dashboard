@@ -1,4 +1,7 @@
-// Who built PuckPulse and where to find him. Icons are inline SVG (no icon
+import { useState } from "react";
+import FeedbackForm from "./FeedbackForm.jsx";
+
+// Who built PuckPulse and where to find him, and a way to send feedback. Icons are inline SVG (no icon
 // font or third-party script, so the strict CSP stays as is).
 const LINKS = [
   {
@@ -16,8 +19,12 @@ const LINKS = [
 ];
 
 export default function SiteFooter() {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   return (
     <footer className="app-footer">
+      <p className="footer-feedback">
+        <button type="button" onClick={() => setFeedbackOpen(true)}>Suggest a feature or report a bug</button>
+      </p>
       <p className="footer-credit">
         <span>
           Built by{" "}
@@ -31,7 +38,11 @@ export default function SiteFooter() {
           ))}
         </span>
       </p>
-      <p>PuckPulse · Data from the NHL; expected goals are our own. Not affiliated with or endorsed by the NHL.</p>
+      <p className="footer-legal">
+        PuckPulse is an <a href="https://github.com/atelier-ai-labs" target="_blank" rel="noopener noreferrer">Atelier AI</a> project
+        · Data from the NHL; expected goals are our own. Not affiliated with or endorsed by the NHL.
+      </p>
+      {feedbackOpen && <FeedbackForm onClose={() => setFeedbackOpen(false)} />}
     </footer>
   );
 }

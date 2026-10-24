@@ -78,3 +78,16 @@ class TestApi:
         monkeypatch.setattr(nhl_players, "search", lambda q: [{"player_id": 8447400, "name": "Wayne Gretzky"}])
         assert client.get("/players/search?q=Gretzky").json() == {"players": [{"player_id": 8447400, "name": "Wayne Gretzky"}]}
         assert client.get("/players/search?q=a").status_code == 422
+
+
+def test_imports_without_a_database_setting():
+    """The API runs without DATABASE_URL (it has its own read-only setting); importing this must not need it."""
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+    code = "import os, dotenv; dotenv.load_dotenv = lambda *a, **k: False; import nhl_players"
+    result = subprocess.run([sys.executable, "-c", code], cwd=os.path.dirname(nhl_players.__file__), env=env,
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

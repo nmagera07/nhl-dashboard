@@ -134,3 +134,41 @@ class TestTeamSharePreview:
     def test_unknown_team_is_404(self, client):
         assert client.get("/teams/XYZ/share").status_code == 404
         assert client.get("/teams/BUFF/share").status_code == 422
+
+
+class TestSwingOfTheNight:
+    GAMES = [{"id": 2026020149, "gameState": "OFF", "gameType": 2, "gameOutcome": {"lastPeriodType": "SO"},
+              "awayTeam": {"abbrev": "DET", "score": 3}, "homeTeam": {"abbrev": "SEA", "score": 4}},
+             {"id": 2026020150, "gameState": "FUT", "gameType": 2, "awayTeam": {"abbrev": "A"}, "homeTeam": {"abbrev": "B"}}]
+    CURVE = {"available": True, "playoff": False, "points": [[0, 0.55], [3583, 0.98], [3583, 0.52], [3900, 1.0]],
+             "goals": [{"second": 1000, "team": "home", "scorer": "J. Eberle", "before": 0.55, "after": 0.7},
+                       {"second": 3583, "team": "away", "scorer": "A. DeBrincat", "before": 0.98, "after": 0.52}]}
+
+    def setup(self, monkeypatch):
+        import api
+        calls = []
+        monkeypatch.setattr(api, "games_on_date", lambda day: self.GAMES)
+        monkeypatch.setattr(api, "_win_curve", lambda game_id: calls.append(game_id) or self.CURVE)
+        return calls
+
+    def test_last_nights_swing_from_the_scorers_side(self, client, monkeypatch):
+        calls = self.setup(monkeypatch)
+        body = client.get("/swing-of-the-night?date=2026-10-20").json()
+        assert calls == [2026020149]  # finished games only
+        assert body["goal"] == {"scorer": "A. DeBrincat", "team": "DET", "side": "away", "second": 3583,
+                                "when": "0:17 left in the 3rd", "effect": "ties it", "before": 0.02, "after": 0.48}
+        assert body["game"]["last_period"] == "SO"
+
+    def test_share_card_and_image(self, client, monkeypatch):
+        self.setup(monkeypatch)
+        share = client.get("/swing/2026-10-20/share").json()
+        assert share["title"] == "Swing of the Night, Oct 20: A. DeBrincat ties it with 0:17 left in the 3rd"
+        assert share["game_id"] == 2026020149 and share["image"].endswith("/og/swing/2026-10-20.png")
+        image = client.get("/og/swing/2026-10-20.png")
+        assert image.status_code == 200 and image.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_a_night_without_games(self, client, monkeypatch):
+        import api
+        monkeypatch.setattr(api, "games_on_date", lambda day: [])
+        assert client.get("/swing-of-the-night?date=2026-07-01").json() == {"available": False, "date": "2026-07-01"}
+        assert client.get("/swing/2026-07-01/share").status_code == 404

@@ -49,4 +49,21 @@ describe("share function", () => {
     expect(fetch.mock.calls[0][0]).toMatch(/\/games\/2026020150\/share$/);
     expect(html).toContain("url=https://puckpulse.io/games/2026020150");
   });
+
+  it("serves Swing of the Night for /s/{date} and sends people to that game", async () => {
+    const { html, fetch } = await run("/s/2026-10-20", {
+      title: "Swing of the Night, Oct 20: A. DeBrincat ties it with 0:17 left in the 3rd", description: "DET @ SEA",
+      game_id: 2026020149, image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/swing/2026-10-20.png" });
+    expect(fetch.mock.calls[0][0]).toMatch(/\/swing\/2026-10-20\/share$/);
+    expect(html).toContain("ties it with 0:17 left");
+    expect(html).toContain('content="0; url=https://puckpulse.io/games/2026020149"');
+    expect(html).toContain("/og/swing/2026-10-20.png");
+  });
+
+  it("only sends a swing link to one of our own game pages", async () => {
+    const { html } = await run("/s/2026-10-20", { title: "x", description: "y", game_id: "../evil" });
+    expect(html).toContain('url=https://puckpulse.io"');
+    const bad = await run("/s/not-a-date");
+    expect(bad.fetch).not.toHaveBeenCalled();
+  });
 });

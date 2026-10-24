@@ -95,12 +95,12 @@ def _panel(draw, box, team, big, small):
         draw.text((cx, y1 - 32), small, font=_font(26, "Bold"), fill=ink, anchor="mm")
 
 
-def _header(img, draw, game):
+def _header(img, draw, game, status=None):
     icon = Image.open(os.path.join(ASSETS, "puckpulse-mark.png")).convert("RGBA").resize((98, 68))
     img.paste(icon, (60, 49), icon)
     draw.text((172, 83), "Puck", font=_font(48), fill=TEXT, anchor="lm")
     draw.text((172 + draw.textlength("Puck", font=_font(48)), 83), "Pulse", font=_font(48), fill=ACCENT, anchor="lm")
-    status = status_line(game)
+    status = status or status_line(game)
     draw.text((WIDTH - 64, 83), status, font=_font(34, "Bold"), fill=LIVE if status.startswith("LIVE") else TEXT,
               anchor="rm")
 
@@ -128,7 +128,7 @@ def _swing_line(curve, away, home, arrow="→"):
            f"{team} {round(before * 100)}% {arrow} {round(after * 100)}%"
 
 
-def _render_curve(img, draw, game, curve):
+def _render_curve(img, draw, game, curve, footer=None, highlight=None):
     """Score across the top, the win probability curve below it, the biggest swing at the bottom."""
     away, home = game["awayTeam"], game["homeTeam"]
     a_color, h_color = _chart_colors(away["abbrev"], home["abbrev"])
@@ -161,11 +161,14 @@ def _render_curve(img, draw, game, curve):
     draw.line(line, fill=TEXT, width=5, joint="curve")
     for g in curve.get("goals", []):
         cx, cy = x(g["second"]), y(g["after"])
-        draw.ellipse((cx - 10, cy - 10, cx + 10, cy + 10), fill=h_color if g["team"] == "home" else a_color,
+        r = 16 if highlight and g["second"] == highlight["second"] and g["team"] == highlight["side"] else 10
+        if r > 10:  # the moment the card is about: a ring around its dot
+            draw.ellipse((cx - r - 8, cy - r - 8, cx + r + 8, cy + r + 8), outline=TEXT, width=3)
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=h_color if g["team"] == "home" else a_color,
                      outline=BG, width=3)
 
     # "to", not an arrow: the bundled Inter has no arrow glyph.
-    footer = _swing_line(curve, away["abbrev"], home["abbrev"], "to") or "Win probability by PuckPulse"
+    footer = footer or _swing_line(curve, away["abbrev"], home["abbrev"], "to") or "Win probability by PuckPulse"
     draw.text((64, 580), footer, font=_font(28, "Bold"), fill=DIM, anchor="lm")
 
 
@@ -199,6 +202,28 @@ def render_game(game, home_win_prob=None, curve=None):
         draw.text((WIDTH // 2, 330), "@", font=_font(64), fill=DIM, anchor="mm")
         draw.text((64, 562), footer, font=_font(28, "Bold"), fill=DIM, anchor="lm")
 
+    out = io.BytesIO()
+    img.save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
+def render_swing(swing, headline):
+    """
+    Swing of the Night's card: the game's score and win-probability curve
+    with the moment ringed, "SWING OF THE NIGHT · Oct 20" up top and what
+    happened along the bottom. swing is api._swing_of_the_night()'s result.
+    """
+    game = {"gameState": "OFF",
+            "awayTeam": {"abbrev": swing["game"]["away"], "score": swing["game"]["away_score"]},
+            "homeTeam": {"abbrev": swing["game"]["home"], "score": swing["game"]["home_score"]}}
+    goal = swing["goal"]
+    day = datetime.fromisoformat(swing["date"])
+    img = _background()
+    draw = ImageDraw.Draw(img)
+    _header(img, draw, game, status=f"SWING OF THE NIGHT · {day.strftime('%b %-d')}")
+    footer = f"{headline} · {goal['team']} {round(goal['before'] * 100)}% to {round(goal['after'] * 100)}%"
+    _render_curve(img, draw, game, {"points": swing["points"], "goals": swing["goals"], "playoff": swing["playoff"]},
+                  footer=footer, highlight=goal)
     out = io.BytesIO()
     img.save(out, "PNG", optimize=True)
     return out.getvalue()

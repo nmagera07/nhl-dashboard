@@ -34,6 +34,8 @@ import requests
 from dotenv import load_dotenv
 
 from logging_config import setup_logging
+# Shared with nhl_players (retired players' pages), which must import without a database.
+from nhl_players import _combine_season_entries, _parse_time_on_ice_to_seconds  # noqa: F401
 
 load_dotenv()
 
@@ -323,64 +325,6 @@ def upsert_career_totals(cur, player_id, landing):
         upserted_any = True
 
     return upserted_any
-
-
-def _parse_time_on_ice_to_seconds(time_on_ice):
-    if not time_on_ice:
-        return 0
-    minutes, seconds = time_on_ice.split(":")
-    return int(minutes) * 60 + int(seconds)
-
-
-def _combine_season_entries(entries):
-    """
-    Combine multiple raw seasonTotals entries for the same (season,
-    gameTypeId) -- i.e. a mid-season trade, where the player has one
-    entry per team -- into the single row stored in player_season_history.
-    Counting stats are summed (None treated as 0 so a partial None from a
-    skater-only or goalie-only entry doesn't poison the sum). shooting_pctg,
-    save_pctg, and goals_against_avg are NOT averaged across entries --
-    they're recomputed from the summed underlying counts, since averaging
-    per-stint percentages would misweight a short stint against a long one.
-    """
-    counting_int_keys = (
-        "gamesPlayed",
-        "goals",
-        "assists",
-        "points",
-        "plusMinus",
-        "pim",
-        "shots",
-        "powerPlayGoals",
-        "powerPlayPoints",
-        "shorthandedGoals",
-        "shorthandedPoints",
-        "gameWinningGoals",
-        "otGoals",
-        "wins",
-        "losses",
-        "otLosses",
-        "shutouts",
-    )
-    combined = {key: sum(e.get(key) or 0 for e in entries) for key in counting_int_keys}
-
-    total_shots = combined["shots"]
-    combined["shootingPctg"] = (combined["goals"] / total_shots) if total_shots > 0 else None
-
-    total_goals_against = sum(e.get("goalsAgainst") or 0 for e in entries)
-    total_shots_against = sum(e.get("shotsAgainst") or 0 for e in entries)
-    total_seconds = sum(_parse_time_on_ice_to_seconds(e.get("timeOnIce")) for e in entries)
-
-    combined["savePctg"] = (
-        (total_shots_against - total_goals_against) / total_shots_against
-        if total_shots_against > 0
-        else None
-    )
-    combined["goalsAgainstAvg"] = (
-        total_goals_against * 3600 / total_seconds if total_seconds > 0 else None
-    )
-
-    return combined
 
 
 def upsert_season_history(cur, player_id, landing):

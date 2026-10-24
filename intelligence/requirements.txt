@@ -1,9 +1,9 @@
 # Pinned to the versions the tests and evals ran against (like backend/),
 # so a rebuild can't silently pick up a new release. Dependabot proposes
 # upgrades weekly as one PR into dev.
-fastapi==0.143.3
+fastapi==0.156.4
 uvicorn[standard]==0.54.0
 httpx==0.28.1
-openai==3.34.0
+openai==3.35.1
 slowapi==0.1.10
 tzdata==2026.5  # zoneinfo data for Eastern times; slim images may not ship it

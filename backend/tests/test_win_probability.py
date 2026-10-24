@@ -108,3 +108,21 @@ def test_clock_labels():
     assert wp.clock_label(1200 + 754) == "2nd 12:34"
     assert wp.clock_label(3600 + 133) == "OT 2:13"
     assert wp.clock_label(3600 + 1200 + 60, playoff=True) == "2OT 1:00"
+
+
+def test_time_left_and_what_each_goal_did():
+    assert wp.time_left_label(3600 - 17) == "0:17 left in the 3rd"
+    assert wp.time_left_label(1200 + 300) == "15:00 left in the 2nd"
+    assert wp.time_left_label(3600 + 133) == "OT"
+    goals = [{"team": t, "second": s} for t, s in (("home", 1), ("away", 2), ("away", 3), ("away", 4), ("home", 5))]
+    assert [e for _, e in wp.goal_effects(goals)] == ["takes the lead", "ties it", "takes the lead", "makes it 3-1", "cuts it to 3-2"]
+
+
+def test_swing_of_the_night_skips_goals_that_end_the_game():
+    tying = {"team": "away", "second": 3583, "before": 0.98, "after": 0.52}
+    ot_winner = {"team": "home", "second": 3733, "before": 0.52, "after": 1.0}
+    early = {"team": "home", "second": 600, "before": 0.5, "after": 0.62}
+    curves = [("game1", {"goals": [early, tying, ot_winner]}), ("game2", {"goals": [early]})]
+    game, curve, goal, effect = wp.swing_of_the_night(curves)
+    assert (game, goal, effect) == ("game1", tying, "ties it")
+    assert wp.swing_of_the_night([("game3", {"goals": [ot_winner]})]) is None

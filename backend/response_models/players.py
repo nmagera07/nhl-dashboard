@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -308,7 +308,16 @@ class PlayerDetail(PlayerBio):
     player's history yet), same as season_stats.
     """
 
-    team_name: str
+    # A player who isn't on a current roster (retired, or between teams) is
+    # built from the NHL's profile (nhl_players.py): no team, and these say
+    # who he was instead. Rostered players leave them unset.
+    team_abbrev: Optional[str] = None
+    updated_at: Optional[datetime] = None
+    team_name: Optional[str] = None
+    status: Optional[Literal["active", "retired"]] = None
+    in_hall_of_fame: Optional[bool] = None
+    last_season_id: Optional[int] = None
+    last_team_name: Optional[str] = None
     team_logo_url: Optional[str] = None
     season_stats: List[PlayerSeasonStat]
     advanced_stats: Optional[PlayerAdvancedStat] = None

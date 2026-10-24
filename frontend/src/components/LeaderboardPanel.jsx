@@ -2,6 +2,7 @@ import { teamLogo } from "../utils/teamLogo.js";
 import { useState, useMemo } from "react";
 import StatAbbr from "./StatAbbr.jsx";
 import StatGlossary from "./StatGlossary.jsx";
+import AllPlayerSearch from "./AllPlayerSearch.jsx";
 import { formatSigned, formatToi } from "../utils/format.js";
 
 // The Players page fetches /players/leaders?view=table, which returns only
@@ -85,6 +86,7 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   };
 
   const isSearching = search.trim().length > 0;
+  const rosterIds = useMemo(() => new Set(players.map((p) => p.player_id)), [players]);
 
   const groupPlayers = useMemo(
     () => players.filter((p) => (group === "goalies" ? p.position_code === "G" : p.position_code !== "G")),
@@ -269,6 +271,9 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
             Next ›
           </button>
         </nav>
+      )}
+      {isSearching && (
+        <AllPlayerSearch query={search} exclude={rosterIds} onSelectPlayer={onSelectPlayer} />
       )}
       <StatGlossary terms={columns.map((col) => col.label)} />
     </div>

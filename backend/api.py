@@ -1369,6 +1369,7 @@ def push_unsubscribe(request: Request, body: PushUnsubscribeIn):
 
 
 FEEDBACK_RATE_LIMIT = "5/hour"
+PLAYER_SEARCH_RATE_LIMIT = "60/minute"
 PICKEM_JOIN_RATE_LIMIT = "5/hour"
 PICKEM_RATE_LIMIT = "60/minute"
 
@@ -2122,12 +2123,45 @@ def goalies_advanced():
     return {"goalies": goalies}
 
 
+def _nhl_player(player_id):
+    """A player not on a current roster, from the NHL's profile (nhl_players.py); 404 if he never played."""
+    import nhl_players
+
+    def fetch():
+        return nhl_players.player_detail(nhl_players.fetch_landing(player_id))
+    try:
+        return daily_cache.get_or_compute(("nhl_player", player_id), fetch)
+    except nhl_players.PlayerNotFound:
+        raise HTTPException(status_code=404, detail=f"No player found with id '{player_id}'")
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail="The NHL's player data is unavailable right now.") from exc
+
+
+@app.get("/players/search")
+@limiter.limit(PLAYER_SEARCH_RATE_LIMIT)
+def player_search(request: Request, q: str = Query(..., min_length=2, max_length=40)):
+    """
+    Anyone who has played in the NHL, active or retired, matching `q`
+    (the NHL's own player search), most recent first. The Players page uses
+    it for names that aren't on a current roster.
+    """
+    import nhl_players
+
+    query = " ".join(q.split()).lower()
+    try:
+        return {"players": daily_cache.get_or_compute(("player_search", query), lambda: nhl_players.search(query))}
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail="The NHL's player search is unavailable right now.") from exc
+
+
 @app.get("/players/{player_id}", response_model=PlayerDetail)
 def player_detail(player_id: int):
     """
-    Bio plus season-by-season stats for one player.
+    Bio plus season-by-season stats for one player. A player who isn't on
+    a current roster (retired, or between teams) comes from the NHL's
+    profile instead (_nhl_player).
 
-    404s (not an empty body) when player_id doesn't exist.
+    404s (not an empty body) when player_id has never played in the NHL.
     """
     conn = get_connection()
     try:
@@ -2143,7 +2177,9 @@ def player_detail(player_id: int):
             )
             player = cur.fetchone()
             if not player:
-                raise HTTPException(status_code=404, detail=f"No player found with id '{player_id}'")
+                conn.close()  # don't hold a connection while the NHL answers
+                conn = None
+                return _nhl_player(player_id)
 
             cur.execute(
                 """
@@ -2197,7 +2233,8 @@ def player_detail(player_id: int):
         logger.error(f"Failed to fetch player detail for id '{player_id}'", exc_info=True)
         raise
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 def _ixg60(row):

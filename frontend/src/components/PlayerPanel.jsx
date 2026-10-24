@@ -192,6 +192,9 @@ function PlayerPanel({ player, onBack, backLabel }) {
   if (!player) return null;
 
   const isGoalie = player.position_code === "G";
+  // Not on a current roster (retired, or between teams): built from the NHL's profile, so no team or this season.
+  const former = Boolean(player.status);
+  const careerRegular = player.career_totals?.regular_season;
   const columns = isGoalie ? GOALIE_COLUMNS : SKATER_COLUMNS;
   const seasonColumns = isGoalie ? GOALIE_COLUMNS : [...SKATER_COLUMNS, SEASON_TOI];
   const seasonStats = player.season_stats?.[0];
@@ -243,6 +246,7 @@ function PlayerPanel({ player, onBack, backLabel }) {
               )}
               <span>#{player.sweater_number ?? "—"}</span>
               <span>{POSITION_LABELS[player.position_code] ?? player.position_code}</span>
+              {player.in_hall_of_fame && <span className="player-hof">Hall of Fame</span>}
             </p>
             {bio.length > 0 && <p className="player-hero-bio">{bio.join(" · ")}</p>}
           </div>
@@ -250,9 +254,17 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
         <div className="player-hero-season">
           <div className="player-hero-season-label">
-            {seasonStats ? `${formatSeasonLabel(seasonStats.season_id)} season` : "This season"}
+            {seasonStats ? `${formatSeasonLabel(seasonStats.season_id)} season` : former ? "NHL career" : "This season"}
           </div>
-          {seasonStats ? (
+          {!seasonStats && former && careerRegular ? (
+            <>
+              <StatStrip stats={careerRegular} columns={columns} label="NHL career" />
+              <p className="player-former">
+                {player.status === "retired" ? "Retired" : "Not on an NHL roster"} · last NHL season{" "}
+                {formatSeasonLabel(player.last_season_id)}{player.last_team_name ? `, ${player.last_team_name}` : ""}
+              </p>
+            </>
+          ) : seasonStats ? (
             <>
               <StatStrip stats={seasonStats} columns={seasonColumns} label="This season" />
               <WarLine war={player.war} />

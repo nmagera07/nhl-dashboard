@@ -4,6 +4,7 @@ import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
 import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
 import PickemCard from "../components/PickemCard.jsx";
+import SwingOfTheNight from "../components/SwingOfTheNight.jsx";
 import TopHeadlines from "../components/TopHeadlines.jsx";
 import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
@@ -59,6 +60,7 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
       <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
       <Scoreboard key={date} date={isToday ? null : date} pinTeam={favorite || null} />
       {isToday && <PickemCard />}
+      {isToday && <SwingOfTheNight />}
       {myTeam ? (
         <MyTeamCard team={myTeam} odds={playoffOddsByTeam[myTeam.team_abbrev]} teams={standings} onChangeTeam={setFavorite} />
       ) : standings.length > 0 && !favorite ? (

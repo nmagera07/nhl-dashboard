@@ -23,7 +23,8 @@ import re
 import threading
 import time
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Literal, Optional
 
 import psycopg2
@@ -115,6 +116,7 @@ if SENTRY_DSN:
 # filesystem is ephemeral, so skip the rotating file handler here -- just
 # reuse the same shared setup with file logging disabled.
 logger = setup_logging(__name__, log_to_file=False)
+EASTERN = ZoneInfo("America/New_York")
 
 # Ingestion (ingest_standings.py) runs on a schedule outside this process
 # (an Azure Container Apps Job `nhl-standings-ingest`, not something api.py ever calls --
@@ -604,6 +606,98 @@ def _win_curve(game_id):
 
     key = ("win_probability", game_id, pbp.get("gameState"), len(pbp["plays"]), pbp["plays"][-1].get("eventId"))
     return daily_cache.get_or_compute(key, compute)
+
+
+def _swing_of_the_night(day):
+    """
+    The night's biggest swing (win_probability.swing_of_the_night) among
+    the day's finished games, as the site and its share card use it. The
+    scoring team's chances (before/after) are from its side.
+    """
+    games = [g for g in games_on_date(day) if g.get("gameState") in ("OFF", "FINAL") and g.get("gameType") in (2, 3)]
+
+    def curve(game):
+        try:
+            c = _win_curve(game["id"])
+        except NHLGamesUnavailable:
+            return None
+        return (game, c) if c.get("available") else None
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        curves = [c for c in pool.map(curve, games) if c]
+    found = win_probability.swing_of_the_night(curves)
+    if not found:
+        return {"available": False, "date": day.isoformat()}
+    game, c, goal, effect = found
+    home = goal["team"] == "home"
+    side = game["homeTeam" if home else "awayTeam"]["abbrev"]
+    mine = (lambda p: p) if home else (lambda p: 1 - p)
+    return {
+        "available": True, "date": day.isoformat(), "games": len(curves),
+        "game": {"id": game["id"], "away": game["awayTeam"]["abbrev"], "home": game["homeTeam"]["abbrev"],
+                 "away_score": game["awayTeam"].get("score"), "home_score": game["homeTeam"].get("score"),
+                 "last_period": (game.get("gameOutcome") or {}).get("lastPeriodType")},
+        "goal": {"scorer": goal["scorer"], "team": side, "side": goal["team"], "second": goal["second"],
+                 "when": win_probability.time_left_label(goal["second"]), "effect": effect,
+                 "before": round(mine(goal["before"]), 4), "after": round(mine(goal["after"]), 4)},
+        "points": c["points"], "goals": c["goals"], "playoff": c.get("playoff", False),
+    }
+
+
+def _last_night():
+    return (datetime.now(EASTERN) - timedelta(days=1)).date()
+
+
+def _cached_swing(day):
+    return daily_cache.get_or_compute(("swing", day.isoformat()), lambda: _swing_of_the_night(day))
+
+
+@app.get("/swing-of-the-night")
+def swing_of_the_night(day: Optional[date] = Query(None, alias="date")):
+    """
+    Last night's (or `date`'s) biggest win-probability swing from a goal
+    that didn't end the game, with that game's curve. {"available": false}
+    for a night without finished games.
+    """
+    try:
+        return _cached_swing(day or _last_night())
+    except NHLGamesUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _swing_headline(swing):
+    """'A. DeBrincat ties it with 0:17 left in the 3rd'."""
+    g = swing["goal"]
+    return f"{g['scorer'] or g['team']} {g['effect']} with {g['when']}"
+
+
+@app.get("/og/swing/{day}.png")
+def swing_image(day: date):
+    """Swing of the Night's share image (og_image.render_swing). 1200x630 PNG."""
+    swing = _cached_swing(day)
+    if not swing.get("available"):
+        raise HTTPException(status_code=404, detail="No swing that night")
+    png = daily_cache.get_or_compute(("og-swing", day.isoformat()), lambda: og_image.render_swing(swing, _swing_headline(swing)))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/swing/{day}/share")
+def swing_share(day: date):
+    """Title, description, and image for Swing of the Night's link preview (the site's /s/{date})."""
+    swing = _cached_swing(day)
+    if not swing.get("available"):
+        raise HTTPException(status_code=404, detail="No swing that night")
+    g, game = swing["goal"], swing["game"]
+    label = day.strftime("%b %-d")
+    return {
+        "title": f"Swing of the Night, {label}: {_swing_headline(swing)}",
+        "description": f"{game['away']} @ {game['home']}: {g['team']} went from {round(g['before'] * 100)}% to "
+                       f"{round(g['after'] * 100)}% to win. Final {game['away']} {game['away_score']}, "
+                       f"{game['home']} {game['home_score']}. Win probability by PuckPulse.",
+        "url": f"https://puckpulse.io/games/{game['id']}",
+        "game_id": game["id"],
+        "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/swing/{day.isoformat()}.png",
+    }
 
 
 def _share_curve(game):

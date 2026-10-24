@@ -235,6 +235,59 @@ def clock_label(second, playoff=False):
     return f"{label} {into // 60}:{into % 60:02d}"
 
 
+def time_left_label(second):
+    """'0:17 left in the 3rd' for a regulation goal; 'OT' / '2OT' in overtime (no clock to beat)."""
+    if second >= REGULATION_SECONDS:
+        return clock_label(second).split()[0]
+    period = second // 1200
+    left = 1200 - second % 1200
+    return f"{left // 60}:{left % 60:02d} left in the {('1st', '2nd', '3rd')[period]}"
+
+
+def goal_effects(goals):
+    """
+    What each goal did to the score, in order: [(goal, "ties it" | "takes the lead" | "makes it 3-1" |
+    "cuts it to 3-2")],
+    from the scoring team's side (goals as series() returns them).
+    """
+    home = away = 0
+    out = []
+    for g in goals:
+        if g["team"] == "home":
+            home += 1
+        else:
+            away += 1
+        mine, theirs = (home, away) if g["team"] == "home" else (away, home)
+        if mine == theirs:
+            effect = "ties it"
+        elif mine == theirs + 1:
+            effect = "takes the lead"
+        elif mine < theirs:
+            effect = f"cuts it to {theirs}-{mine}"
+        else:
+            effect = f"makes it {mine}-{theirs}"
+        out.append((g, effect))
+    return out
+
+
+def swing_of_the_night(curves):
+    """
+    The night's biggest swing, from a goal that didn't end the game: an
+    overtime winner always jumps a coin flip to 100% and would win every
+    busy night, while a late tying goal is the moment people talk about.
+    curves: [(game, curve)]. Returns (game, curve, goal, effect) or None.
+    """
+    best = None
+    for game, curve in curves:
+        for goal, effect in goal_effects(curve.get("goals", [])):
+            if goal["second"] >= REGULATION_SECONDS:
+                continue
+            swing = abs(goal["after"] - goal["before"])
+            if best is None or swing > best[0]:
+                best = (swing, game, curve, goal, effect)
+    return best[1:] if best else None
+
+
 def biggest_swing(goals):
     """The goal that moved the home team's chances the most, or None."""
     return max(goals, key=lambda g: abs(g["after"] - g["before"]), default=None)

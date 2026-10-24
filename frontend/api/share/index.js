@@ -6,7 +6,8 @@
 //
 // staticwebapp.config.json rewrites /g/* here; the game id comes from the
 // original URL (or /api/share/{id} directly). /t/{team abbrev} works the
-// same way for a team, sending people on to the team page.
+// same way for a team, sending people on to the team page, and
+// /s/{YYYY-MM-DD} for that night's Swing of the Night, on to its game.
 
 const API = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
 const SITE = "https://puckpulse.io";
@@ -32,6 +33,13 @@ function teamAbbrev(req) {
   const fromUrl = (original.match(/\/t\/([A-Za-z]{3})(?:[/?#]|$)/) || [])[1];
   const abbrev = String(fromUrl || (req.query && req.query.team) || "").toUpperCase();
   return TEAMS.has(abbrev) ? abbrev : null;
+}
+
+// "2026-10-20" for /s/2026-10-20; null for anything that isn't a date.
+function swingDate(req) {
+  const original = req.headers["x-ms-original-url"] || "";
+  const day = (original.match(/\/s\/(\d{4}-\d{2}-\d{2})(?:[/?#]|$)/) || [])[1];
+  return day && !Number.isNaN(Date.parse(day)) ? day : null;
 }
 
 function isTeamLink(req) {
@@ -65,15 +73,28 @@ ${tags.join("\n")}
 }
 
 module.exports = async function (context, req) {
-  const team = isTeamLink(req) ? teamAbbrev(req) : null;
-  const id = isTeamLink(req) ? null : gameId(req);
+  const swing = swingDate(req);
+  const team = !swing && isTeamLink(req) ? teamAbbrev(req) : null;
+  const id = swing || isTeamLink(req) ? null : gameId(req);
   let meta = {
     title: "PuckPulse: NHL scores, playoff odds, and an AI hockey analyst",
     description: "Live NHL scores, playoff odds for every team, goal alerts, and an AI hockey analyst you can ask anything. Free.",
     image: `${SITE}/og-card.png`,
     url: id ? `${SITE}/games/${id}` : team ? `${SITE}/teams/${team}` : SITE,
   };
-  if (team) {
+  if (swing) {
+    try {
+      const response = await fetch(`${API}/swing/${swing}/share`, { signal: AbortSignal.timeout(8000) });
+      if (response.ok) {
+        const data = await response.json();
+        meta = { ...meta, ...previewText(data) };
+        // The game is the only thing taken from the API, and only as a number on our own site.
+        if (/^\d{6,12}$/.test(String(data.game_id || ""))) meta.url = `${SITE}/games/${data.game_id}`;
+      }
+    } catch (error) {
+      context.log.warn(`share swing ${swing}: ${error}`);
+    }
+  } else if (team) {
     try {
       const response = await fetch(`${API}/teams/${team}/share`, { signal: AbortSignal.timeout(6000) });
       if (response.ok) meta = { ...meta, ...previewText(await response.json()) };

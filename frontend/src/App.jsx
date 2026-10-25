@@ -49,7 +49,7 @@ export function SwingShareRedirect() {
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(day);
   const { data, status } = useFetchWithStatus(valid ? `${API_BASE}/swing-of-the-night?date=${day}` : null);
   if (!valid || status === "error" || (data && !data.available)) return <Navigate to="/" replace />;
-  if (data?.game?.id) return <Navigate to={`/games/${data.game.id}`} replace />;
+  if (data?.game?.id) return <Navigate to={`/games/${data.game.id}?swing=${day}`} replace />;
   return <div className="page-message">Loading…</div>;
 }
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";

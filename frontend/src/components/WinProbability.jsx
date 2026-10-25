@@ -42,7 +42,7 @@ function favored(p, away, home) {
 // with a dot at each goal and the goal that swung it most called out. Hidden
 // for games we didn't predict. `refreshKey` changes when the live box score
 // refreshes, which refetches the curve.
-export default function WinProbability({ gameId, away, home, playoff = false, refreshKey }) {
+export default function WinProbability({ gameId, away, home, playoff = false, refreshKey, highlight }) {
   const [wrap, setWrap] = useState(null);
   const width = useWidth(wrap);
   const [data, setData] = useState(null);
@@ -119,6 +119,10 @@ export default function WinProbability({ gameId, away, home, playoff = false, re
             <circle key={`${g.second}-${g.team}-${g.after}`} className={`win-prob-goal win-prob-goal-${g.team}`} cx={x(g.second)} cy={y(g.after)} r={g.second === swing?.second && g.team === swing?.team ? 5.5 : 4}>
               <title>{`${g.scorer || (g.team === "home" ? home : away)} (${g.team === "home" ? home : away}), ${gameClock(g.second, playoff)}`}</title>
             </circle>
+          ))}
+          {/* The Swing of the Night goal, when the page was opened from its link: ringed, like its share card. */}
+          {highlight && (data.goals || []).filter((g) => g.second === highlight.second && g.team === highlight.side).map((g) => (
+            <circle key="swing-ring" className="win-prob-ring" cx={x(g.second)} cy={y(g.after)} r="11" />
           ))}
         </svg>
       </div>

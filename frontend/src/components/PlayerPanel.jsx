@@ -230,7 +230,10 @@ function PlayerPanel({ player, onBack, backLabel }) {
 
   return (
     <main className="player-panel">
-      <button className="back-link" onClick={onBack}>&larr; {backLabel}</button>
+      <div className="player-topbar">
+        <button className="back-link" onClick={onBack}>&larr; {backLabel}</button>
+        <Link className="player-compare-link" to={`/compare?a=${player.player_id}`}>Compare</Link>
+      </div>
 
       <section className="player-hero" aria-label={`${player.first_name} ${player.last_name}`}>
         <div className="player-hero-identity">

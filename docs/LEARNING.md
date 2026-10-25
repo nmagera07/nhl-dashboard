@@ -191,6 +191,34 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-24 — "Works on my machine": a setting read at import
+
+**What happened:** The first piece of user feedback asked for retired players, so I shipped
+search and pages for every NHL player, built from the NHL's own profiles. Every test passed,
+it worked locally, and in production every retired player's page returned 500.
+
+**Why:** The new module borrowed one helper from the nightly ingest script. That script runs
+`os.environ["DATABASE_URL"]` the moment it's imported. My machine and the test setup both
+have `DATABASE_URL`; the production API deliberately doesn't. It connects with its own
+read-only credential, so importing the helper crashed there and nowhere else.
+
+**What I learned:**
+- **Import-time side effects are traps.** Scripts that read config, connect, or log at the
+  top of the file make every importer inherit those requirements. Keep shared helpers in
+  modules with no side effects, and do setup inside `main()`.
+- **Tests run in the developer's environment, not production's.** The fix came with a test
+  that imports the module in a subprocess *without* `DATABASE_URL`. It fails on the old code
+  with the exact production error, so this class of bug can't sneak back.
+- **Verify on production after every deploy.** The post-deploy check (search, open a
+  retired page) caught it within minutes, before anyone reported it. Only the new feature was
+  affected, and the fix shipped through the normal PR → release path.
+
+**Interview angle:** "Tell me about a bug that only happened in production." Different
+environment variables between local and prod, an import-time side effect, and a regression
+test that reproduces the production environment instead of mine.
+
+---
+
 ## 2026-10-22 — WAR: when the backtest can't make the call
 
 **What happened:** Added Wins Above Replacement for every player.

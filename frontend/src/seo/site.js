@@ -26,6 +26,7 @@ export const PAGES = [
   { path: "/report-card", title: "Report Card" },
   { path: "/draft-lottery", title: "NHL Draft Lottery Odds" },
   { path: "/pickem", title: "Pick'em" },
+  { path: "/compare", title: "Compare players", index: false }, // an empty picker isn't worth indexing
   { path: "/bets", title: "Bets", index: false }, // kept out of the sitemap: launch leads with non-betting pages
 ];
 

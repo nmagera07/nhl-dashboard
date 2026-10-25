@@ -1,0 +1,44 @@
+/* Compare players (ComparePage.jsx, PlayerPicker.jsx). */
+.compare-page { max-width: 860px; margin: 0 auto; padding: 0 var(--gutter); }
+.compare-sides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 12px; margin-top: 14px; }
+.compare-vs { align-self: center; color: var(--text-dim); font-size: 14px; font-weight: 800; text-transform: uppercase; }
+.compare-side { display: grid; justify-items: center; gap: 4px; min-width: 0; padding: 16px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: center; }
+.compare-side-empty { justify-items: stretch; text-align: left; }
+.compare-headshot { width: 72px; height: 72px; border-radius: 50%; background: var(--card-raised); object-fit: cover; }
+.compare-name { color: var(--text); font-size: 17px; font-weight: 800; text-decoration: none; }
+.compare-name:hover { color: var(--accent-strong); }
+.compare-meta { color: var(--text-dim); font-size: 12px; }
+.compare-side-actions { display: flex; gap: 6px; margin-top: 6px; }
+.compare-side-actions button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; cursor: pointer; }
+.compare-side-actions button:hover { border-color: var(--accent); color: var(--text); }
+.compare-card { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.compare-card h2 { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; margin: 0 0 6px; color: var(--text-dim); font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.compare-card-head span { overflow: hidden; color: var(--text); font-size: 11px; letter-spacing: 0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.compare-card-head span:last-child { text-align: right; }
+.compare-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.compare-row:first-of-type { border-top: 0; }
+.compare-value { font-size: 16px; font-weight: 600; }
+.compare-row .compare-value:first-child { text-align: left; }
+.compare-row .compare-value:last-child { text-align: right; }
+.compare-label { color: var(--text-dim); font-size: 12px; text-align: center; }
+.compare-win { color: var(--good); font-weight: 800; }
+.compare-note { margin: 14px 0 0; color: var(--text-dim); font-size: 12px; }
+.player-picker input { width: 100%; box-sizing: border-box; }
+.player-picker ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.player-picker button { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.player-picker button:hover { border-color: var(--accent); }
+.player-picker strong { font-size: 13px; }
+.player-picker span, .player-picker-empty { color: var(--text-dim); font-size: 11px; }
+.player-compare-link { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.player-compare-link:hover { border-color: var(--accent); }
+.player-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+@media (max-width: 640px) {
+  .compare-sides { gap: 6px; }
+  .compare-side { padding: 12px 8px; }
+  .compare-headshot { width: 52px; height: 52px; }
+  .compare-name { font-size: 14px; line-height: 1.2; }
+  .compare-meta { font-size: 11px; }
+  .compare-vs { font-size: 11px; }
+  .compare-side-actions button { padding: 3px 8px; font-size: 11px; }
+  .compare-value { font-size: 15px; }
+}

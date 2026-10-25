@@ -174,3 +174,54 @@ class TestRun:
         _, sent, _ = _run(monkeypatch, [_game("FINAL", away_score=2, home_score=3)], subs=[SUB])
 
         assert sent == [(SUB["endpoint"], "Final: PIT 2, CBJ 3", 3 * 60 * 60)]
+
+
+class _ReminderCursor(_Cursor):
+    def execute(self, query, params=None):
+        super().execute(query, params)
+        if "FROM push_events_sent" in query:
+            self._one = (1,) if params[0] in self.already_sent else None
+
+    def fetchone(self):
+        return self._one
+
+
+SWING = {"available": True, "goal": {"scorer": "R. Rakell", "team": "PIT", "effect": "ties it",
+                                     "when": "1:06 left in the 3rd", "before": 0.0706, "after": 0.5473}}
+MORNING = datetime(2026, 10, 25, 14, 30, tzinfo=timezone.utc)  # 10:30 AM ET
+
+
+def _remind(monkeypatch, now=MORNING, swing=SWING, already_sent=()):
+    cur = _ReminderCursor(already_sent, [SUB])
+
+    def fake_execute_values(cursor, query, rows, fetch=False):
+        fresh = [(k,) for (k,) in rows if k not in cursor.already_sent]
+        cursor.already_sent.update(k for (k,) in rows)
+        return fresh
+
+    monkeypatch.setattr(n.psycopg2, "connect", lambda url: _Conn(cur))
+    monkeypatch.setattr(n.psycopg2.extras, "execute_values", fake_execute_values)
+    sent = []
+    monkeypatch.setattr(push, "send", lambda sub, payload, ttl=None, urgency=None: sent.append(payload) or 201)
+    asked = []
+    count = n.creator_reminder(now=now, fetch=lambda day: asked.append(day) or swing)
+    return count, sent, asked, cur
+
+
+class TestCreatorReminder:
+    def test_the_morning_after_tells_the_creator_the_swing_is_ready(self, monkeypatch):
+        count, sent, asked, cur = _remind(monkeypatch)
+        assert count == 1 and asked == ["2026-10-24"]
+        assert sent[0]["title"] == "Swing of the Night is ready"
+        assert sent[0]["body"] == "R. Rakell ties it with 1:06 left in the 3rd · PIT 7% → 55%. Tap to post it."
+        assert sent[0]["url"] == "/post-kit?date=2026-10-24"
+        assert any("WHERE is_creator" in q for q, _ in cur.sql)  # the creator's devices only
+
+    def test_once_a_day(self, monkeypatch):
+        count, sent, asked, _ = _remind(monkeypatch, already_sent={"swing-ready:2026-10-24"})
+        assert (count, sent, asked) == (0, [], [])
+
+    def test_only_in_the_morning_and_not_after_a_night_without_games(self, monkeypatch):
+        assert _remind(monkeypatch, now=datetime(2026, 10, 25, 3, 0, tzinfo=timezone.utc))[0] == 0
+        count, sent, _, cur = _remind(monkeypatch, swing={"available": False})
+        assert (count, sent) == (0, []) and "swing-ready:2026-10-24" in cur.already_sent  # claimed: don't ask again

@@ -463,6 +463,10 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     updated_at              TIMESTAMP DEFAULT NOW()
 );
 
+-- The site owner's devices: the morning "Swing of the Night is ready" reminder
+-- goes only to these (notify_live_games.creator_reminder). Set by hand.
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS is_creator BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- Goals and finals already notified (notify_live_games.py), so overlapping
 -- runs never send twice. Rows older than a few days are pruned.
 CREATE TABLE IF NOT EXISTS push_events_sent (

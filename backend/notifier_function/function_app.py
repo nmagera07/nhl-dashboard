@@ -1,10 +1,13 @@
 """
-Two timers during game hours:
+Three timers:
 
   - live_notifier: goal and final-score push notifications, every minute
     (UTC hours 16-23 and 0-7, noon-4am ET).
   - closing_odds: every 5 minutes while games can start (UTC 15-23 and
     0-4); snapshots the market near puck drop (market_odds.log_closing).
+  - post_reminder: every 10 minutes, UTC 14-17 (the morning ET); once a
+    day after a game night, tells the creator's devices that Swing of the
+    Night is ready to post (notify_live_games.creator_reminder).
 
 It used to be the nhl-live-notifier Container Apps Job, which started a
 fresh container 960 times a day (about 25 s each, almost all startup) and
@@ -43,3 +46,8 @@ def live_notifier(timer: func.TimerRequest) -> None:
 @app.timer_trigger(arg_name="timer", schedule="30 */5 0-4,15-23 * * *", run_on_startup=False, use_monitor=False)
 def closing_odds(timer: func.TimerRequest) -> None:
     market_odds.log_closing()
+
+
+@app.timer_trigger(arg_name="timer", schedule="15 */10 14-17 * * *", run_on_startup=False, use_monitor=False)
+def post_reminder(timer: func.TimerRequest) -> None:
+    notify_live_games.creator_reminder()

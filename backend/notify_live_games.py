@@ -12,6 +12,7 @@ two without touching the database.
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 
 import psycopg2
@@ -29,6 +30,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 logger = setup_logging("notify_live_games", log_to_file=False)
 
 SCORE_URL = "https://api-web.nhle.com/v1/score/now"
+SWING_URL = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/swing-of-the-night?date={day}"
+EASTERN = ZoneInfo("America/New_York")
+REMINDER_HOURS = range(10, 14)  # ET: the morning after, once the nightly run has finished
 RECENT = timedelta(hours=6)  # ignore games that started longer ago (yesterday's finals linger in the feed)
 GOAL_STATES = {"LIVE", "CRIT", "FINAL"}  # FINAL too: an overtime winner can arrive with the final whistle
 FINAL_STATES = {"FINAL", "OFF"}
@@ -201,6 +205,58 @@ def run(now=None, fetch=None):
             logger.info("%s -> %s [%s]", event["key"], event["payload"]["title"], ", ".join(statuses) or "no subscribers")
         cur.execute("DELETE FROM push_events_sent WHERE sent_at < NOW() - INTERVAL '3 days'")
     return sent
+
+
+def creators(cur):
+    """The site owner's devices (push_subscriptions.is_creator), for the morning post reminder."""
+    cur.execute("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE is_creator")
+    return [{"endpoint": e, "p256dh": p, "auth": a} for e, p, a in cur.fetchall()]
+
+
+def creator_reminder(now=None, fetch=None):
+    """
+    The morning after a game night, once: "Swing of the Night is ready, tap
+    to post", to the creator's devices only, opening the site's post kit
+    (the card, the post text, Post on X). Called every few minutes in the
+    morning; push_events_sent makes it once a day. Returns pushes sent.
+    """
+    now = now or datetime.now(timezone.utc)
+    et = now.astimezone(EASTERN)
+    if et.hour not in REMINDER_HOURS:
+        return 0
+    day = (et.date() - timedelta(days=1)).isoformat()
+    key = f"swing-ready:{day}"
+    with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM push_events_sent WHERE event_key = %s", (key,))
+        if cur.fetchone():
+            return 0
+        try:
+            swing = (fetch or (lambda d: requests.get(SWING_URL.format(day=d), timeout=30).json()))(day)
+        except (requests.RequestException, ValueError) as exc:
+            logger.warning("Swing of the Night for %s unavailable (%s); trying again next run", day, exc.__class__.__name__)
+            return 0
+        if not claim(cur, [key]):
+            return 0
+        conn.commit()
+        if not swing.get("available"):
+            return 0  # no games that night: nothing to post
+        g = swing["goal"]
+        payload = {
+            "title": "Swing of the Night is ready",
+            "body": f"{g['scorer'] or g['team']} {g['effect']} with {g['when']} · {g['team']} "
+                    f"{round(g['before'] * 100)}% → {round(g['after'] * 100)}%. Tap to post it.",
+            "url": f"/post-kit?date={day}",
+            "tag": f"swing-ready-{day}",
+        }
+        sent = 0
+        for sub in creators(cur):
+            try:
+                status = push.send(sub, payload, ttl=6 * 3600, urgency="normal")
+                sent += 1 if status and status < 300 else 0
+            except push.SubscriptionGone:
+                cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))
+        logger.info("%s -> %d creator device(s)", key, sent)
+        return sent
 
 
 if __name__ == "__main__":

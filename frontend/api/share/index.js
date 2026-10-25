@@ -105,7 +105,7 @@ module.exports = async function (context, req) {
         const data = await response.json();
         meta = { ...meta, ...previewText(data) };
         // The game is the only thing taken from the API, and only as a number on our own site.
-        if (/^\d{6,12}$/.test(String(data.game_id || ""))) meta.url = `${SITE}/games/${data.game_id}`;
+        if (/^\d{6,12}$/.test(String(data.game_id || ""))) meta.url = `${SITE}/games/${data.game_id}?swing=${swing}`;
       }
     } catch (error) {
       context.log.warn(`share swing ${swing}: ${error}`);

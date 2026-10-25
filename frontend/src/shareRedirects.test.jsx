@@ -23,10 +23,10 @@ describe("share links inside the installed app", () => {
   beforeEach(() => clearResponseCache());
   afterEach(() => vi.restoreAllMocks());
 
-  it("a Swing of the Night link opens that night's game", async () => {
+  it("a Swing of the Night link opens that night's game, with the moment", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, json: async () => ({ available: true, game: { id: 2026020172 } }) });
     renderAt("/s/2026-10-24");
-    expect(await screen.findByText("at /games/2026020172")).toBeInTheDocument();
+    expect(await screen.findByText("at /games/2026020172?swing=2026-10-24")).toBeInTheDocument();
     expect(globalThis.fetch.mock.calls[0][0]).toMatch(/\/swing-of-the-night\?date=2026-10-24$/);
   });
 

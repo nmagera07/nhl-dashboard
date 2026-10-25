@@ -13,3 +13,19 @@ export function nhlVideoUrl(pathOrUrl) {
     return null;
   }
 }
+
+const toSeconds = (clock) => {
+  const [m, s] = String(clock || "").split(":").map(Number);
+  return Number.isFinite(m) && Number.isFinite(s) ? m * 60 + s : null;
+};
+
+// The NHL clip of the goal at `second` (game time), from the box score's scoring summary.
+export function goalClip(scoring, second) {
+  const period = Math.floor(second / 1200) + 1;
+  const into = second - (period - 1) * 1200;
+  const goal = (scoring || [])
+    .filter((p) => p.periodDescriptor?.number === period)
+    .flatMap((p) => p.goals || [])
+    .find((g) => toSeconds(g.timeInPeriod) === into);
+  return nhlVideoUrl(goal?.highlightClipSharingUrl);
+}

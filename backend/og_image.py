@@ -229,6 +229,60 @@ def render_swing(swing, headline):
     return out.getvalue()
 
 
+GOOD = (52, 211, 153)
+
+
+def _headshot(url, size, get=None):
+    """A player's NHL headshot as a round RGBA image, or None (no URL, or the fetch failed)."""
+    if not url:
+        return None
+    import requests
+
+    try:
+        response = (get or requests.get)(url, timeout=6)
+        response.raise_for_status()
+        img = Image.open(io.BytesIO(response.content)).convert("RGBA").resize((size, size))
+    except Exception:  # noqa: BLE001 -- a missing face shouldn't cost the card
+        return None
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
+    img.putalpha(mask)
+    return img
+
+
+def render_compare(a, b, get=None):
+    """
+    A "Player vs Player" card: both players (headshot, name, team or era),
+    then compare_card.summary()'s rows side by side, the better number of
+    each in green. a, b: compare_card.summary() results.
+    """
+    img = _background()
+    draw = ImageDraw.Draw(img)
+    _header(img, draw, {}, status="PLAYER COMPARISON")
+    for x, p, anchor in ((300, a, "mm"), (900, b, "mm")):
+        face = _headshot(p.get("headshot"), 120, get)
+        if face:
+            img.paste(face, (x - 60, 128), face)
+        else:
+            draw.ellipse((x - 60, 128, x + 60, 248), fill=(33, 37, 47))
+            draw.text((x, 188), p["last"][:1], font=_font(60), fill=DIM, anchor="mm")
+        name_font = _font(44 if len(p["name"]) <= 18 else 36)
+        draw.text((x, 282), p["name"], font=name_font, fill=TEXT, anchor=anchor)
+        draw.text((x, 322), p["subtitle"], font=_font(24, "Bold"), fill=DIM, anchor=anchor)
+    draw.text((WIDTH // 2, 200), "vs", font=_font(44), fill=DIM, anchor="mm")
+    y = 372
+    for (label, va, sa, high), (_, vb, sb, _) in zip(a["rows"], b["rows"]):
+        better = None if va is None or vb is None or va == vb else ("a" if (va > vb) == high else "b")
+        draw.line((64, y - 6, WIDTH - 64, y - 6), fill=(33, 37, 47), width=2)
+        draw.text((300, y + 24), sa, font=_font(36), fill=GOOD if better == "a" else TEXT, anchor="mm")
+        draw.text((WIDTH // 2, y + 24), label, font=_font(22, "Bold"), fill=DIM, anchor="mm")
+        draw.text((900, y + 24), sb, font=_font(36), fill=GOOD if better == "b" else TEXT, anchor="mm")
+        y += 58
+    out = io.BytesIO()
+    img.save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
 def share_text(game, home_win_prob=None, curve=None):
     """(title, description) for a game's link preview; curve adds its biggest swing once the game is on."""
     away, home = game["awayTeam"]["abbrev"], game["homeTeam"]["abbrev"]

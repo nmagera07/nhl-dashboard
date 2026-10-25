@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import PlayerPicker from "../components/PlayerPicker.jsx";
+import ShareButton from "../components/ShareButton.jsx";
 import { compareRows, eraAdjust, isGoalie, winner } from "../utils/compare.js";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 
@@ -81,7 +82,13 @@ export default function ComparePage() {
 
   return (
     <main className="page compare-page">
-      <div className="page-header"><h1>Compare players</h1></div>
+      <div className="page-header compare-header">
+        <h1>Compare players</h1>
+        {pa && pb && !mismatch && (
+          <ShareButton url={`https://puckpulse.io/c/${pa.player_id}-${pb.player_id}`} title={`${pa.last_name} vs ${pb.last_name} on PuckPulse`}
+                       event="share-compare" label={`Share ${pa.last_name} vs ${pb.last_name}`} />
+        )}
+      </div>
       <p className="page-subtitle">Any two NHL players, today's or all-time. Pick two skaters or two goalies.</p>
       <div className="compare-sides">
         <Side slot="a" player={pa} status={ids.a ? a.status : "idle"} onPick={(id) => setSlot("a", id)} onClear={() => setSlot("a", null)} />

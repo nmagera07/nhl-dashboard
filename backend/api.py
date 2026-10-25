@@ -2137,6 +2137,67 @@ def _nhl_player(player_id):
         raise HTTPException(status_code=503, detail="The NHL's player data is unavailable right now.") from exc
 
 
+@app.get("/era/scoring")
+def era_scoring():
+    """
+    Goals per team per regular-season game for every NHL season (era.py),
+    and the reference season the compare page's era-adjusted view rescales
+    to: the last completed one. The season in progress is read live.
+    """
+    import era
+    from seasons import current_season_id
+
+    def compute():
+        seasons = dict(era.load()["seasons"])
+        current = current_season_id()
+        try:
+            live = era.season_scoring(current)
+            if live:
+                seasons[str(current)] = live
+        except requests.RequestException:
+            logger.warning("Couldn't read this season's league scoring; era adjustment uses completed seasons only")
+        reference = max(k for k in era.load()["seasons"])
+        return {"reference_season": int(reference), "reference": seasons[reference],
+                "seasons": {k: v for k, v in sorted(seasons.items())}}
+
+    return daily_cache.get_or_compute(("era_scoring",), compute)
+
+
+def _compare_pair(a, b):
+    """(summary a, summary b) for a compare card: compare_card.summary() of each player's page data."""
+    import compare_card
+
+    era = era_scoring()
+    pa, pb = player_detail(a), player_detail(b)
+    if (pa.get("position_code") == "G") != (pb.get("position_code") == "G"):
+        raise HTTPException(status_code=400, detail="Compare two skaters or two goalies")
+    return compare_card.summary(pa, era), compare_card.summary(pb, era)
+
+
+@app.get("/compare/{a}/{b}/share")
+def compare_share(a: int = Path(..., gt=0), b: int = Path(..., gt=0)):
+    """Title, description, and image for a "Player vs Player" link preview (the site's /c/{a}-{b})."""
+    sa, sb = daily_cache.get_or_compute(("compare", a, b), lambda: _compare_pair(a, b))
+    (label, _, a_shown, _), (_, _, b_shown, _) = sa["rows"][0], sb["rows"][0]
+    line = f"{label}: {sa['last']} {a_shown}, {sb['last']} {b_shown}"
+    if sa["rows"][1][0].startswith("Era-adjusted"):  # skaters: both views of the same number
+        line += f" (era-adjusted {sa['rows'][1][2]} vs {sb['rows'][1][2]})"
+    return {
+        "title": f"{sa['last']} vs {sb['last']}: who's better?",
+        "description": f"{line}. Compare any two NHL players, today's or all-time, on PuckPulse.",
+        "url": f"https://puckpulse.io/compare?a={a}&b={b}",
+        "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/compare/{a}-{b}.png",
+    }
+
+
+@app.get("/og/compare/{a}-{b}.png")
+def compare_image(a: int = Path(..., gt=0), b: int = Path(..., gt=0)):
+    """The "Player vs Player" share image (og_image.render_compare). 1200x630 PNG."""
+    sa, sb = daily_cache.get_or_compute(("compare", a, b), lambda: _compare_pair(a, b))
+    png = daily_cache.get_or_compute(("og-compare", a, b), lambda: og_image.render_compare(sa, sb))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
 @app.get("/players/search")
 @limiter.limit(PLAYER_SEARCH_RATE_LIMIT)
 def player_search(request: Request, q: str = Query(..., min_length=2, max_length=40)):

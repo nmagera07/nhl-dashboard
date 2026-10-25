@@ -40,7 +40,7 @@ def test_drafted_but_never_played_is_not_found():
         nhl_players.player_detail({**LANDING, "seasonTotals": [LANDING["seasonTotals"][0]]})
 
 
-def test_search_skips_players_who_never_played_and_lists_recent_ones_first():
+def test_search_skips_players_who_never_played_and_puts_full_name_matches_first():
     class Resp:
         def raise_for_status(self):
             pass
@@ -52,8 +52,9 @@ def test_search_skips_players_who_never_played_and_lists_recent_ones_first():
                      "lastTeamAbbrev": "NYR", "positionCode": "C"}]
 
     found = nhl_players.search("gretzky", get=lambda *a, **k: Resp())
-    assert [p["name"] for p in found] == ["Wayne Gretzky", "Brent Gretzky"]
-    assert found[0] == {"player_id": 8447400, "name": "Wayne Gretzky", "position_code": "C", "active": False,
+    assert [p["name"] for p in found] == ["Brent Gretzky", "Wayne Gretzky"]  # the NHL's order on ties
+    assert [p["name"] for p in nhl_players.search("wayne gretzky", get=lambda *a, **k: Resp())][0] == "Wayne Gretzky"
+    assert found[1] == {"player_id": 8447400, "name": "Wayne Gretzky", "position_code": "C", "active": False,
                         "last_team_abbrev": "NYR", "last_season_id": 19981999}
 
 

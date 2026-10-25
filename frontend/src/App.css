@@ -23,6 +23,7 @@
 @import "./styles/digest.css"; /* Morning digest */
 @import "./styles/update-banner.css"; /* New-version banner */
 @import "./styles/game-preview.css"; /* Game preview (before puck drop) */
+@import "./styles/compare.css"; /* Compare players */
 @import "./styles/mobile.css"; /* Phone overrides (max-width 640px); must load after the feature styles */
 @import "./styles/pagination.css"; /* Pagination controls */
 @import "./styles/news.css"; /* News tab, top headlines, team news, injuries */

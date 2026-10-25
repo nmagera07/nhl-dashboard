@@ -39,10 +39,11 @@ def _text(value):
 def search(query, limit=10, get=requests.get):
     """
     Players matching `query` who have played in the NHL, active or not:
-    [{player_id, name, position_code, active, last_team_abbrev, last_season_id}].
-    The search also knows draft picks who never played; those are left out.
+    [{player_id, name, position_code, active, last_team_abbrev, last_season_id}],
+    best matches first. The search also knows draft picks who never played;
+    those are left out.
     """
-    response = get(SEARCH_URL, params={"culture": "en-us", "limit": 40, "q": query}, timeout=TIMEOUT)
+    response = get(SEARCH_URL, params={"culture": "en-us", "limit": 100, "q": query}, timeout=TIMEOUT)
     response.raise_for_status()
     out = []
     for p in response.json():
@@ -51,9 +52,17 @@ def search(query, limit=10, get=requests.get):
         out.append({"player_id": int(p["playerId"]), "name": p.get("name"), "position_code": p.get("positionCode"),
                     "active": bool(p.get("active")), "last_team_abbrev": p.get("lastTeamAbbrev"),
                     "last_season_id": int(p["lastSeasonId"])})
-    # Most recent first, so the familiar names come up before the 1930s ones.
-    out.sort(key=lambda p: (not p["active"], -p["last_season_id"]))
+    # The NHL ranks by relevance; names matching every word typed come first ("patrick roy" -> Patrick
+    # Roy, not every Patrick), whole words before word starts. Python's sort keeps the NHL's order on ties.
+    words = query.lower().split()
+    out.sort(key=lambda p: -_name_match(p["name"], words))
     return out[:limit]
+
+
+def _name_match(name, words):
+    """2 per typed word that's a whole word of the name, 1 per one that starts a word, 0 for none."""
+    parts = (name or "").lower().replace("-", " ").split()
+    return sum(2 if w in parts else 1 if any(part.startswith(w) for part in parts) else 0 for w in words)
 
 
 def fetch_landing(player_id, get=requests.get):

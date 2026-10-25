@@ -45,3 +45,13 @@
 .compare-era { display: grid; justify-items: center; gap: 8px; margin-top: 14px; }
 .compare-era-note { margin: 0; color: var(--text-dim); font-size: 12px; text-align: center; }
 .compare-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* The morning post kit (PostKitPage.jsx). */
+.post-kit { max-width: 640px; margin: 0 auto; padding: 0 var(--gutter); }
+.post-kit-card { display: block; width: 100%; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; }
+.post-kit-label { display: block; margin: 16px 0 6px; font-size: 13px; font-weight: 700; }
+.post-kit-label span { color: var(--text-dim); font-weight: 400; }
+.post-kit textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 15px; resize: vertical; }
+.post-kit-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.post-kit-actions a, .post-kit-actions button { padding: 10px 16px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
+.post-kit-actions .post-kit-primary { border-color: var(--accent-fill); background: var(--accent-fill); color: #fff; }
+.post-kit-note { margin-top: 10px; font-size: 12px; }

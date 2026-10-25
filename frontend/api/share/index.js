@@ -7,7 +7,8 @@
 // staticwebapp.config.json rewrites /g/* here; the game id comes from the
 // original URL (or /api/share/{id} directly). /t/{team abbrev} works the
 // same way for a team, sending people on to the team page, and
-// /s/{YYYY-MM-DD} for that night's Swing of the Night, on to its game.
+// /s/{YYYY-MM-DD} for that night's Swing of the Night, on to its game, and
+// /c/{player}-{player} for a player comparison, on to the compare page.
 
 const API = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
 const SITE = "https://puckpulse.io";
@@ -42,6 +43,13 @@ function swingDate(req) {
   return day && !Number.isNaN(Date.parse(day)) ? day : null;
 }
 
+// [a, b] player ids for /c/8478402-8447400; null for anything else.
+function comparePair(req) {
+  const original = req.headers["x-ms-original-url"] || "";
+  const m = original.match(/\/c\/(\d{6,10})-(\d{6,10})(?:[/?#]|$)/);
+  return m ? [m[1], m[2]] : null;
+}
+
 function isTeamLink(req) {
   return /\/t\//.test(req.headers["x-ms-original-url"] || "") || Boolean(req.query && req.query.team);
 }
@@ -73,16 +81,24 @@ ${tags.join("\n")}
 }
 
 module.exports = async function (context, req) {
-  const swing = swingDate(req);
-  const team = !swing && isTeamLink(req) ? teamAbbrev(req) : null;
-  const id = swing || isTeamLink(req) ? null : gameId(req);
+  const pair = comparePair(req);
+  const swing = pair ? null : swingDate(req);
+  const team = !pair && !swing && isTeamLink(req) ? teamAbbrev(req) : null;
+  const id = pair || swing || isTeamLink(req) ? null : gameId(req);
   let meta = {
     title: "PuckPulse: NHL scores, playoff odds, and an AI hockey analyst",
     description: "Live NHL scores, playoff odds for every team, goal alerts, and an AI hockey analyst you can ask anything. Free.",
     image: `${SITE}/og-card.png`,
-    url: id ? `${SITE}/games/${id}` : team ? `${SITE}/teams/${team}` : SITE,
+    url: id ? `${SITE}/games/${id}` : team ? `${SITE}/teams/${team}` : pair ? `${SITE}/compare?a=${pair[0]}&b=${pair[1]}` : SITE,
   };
-  if (swing) {
+  if (pair) {
+    try {
+      const response = await fetch(`${API}/compare/${pair[0]}/${pair[1]}/share`, { signal: AbortSignal.timeout(8000) });
+      if (response.ok) meta = { ...meta, ...previewText(await response.json()) };
+    } catch (error) {
+      context.log.warn(`share compare ${pair.join("-")}: ${error}`);
+    }
+  } else if (swing) {
     try {
       const response = await fetch(`${API}/swing/${swing}/share`, { signal: AbortSignal.timeout(8000) });
       if (response.ok) {

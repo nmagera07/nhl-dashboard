@@ -66,4 +66,13 @@ describe("share function", () => {
     const bad = await run("/s/not-a-date");
     expect(bad.fetch).not.toHaveBeenCalled();
   });
+
+  it("serves a comparison card for /c/{a}-{b} and opens the compare page", async () => {
+    const { html, fetch } = await run("/c/8478402-8447400", { title: "McDavid vs Gretzky: who's better?", description: "x",
+      url: "https://evil.example", image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/compare/8478402-8447400.png" });
+    expect(fetch.mock.calls[0][0]).toMatch(/\/compare\/8478402\/8447400\/share$/);
+    expect(html).toContain("McDavid vs Gretzky: who&#39;s better?");
+    expect(html).toContain('content="0; url=https://puckpulse.io/compare?a=8478402&amp;b=8447400"');
+    expect(html).not.toContain("evil.example");
+  });
 });

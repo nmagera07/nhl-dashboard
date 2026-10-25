@@ -47,6 +47,7 @@ export default function SwingOfTheNight() {
         </span>
       </Link>
       <ShareButton url={`https://puckpulse.io/s/${data.date}`} title={`Swing of the Night: ${headline}`}
+                   image={`${API_BASE}/og/swing/${data.date}.png`}
                    event="share-swing" label="Share Swing of the Night" />
     </section>
   );

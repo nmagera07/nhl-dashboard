@@ -30,6 +30,9 @@ describe("SwingOfTheNight", () => {
     const writeText = vi.fn().mockResolvedValue();
     Object.assign(navigator, { clipboard: { writeText } });
     screen.getByRole("button", { name: "Share Swing of the Night" }).click();
+    const copy = await screen.findByRole("menuitem", { name: "Copy link" });
+    expect(screen.getByRole("menuitem", { name: "Save image" })).toBeInTheDocument(); // the swing's own card
+    copy.click();
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("https://puckpulse.io/s/2026-10-20"));
   });
 

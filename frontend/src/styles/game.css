@@ -79,3 +79,8 @@
 .win-prob-goal-away { fill: var(--warn); }
 .win-prob-swing { margin: 10px 0 0; color: var(--text-dim); font-size: 12px; }
 .win-prob-swing strong { color: var(--text); }
+/* The share menu (ShareButton.jsx). */
+.share { position: relative; display: inline-block; }
+.share-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 45; display: grid; min-width: 180px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-raised); box-shadow: 0 12px 32px var(--shadow); }
+.share-menu a, .share-menu button { display: block; padding: 9px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 14px; text-align: left; text-decoration: none; cursor: pointer; }
+.share-menu a:hover, .share-menu button:hover, .share-menu a:focus-visible, .share-menu button:focus-visible { background: var(--neutral-soft); outline: none; }

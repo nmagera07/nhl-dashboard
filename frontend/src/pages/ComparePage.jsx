@@ -85,7 +85,8 @@ export default function ComparePage() {
       <div className="page-header compare-header">
         <h1>Compare players</h1>
         {pa && pb && !mismatch && (
-          <ShareButton url={`https://puckpulse.io/c/${pa.player_id}-${pb.player_id}`} title={`${pa.last_name} vs ${pb.last_name} on PuckPulse`}
+          <ShareButton url={`https://puckpulse.io/c/${pa.player_id}-${pb.player_id}`} title={`${pa.last_name} vs ${pb.last_name}: who's better?`}
+                       image={`${API_BASE}/og/compare/${pa.player_id}-${pb.player_id}.png`}
                        event="share-compare" label={`Share ${pa.last_name} vs ${pb.last_name}`} />
         )}
       </div>

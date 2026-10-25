@@ -1,22 +1,6 @@
-import { nhlVideoUrl } from "../utils/highlights.js";
+import { goalClip } from "../utils/highlights.js";
 
 const pct = (p) => `${Math.round(p * 100)}%`;
-const toSeconds = (clock) => {
-  const [m, s] = String(clock || "").split(":").map(Number);
-  return Number.isFinite(m) && Number.isFinite(s) ? m * 60 + s : null;
-};
-
-// The NHL clip of the goal at `second` (game time), from the box score's scoring summary.
-export function goalClip(scoring, second) {
-  const period = Math.floor(second / 1200) + 1;
-  const into = second - (period - 1) * 1200;
-  const goal = (scoring || [])
-    .filter((p) => p.periodDescriptor?.number === period)
-    .flatMap((p) => p.goals || [])
-    .find((g) => toSeconds(g.timeInPeriod) === into);
-  return nhlVideoUrl(goal?.highlightClipSharingUrl);
-}
-
 // Shown when someone arrives from a Swing of the Night link (?swing={date}):
 // the moment in words, the goal's clip, and a jump to the chart, which rings
 // it. swing is that night's /swing-of-the-night, already checked to be this game.

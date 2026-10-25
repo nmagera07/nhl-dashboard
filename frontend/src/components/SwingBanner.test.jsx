@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import SwingBanner, { goalClip } from "./SwingBanner.jsx";
+import SwingBanner from "./SwingBanner.jsx";
+import { goalClip } from "../utils/highlights.js";
 
 const SCORING = [
   { periodDescriptor: { number: 2 }, goals: [{ timeInPeriod: "05:00", highlightClipSharingUrl: "https://www.nhl.com/video/early" }] },

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ComparePage from "./ComparePage.jsx";
 import { clearResponseCache } from "../utils/responseCache.js";
@@ -44,7 +44,7 @@ describe("ComparePage", () => {
     expect(within(points).getByText("1251")).not.toHaveClass("compare-win");
     expect(within(career).getByText("1.92")).toBeInTheDocument(); // points per game
     expect(screen.getByText("Hall of Fame")).toBeInTheDocument();
-    expect(document.title).toBe("McDavid vs Gretzky | PuckPulse");
+    await waitFor(() => expect(document.title).toBe("McDavid vs Gretzky | PuckPulse")); // set just after render
   });
 
   it("switches to era-adjusted numbers, rescaling each season to today's scoring", async () => {

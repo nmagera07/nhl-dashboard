@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
+import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { teamLogo } from "../utils/teamLogo.js";
 import ShareButton from "../components/ShareButton.jsx";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import GamePreview from "../components/GamePreview.jsx";
 import WinProbability from "../components/WinProbability.jsx";
+import SwingBanner from "../components/SwingBanner.jsx";
 import GamePick from "../components/GamePick.jsx";
 import { nhlVideoUrl } from "../utils/highlights.js";
 
@@ -352,6 +354,12 @@ function PlayerStats({ playerStats, away, home }) {
 export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
   const { gameId } = useParams();
   const location = useLocation();
+  // Arriving from a Swing of the Night link (?swing={date}): show that moment up top and ring it on the chart.
+  const [searchParams] = useSearchParams();
+  const swingDay = searchParams.get("swing");
+  const { data: swingData } = useFetchWithStatus(
+    /^\d{4}-\d{2}-\d{2}$/.test(swingDay || "") ? `${API_BASE}/swing-of-the-night?date=${swingDay}` : null,
+  );
   // Back to the scoreboard day this game was opened from (defaults to today).
   const backTo = location.state?.from || "/";
   const [game, setGame] = useState(null);
@@ -393,6 +401,7 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
 
   const away = game.awayTeam;
   const home = game.homeTeam;
+  const swing = swingData?.available && swingData.game?.id === game.id ? swingData : null;
   const standingsByTeam = Object.fromEntries(standings.map((r) => [r.team_abbrev, r]));
   const started = isLive || FINAL_STATES.has(game.gameState);
   const linescore = game.linescore?.byPeriod || [];
@@ -437,6 +446,12 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
         <p>{game.venue?.default ? `${game.venue.default} · ` : ""}{game.gameDate}</p>
       </div>
 
+      {swing && (
+        <SwingBanner swing={swing} game={game} onShowChart={() => {
+          document.querySelector(".win-prob")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }} />
+      )}
+
       {!started && <GamePick game={game} />}
 
       {!started && <GamePreview game={game} standingsByTeam={standingsByTeam} playoffOddsByTeam={playoffOddsByTeam} />}
@@ -460,6 +475,7 @@ export default function GamePage({ standings = [], playoffOddsByTeam = {} }) {
           home={home?.abbrev}
           playoff={game.gameType === 3}
           refreshKey={`${game.gameState}-${away?.score}-${home?.score}-${game.periodDescriptor?.number}-${game.clock?.timeRemaining}`}
+          highlight={swing?.goal}
         />
       )}
 

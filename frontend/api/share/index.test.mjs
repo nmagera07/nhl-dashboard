@@ -56,7 +56,7 @@ describe("share function", () => {
       game_id: 2026020149, image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/swing/2026-10-20.png" });
     expect(fetch.mock.calls[0][0]).toMatch(/\/swing\/2026-10-20\/share$/);
     expect(html).toContain("ties it with 0:17 left");
-    expect(html).toContain('content="0; url=https://puckpulse.io/games/2026020149"');
+    expect(html).toContain('content="0; url=https://puckpulse.io/games/2026020149?swing=2026-10-20"');
     expect(html).toContain("/og/swing/2026-10-20.png");
   });
 

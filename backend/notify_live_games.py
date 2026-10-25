@@ -251,7 +251,7 @@ def creator_reminder(now=None, fetch=None):
         sent = 0
         for sub in creators(cur):
             try:
-                status = push.send(sub, payload, ttl=6 * 3600, urgency="normal")
+                status = push.send(sub, payload, ttl=6 * 3600, urgency="high")  # "normal" sat unshown in Android's batching
                 sent += 1 if status and status < 300 else 0
             except push.SubscriptionGone:
                 cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))

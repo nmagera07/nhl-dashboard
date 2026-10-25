@@ -1,4 +1,4 @@
-import { bestSeason, compareRows, winner } from "./compare.js";
+import { bestSeason, compareRows, eraAdjust, winner } from "./compare.js";
 
 const season = (id, points, extra = {}) => ({ season_id: id, season_type: "regular_season", points, goals: 10, ...extra });
 const MCDAVID = {
@@ -34,5 +34,33 @@ describe("compare", () => {
     const g = (gaa) => ({ position_code: "G", career_totals: { regular_season: { games_played: 500, goals_against_avg: gaa } } });
     const row = compareRows(g(2.3), g(2.6)).find((r) => r.label === "Goals against avg");
     expect(winner(row)).toBe("a");
+  });
+});
+
+describe("eraAdjust", () => {
+  const ERA = { reference: 3.08, seasons: { 19851986: 3.97, 20222023: 3.18 } };
+  const gretzky = {
+    position_code: "C",
+    season_history: [
+      { season_id: 19851986, season_type: "regular_season", games_played: 80, goals: 52, assists: 163, points: 215, plus_minus: 71 },
+      { season_id: 19851986, season_type: "playoffs", games_played: 10, goals: 8, assists: 11, points: 19 },
+    ],
+    season_stats: [],
+  };
+
+  it("rescales each season to today's scoring and rebuilds career totals", () => {
+    const adj = eraAdjust(gretzky, ERA);
+    const season = adj.season_history[0];
+    expect([season.goals, season.assists, season.points]).toEqual([40, 126, 166]);
+    expect(season.plus_minus).toBeNull();
+    expect(adj.career_totals.regular_season).toEqual({ games_played: 80, goals: 40, assists: 126, points: 166 });
+    expect(adj.career_totals.playoffs.points).toBe(Math.round(8 * 3.08 / 3.97) + Math.round(11 * 3.08 / 3.97));
+  });
+
+  it("leaves goalies alone, and a season missing from the table unscaled", () => {
+    const goalie = { position_code: "G", season_history: [] };
+    expect(eraAdjust(goalie, ERA)).toBe(goalie);
+    const unknown = eraAdjust({ position_code: "C", season_history: [{ season_id: 19001901, season_type: "regular_season", goals: 10, assists: 5 }] }, ERA);
+    expect(unknown.season_history[0].points).toBe(15);
   });
 });

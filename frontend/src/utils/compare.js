@@ -76,3 +76,36 @@ export function winner(row) {
   const aWins = row.better === "high" ? row.a > row.b : row.a < row.b;
   return aWins ? "a" : "b";
 }
+
+// A copy of `player` with every season rescaled to the reference season's
+// scoring (API /era/scoring): goals and assists times reference / that
+// season's goals per team-game, rounded per season, and career totals
+// rebuilt from the adjusted seasons. +/- isn't adjusted (it's left out).
+// Goalies aren't adjusted here.
+export function eraAdjust(player, era) {
+  if (!player || !era || isGoalie(player)) return player;
+  const factor = (seasonId) => {
+    const scoring = era.seasons?.[String(seasonId)];
+    return scoring ? era.reference / scoring : 1;
+  };
+  const adjust = (row) => {
+    const f = factor(row.season_id);
+    const goals = row.goals == null ? null : Math.round(row.goals * f);
+    const assists = row.assists == null ? null : Math.round(row.assists * f);
+    return { ...row, goals, assists, points: goals == null || assists == null ? null : goals + assists, plus_minus: null };
+  };
+  const history = (player.season_history || []).map(adjust);
+  const total = (type) => {
+    const rows = history.filter((s) => s.season_type === type);
+    if (!rows.length) return null;
+    const sum = (key) => rows.reduce((t, s) => t + (s[key] || 0), 0);
+    return { games_played: sum("games_played"), goals: sum("goals"), assists: sum("assists"), points: sum("points") };
+  };
+  const current = player.season_stats?.[0];
+  return {
+    ...player,
+    season_history: history,
+    career_totals: { regular_season: total("regular_season"), playoffs: total("playoffs") },
+    season_stats: current ? [adjust({ ...current, season_id: current.season_id })] : [],
+  };
+}

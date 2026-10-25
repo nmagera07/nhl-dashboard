@@ -36,6 +36,22 @@ function TeamShareRedirect() {
   const { teamAbbrev } = useParams();
   return <Navigate to={`/teams/${teamAbbrev.toUpperCase()}`} replace />;
 }
+
+export function CompareShareRedirect() {
+  const { pair } = useParams();
+  const [a, b] = (pair.match(/^(\d{6,10})-(\d{6,10})$/) || []).slice(1);
+  return <Navigate to={a ? `/compare?a=${a}&b=${b}` : "/compare"} replace />;
+}
+
+// A Swing of the Night link names a night, not a game: ask which game, then go there (Scores if none).
+export function SwingShareRedirect() {
+  const { day } = useParams();
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(day);
+  const { data, status } = useFetchWithStatus(valid ? `${API_BASE}/swing-of-the-night?date=${day}` : null);
+  if (!valid || status === "error" || (data && !data.available)) return <Navigate to="/" replace />;
+  if (data?.game?.id) return <Navigate to={`/games/${data.game.id}`} replace />;
+  return <div className="page-message">Loading…</div>;
+}
 import TrackRecordPage from "./pages/TrackRecordPage.jsx";
 import NewsPage from "./pages/NewsPage.jsx";
 
@@ -233,6 +249,9 @@ export default function NHLDashboard() {
           <Route path="/g/:gameId" element={<ShareRedirect />} />
           {/* Same for a shared team, puckpulse.io/t/{abbrev}. */}
           <Route path="/t/:teamAbbrev" element={<TeamShareRedirect />} />
+          {/* And Swing of the Night (/s/{date}) and comparison (/c/{a}-{b}) links. */}
+          <Route path="/s/:day" element={<SwingShareRedirect />} />
+          <Route path="/c/:pair" element={<CompareShareRedirect />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

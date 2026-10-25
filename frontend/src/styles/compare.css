@@ -42,3 +42,5 @@
   .compare-side-actions button { padding: 3px 8px; font-size: 11px; }
   .compare-value { font-size: 15px; }
 }
+.compare-era { display: grid; justify-items: center; gap: 8px; margin-top: 14px; }
+.compare-era-note { margin: 0; color: var(--text-dim); font-size: 12px; text-align: center; }

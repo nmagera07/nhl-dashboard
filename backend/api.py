@@ -2137,6 +2137,32 @@ def _nhl_player(player_id):
         raise HTTPException(status_code=503, detail="The NHL's player data is unavailable right now.") from exc
 
 
+@app.get("/era/scoring")
+def era_scoring():
+    """
+    Goals per team per regular-season game for every NHL season (era.py),
+    and the reference season the compare page's era-adjusted view rescales
+    to: the last completed one. The season in progress is read live.
+    """
+    import era
+    from seasons import current_season_id
+
+    def compute():
+        seasons = dict(era.load()["seasons"])
+        current = current_season_id()
+        try:
+            live = era.season_scoring(current)
+            if live:
+                seasons[str(current)] = live
+        except requests.RequestException:
+            logger.warning("Couldn't read this season's league scoring; era adjustment uses completed seasons only")
+        reference = max(k for k in era.load()["seasons"])
+        return {"reference_season": int(reference), "reference": seasons[reference],
+                "seasons": {k: v for k, v in sorted(seasons.items())}}
+
+    return daily_cache.get_or_compute(("era_scoring",), compute)
+
+
 @app.get("/players/search")
 @limiter.limit(PLAYER_SEARCH_RATE_LIMIT)
 def player_search(request: Request, q: str = Query(..., min_length=2, max_length=40)):

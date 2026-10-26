@@ -260,9 +260,18 @@ async def poll_fantasy_updates_loop():
         await asyncio.sleep(FANTASY_POLL_SECONDS)
 
 
+async def warm_swing():
+    """After a restart, last night's swing back in the cache before anyone asks (usually a saved row)."""
+    try:
+        await asyncio.to_thread(_cached_swing, _last_night())
+    except Exception:
+        logger.warning("Couldn't warm Swing of the Night", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [asyncio.create_task(check_ingestion_freshness_loop()), asyncio.create_task(poll_fantasy_updates_loop())]
+    tasks = [asyncio.create_task(check_ingestion_freshness_loop()), asyncio.create_task(poll_fantasy_updates_loop()),
+             asyncio.create_task(warm_swing())]
     yield
     for task in tasks:
         task.cancel()
@@ -631,7 +640,8 @@ def _swing_of_the_night(day):
     the day's finished games, as the site and its share card use it. The
     scoring team's chances (before/after) are from its side.
     """
-    games = [g for g in games_on_date(day) if g.get("gameState") in ("OFF", "FINAL") and g.get("gameType") in (2, 3)]
+    scheduled = [g for g in games_on_date(day) if g.get("gameType") in (2, 3)]
+    games = [g for g in scheduled if g.get("gameState") in ("OFF", "FINAL")]
 
     def curve(game):
         try:
@@ -643,8 +653,10 @@ def _swing_of_the_night(day):
     with ThreadPoolExecutor(max_workers=6) as pool:
         curves = [c for c in pool.map(curve, games) if c]
     found = win_probability.swing_of_the_night(curves)
+    # Settled: the night is over and every game in it is final and charted, so the answer can't change.
+    settled = day < datetime.now(EASTERN).date() and len(curves) == len(scheduled)
     if not found:
-        return {"available": False, "date": day.isoformat()}
+        return {"available": False, "date": day.isoformat(), "settled": settled}
     game, c, goal, effect = found
     home = goal["team"] == "home"
     side = game["homeTeam" if home else "awayTeam"]["abbrev"]
@@ -657,7 +669,7 @@ def _swing_of_the_night(day):
         "goal": {"scorer": goal["scorer"], "team": side, "side": goal["team"], "second": goal["second"],
                  "when": win_probability.time_left_label(goal["second"]), "effect": effect,
                  "before": round(mine(goal["before"]), 4), "after": round(mine(goal["after"]), 4)},
-        "points": c["points"], "goals": c["goals"], "playoff": c.get("playoff", False),
+        "points": c["points"], "goals": c["goals"], "playoff": c.get("playoff", False), "settled": settled,
     }
 
 
@@ -665,8 +677,50 @@ def _last_night():
     return (datetime.now(EASTERN) - timedelta(days=1)).date()
 
 
+# A settled night's swing is saved (swing_of_the_night table), so a restart
+# reads it back in a query instead of rebuilding every game's curve from
+# play-by-play (5-11 s). The notifier's swing_precompute timer asks for it in
+# the early morning, so the first visitor usually finds it saved.
+def _stored_swing(day):
+    """The saved swing for `day`, or None. Best effort: a database problem means computing it."""
+    try:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT payload FROM swing_of_the_night WHERE day = %s", (day,))
+                row = cur.fetchone()
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning("Couldn't read the saved Swing of the Night", exc_info=True)
+        return None
+    return row["payload"] if row else None
+
+
+def _store_swing(day, swing):
+    try:
+        conn = get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO swing_of_the_night (day, payload) VALUES (%s, %s) ON CONFLICT (day) DO NOTHING",
+                            (day, psycopg2.extras.Json(swing)))
+        finally:
+            conn.close()
+    except Exception:
+        logger.warning("Couldn't save Swing of the Night", exc_info=True)
+
+
+def _swing(day):
+    swing = _stored_swing(day)
+    if swing is None:
+        swing = _swing_of_the_night(day)
+        if swing.pop("settled"):
+            _store_swing(day, swing)
+    return swing
+
+
 def _cached_swing(day):
-    return daily_cache.get_or_compute(("swing", day.isoformat()), lambda: _swing_of_the_night(day))
+    return daily_cache.get_or_compute(("swing", day.isoformat()), lambda: _swing(day))
 
 
 @app.get("/swing-of-the-night")

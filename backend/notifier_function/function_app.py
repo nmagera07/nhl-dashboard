@@ -1,5 +1,5 @@
 """
-Three timers:
+Four timers:
 
   - live_notifier: goal and final-score push notifications, every minute
     (UTC hours 16-23 and 0-7, noon-4am ET).
@@ -8,6 +8,9 @@ Three timers:
   - post_reminder: every 10 minutes, UTC 14-17 (the morning ET); once a
     day after a game night, tells the creator's devices that Swing of the
     Night is ready to post (notify_live_games.creator_reminder).
+  - swing_precompute: hourly, UTC 6-13 (2-9am ET); asks the API for last
+    night's Swing of the Night so it's built and saved before the first
+    visitor (notify_live_games.precompute_swing).
 
 It used to be the nhl-live-notifier Container Apps Job, which started a
 fresh container 960 times a day (about 25 s each, almost all startup) and
@@ -51,3 +54,8 @@ def closing_odds(timer: func.TimerRequest) -> None:
 @app.timer_trigger(arg_name="timer", schedule="15 */10 14-17 * * *", run_on_startup=False, use_monitor=False)
 def post_reminder(timer: func.TimerRequest) -> None:
     notify_live_games.creator_reminder()
+
+
+@app.timer_trigger(arg_name="timer", schedule="0 40 6-13 * * *", run_on_startup=False, use_monitor=False)
+def swing_precompute(timer: func.TimerRequest) -> None:
+    notify_live_games.precompute_swing()

@@ -29,6 +29,15 @@ describe("useTheme", () => {
     expect(localStorage.getItem("pp-theme")).toBe("light");
   });
 
+  it("toggling back to the system's theme follows the phone again", () => {
+    mockSystem(false);
+    const { result } = renderHook(() => useTheme());
+    act(() => result.current[1]()); // light: saved
+    act(() => result.current[1]()); // dark again, as the phone is: not saved
+    expect(result.current[0]).toBe("dark");
+    expect(localStorage.getItem("pp-theme")).toBeNull();
+  });
+
   it("a saved choice beats the system", () => {
     mockSystem(true);
     localStorage.setItem("pp-theme", "dark");

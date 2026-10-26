@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 
 // Light or dark. Until someone picks, the page follows the system setting
 // (and keeps following it); once they toggle, the choice is saved on this
-// device. public/theme-init.js applies the same rule before first paint.
+// device. Toggling back to what the system shows clears it, so the page
+// follows the phone again. public/theme-init.js applies the same rule before
+// first paint.
 const KEY = "pp-theme";
 const BAR_COLORS = { light: "#f4f7fb", dark: "#0a0b0f" };
 
@@ -41,12 +43,14 @@ export function useTheme() {
 
   const toggle = () => {
     const next = theme === "light" ? "dark" : "light";
+    const follow = next === system; // back to the phone's theme: follow it again
     try {
-      localStorage.setItem(KEY, next);
+      if (follow) localStorage.removeItem(KEY);
+      else localStorage.setItem(KEY, next);
     } catch {
       /* not saved; it still switches for this visit */
     }
-    setChoice(next);
+    setChoice(follow ? null : next);
   };
   return [theme, toggle];
 }

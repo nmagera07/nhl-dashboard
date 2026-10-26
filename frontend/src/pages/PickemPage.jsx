@@ -6,7 +6,7 @@ import { winProbability } from "../utils/seasonSim.js";
 import { todayISO } from "../utils/dates.js";
 import { teamLogo } from "../utils/teamLogo.js";
 import { track } from "../utils/analytics.js";
-import { fetchMe, joinPickem, makePick, pickable, pickOpen, record, saveKey, savedKey } from "../utils/pickem.js";
+import { fetchMe, joinPickem, makePick, renamePickem, pickable, pickOpen, record, saveKey, savedKey } from "../utils/pickem.js";
 
 const startTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -62,6 +62,54 @@ function JoinForm({ onJoined }) {
       </details>
       {error && <p className="pickem-error" role="alert">{error}</p>}
     </section>
+  );
+}
+
+// The player's name, with an Edit to change it (same rules as joining; picks and record stay).
+function NameEditor({ name, playerKey, onRenamed }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  if (!editing) {
+    return (
+      <div className="pickem-name">
+        <strong>{name}</strong>
+        <button type="button" className="link-button pickem-edit" onClick={() => { setValue(name); setError(null); setEditing(true); }}>
+          Edit name
+        </button>
+      </div>
+    );
+  }
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (value.trim() === name) return setEditing(false);
+    setBusy(true);
+    setError(null);
+    try {
+      const renamed = await renamePickem(playerKey, value);
+      track("pickem-rename");
+      onRenamed(renamed.name);
+      setEditing(false);
+    } catch (err) {
+      setError(err.status === 429 ? "Too many name changes. Try again in an hour." : err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="pickem-rename" onSubmit={save}>
+      <div className="pickem-join-row">
+        <input aria-label="Display name" value={value} onChange={(e) => setValue(e.target.value)} maxLength={20} autoFocus
+               autoComplete="nickname" />
+        <button type="submit" disabled={busy || value.trim().length < 3}>Save</button>
+        <button type="button" className="link-button" onClick={() => setEditing(false)}>Cancel</button>
+      </div>
+      {error && <p className="pickem-error" role="alert">{error}</p>}
+    </form>
   );
 }
 
@@ -183,7 +231,8 @@ function PickemPage() {
         <>
           {me && (
             <section className="pickem-card pickem-me">
-              <p><strong>{me.name}</strong> · {record(me.record.correct, me.record.graded)}{me.record.pending > 0 && ` · ${me.record.pending} pending`}</p>
+              <NameEditor name={me.name} playerKey={key} onRenamed={(name) => setMe((m) => ({ ...m, name }))} />
+              <p>{record(me.record.correct, me.record.graded)}{me.record.pending > 0 && ` · ${me.record.pending} pending`}</p>
               {me.vs_puckpulse.games > 0 && (
                 <p className="pickem-hint">
                   On your games: you {me.vs_puckpulse.you}, PuckPulse {me.vs_puckpulse.puckpulse} of {me.vs_puckpulse.games}
@@ -209,7 +258,7 @@ function PickemPage() {
           </details>
         </>
       )}
-      <Leaderboard me={me?.name} />
+      <Leaderboard key={me?.name} me={me?.name} />
     </main>
   );
 }

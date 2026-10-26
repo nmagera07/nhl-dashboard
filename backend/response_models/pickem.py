@@ -10,6 +10,11 @@ class PickemJoinIn(BaseModel):
     name: str = Field(..., max_length=40)
 
 
+class PickemRenameIn(BaseModel):
+    key: str = Field(..., max_length=100)
+    name: str = Field(..., max_length=40)
+
+
 class PickemMeIn(BaseModel):
     key: str = Field(..., max_length=100)
     day: Optional[date] = Field(None, alias="date")  # which day's picks to return (default: today, Eastern)

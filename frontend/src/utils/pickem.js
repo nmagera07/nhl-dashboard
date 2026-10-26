@@ -37,6 +37,7 @@ async function post(path, body) {
 }
 
 export const joinPickem = (name) => post("/pickem/join", { name });
+export const renamePickem = (key, name) => post("/pickem/rename", { key, name });
 export const fetchMe = (key, date) => post("/pickem/me", date ? { key, date } : { key });
 export const makePick = (key, gameId, team) => post("/pickem/pick", { key, game_id: gameId, team });
 

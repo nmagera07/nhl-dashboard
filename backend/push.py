@@ -62,8 +62,8 @@ def valid_keys(p256dh: str, auth: str) -> bool:
 
 def send(subscription: dict, payload: dict, ttl: int = 600, urgency: str = "high") -> int | None:
     """
-    Send one notification; returns the push service's HTTP status (None on
-    failure). subscription: {endpoint, p256dh, auth}. Raises
+    Send one notification; returns the push service's HTTP status (its
+    error status on a refusal, None when there was no response). subscription: {endpoint, p256dh, auth}. Raises
     SubscriptionGone when the browser has unsubscribed, so the caller can
     delete it; other failures are logged and swallowed (one bad device
     shouldn't stop everyone else's notifications).
@@ -96,3 +96,4 @@ def send(subscription: dict, payload: dict, ttl: int = 600, urgency: str = "high
         if status in (404, 410):
             raise SubscriptionGone(str(status)) from exc
         logger.warning("Push to %s failed (%s)", urlparse(subscription["endpoint"]).hostname, status or exc)
+        return status  # the push service's refusal (e.g. 403, 413), for the delivery log

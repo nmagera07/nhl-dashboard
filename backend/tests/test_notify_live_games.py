@@ -130,7 +130,7 @@ def _run(monkeypatch, games, already_sent=(), subs=(), send=None):
     monkeypatch.setattr(n.psycopg2, "connect", lambda url: _Conn(cur))
     monkeypatch.setattr(n.psycopg2.extras, "execute_values", fake_execute_values)
     sent = []
-    def default_send(sub, payload, ttl=None):
+    def default_send(sub, payload, ttl=None, urgency=None):
         sent.append((sub["endpoint"], payload["title"], ttl))
         return 201
 
@@ -162,7 +162,7 @@ class TestRun:
         assert n.run(now=NOW, fetch=lambda: {"games": [_game("FUT")]}) == 0
 
     def test_removes_subscriptions_the_browser_dropped(self, monkeypatch):
-        def gone(sub, payload, ttl=None):
+        def gone(sub, payload, ttl=None, urgency=None):
             raise push.SubscriptionGone("410")
 
         _, _, cur = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB], send=gone)
@@ -225,3 +225,24 @@ class TestCreatorReminder:
         assert _remind(monkeypatch, now=datetime(2026, 10, 25, 3, 0, tzinfo=timezone.utc))[0] == 0
         count, sent, _, cur = _remind(monkeypatch, swing={"available": False})
         assert (count, sent) == (0, []) and "swing-ready:2026-10-24" in cur.already_sent  # claimed: don't ask again
+
+
+class TestDeliveryLog:
+    def test_every_push_is_logged_with_what_the_push_service_said(self, monkeypatch):
+        _, _, cur = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB])
+        logged = [p for q, p in cur.sql if "INSERT INTO push_deliveries" in q]
+        assert len(logged) == 1
+        key, device, status, outcome, ttl = logged[0]
+        assert key.startswith("goal:") and device == n.device_label(SUB["endpoint"])
+        assert (status, outcome) == (201, "accepted")
+
+    def test_a_gone_subscription_is_logged_and_removed(self, monkeypatch):
+        def gone(sub, payload, ttl=None, urgency=None):
+            raise push.SubscriptionGone("410")
+
+        _, _, cur = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB], send=gone)
+        logged = [p for q, p in cur.sql if "INSERT INTO push_deliveries" in q]
+        assert logged[0][2:4] == (None, "gone")
+
+    def test_device_label_tells_devices_apart_without_the_whole_endpoint(self):
+        assert n.device_label("https://fcm.googleapis.com/fcm/send/abcdefXYZ123") == "fcm.googleapis.com ...XYZ123"

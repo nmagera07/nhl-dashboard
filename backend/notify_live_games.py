@@ -168,6 +168,36 @@ def record_results(cur, results):
         logger.warning(f"Couldn't record game results ({exc.__class__.__name__}); pick'em scoring waits for the nightly grade")
 
 
+def deliver(cur, key, sub, payload, ttl, urgency="high"):
+    """
+    Send one push and record what the push service said in push_deliveries
+    (accepted, refused, gone, or no response), so a missed alert can be
+    traced without the function's logs. A gone subscription is deleted.
+    Returns True if the push service accepted it.
+    """
+    try:
+        status = push.send(sub, payload, ttl=ttl, urgency=urgency)
+        outcome = "accepted" if status and status < 300 else "refused" if status else "no response"
+    except push.SubscriptionGone:
+        status, outcome = None, "gone"
+        cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))
+    try:
+        cur.execute("SAVEPOINT delivery")
+        cur.execute(
+            "INSERT INTO push_deliveries (event_key, device, status, outcome, ttl) VALUES (%s, %s, %s, %s, %s)",
+            (key, device_label(sub["endpoint"]), status, outcome, ttl),
+        )
+        cur.execute("RELEASE SAVEPOINT delivery")
+    except psycopg2.Error:  # no table yet: the alert matters more than the log
+        cur.execute("ROLLBACK TO SAVEPOINT delivery")
+    return outcome == "accepted"
+
+
+def device_label(endpoint):
+    """'fcm.googleapis.com ...a5Bq9': which push service, plus enough of the end to tell devices apart."""
+    return f"{urlparse(endpoint).hostname} ...{endpoint[-6:]}"
+
+
 def subscribers(cur, teams, kind):
     column = {"goals": "notify_goals", "finals": "notify_finals"}[kind]
     cur.execute(
@@ -192,18 +222,17 @@ def run(now=None, fetch=None):
         record_results(cur, [e["result"] for e in candidates if e["key"] in fresh and e.get("result")])
         conn.commit()
         for event in (e for e in candidates if e["key"] in fresh):
-            statuses = []
-            for sub in subscribers(cur, event["teams"], event["kind"]):
-                try:
-                    status = push.send(sub, event["payload"], ttl=event["ttl"])
-                    statuses.append(f"{urlparse(sub['endpoint']).hostname}:{status}")
-                    sent += 1 if status and status < 300 else 0
-                except push.SubscriptionGone:
-                    statuses.append(f"{urlparse(sub['endpoint']).hostname}:gone")
-                    cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))
-            # Which push services accepted it (e.g. fcm.googleapis.com:201), for tracing a missed alert.
-            logger.info("%s -> %s [%s]", event["key"], event["payload"]["title"], ", ".join(statuses) or "no subscribers")
+            subs = subscribers(cur, event["teams"], event["kind"])
+            accepted = sum(deliver(cur, event["key"], sub, event["payload"], event["ttl"]) for sub in subs)
+            sent += accepted
+            logger.info("%s -> %s [%d of %d accepted]", event["key"], event["payload"]["title"], accepted, len(subs))
         cur.execute("DELETE FROM push_events_sent WHERE sent_at < NOW() - INTERVAL '3 days'")
+        cur.execute("SAVEPOINT prune")
+        try:
+            cur.execute("DELETE FROM push_deliveries WHERE sent_at < NOW() - INTERVAL '14 days'")
+            cur.execute("RELEASE SAVEPOINT prune")
+        except psycopg2.Error:
+            cur.execute("ROLLBACK TO SAVEPOINT prune")
     return sent
 
 
@@ -248,13 +277,8 @@ def creator_reminder(now=None, fetch=None):
             "url": f"/post-kit?date={day}",
             "tag": f"swing-ready-{day}",
         }
-        sent = 0
-        for sub in creators(cur):
-            try:
-                status = push.send(sub, payload, ttl=6 * 3600, urgency="high")  # "normal" sat unshown in Android's batching
-                sent += 1 if status and status < 300 else 0
-            except push.SubscriptionGone:
-                cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (sub["endpoint"],))
+        # "high": at "normal" the first one sat unshown in Android's batching.
+        sent = sum(deliver(cur, key, sub, payload, 6 * 3600) for sub in creators(cur))
         logger.info("%s -> %d creator device(s)", key, sent)
         return sent
 

@@ -467,6 +467,19 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- goes only to these (notify_live_games.creator_reminder). Set by hand.
 ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS is_creator BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- What the push service said for each alert to each device (notify_live_games.deliver),
+-- for tracing missed alerts without the function's logs. Kept 14 days.
+CREATE TABLE IF NOT EXISTS push_deliveries (
+    id          SERIAL PRIMARY KEY,
+    event_key   TEXT NOT NULL,                 -- push_events_sent.event_key (goal:..., final:..., swing-ready:...)
+    device      TEXT NOT NULL,                 -- push service host + the endpoint's last 6 characters
+    status      SMALLINT,                      -- the push service's HTTP status; NULL when gone or no response
+    outcome     TEXT NOT NULL,                 -- accepted, refused, gone, no response
+    ttl         INTEGER,
+    sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS push_deliveries_sent ON push_deliveries (sent_at);
+
 -- Goals and finals already notified (notify_live_games.py), so overlapping
 -- runs never send twice. Rows older than a few days are pruned.
 CREATE TABLE IF NOT EXISTS push_events_sent (

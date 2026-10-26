@@ -20,6 +20,7 @@ import RosterPage from "./pages/RosterPage.jsx";
 import PlayerPage from "./pages/PlayerPage.jsx";
 import ComparePage from "./pages/ComparePage.jsx";
 import PostKitPage from "./pages/PostKitPage.jsx";
+import TimeMachinePage from "./pages/TimeMachinePage.jsx";
 import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 import PickemPage from "./pages/PickemPage.jsx";
@@ -240,6 +241,7 @@ export default function NHLDashboard() {
           <Route path="/players/:playerId" element={<PlayerPage key={location.pathname} />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/post-kit" element={<PostKitPage />} />
+          <Route path="/time-machine" element={<TimeMachinePage />} />
           <Route path="/track-record" element={<TrackRecordPage />} />
           <Route path="/pickem" element={<PickemPage />} />
           <Route path="/bets" element={<BetsPage />} />

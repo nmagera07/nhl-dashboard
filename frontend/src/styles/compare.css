@@ -55,3 +55,27 @@
 .post-kit-actions a, .post-kit-actions button { padding: 10px 16px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .post-kit-actions .post-kit-primary { border-color: var(--accent-fill); background: var(--accent-fill); color: #fff; }
 .post-kit-note { margin-top: 10px; font-size: 12px; }
+/* The time machine (TimeMachinePage.jsx). */
+.time-machine { max-width: 720px; margin: 0 auto; padding: 0 var(--gutter); }
+.tm-card { margin-top: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.tm-controls { display: grid; gap: 12px; }
+.tm-who { display: flex; align-items: center; gap: 10px; }
+.tm-who img { width: 44px; height: 44px; border-radius: 50%; background: var(--card-raised); }
+.tm-who a { color: var(--text); font-size: 17px; font-weight: 800; text-decoration: none; }
+.tm-who button { margin-left: auto; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; cursor: pointer; }
+.tm-controls label { display: grid; gap: 4px; color: var(--text-dim); font-size: 12px; font-weight: 700; }
+.tm-controls select { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px; }
+.tm-result { text-align: center; background: linear-gradient(140deg, var(--accent-soft), var(--card) 60%); border-color: var(--accent-line); }
+.tm-eyebrow { margin: 0; color: var(--accent-strong); font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.tm-big { margin: 6px 0 0; font-size: 18px; }
+.tm-big strong { font-size: 48px; line-height: 1; }
+.tm-range { margin: 4px 0 10px; color: var(--text-dim); font-size: 13px; }
+.tm-histogram { display: block; width: 100%; max-width: 420px; margin: 0 auto; }
+.tm-bar { fill: var(--neutral-mid); }
+.tm-bar-in { fill: var(--accent); }
+.tm-axis { fill: var(--text-dim); font-size: 10px; }
+.tm-real { margin: 12px 0 0; color: var(--text-dim); font-size: 13px; text-align: left; }
+.tm-real strong { color: var(--text); }
+.player-topbar-links { display: flex; flex-shrink: 0; gap: 6px; padding-right: var(--gutter); margin-bottom: 16px; }
+.player-topbar-links .player-compare-link { white-space: nowrap; }
+@media (max-width: 480px) { .player-topbar-links .player-compare-link { padding: 5px 10px; font-size: 12px; } }

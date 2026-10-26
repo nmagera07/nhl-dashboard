@@ -245,3 +245,19 @@ class TestPlayoffLine:
     def test_is_cacheable_daily_data(self, client, db_router):
         import api
         assert api._daily_cacheable("/playoff-line")
+
+
+def test_slow_requests_are_logged_with_path_and_time(client, monkeypatch, caplog):
+    import api
+    monkeypatch.setattr(api, "SLOW_REQUEST_SECONDS", 0.0)
+    with caplog.at_level("WARNING", logger="api"):
+        client.get("/?x=1")
+    assert any(r.message.startswith("Slow request: GET /?x=1 -> ") and r.message.endswith("s") for r in caplog.records)
+
+
+def test_fast_requests_are_not_logged(client, monkeypatch, caplog):
+    import api
+    monkeypatch.setattr(api, "SLOW_REQUEST_SECONDS", 60.0)
+    with caplog.at_level("WARNING", logger="api"):
+        client.get("/")
+    assert not [r for r in caplog.records if r.message.startswith("Slow request")]

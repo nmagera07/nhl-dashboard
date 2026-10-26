@@ -343,6 +343,23 @@ async def daily_cache_headers(request: Request, call_next):
         response.headers.setdefault("Cache-Control", DAILY_CACHE_CONTROL)
     return response
 
+
+# Requests slower than this get a log line (path, status, time), so a slow
+# spell can be traced to the endpoint behind it. Paths carry only ids and
+# filters; nothing from a request body is logged.
+SLOW_REQUEST_SECONDS = float(os.environ.get("SLOW_REQUEST_SECONDS", "1.0"))
+
+
+@app.middleware("http")
+async def log_slow_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - start
+    if elapsed >= SLOW_REQUEST_SECONDS:
+        query = f"?{request.url.query}" if request.url.query else ""
+        logger.warning(f"Slow request: {request.method} {request.url.path}{query} -> {response.status_code} in {elapsed:.2f}s")
+    return response
+
 # Only the deployed frontend (and local dev) can call this API.
 app.add_middleware(
     CORSMiddleware,

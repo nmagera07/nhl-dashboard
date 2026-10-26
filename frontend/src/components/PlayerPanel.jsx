@@ -232,7 +232,10 @@ function PlayerPanel({ player, onBack, backLabel }) {
     <main className="player-panel">
       <div className="player-topbar">
         <button className="back-link" onClick={onBack}>&larr; {backLabel}</button>
-        <Link className="player-compare-link" to={`/compare?a=${player.player_id}`}>Compare</Link>
+        <span className="player-topbar-links">
+          {!isGoalie && <Link className="player-compare-link" to={`/time-machine?player=${player.player_id}`}>Time machine</Link>}
+          <Link className="player-compare-link" to={`/compare?a=${player.player_id}`}>Compare</Link>
+        </span>
       </div>
 
       <section className="player-hero" aria-label={`${player.first_name} ${player.last_name}`}>

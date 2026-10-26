@@ -2198,6 +2198,28 @@ def compare_image(a: int = Path(..., gt=0), b: int = Path(..., gt=0)):
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/players/{player_id}/time-machine")
+def player_time_machine(player_id: int = Path(..., gt=0), season: Optional[int] = Query(None, ge=19171918),
+                        target: Optional[int] = Query(None, ge=19171918)):
+    """
+    One of a skater's seasons (default: his best) replayed at another
+    season's scoring (default: the last completed one), 10,000 simulated
+    82-game seasons: median and likely range of goals, assists, and points,
+    plus a histogram (time_machine.py). 400 for goalies or an unknown season.
+    """
+    import time_machine
+
+    era = era_scoring()
+    target = target or era["reference_season"]
+
+    def compute():
+        return time_machine.run(player_detail(player_id), season, target, era["seasons"])
+    try:
+        return daily_cache.get_or_compute(("time_machine", player_id, season, target), compute)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get("/players/search")
 @limiter.limit(PLAYER_SEARCH_RATE_LIMIT)
 def player_search(request: Request, q: str = Query(..., min_length=2, max_length=40)):

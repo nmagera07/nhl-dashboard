@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import TimeMachinePage from "./TimeMachinePage.jsx";
@@ -42,7 +42,7 @@ describe("TimeMachinePage", () => {
     expect(screen.getByText(/likely 144–199 over 82 games/)).toBeInTheDocument();
     expect(screen.getByText(/52 G, 163 A/)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /most between 144 and 199/i })).toBeInTheDocument();
-    expect(document.title).toBe("Wayne Gretzky in another era | PuckPulse");
+    await waitFor(() => expect(document.title).toBe("Wayne Gretzky in another era | PuckPulse"));
   });
 
   it("picking another era asks the API for that target", async () => {

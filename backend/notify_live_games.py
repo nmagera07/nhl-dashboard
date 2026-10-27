@@ -76,6 +76,7 @@ def goal_event(game, goal):
     return {
         "key": f"goal:{game['id']}:{goal.get('teamAbbrev')}:{score}",
         "kind": "goals",
+        "scorer": goal.get("teamAbbrev"),  # a goal for a subscriber who follows this team, against one who doesn't
         # An idle Android phone can hold even high-urgency pushes until it's
         # picked up; past the TTL the push service drops them and the alert
         # never shows (two goals on 2026-10-16). A late alert beats none.
@@ -94,11 +95,11 @@ def goal_event(game, goal):
 
 
 def start_event(game):
-    """'🏒 Puck drop: FLA @ WPG'. Goes to goal-alert subscribers; stale after 15 minutes."""
+    """'🏒 Puck drop: FLA @ WPG'. Stale after 15 minutes."""
     away, home = game["awayTeam"]["abbrev"], game["homeTeam"]["abbrev"]
     return {
         "key": f"start:{game['id']}",
-        "kind": "goals",
+        "kind": "starts",
         "ttl": 15 * 60,
         "teams": [away, home],
         "payload": {
@@ -238,12 +239,27 @@ def device_label(endpoint):
     return f"{urlparse(endpoint).hostname} ...{endpoint[-6:]}"
 
 
-def subscribers(cur, teams, kind):
-    column = {"goals": "notify_goals", "finals": "notify_finals"}[kind]
-    cur.execute(
-        f"SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE teams && %s::text[] AND {column}",
-        (teams,),
-    )
+def subscribers(cur, teams, kind, scorer=None):
+    """
+    Devices following either team that want this kind of alert (their
+    alert settings). A goal is "for" a device that follows the scoring
+    team, "against" one that only follows the opponent.
+    """
+    if kind == "goals":
+        cur.execute(
+            """
+            SELECT endpoint, p256dh, auth FROM push_subscriptions
+            WHERE teams && %s::text[]
+              AND ((notify_goals AND %s = ANY(teams)) OR (notify_goals_against AND NOT %s = ANY(teams)))
+            """,
+            (teams, scorer, scorer),
+        )
+    else:
+        column = {"starts": "notify_starts", "finals": "notify_finals"}[kind]
+        cur.execute(
+            f"SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE teams && %s::text[] AND {column}",
+            (teams,),
+        )
     return [{"endpoint": e, "p256dh": p, "auth": a} for e, p, a in cur.fetchall()]
 
 
@@ -262,7 +278,7 @@ def run(now=None, fetch=None):
         record_results(cur, [e["result"] for e in candidates if e["key"] in fresh and e.get("result")])
         conn.commit()
         for event in (e for e in candidates if e["key"] in fresh):
-            subs = subscribers(cur, event["teams"], event["kind"])
+            subs = subscribers(cur, event["teams"], event["kind"], event.get("scorer"))
             accepted = sum(deliver(cur, event["key"], sub, event["payload"], event["ttl"]) for sub in subs)
             sent += accepted
             logger.info("%s -> %s [%d of %d accepted]", event["key"], event["payload"]["title"], accepted, len(subs))

@@ -9,6 +9,8 @@ vi.mock("../utils/push.js", () => ({
   enableAlerts: vi.fn(async () => "granted"),
   disableAlerts: vi.fn(async () => {}),
   updateAlertTeams: vi.fn(async () => {}),
+  alertPrefs: vi.fn(() => ({ starts: true, goals: true, goals_against: true, finals: true, muted: [] })),
+  setAlertPrefs: vi.fn(),
 }));
 
 describe("GoalAlerts", () => {
@@ -24,6 +26,23 @@ describe("GoalAlerts", () => {
     await userEvent.click(screen.getByRole("button", { name: /alerts on/i }));
     expect(push.disableAlerts).toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: /goal alerts/i })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("alert settings: switch off a kind of alert or a team, and each change is saved", async () => {
+    push.currentSubscription.mockResolvedValueOnce({ endpoint: "https://fcm.googleapis.com/x" });
+    render(<GoalAlerts teams={["PIT", "VGK"]} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Alert settings" }));
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Goals against" }));
+    expect(push.setAlertPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ goals_against: false, starts: true }));
+    expect(push.updateAlertTeams).toHaveBeenLastCalledWith(["PIT", "VGK"]);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "VGK" }));
+    expect(push.setAlertPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ muted: ["VGK"] }));
+    expect(screen.getByRole("checkbox", { name: "PIT" })).toBeDisabled(); // the last team can't be switched off
+
+    await userEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("group", { name: "Alert me about" })).not.toBeInTheDocument();
   });
 
   it("shows alerts on for a subscribed device and keeps its team current", async () => {

@@ -53,7 +53,14 @@ class TestSubscribeEndpoint:
 
         assert response.status_code == 204
         _, params = db_router.calls[-1]
-        assert params[0] == FCM and params[3] == ["BOS", "PIT"] and params[4:] == (True, True)
+        assert params[0] == FCM and params[3] == ["BOS", "PIT"] and params[4:] == (True, True, True, True)  # everything on by default
+
+    def test_saves_the_alert_settings(self, client, db_router):
+        db_router.when("from teams where team_abbrev = any", lambda params: [{"team_abbrev": t} for t in params[0]])
+        db_router.when("insert into push_subscriptions", None)
+        body = _body(starts=False, goals=True, goals_against=False, finals=True)
+        assert client.post("/push/subscriptions", json=body).status_code == 204
+        assert db_router.calls[-1][1][4:] == (False, True, False, True)  # starts, goals, goals against, finals
 
     def test_rejects_a_non_push_endpoint_before_touching_the_database(self, client, db_router):
         response = client.post("/push/subscriptions", json=_body(endpoint="https://attacker.example/hook"))

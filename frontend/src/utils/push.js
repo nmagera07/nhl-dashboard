@@ -34,25 +34,57 @@ export async function currentSubscription() {
   return (await registration()).pushManager.getSubscription();
 }
 
+// This device's alert settings: what to be alerted about, and followed
+// teams to leave out ("muted"). Saved with the subscription, so the
+// notifier filters before sending.
+const PREFS_KEY = "pp-alert-prefs";
+export const DEFAULT_ALERT_PREFS = { starts: true, goals: true, goals_against: true, finals: true, muted: [] };
+
+export function alertPrefs() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PREFS_KEY) || "{}");
+    return { ...DEFAULT_ALERT_PREFS, ...saved, muted: Array.isArray(saved.muted) ? saved.muted : [] };
+  } catch {
+    return { ...DEFAULT_ALERT_PREFS };
+  }
+}
+
+export function setAlertPrefs(prefs) {
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // not saved here; the server still has them for this visit's save
+  }
+}
+
+// The subscription body's settings: followed teams minus muted ones (never
+// none: muting is stopped at the last team), and the four switches.
+export function alertSettings(teams, prefs = alertPrefs()) {
+  const kept = teams.filter((t) => !prefs.muted.includes(t));
+  return { teams: kept.length ? kept : teams, starts: prefs.starts, goals: prefs.goals, goals_against: prefs.goals_against, finals: prefs.finals };
+}
+
 async function save(subscription, teams) {
   const { endpoint, keys } = subscription.toJSON();
+  const settings = alertSettings(teams);
   const res = await fetch(`${API_BASE}/push/subscriptions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint, keys, teams }),
+    body: JSON.stringify({ endpoint, keys, ...settings }),
   });
   if (!res.ok) throw new Error(`Couldn't save the subscription (${res.status})`);
-  rememberTeams(teams);
+  rememberSettings(settings);
 }
 
 // The service worker can't read localStorage; if the browser replaces the
-// subscription while the app is closed, it re-subscribes with these teams
+// subscription while the app is closed, it re-subscribes with these
 // (public/push-sw.js, pushsubscriptionchange).
-async function rememberTeams(teams) {
+async function rememberSettings(settings) {
   try {
     const cache = await caches.open("pp-alerts");
-    if (teams) await cache.put("/alert-teams", new Response(JSON.stringify(teams), { headers: { "Content-Type": "application/json" } }));
-    else await cache.delete("/alert-teams");
+    await cache.delete("/alert-teams"); // before alert settings: the teams alone
+    if (settings) await cache.put("/alert-settings", new Response(JSON.stringify(settings), { headers: { "Content-Type": "application/json" } }));
+    else await cache.delete("/alert-settings");
   } catch {
     // no Cache API here: the app re-saves the subscription the next time it opens anyway
   }
@@ -89,5 +121,5 @@ export async function disableAlerts() {
     body: JSON.stringify({ endpoint: subscription.endpoint }),
   }).catch(() => {});
   await subscription.unsubscribe();
-  await rememberTeams(null);
+  await rememberSettings(null);
 }

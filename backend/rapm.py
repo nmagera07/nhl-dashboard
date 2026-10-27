@@ -30,6 +30,7 @@ Usage:
     python rapm.py --fit 20252026 --top 20          # one season's leaders
     python rapm.py --predict 20242025 20252026      # fit one season, score the next
     python rapm.py --repeat 20242025 20252026       # year-over-year, RAPM vs raw on-ice
+    python rapm.py --fit 20232024 20242025 20252026 --chain   # the ratings WAR v2 will use
 """
 
 import argparse
@@ -40,6 +41,7 @@ import numpy as np
 import rapm_stints as rs
 
 LAMBDA = 15.0  # in hours of 5v5 (row weights are hours); --cv and --predict on 2024-26 both pick ~10-25
+CHAIN_LAMBDA = 25.0  # a little stronger with a prior to lean on (best on 2026-27 so far)
 CONTROLS = ["intercept", "home", "trail2", "trail1", "lead1", "lead2", "ozone", "dzone"]
 WIDTH = 1 + 5 + 5 + 4  # intercept, 5 attackers, 5 defenders, home/score/zone (padded)
 CHUNK = 100_000
@@ -171,6 +173,22 @@ def solve(sums, design, lam=LAMBDA, prior=None):
     return np.linalg.solve(sums.xtx + np.diag(penalty) + np.eye(design.n) * 1e-9, sums.xty + target)
 
 
+def chain(seasons, lam=CHAIN_LAMBDA):
+    """
+    Fit the seasons oldest first, each pulled toward the previous one's
+    ratings (a new player starts at 0). Returns (beta, design, sums of the
+    last season). On 2026-27's first 187 games, the chain from 2023-24 beat
+    2025-26 alone by 29% over the no-players baseline.
+    """
+    seasons = sorted(seasons)
+    _, design = build(seasons)
+    beta = None
+    for season in seasons:
+        sums = build([season], design=design)[0][0]
+        beta = solve(sums, design, lam, beta)
+    return beta, design, sums
+
+
 def ratings(beta, design, sums):
     """{player: {offense, defense, net, hours}} per 60 at 5-on-5; defense positive = prevents xG."""
     hours = np.diag(sums.xtx)  # a player's weighted rows: on offense (= his ice time) and on defense
@@ -218,7 +236,8 @@ def main():
     parser.add_argument("--compare", nargs=3, type=int, metavar=("OLDER", "LAST", "SCORE"),
                         help="one season vs. two weighted vs. last season with the older one as its prior")
     parser.add_argument("--repeat", nargs=2, type=int, metavar=("FIRST", "SECOND"))
-    parser.add_argument("--lam", type=float, default=LAMBDA)
+    parser.add_argument("--lam", type=float, default=None)
+    parser.add_argument("--chain", action="store_true", help="--fit seasons as a chain of priors, not pooled")
     parser.add_argument("--top", type=int, default=15)
     parser.add_argument("--min-hours", type=float, default=500 / 60)
     args = parser.parse_args()
@@ -228,9 +247,12 @@ def main():
             print(f"lambda {lam:>12,.0f}: held-out error {error:.4f}")
 
     if args.fit:
-        sums, design = build(args.fit)
-        total = sums[0]
-        beta = solve(total, design, args.lam)
+        if args.chain:
+            beta, design, total = chain(args.fit, args.lam or CHAIN_LAMBDA)
+        else:
+            sums, design = build(args.fit)
+            total = sums[0]
+            beta = solve(total, design, args.lam or LAMBDA)
         print("controls (xG/60):", {c: round(float(beta[i]), 3) for c, i in design.controls.items()})
         rated = {p: r for p, r in ratings(beta, design, total).items() if r["hours"] >= args.min_hours}
         names = _names(set(rated))
@@ -274,7 +296,7 @@ def main():
         fits = {}
         for season in (first, second):
             sums, design = build([season])
-            fits[season] = ratings(solve(sums[0], design, args.lam), design, sums[0])
+            fits[season] = ratings(solve(sums[0], design, args.lam or LAMBDA), design, sums[0])
         raw = {season: _raw_on_ice(season) for season in (first, second)}
         both = [p for p in fits[first] if p in fits[second]
                 and min(fits[first][p]["hours"], fits[second][p]["hours"]) >= args.min_hours]

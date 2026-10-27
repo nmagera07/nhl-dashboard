@@ -283,6 +283,66 @@ def render_compare(a, b, get=None):
     return out.getvalue()
 
 
+def _season_label(season_id):
+    s = str(season_id)
+    return f"{s[:4]}-{s[6:]}"
+
+
+def render_time_machine(tm, target_label, get=None):
+    """
+    A time machine card: the player, "his 1985-86 in today's game", the
+    simulated points (median, likely range) beside the histogram with the
+    likely range lit, and his real season underneath. tm: time_machine.run()'s
+    result; target_label: "today's game" or "1985-86".
+    """
+    img = _background()
+    draw = ImageDraw.Draw(img)
+    _header(img, draw, {}, status="TIME MACHINE")
+    player, source = tm["player"], tm["source"]
+    face = _headshot(player.get("headshot"), 104, get)
+    if face:
+        img.paste(face, (64, 146), face)
+    else:
+        draw.ellipse((64, 146, 168, 250), fill=(33, 37, 47))
+        draw.text((116, 198), player["name"].split()[-1][:1], font=_font(52), fill=DIM, anchor="mm")
+    name_font = _font(46 if len(player["name"]) <= 18 else 38)
+    draw.text((192, 184), player["name"], font=name_font, fill=TEXT, anchor="lm")
+    draw.text((192, 228), f"His {_season_label(source['season_id'])} in {target_label}", font=_font(26, "Bold"),
+              fill=ACCENT, anchor="lm")
+
+    points = tm["points"]
+    median = f"~{points['median']}"
+    draw.text((64, 380), median, font=_font(128), fill=TEXT, anchor="ls")
+    draw.text((76 + draw.textlength(median, font=_font(128)), 380), "points", font=_font(36, "Bold"), fill=DIM, anchor="ls")
+    draw.text((64, 428), f"likely {points['low']}\u2013{points['high']} over 82 games", font=_font(30, "Bold"), fill=TEXT,
+              anchor="ls")
+    draw.text((64, 470), f"{tm['goals']['median']} goals, {tm['assists']['median']} assists", font=_font(26, "Bold"),
+              fill=DIM, anchor="ls")
+
+    # The histogram: every bar a slice of the 10,000 seasons; the likely range lit.
+    bins, width = tm["histogram"], tm["bin_width"]
+    left, right, top, bottom = 640, WIDTH - 64, 170, 440
+    tallest = max(n for _, n in bins)
+    step = (right - left) / len(bins)
+    for i, (start, n) in enumerate(bins):
+        h = max(3, (n / tallest) * (bottom - top))
+        lit = start + width > points["low"] and start <= points["high"]
+        x0 = left + i * step + 2
+        draw.rounded_rectangle((x0, bottom - h, x0 + step - 4, bottom), radius=3, fill=ACCENT if lit else (44, 50, 64))
+    draw.text((left, bottom + 30), str(bins[0][0]), font=_font(22, "Bold"), fill=DIM, anchor="ls")
+    draw.text((right, bottom + 30), str(bins[-1][0] + width - 1), font=_font(22, "Bold"), fill=DIM, anchor="rs")
+    draw.text(((left + right) / 2, bottom + 30), "points in 10,000 simulated seasons", font=_font(22, "Bold"), fill=DIM,
+              anchor="ms")
+
+    draw.line((64, 530, WIDTH - 64, 530), fill=(33, 37, 47), width=2)
+    real = (f"His real {_season_label(source['season_id'])}: {source['points']} points in {source['games_played']} games, "
+            f"when teams scored {source['scoring']:.2f} a game")
+    draw.text((64, 578), real, font=_font(26, "Bold"), fill=DIM, anchor="ls")
+    out = io.BytesIO()
+    img.save(out, "PNG", optimize=True)
+    return out.getvalue()
+
+
 def share_text(game, home_win_prob=None, curve=None):
     """(title, description) for a game's link preview; curve adds its biggest swing once the game is on."""
     away, home = game["awayTeam"]["abbrev"], game["homeTeam"]["abbrev"]

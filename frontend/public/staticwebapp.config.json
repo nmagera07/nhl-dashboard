@@ -26,6 +26,10 @@
       "rewrite": "/api/share"
     },
     {
+      "route": "/tm/*",
+      "rewrite": "/api/share"
+    },
+    {
       "route": "/sw.js",
       "headers": {
         "cache-control": "no-cache"

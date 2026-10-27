@@ -14,7 +14,10 @@ class PushSubscriptionIn(BaseModel):
     endpoint: str = Field(..., max_length=1000)
     keys: PushKeys
     teams: List[str] = Field(..., min_length=1, max_length=32)
-    goals: bool = True
+    # What to be alerted about (all on unless the device's alert settings say otherwise).
+    starts: bool = True         # puck drop
+    goals: bool = True          # goals by the followed teams
+    goals_against: bool = True  # goals by their opponents
     finals: bool = True
 
 

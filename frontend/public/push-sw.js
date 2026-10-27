@@ -71,10 +71,13 @@ self.addEventListener("pushsubscriptionchange", (event) => {
         if (moved.ok) return;
       }
       // Chrome often doesn't say which subscription was replaced: subscribe
-      // again with the teams the app last saved (src/utils/push.js).
-      const saved = await (await caches.open("pp-alerts")).match("/alert-teams");
-      const teams = saved ? await saved.json() : null;
-      if (Array.isArray(teams) && teams.length) await post("/push/subscriptions", { endpoint, keys, teams });
+      // again with the teams and alert settings the app last saved
+      // (src/utils/push.js; older versions saved only the teams).
+      const cache = await caches.open("pp-alerts");
+      const saved = (await cache.match("/alert-settings")) || (await cache.match("/alert-teams"));
+      const settings = saved ? await saved.json() : null;
+      const body = Array.isArray(settings) ? { teams: settings } : settings;
+      if (body && Array.isArray(body.teams) && body.teams.length) await post("/push/subscriptions", { ...body, endpoint, keys });
     })().catch(() => {})
   );
 });

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import PlayerPicker from "../components/PlayerPicker.jsx";
+import ShareButton from "../components/ShareButton.jsx";
 
 const fullSeason = (id) => `${String(id).slice(0, 4)}-${String(id).slice(6)}`;
 const validId = (v) => (/^\d{6,10}$/.test(v || "") ? v : null);
@@ -96,6 +97,12 @@ export default function TimeMachinePage() {
           </section>
 
           <section className="tm-card tm-result" aria-live="polite">
+            <div className="tm-share">
+              <ShareButton url={`https://puckpulse.io/tm/${data.player.id}-${s.season_id}-${t.season_id}`}
+                           title={`${name}'s ${fullSeason(s.season_id)} in ${Number(t.season_id) === ref ? "today's game" : fullSeason(t.season_id)}: ~${data.points.median} points`}
+                           image={`${API_BASE}/og/time-machine/${data.player.id}-${s.season_id}-${t.season_id}.png`}
+                           event="share-time-machine" label="Share this result" />
+            </div>
             <p className="tm-eyebrow">{name}&apos;s {fullSeason(s.season_id)} in {Number(t.season_id) === ref ? "today's game" : fullSeason(t.season_id)}</p>
             <p className="tm-big"><strong>~{data.points.median}</strong> points</p>
             <p className="tm-range">likely {data.points.low}–{data.points.high} over 82 games · {data.goals.median} goals, {data.assists.median} assists</p>

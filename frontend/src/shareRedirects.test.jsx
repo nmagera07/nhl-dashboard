@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { CompareShareRedirect, SwingShareRedirect } from "./App.jsx";
+import { CompareShareRedirect, SwingShareRedirect, TimeMachineShareRedirect } from "./App.jsx";
 import { clearResponseCache } from "./utils/responseCache.js";
 
 function Where() {
@@ -13,6 +13,7 @@ const renderAt = (path) => render(
     <Routes>
       <Route path="/s/:day" element={<SwingShareRedirect />} />
       <Route path="/c/:pair" element={<CompareShareRedirect />} />
+      <Route path="/tm/:spec" element={<TimeMachineShareRedirect />} />
       <Route path="*" element={<Where />} />
     </Routes>
   </MemoryRouter>,
@@ -39,5 +40,15 @@ describe("share links inside the installed app", () => {
   it("a comparison link opens the compare page", () => {
     renderAt("/c/8478402-8447400");
     expect(screen.getByText("at /compare?a=8478402&b=8447400")).toBeInTheDocument();
+  });
+
+  it("a time machine link opens that result", () => {
+    renderAt("/tm/8447400-19851986-20252026");
+    expect(screen.getByText("at /time-machine?player=8447400&season=19851986&target=20252026")).toBeInTheDocument();
+  });
+
+  it("a mangled time machine link opens the empty time machine", () => {
+    renderAt("/tm/gretzky");
+    expect(screen.getByText("at /time-machine")).toBeInTheDocument();
   });
 });

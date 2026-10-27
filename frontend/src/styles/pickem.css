@@ -57,6 +57,6 @@
 @media (prefers-reduced-motion: reduce) { .pickem-promo, .pickem-promo-progress span { transition: none; } .pickem-promo:hover { transform: none; } }
 .pickem-name { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
 .pickem-name strong { font-size: 17px; }
-.pickem-edit { font-size: 12px; }
+.pickem-name .pickem-edit { font-size: 12px; }
 .pickem-rename { margin-bottom: 6px; }
-.pickem-rename .link-button { color: var(--text-dim); font-size: 13px; }
+.pickem-rename .pickem-join-row .link-button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); font-size: 13px; }

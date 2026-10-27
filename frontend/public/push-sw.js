@@ -38,3 +38,43 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+// The browser can replace a push subscription on its own (keys rotated,
+// subscription expired). Alerts then went to the old endpoint until the
+// app was opened or alerts were toggled off and on (2026-10-25: three
+// goals and a final missed). Move the saved subscription to the new one.
+const API = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
+
+function keyBytes(base64url) {
+  const padded = base64url.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (base64url.length % 4)) % 4);
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+}
+
+const post = (path, body) =>
+  fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      let subscription = event.newSubscription;
+      if (!subscription) {
+        const config = await fetch(`${API}/push/config`).then((r) => r.json());
+        if (!config.enabled) return;
+        subscription = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes(config.vapid_public_key),
+        });
+      }
+      const { endpoint, keys } = subscription.toJSON();
+      if (event.oldSubscription) {
+        const moved = await post("/push/subscriptions/renew", { old_endpoint: event.oldSubscription.endpoint, endpoint, keys });
+        if (moved.ok) return;
+      }
+      // Chrome often doesn't say which subscription was replaced: subscribe
+      // again with the teams the app last saved (src/utils/push.js).
+      const saved = await (await caches.open("pp-alerts")).match("/alert-teams");
+      const teams = saved ? await saved.json() : null;
+      if (Array.isArray(teams) && teams.length) await post("/push/subscriptions", { endpoint, keys, teams });
+    })().catch(() => {})
+  );
+});

@@ -42,6 +42,20 @@ async function save(subscription, teams) {
     body: JSON.stringify({ endpoint, keys, teams }),
   });
   if (!res.ok) throw new Error(`Couldn't save the subscription (${res.status})`);
+  rememberTeams(teams);
+}
+
+// The service worker can't read localStorage; if the browser replaces the
+// subscription while the app is closed, it re-subscribes with these teams
+// (public/push-sw.js, pushsubscriptionchange).
+async function rememberTeams(teams) {
+  try {
+    const cache = await caches.open("pp-alerts");
+    if (teams) await cache.put("/alert-teams", new Response(JSON.stringify(teams), { headers: { "Content-Type": "application/json" } }));
+    else await cache.delete("/alert-teams");
+  } catch {
+    // no Cache API here: the app re-saves the subscription the next time it opens anyway
+  }
 }
 
 // Ask permission (must be called from a tap), subscribe, and register the
@@ -75,4 +89,5 @@ export async function disableAlerts() {
     body: JSON.stringify({ endpoint: subscription.endpoint }),
   }).catch(() => {});
   await subscription.unsubscribe();
+  await rememberTeams(null);
 }

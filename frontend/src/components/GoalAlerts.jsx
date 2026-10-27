@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { currentSubscription, disableAlerts, enableAlerts, pushSupport, updateAlertTeams } from "../utils/push.js";
 
-// "🔔 Goal alerts" for the followed team: a push notification for every
-// goal in its games and the final score. Adapts to what this device can do.
+// "🔔 Goal alerts" for the followed team: a push notification at puck drop,
+// for every goal in its games, and the final score. Adapts to what this
+// device can do.
 function GoalAlerts({ team }) {
   const [support, setSupport] = useState(() => pushSupport());
   const [on, setOn] = useState(false);
@@ -59,7 +60,7 @@ function GoalAlerts({ team }) {
         aria-pressed={on}
         disabled={busy}
         onClick={toggle}
-        title={on ? "Turn off goal and final-score notifications" : `Get a notification for every ${team} goal (and goal against) and the final score`}
+        title={on ? "Turn off game notifications" : `Get a notification at puck drop, for every ${team} goal (and goal against), and the final score`}
       >
         {busy ? "…" : on ? "🔔 Alerts on" : "🔔 Goal alerts"}
       </button>

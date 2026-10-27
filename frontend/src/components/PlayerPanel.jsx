@@ -214,12 +214,16 @@ function PlayerPanel({ player, onBack, backLabel }) {
     seasonHistoryTab === "playoffs" && hasPlayoffHistory ? playoffsHistory : regularSeasonHistory;
   const visibleSeasonHistory = showAllSeasons ? activeSeasonHistory : activeSeasonHistory.slice(0, 5);
 
-  const age = ageOn(player.birth_date);
+  // A retired player's age would keep counting for players who have died (the
+  // NHL's data has no death date), so their pages show the birth year instead.
+  const retired = player.status === "retired";
+  const age = retired ? null : ageOn(player.birth_date);
   const bio = [
     player.shoots_catches && `${isGoalie ? "Catches" : "Shoots"} ${player.shoots_catches}`,
     heightLabel(player.height_in_inches),
     player.weight_in_pounds && `${player.weight_in_pounds} lbs`,
     age != null && `Age ${age}`,
+    retired && player.birth_date && `Born ${player.birth_date.slice(0, 4)}`,
     player.birth_city && `${player.birth_city}, ${player.birth_country}`,
   ].filter(Boolean);
 

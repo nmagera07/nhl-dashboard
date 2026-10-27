@@ -20,3 +20,11 @@ class PushSubscriptionIn(BaseModel):
 
 class PushUnsubscribeIn(BaseModel):
     endpoint: str = Field(..., max_length=1000)
+
+
+class PushRenewIn(BaseModel):
+    """The service worker's pushsubscriptionchange: the browser replaced a subscription."""
+
+    old_endpoint: str = Field(..., max_length=1000)
+    endpoint: str = Field(..., max_length=1000)
+    keys: PushKeys

@@ -124,3 +124,27 @@ class TestSend:
 
         with pytest.raises(push.SubscriptionGone):
             push.send({"endpoint": FCM, "p256dh": P256DH, "auth": AUTH}, {"title": "t"})
+
+
+class TestRenewEndpoint:
+    NEW = "https://fcm.googleapis.com/fcm/send/new456"
+
+    def _renew(self, client, **overrides):
+        body = {"old_endpoint": FCM, "endpoint": self.NEW, "keys": {"p256dh": P256DH, "auth": AUTH}, **overrides}
+        return client.post("/push/subscriptions/renew", json=body)
+
+    def test_moves_the_subscription_keeping_its_settings(self, client, db_router):
+        db_router.when("delete from push_subscriptions", None)
+        db_router.when("update push_subscriptions set endpoint", {"endpoint": self.NEW})
+        assert self._renew(client).status_code == 204
+        update = next(p for q, p in db_router.calls if "UPDATE push_subscriptions" in q)
+        assert update == (self.NEW, P256DH, AUTH, FCM)  # only the endpoint and keys change
+
+    def test_unknown_old_subscription_is_404(self, client, db_router):
+        db_router.when("delete from push_subscriptions", None)
+        db_router.when("update push_subscriptions set endpoint", None)
+        assert self._renew(client).status_code == 404
+
+    def test_new_endpoint_must_be_a_push_service(self, client, db_router):
+        assert self._renew(client, endpoint="https://attacker.example/hook").status_code == 400
+        assert not db_router.calls

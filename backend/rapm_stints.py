@@ -19,6 +19,11 @@ Who was on the ice comes from the NHL's shift charts; a player is on for a
 moment t when start < t <= end (as in ingest_xg.on_ice), so a goal at a
 change belongs to the group that was out when it went in.
 
+When the NHL never posts a game's shift chart (whole stretches go
+missing: Apr 8-15 2025, Oct 13-19 2026), the shifts come from its HTML
+time-on-ice reports instead (TH home, TV visitor), which list every
+player's shifts under his sweater number.
+
 Games come from a local cache, {CACHE}/{pbp,shifts}/{season}/{game_id}.json.gz
 (the same one train_xg.py and the backtests read); `--download` fills it.
 Stints for a season are written to {CACHE}/stints/{season}.json.gz.
@@ -33,6 +38,7 @@ import argparse
 import gzip
 import json
 import os
+import re
 import time
 from collections import defaultdict
 
@@ -46,6 +52,7 @@ logger = setup_logging("rapm_stints")
 CACHE = os.path.expanduser("~/.cache/puckpulse")
 PBP_URL = "https://api-web.nhle.com/v1/gamecenter/{game_id}/play-by-play"
 SHIFTS_URL = "https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId={game_id}"
+TOI_REPORT_URL = "https://www.nhl.com/scores/htmlreports/{season}/{side}{number}.HTM"  # TH home, TV visitor
 HEADERS = {"User-Agent": "nhl-dashboard (personal project)"}
 FINAL_STATES = {"OFF", "FINAL"}
 FIVE_ON_FIVE = "1551"
@@ -91,7 +98,46 @@ def _get(url):
     response.raise_for_status()
 
 
-def download(season, get=_get, pause=PAUSE):
+def _get_text(url):
+    response = requests.get(url, headers=HEADERS, timeout=30)
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    return response.text
+
+
+_PLAYER = re.compile(r'class="playerHeading[^"]*"[^>]*>(\d+) [^<]*</td>')
+# Shift #, period, "start elapsed / game clock", "end elapsed / game clock" (the per-period summary rows have no "/").
+_SHIFT_ROW = re.compile(r'<td[^>]*>\d+</td>\s*<td[^>]*>(\d|OT)</td>\s*'
+                        r'<td[^>]*>(\d+:\d\d) / [\d:]+</td>\s*<td[^>]*>(\d+:\d\d) / [\d:]+</td>')
+
+
+def html_shifts(pbp, get_text=_get_text):
+    """
+    The game's shifts from the HTML time-on-ice reports, shaped like the
+    shift chart's rows ({playerId, teamId, period, startTime, endTime,
+    typeCode}); None if either report is missing.
+    """
+    game_id = str(pbp["id"])
+    season = f"{game_id[:4]}{int(game_id[:4]) + 1}"
+    rows = []
+    for side, team in (("TH", pbp["homeTeam"]["id"]), ("TV", pbp["awayTeam"]["id"])):
+        html = get_text(TOI_REPORT_URL.format(season=season, side=side, number=game_id[4:]))
+        if not html:
+            return None
+        number_to_id = {r.get("sweaterNumber"): r["playerId"] for r in pbp.get("rosterSpots", []) if r["teamId"] == team}
+        parts = _PLAYER.split(html)  # [before, number, his rows, number, his rows, ...]
+        for number, chunk in zip(parts[1::2], parts[2::2]):
+            pid = number_to_id.get(int(number))
+            if pid is None:
+                continue
+            for period, start, end in _SHIFT_ROW.findall(chunk):
+                rows.append({"playerId": pid, "teamId": team, "period": 4 if period == "OT" else int(period),
+                             "startTime": start, "endTime": end, "typeCode": SHIFT})
+    return rows
+
+
+def download(season, get=_get, get_text=_get_text, pause=PAUSE):
     """
     Cache play-by-play and shift charts for a season's finished regular-season
     games. Already-cached games are skipped, so it can be re-run (and picks
@@ -118,7 +164,10 @@ def download(season, get=_get, pause=PAUSE):
         if load("shifts", season, game_id) is None:
             shifts = (get(SHIFTS_URL.format(game_id=game_id)) or {}).get("data", [])
             time.sleep(pause)
-            if len(shifts) >= MIN_SHIFTS:  # a missing chart may still be posted later
+            if len(shifts) < MIN_SHIFTS:
+                shifts = html_shifts(pbp, get_text) or []
+                time.sleep(pause)
+            if len(shifts) >= MIN_SHIFTS:  # neither yet: the reports may still be posted later
                 _save("shifts", season, game_id, shifts)
                 saved["shifts"] += 1
         if number % 100 == 0:

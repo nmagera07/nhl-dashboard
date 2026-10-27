@@ -76,3 +76,38 @@ def test_download_caches_finished_games_and_stops_after_the_last(tmp_path, monke
     calls.clear()
     rs.download(20252026, get=get, pause=0)  # a re-run only asks for what's missing
     assert not any("2025020001" in c for c in calls)
+
+
+def _toi_report(players):
+    """A trimmed TH/TV report: a heading per player, his shift rows, then a per-period summary row."""
+    html = []
+    for number, shifts in players:
+        html.append(f'<td align="center" valign="top" class="playerHeading + border" colspan="8">{number} LAST, FIRST</td>')
+        for i, (period, start, end) in enumerate(shifts, 1):
+            html.append(f'<tr class="oddColor"><td align="center" class="lborder + bborder">{i}</td>'
+                        f'<td align="center" class="lborder + bborder">{period}</td>'
+                        f'<td align="center" class="lborder + bborder">{start} / 19:00</td>'
+                        f'<td align="center" class="lborder + bborder">{end} / 18:00</td>'
+                        f'<td align="center" class="lborder + bborder">00:40</td></tr>')
+        html.append('<tr><td align="center">1</td><td align="center">12</td><td align="center">00:51</td></tr>')
+    return "\n".join(html)
+
+
+def test_html_reports_stand_in_for_a_missing_shift_chart():
+    pbp = {"id": 2026020090, "homeTeam": {"id": HOME}, "awayTeam": {"id": AWAY},
+           "rosterSpots": [{"playerId": 87, "teamId": HOME, "sweaterNumber": 87},
+                           {"playerId": 8, "teamId": AWAY, "sweaterNumber": 8}]}
+    reports = {"TH": _toi_report([(87, [("1", "0:36", "1:16"), ("OT", "2:00", "2:45")]), (99, [("1", "0:00", "0:30")])]),
+               "TV": _toi_report([(8, [("2", "10:05", "11:00")])])}
+    urls = []
+
+    def get_text(url):
+        urls.append(url)
+        return reports[url.split("/")[-1][:2]]
+
+    rows = rs.html_shifts(pbp, get_text)
+    assert urls[0] == "https://www.nhl.com/scores/htmlreports/20262027/TH020090.HTM"
+    assert [(r["playerId"], r["teamId"], r["period"], r["startTime"], r["endTime"]) for r in rows] == [
+        (87, HOME, 1, "0:36", "1:16"), (87, HOME, 4, "2:00", "2:45"),  # OT is period 4; #99 isn't on the roster
+        (8, AWAY, 2, "10:05", "11:00")]
+    assert rs.html_shifts(pbp, lambda url: None) is None

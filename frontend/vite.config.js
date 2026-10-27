@@ -35,6 +35,9 @@ export default defineConfig({
           // Same art; the glyph sits inside the safe zone, so it survives
           // Android's circle/squircle masks.
           { src: 'icons/puckpulse-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          // One color, for Android's themed icons where the browser supports
+          // them (the system tints it to match the wallpaper).
+          { src: 'icons/puckpulse-mono-512.png', sizes: '512x512', type: 'image/png', purpose: 'monochrome' },
         ],
       },
       workbox: {

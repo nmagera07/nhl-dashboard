@@ -67,6 +67,17 @@ describe("share function", () => {
     expect(bad.fetch).not.toHaveBeenCalled();
   });
 
+  it("serves a time machine card for /tm/{player}-{season}-{target} and opens its page", async () => {
+    const { html, fetch } = await run("/tm/8447400-19851986-20252026", { title: "Wayne Gretzky's 1985-86 in today's game: ~171 points",
+      description: "x", url: "https://evil.example",
+      image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/time-machine/8447400-19851986-20252026.png" });
+    expect(fetch.mock.calls[0][0]).toMatch(/\/time-machine\/8447400\/19851986\/20252026\/share$/);
+    expect(html).toContain("Wayne Gretzky&#39;s 1985-86 in today&#39;s game: ~171 points");
+    expect(html).toContain('content="0; url=https://puckpulse.io/time-machine?player=8447400&amp;season=19851986&amp;target=20252026"');
+    expect(html).toContain("/og/time-machine/8447400-19851986-20252026.png");
+    expect(html).not.toContain("evil.example");
+  });
+
   it("serves a comparison card for /c/{a}-{b} and opens the compare page", async () => {
     const { html, fetch } = await run("/c/8478402-8447400", { title: "McDavid vs Gretzky: who's better?", description: "x",
       url: "https://evil.example", image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/compare/8478402-8447400.png" });

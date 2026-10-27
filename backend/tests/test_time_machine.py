@@ -51,3 +51,19 @@ def test_route(client, monkeypatch):
     assert body["points"]["median"] > 153  # more goals per game in 1985-86
     assert client.get("/players/8447400/time-machine").json()["target"]["season_id"] == 20252026  # today by default
     assert client.get("/players/8451033/time-machine").status_code == 400
+
+
+def test_share_text_and_card(client, monkeypatch):
+    import api
+    monkeypatch.setattr(api, "player_detail", lambda pid: GRETZKY)
+    monkeypatch.setattr(api, "era_scoring", lambda: {**ERA, "seasons": {**ERA["seasons"], "20252026": 3.08}})
+    body = client.get("/time-machine/8447400/19851986/20252026/share").json()
+    assert body["title"].startswith("Wayne Gretzky's 1985-86 in today's game: ~17")
+    assert "his real one: 215 points in 80 games" in body["description"]
+    assert body["url"] == "https://puckpulse.io/time-machine?player=8447400&season=19851986&target=20252026"
+    assert body["image"].endswith("/og/time-machine/8447400-19851986-20252026.png")
+    older = client.get("/time-machine/8447400/19851986/19851986/share").json()
+    assert "in 1985-86:" in older["title"]
+    image = client.get("/og/time-machine/8447400-19851986-20252026.png")
+    assert image.status_code == 200 and image.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert client.get("/time-machine/8447400/19801981/20252026/share").status_code == 400

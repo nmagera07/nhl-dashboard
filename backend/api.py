@@ -2311,6 +2311,10 @@ def player_time_machine(player_id: int = Path(..., gt=0), season: Optional[int] 
     82-game seasons: median and likely range of goals, assists, and points,
     plus a histogram (time_machine.py). 400 for goalies or an unknown season.
     """
+    return _time_machine(player_id, season, target)
+
+
+def _time_machine(player_id, season, target):
     import time_machine
 
     era = era_scoring()
@@ -2322,6 +2326,38 @@ def player_time_machine(player_id: int = Path(..., gt=0), season: Optional[int] 
         return daily_cache.get_or_compute(("time_machine", player_id, season, target), compute)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _time_machine_target_label(tm):
+    ref = era_scoring()["reference_season"]
+    return "today's game" if tm["target"]["season_id"] == ref else og_image._season_label(tm["target"]["season_id"])
+
+
+@app.get("/time-machine/{player_id}/{season}/{target}/share")
+def time_machine_share(player_id: int = Path(..., gt=0), season: int = Path(..., ge=19171918),
+                       target: int = Path(..., ge=19171918)):
+    """Title, description, and image for a time machine link preview (the site's /tm/{player}-{season}-{target})."""
+    tm = _time_machine(player_id, season, target)
+    where, points = _time_machine_target_label(tm), tm["points"]
+    source = tm["source"]
+    return {
+        "title": f"{tm['player']['name']}'s {og_image._season_label(season)} in {where}: ~{points['median']} points",
+        "description": f"Likely {points['low']}\u2013{points['high']} over 82 games, from 10,000 simulated seasons "
+                       f"(his real one: {source['points']} points in {source['games_played']} games). "
+                       f"Send any player through the time machine on PuckPulse.",
+        "url": f"https://puckpulse.io/time-machine?player={player_id}&season={season}&target={target}",
+        "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/time-machine/{player_id}-{season}-{target}.png",
+    }
+
+
+@app.get("/og/time-machine/{player_id}-{season}-{target}.png")
+def time_machine_image(player_id: int = Path(..., gt=0), season: int = Path(..., ge=19171918),
+                       target: int = Path(..., ge=19171918)):
+    """The time machine share image (og_image.render_time_machine). 1200x630 PNG."""
+    tm = _time_machine(player_id, season, target)
+    png = daily_cache.get_or_compute(("og-time-machine", player_id, season, target),
+                                     lambda: og_image.render_time_machine(tm, _time_machine_target_label(tm)))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/players/search")

@@ -45,6 +45,12 @@ export function CompareShareRedirect() {
   return <Navigate to={a ? `/compare?a=${a}&b=${b}` : "/compare"} replace />;
 }
 
+export function TimeMachineShareRedirect() {
+  const { spec } = useParams();
+  const [player, season, target] = (spec.match(/^(\d{6,10})-(\d{8})-(\d{8})$/) || []).slice(1);
+  return <Navigate to={player ? `/time-machine?player=${player}&season=${season}&target=${target}` : "/time-machine"} replace />;
+}
+
 // A Swing of the Night link names a night, not a game: ask which game, then go there (Scores if none).
 export function SwingShareRedirect() {
   const { day } = useParams();
@@ -256,6 +262,7 @@ export default function NHLDashboard() {
           {/* And Swing of the Night (/s/{date}) and comparison (/c/{a}-{b}) links. */}
           <Route path="/s/:day" element={<SwingShareRedirect />} />
           <Route path="/c/:pair" element={<CompareShareRedirect />} />
+          <Route path="/tm/:spec" element={<TimeMachineShareRedirect />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

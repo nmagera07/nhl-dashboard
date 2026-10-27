@@ -79,3 +79,5 @@
 .player-topbar-links { display: flex; flex-shrink: 0; gap: 6px; padding-right: var(--gutter); margin-bottom: 16px; }
 .player-topbar-links .player-compare-link { white-space: nowrap; }
 @media (max-width: 480px) { .player-topbar-links .player-compare-link { padding: 5px 10px; font-size: 12px; } }
+.tm-result { position: relative; }
+.tm-share { display: flex; justify-content: flex-end; margin: -4px -4px 4px 0; }

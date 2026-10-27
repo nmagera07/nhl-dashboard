@@ -62,6 +62,9 @@ class TestEvents:
         assert start["payload"]["title"] == "🏒 Puck drop: PIT @ CBJ" and start["payload"]["url"] == "/games/2026020068"
         assert n.events_for([live(800)], NOW) == ([], [])  # 13 minutes in: too late to announce
         assert n.events_for([live(1150, period=2)], NOW) == ([], [])
+        # The first intermission: still "period 1", with the 18:00 intermission countdown on the clock.
+        intermission = {**live(1080), "clock": {"secondsRemaining": 1080, "inIntermission": True}}
+        assert n.events_for([intermission], NOW) == ([], [])
         assert n.events_for([{**_game("PRE"), "periodDescriptor": {"number": 1}, "clock": {"secondsRemaining": 1200}}], NOW) == ([], [])
 
     def test_a_corrected_goal_time_is_the_same_goal(self):

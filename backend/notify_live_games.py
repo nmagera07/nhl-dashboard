@@ -111,10 +111,17 @@ def start_event(game):
 
 
 def _just_started(game):
-    """In the first minutes of the 1st period, so a restart mid-game doesn't announce a start an hour late."""
+    """
+    In the first minutes of the 1st period, so a restart mid-game doesn't
+    announce a start an hour late. Not in the first intermission: the feed
+    still says period 1 there, with the intermission's 18:00 countdown on
+    the clock, which looked like the opening minutes (2026-10-26, TOR@CGY).
+    """
     period = (game.get("periodDescriptor") or {}).get("number") or game.get("period")
-    remaining = (game.get("clock") or {}).get("secondsRemaining")
-    return period == 1 and remaining is not None and remaining >= 20 * 60 - START_WINDOW_SECONDS
+    clock = game.get("clock") or {}
+    remaining = clock.get("secondsRemaining")
+    return (period == 1 and not clock.get("inIntermission") and remaining is not None
+            and remaining >= 20 * 60 - START_WINDOW_SECONDS)
 
 
 def final_event(game):

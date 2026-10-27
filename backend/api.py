@@ -72,7 +72,7 @@ import win_probability
 from seasons import season_games
 from response_models.feedback import FeedbackIn
 from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn, PickemRenameIn
-from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
+from response_models.push import PushRenewIn, PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
 from nhl_games import (NHLGamesUnavailable, game_boxscore, game_play_by_play, games_on_date, month_calendar,
@@ -1419,6 +1419,42 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
     except Exception:
         logger.error("Failed to save push subscription", exc_info=True)
         raise
+    finally:
+        conn.close()
+
+
+@app.post("/push/subscriptions/renew", status_code=204)
+@limiter.limit(SUBSCRIBE_RATE_LIMIT)
+def push_renew(request: Request, body: PushRenewIn):
+    """
+    Move a subscription to the endpoint the browser replaced it with
+    (public/push-sw.js, pushsubscriptionchange), keeping its teams and
+    settings. Without this, alerts kept going to the old endpoint, which
+    the push service may still accept, until the app was opened or alerts
+    were toggled. The old endpoint proves ownership, as for DELETE. 404 if
+    it isn't subscribed.
+    """
+    if not push.is_allowed_endpoint(body.endpoint):
+        raise HTTPException(status_code=400, detail="Not a browser push service endpoint.")
+    if not push.valid_keys(body.keys.p256dh, body.keys.auth):
+        raise HTTPException(status_code=400, detail="Invalid subscription keys.")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if body.endpoint != body.old_endpoint:
+                cur.execute("DELETE FROM push_subscriptions WHERE endpoint = %s", (body.endpoint,))  # saved already: the old row wins
+            cur.execute(
+                """
+                UPDATE push_subscriptions SET endpoint = %s, p256dh = %s, auth = %s, updated_at = NOW()
+                WHERE endpoint = %s RETURNING endpoint
+                """,
+                (body.endpoint, body.keys.p256dh, body.keys.auth, body.old_endpoint),
+            )
+            moved = cur.fetchone()
+        if not moved:
+            conn.rollback()
+            raise HTTPException(status_code=404, detail="That subscription isn't saved.")
+        conn.commit()
     finally:
         conn.close()
 

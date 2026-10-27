@@ -38,13 +38,31 @@ class TestEvents:
             "tag": "goal-2026020068-2-1",
         }
 
-    def test_only_the_newest_goal_is_sent_and_older_ones_are_claimed_quietly(self):
+    def test_two_goals_posted_together_both_alert(self):
+        # The NHL feed sometimes adds two goals at once; only the newest used to alert.
         game = _game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 1, "06:10", 1, 1, assists=())])
 
         candidates, claim_only = n.events_for([game], NOW)
 
-        assert [e["payload"]["body"] for e in candidates] == ["S. Crosby (5), unassisted · 1st 06:10"]
-        assert [e["key"] for e in claim_only] == ["goal:2026020068:PIT:1-0"]
+        assert [e["key"] for e in candidates] == ["goal:2026020068:PIT:1-0", "goal:2026020068:CBJ:1-1"]  # oldest first
+        assert claim_only == []
+
+    def test_an_outage_backlog_sends_only_the_newest_few(self):
+        goals = [_goal("PIT", 1, f"0{i}:00", i, 0) for i in range(1, 6)]
+        candidates, claim_only = n.events_for([_game("LIVE", goals)], NOW)
+        assert [e["key"].split(":")[-1] for e in candidates] == ["3-0", "4-0", "5-0"]
+        assert [e["key"].split(":")[-1] for e in claim_only] == ["1-0", "2-0"]
+
+    def test_puck_drop_in_the_first_minutes_only(self):
+        def live(seconds_left, period=1):
+            return {**_game("LIVE"), "periodDescriptor": {"number": period}, "clock": {"secondsRemaining": seconds_left}}
+
+        (start,), _ = n.events_for([live(1150)], NOW)
+        assert start["key"] == "start:2026020068" and start["kind"] == "goals" and start["ttl"] == 900
+        assert start["payload"]["title"] == "🏒 Puck drop: PIT @ CBJ" and start["payload"]["url"] == "/games/2026020068"
+        assert n.events_for([live(800)], NOW) == ([], [])  # 13 minutes in: too late to announce
+        assert n.events_for([live(1150, period=2)], NOW) == ([], [])
+        assert n.events_for([{**_game("PRE"), "periodDescriptor": {"number": 1}, "clock": {"secondsRemaining": 1200}}], NOW) == ([], [])
 
     def test_a_corrected_goal_time_is_the_same_goal(self):
         # The NHL posts a goal, then fixes its time a few seconds later: one alert, not two.
@@ -54,7 +72,7 @@ class TestEvents:
 
     def test_each_goal_is_its_own_notification(self):
         game = _game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 1, "06:10", 1, 1)])
-        (newest,), (older,) = n.events_for([game], NOW)
+        (older, newest), _ = n.events_for([game], NOW)
         final = n.final_event(_game("FINAL", away_score=1, home_score=1))
         assert len({newest["payload"]["tag"], older["payload"]["tag"], final["payload"]["tag"]}) == 3
 

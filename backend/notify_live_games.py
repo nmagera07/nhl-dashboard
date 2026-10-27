@@ -37,6 +37,12 @@ RECENT = timedelta(hours=6)  # ignore games that started longer ago (yesterday's
 GOAL_STATES = {"LIVE", "CRIT", "FINAL"}  # FINAL too: an overtime winner can arrive with the final whistle
 FINAL_STATES = {"FINAL", "OFF"}
 STRENGTH = {"pp": "power play", "sh": "shorthanded", "en": "empty net"}
+# Goals per game that can alert in one run. Normally a run finds one new
+# goal; the NHL feed sometimes posts two at once (a late or reviewed goal),
+# and both should alert. Past this it's catching up after an outage: the
+# newest few still alert, older ones are claimed quietly.
+MAX_GOAL_ALERTS_PER_RUN = 3
+START_WINDOW_SECONDS = 5 * 60  # puck drop alerts only in the first 5 minutes of the 1st
 
 
 def _period(descriptor):
@@ -87,6 +93,30 @@ def goal_event(game, goal):
     }
 
 
+def start_event(game):
+    """'🏒 Puck drop: FLA @ WPG'. Goes to goal-alert subscribers; stale after 15 minutes."""
+    away, home = game["awayTeam"]["abbrev"], game["homeTeam"]["abbrev"]
+    return {
+        "key": f"start:{game['id']}",
+        "kind": "goals",
+        "ttl": 15 * 60,
+        "teams": [away, home],
+        "payload": {
+            "title": f"🏒 Puck drop: {away} @ {home}",
+            "body": "It's underway. Tap to follow along live.",
+            "url": f"/games/{game['id']}",
+            "tag": f"start-{game['id']}",
+        },
+    }
+
+
+def _just_started(game):
+    """In the first minutes of the 1st period, so a restart mid-game doesn't announce a start an hour late."""
+    period = (game.get("periodDescriptor") or {}).get("number") or game.get("period")
+    remaining = (game.get("clock") or {}).get("secondsRemaining")
+    return period == 1 and remaining is not None and remaining >= 20 * 60 - START_WINDOW_SECONDS
+
+
 def final_event(game):
     away, home = game["awayTeam"], game["homeTeam"]
     last = (game.get("gameOutcome") or {}).get("lastPeriodType", "REG")
@@ -111,10 +141,11 @@ def final_event(game):
 
 def events_for(games, now):
     """
-    New-event candidates from the scoreboard. Per game, only the newest
-    goal is a candidate: two goals inside one minute is rare, and an alert
-    for a goal that's already been followed by another one is stale. The
-    older ones are still claimed, so they're never sent late.
+    New-event candidates from the scoreboard: puck drop, goals, finals.
+    Per game, the newest MAX_GOAL_ALERTS_PER_RUN goals are candidates (the
+    claim drops ones already sent); older ones are claimed quietly, so an
+    outage's backlog is never sent late. Only the newest goal used to be a
+    candidate, so a second goal posted in the same minute never alerted.
     """
     candidates, claim_only = [], []
     for game in games:
@@ -122,10 +153,12 @@ def events_for(games, now):
         if not start or now - datetime.fromisoformat(start.replace("Z", "+00:00")) > RECENT:
             continue
         state = game.get("gameState")
+        if state in ("LIVE", "CRIT") and _just_started(game):
+            candidates.append(start_event(game))
         if state in GOAL_STATES and game.get("goals"):
             goals = [goal_event(game, g) for g in game["goals"]]
-            candidates.append(goals[-1])
-            claim_only.extend(goals[:-1])
+            candidates.extend(goals[-MAX_GOAL_ALERTS_PER_RUN:])
+            claim_only.extend(goals[:-MAX_GOAL_ALERTS_PER_RUN])
         if state in FINAL_STATES:
             candidates.append(final_event(game))
     return candidates, claim_only

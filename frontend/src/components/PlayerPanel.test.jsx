@@ -152,7 +152,7 @@ describe("PlayerPanel advanced stats", () => {
 
   it("shows a retired player's NHL career, last season, and Hall of Fame", () => {
     renderPanel(skater({
-      first_name: "Wayne", last_name: "Gretzky", team_abbrev: null, season_stats: [], status: "retired",
+      first_name: "Wayne", last_name: "Gretzky", team_abbrev: null, season_stats: [], status: "retired", birth_date: "1961-01-26",
       in_hall_of_fame: true, last_season_id: 19981999, last_team_name: "New York Rangers",
       career_totals: { regular_season: { games_played: 1487, goals: 894, assists: 1963, points: 2857 }, playoffs: null },
     }));
@@ -161,6 +161,8 @@ describe("PlayerPanel advanced stats", () => {
     expect(screen.getAllByText("2857").length).toBeGreaterThan(0);
     expect(screen.getByText(/Retired · last NHL season 98-99, New York Rangers/)).toBeInTheDocument();
     expect(screen.queryByText(/No current-season stats/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Born 1961/)).toBeInTheDocument(); // not an age, which would keep counting
+    expect(screen.queryByText(/Age \d+/)).not.toBeInTheDocument();
   });
 
   it("shows this season's WAR and where it ranks in his position", () => {

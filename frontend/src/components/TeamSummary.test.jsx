@@ -76,17 +76,27 @@ describe("TeamSummary", () => {
     expect(screen.getByText("21-12")).toBeInTheDocument();
   });
 
-  it("makes the team my team, and back", async () => {
-    render(<TeamSummary team={team()} />);
+  it("the first team followed is my team; another is Following; unfollow undoes it", async () => {
+    const { rerender } = render(<TeamSummary team={team()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /make my team/i }));
-
-    expect(screen.getByRole("button", { name: /my team/i })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "☆ Follow" }));
+    expect(screen.getByRole("button", { name: "★ My team" })).toHaveAttribute("aria-pressed", "true");
     expect(window.localStorage.getItem("nhl-dash:favorite-team")).toBe("PIT");
 
-    await userEvent.click(screen.getByRole("button", { name: /my team/i }));
+    rerender(<TeamSummary team={team({ team_abbrev: "FLA", team_name: "Florida Panthers" })} />);
+    await userEvent.click(screen.getByRole("button", { name: "☆ Follow" }));
+    expect(screen.getByRole("button", { name: "✓ Following" })).toHaveAttribute("aria-pressed", "true");
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["PIT", "FLA"]);
 
-    expect(screen.getByRole("button", { name: /make my team/i })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(screen.getByRole("button", { name: "✓ Following" }));
+    expect(screen.getByRole("button", { name: "☆ Follow" })).toHaveAttribute("aria-pressed", "false");
+    window.localStorage.clear();
+  });
+
+  it("can't follow more than five", () => {
+    window.localStorage.setItem("nhl-dash:followed-teams", JSON.stringify(["BOS", "TOR", "MTL", "OTT", "BUF"]));
+    render(<TeamSummary team={team()} />);
+    expect(screen.getByRole("button", { name: "☆ Follow" })).toBeDisabled();
     window.localStorage.clear();
   });
 });

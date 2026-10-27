@@ -123,3 +123,9 @@ a.my-team-game:hover { border-color: var(--border-strong); }
 .my-team-line[open] > :not(summary) { margin-top: 0.35rem; }
 
 .my-team-line-range { margin: 6px 0 0; color: var(--text-dim); font-size: 12px; }
+/* Following more than one team: a logo per team, main first. */
+.my-team-tabs { display: flex; gap: 6px; margin: -2px 0 2px; overflow-x: auto; scrollbar-width: none; }
+.my-team-tabs::-webkit-scrollbar { display: none; }
+.my-team-tab { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 6px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.my-team-tab img { width: 22px; height: 22px; object-fit: contain; }
+.my-team-tab-on { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }

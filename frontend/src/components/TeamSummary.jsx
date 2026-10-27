@@ -1,5 +1,5 @@
 import { teamLogo } from "../utils/teamLogo.js";
-import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
+import { MAX_FOLLOWED, useFollowedTeams } from "../hooks/useFavoriteTeam.js";
 
 // Header of the team page: identity, playoff status, and the season at a
 // glance. Replaces the old TeamCard that sat under the standings table.
@@ -13,9 +13,11 @@ function formatPointPct(value) {
 }
 
 function TeamSummary({ team }) {
-  const [favorite, setFavorite] = useFavoriteTeam();
+  const [following, { follow, unfollow }] = useFollowedTeams();
   if (!team) return null;
-  const isFavorite = favorite === team.team_abbrev;
+  const isFollowed = following.includes(team.team_abbrev);
+  const isMain = following[0] === team.team_abbrev;
+  const full = !isFollowed && following.length >= MAX_FOLLOWED;
 
   const inPlayoffs = isInPlayoffSpot(team);
   const diff = team.goal_differential;
@@ -42,11 +44,13 @@ function TeamSummary({ team }) {
         </div>
         <button
           type="button"
-          className={isFavorite ? "follow-button follow-button-on" : "follow-button"}
-          aria-pressed={isFavorite}
-          onClick={() => setFavorite(isFavorite ? null : team.team_abbrev)}
+          className={isFollowed ? "follow-button follow-button-on" : "follow-button"}
+          aria-pressed={isFollowed}
+          disabled={full}
+          title={full ? `You're following ${MAX_FOLLOWED} teams. Stop following one on the Scores page to add another.` : undefined}
+          onClick={() => (isFollowed ? unfollow(team.team_abbrev) : follow(team.team_abbrev))}
         >
-          {isFavorite ? "★ My team" : "☆ Make my team"}
+          {isMain ? "★ My team" : isFollowed ? "✓ Following" : "☆ Follow"}
         </button>
         <span className={inPlayoffs ? "playoff-badge playoff-in" : "playoff-badge playoff-out"}>
           {inPlayoffs ? "In playoff spot" : "Outside looking in"}

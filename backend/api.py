@@ -71,7 +71,7 @@ import season_scenarios
 import win_probability
 from seasons import season_games
 from response_models.feedback import FeedbackIn
-from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn
+from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn, PickemRenameIn
 from response_models.push import PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
@@ -1528,6 +1528,39 @@ def pickem_join(request: Request, body: PickemJoinIn):
     finally:
         conn.close()
     return {"name": name, "key": key}
+
+
+@app.post("/pickem/rename")
+@limiter.limit(PICKEM_JOIN_RATE_LIMIT)
+def pickem_rename(request: Request, body: PickemRenameIn):
+    """
+    Change a player's display name, under the same rules as joining (and
+    the same hourly limit, so a name can't be cycled). Picks and record
+    stay. 409 if the name is taken.
+    """
+    import pickem
+
+    name = body.name.strip()
+    problem = pickem.name_problem(name)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            player = _pickem_player(cur, body.key)
+            cur.execute("UPDATE pickem_players SET display_name = %s WHERE player_id = %s", (name, player["player_id"]))
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail="That name is taken.")
+    except psycopg2.Error as exc:
+        conn.rollback()
+        if _pickem_tables_missing(exc):
+            raise HTTPException(status_code=503, detail="Pick'em isn't set up yet.")
+        raise
+    finally:
+        conn.close()
+    return {"name": name}
 
 
 @app.post("/pickem/me")

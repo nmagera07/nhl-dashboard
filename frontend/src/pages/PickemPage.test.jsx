@@ -19,6 +19,7 @@ function mockApi({ me, onPost } = {}) {
     const reply = (status, json) => ({ ok: status < 300, status, json: async () => json });
     if (url.endsWith("/pickem/join")) return reply(200, { name: body.name, key: "pp_testkey_1234567890" });
     if (url.endsWith("/pickem/me")) return me ? reply(200, me) : reply(401, { detail: "Unknown player key." });
+    if (url.endsWith("/pickem/rename")) return body.name === "Taken" ? reply(409, { detail: "That name is taken." }) : reply(200, { name: body.name.trim() });
     if (url.endsWith("/pickem/pick")) { onPost?.(body); return reply(200, { game_id: body.game_id, pick: body.team }); }
     if (url.includes("/pickem/leaderboard")) return reply(200, BOARD);
     if (url.includes("/season-sim")) return reply(200, SIM);
@@ -39,7 +40,7 @@ describe("PickemPage", () => {
     renderPage();
     await userEvent.type(screen.getByLabelText(/display name/i), "Nate");
     await userEvent.click(screen.getByRole("button", { name: "Join" }));
-    expect(await screen.findByText(/1 pending/)).toHaveTextContent("Nate · 7-3 (70%) · 1 pending");
+    expect(await screen.findByText(/1 pending/)).toHaveTextContent("7-3 (70%) · 1 pending");
     expect(localStorage.getItem("puckpulse:pickem-key")).toBe("pp_testkey_1234567890");
   });
 
@@ -60,6 +61,26 @@ describe("PickemPage", () => {
     const live = screen.getByRole("button", { name: "WSH" });
     expect(live).toBeDisabled(); // already live: locked, and PuckPulse's pick is shown
     expect(within(live.closest("li")).getByText(/Locked/)).toBeInTheDocument();
+  });
+
+  it("edits the display name, and says when a name is taken", async () => {
+    localStorage.setItem("puckpulse:pickem-key", "pp_saved");
+    const fetch = mockApi({ me: ME });
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "Edit name" }));
+    const input = screen.getByRole("textbox", { name: "Display name" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Taken");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That name is taken.");
+
+    await userEvent.clear(input);
+    await userEvent.type(input, "Nate M");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Nate M")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Display name" })).not.toBeInTheDocument();
+    const renames = fetch.mock.calls.filter(([url]) => url.endsWith("/pickem/rename")).map(([, o]) => JSON.parse(o.body));
+    expect(renames.at(-1)).toEqual({ key: "pp_saved", name: "Nate M" });
   });
 
   it("shows the leaderboard with PuckPulse as the benchmark", async () => {

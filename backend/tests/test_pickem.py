@@ -62,6 +62,28 @@ class TestRoutes:
         response = client.post("/pickem/join", json={"name": "PuckPulse"})
         assert response.status_code == 400 and "reserved" in response.json()["detail"]
 
+    def test_rename_keeps_the_player(self, client, db_router):
+        db_router.when("from pickem_players where key_hash", {"player_id": "p1", "display_name": "Nate"})
+        db_router.when("update pickem_players set display_name", None)
+        assert client.post("/pickem/rename", json={"key": "pp_x", "name": " Nate M "}).json() == {"name": "Nate M"}
+        _, params = next((q, p) for q, p in db_router.calls if "update pickem_players" in q.lower())
+        assert params == ("Nate M", "p1")
+
+    def test_rename_uses_the_join_rules(self, client, db_router):
+        response = client.post("/pickem/rename", json={"key": "pp_x", "name": "PuckPulse"})
+        assert response.status_code == 400 and "reserved" in response.json()["detail"]
+        db_router.when("from pickem_players where key_hash", None)
+        assert client.post("/pickem/rename", json={"key": "pp_nope", "name": "Nate"}).status_code == 401
+
+    def test_rename_to_a_taken_name_is_409(self, client, db_router):
+        import psycopg2.errors
+
+        def taken(params):
+            raise psycopg2.errors.UniqueViolation()
+        db_router.when("from pickem_players where key_hash", {"player_id": "p1", "display_name": "Nate"})
+        db_router.when("update pickem_players set display_name", taken)
+        assert client.post("/pickem/rename", json={"key": "pp_x", "name": "Wayne"}).status_code == 409
+
     def test_unknown_key_is_401(self, client, db_router):
         db_router.when("from pickem_players where key_hash", None)
         assert client.post("/pickem/me", json={"key": "pp_nope"}).status_code == 401

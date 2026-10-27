@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- One-color puck mark (white on transparent) for places the system
+       colors in itself: Android's notification badge and themed app icons.
+       The pulse line is cut out of the puck. The mark sits in the central
+       safe zone, so it survives an adaptive icon's mask. -->
+  <defs>
+    <mask id="pulse">
+      <rect width="512" height="512" fill="#fff"/>
+      <polyline points="118,230 222,230 238,206 254,250 274,150 294,282 310,222 396,222" fill="none" stroke="#000" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M86 250 a176 72 0 0 0 340 0" fill="none" stroke="#000" stroke-width="14"/>
+    </mask>
+  </defs>
+  <g transform="translate(256 256) scale(0.82) translate(-256 -262)" mask="url(#pulse)">
+    <path d="M80 226 v84 a176 72 0 0 0 352 0 v-84 z" fill="#fff"/>
+    <ellipse cx="256" cy="226" rx="176" ry="72" fill="#fff"/>
+  </g>
+</svg>

@@ -13,7 +13,9 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "PuckPulse", {
       body: data.body || "",
       icon: "/pwa-192x192.png",
-      badge: "/pwa-192x192.png",
+      // The status-bar icon: Android uses only its shape (alpha), so it is a
+      // white mark on transparent; the full-color icon came out as a block.
+      badge: "/icons/puckpulse-mono-96.png",
       // Tags are per goal (and per final), so each one is its own
       // notification; renotify only matters if a tag ever repeats.
       tag: data.tag,

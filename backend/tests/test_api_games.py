@@ -1,3 +1,6 @@
+from datetime import date
+
+
 def test_games_today_returns_live_feed(client, monkeypatch):
     import api
 
@@ -166,6 +169,25 @@ class TestSwingOfTheNight:
         assert share["game_id"] == 2026020149 and share["image"].endswith("/og/swing/2026-10-20.png")
         image = client.get("/og/swing/2026-10-20.png")
         assert image.status_code == 200 and image.content[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_a_settled_night_is_saved_and_read_back(self, client, monkeypatch, db_router):
+        calls = self.setup(monkeypatch)
+        monkeypatch.setattr(self, "GAMES", self.GAMES[:1])  # every game final
+        saved = {}
+        db_router.when("select payload from swing_of_the_night", lambda params: saved.get(params[0]))
+        db_router.when("insert into swing_of_the_night", lambda params: saved.setdefault(params[0], {"payload": params[1].adapted}))
+        first = client.get("/swing-of-the-night?date=2026-10-20").json()
+        assert "settled" not in first and list(saved) == [date(2026, 10, 20)]
+        import api
+        api.daily_cache.clear()  # as after a restart
+        assert client.get("/swing-of-the-night?date=2026-10-20").json() == first
+        assert calls == [2026020149]  # built once; the second came from the saved row
+
+    def test_a_night_still_playing_isnt_saved(self, client, monkeypatch, db_router):
+        self.setup(monkeypatch)  # one game hasn't started
+        db_router.when("select payload from swing_of_the_night", None)
+        client.get("/swing-of-the-night?date=2026-10-20")
+        assert not [q for q, _ in db_router.calls if "INSERT" in q]
 
     def test_a_night_without_games(self, client, monkeypatch):
         import api

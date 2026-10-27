@@ -242,6 +242,22 @@ def creators(cur):
     return [{"endpoint": e, "p256dh": p, "auth": a} for e, p, a in cur.fetchall()]
 
 
+def precompute_swing(now=None, get=None):
+    """
+    Ask the API for last night's Swing of the Night, so it's built (5-11 s)
+    and saved once every game is final, before anyone visits. Hourly in the
+    early morning; once saved, each later ask is a quick read. Returns
+    whether the API answered.
+    """
+    day = ((now or datetime.now(timezone.utc)).astimezone(EASTERN).date() - timedelta(days=1)).isoformat()
+    try:
+        (get or requests.get)(SWING_URL.format(day=day), timeout=60).raise_for_status()
+    except requests.RequestException as exc:
+        logger.warning("Swing of the Night precompute for %s failed (%s)", day, exc.__class__.__name__)
+        return False
+    return True
+
+
 def creator_reminder(now=None, fetch=None):
     """
     The morning after a game night, once: "Swing of the Night is ready, tap

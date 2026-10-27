@@ -246,3 +246,19 @@ class TestDeliveryLog:
 
     def test_device_label_tells_devices_apart_without_the_whole_endpoint(self):
         assert n.device_label("https://fcm.googleapis.com/fcm/send/abcdefXYZ123") == "fcm.googleapis.com ...XYZ123"
+
+
+def test_precompute_asks_the_api_for_last_nights_swing():
+    asked = []
+
+    class Ok:
+        def raise_for_status(self):
+            pass
+
+    now = datetime(2026, 10, 27, 7, 40, tzinfo=timezone.utc)  # 3:40 AM ET
+    assert n.precompute_swing(now, get=lambda url, timeout: asked.append(url) or Ok())
+    assert asked == [n.SWING_URL.format(day="2026-10-26")]
+
+    def down(url, timeout):
+        raise n.requests.ConnectionError()
+    assert not n.precompute_swing(now, get=down)

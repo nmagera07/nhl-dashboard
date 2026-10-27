@@ -582,3 +582,13 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 GRANT INSERT ON feedback TO nhl_api_readonly;
 GRANT USAGE ON SEQUENCE feedback_id_seq TO nhl_api_readonly;
+
+-- Swing of the Night (api.py _swing) for nights whose games are all final,
+-- so a restart reads it back instead of rebuilding every curve. The API
+-- writes it:
+--   GRANT SELECT, INSERT ON swing_of_the_night TO nhl_api_readonly;
+CREATE TABLE IF NOT EXISTS swing_of_the_night (
+    day                     DATE PRIMARY KEY,          -- the night, Eastern
+    payload                 JSONB NOT NULL,            -- GET /swing-of-the-night's response
+    computed_at             TIMESTAMPTZ DEFAULT NOW()
+);

@@ -6,14 +6,14 @@ import MyTeamCard, { TeamPicker } from "../components/MyTeamCard.jsx";
 import PickemCard from "../components/PickemCard.jsx";
 import SwingOfTheNight from "../components/SwingOfTheNight.jsx";
 import TopHeadlines from "../components/TopHeadlines.jsx";
-import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
+import { useFollowedTeams } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
 
 // The selected day lives in the URL (/?date=2026-10-06), so the back
 // button, refreshes, and shared links all keep it. No date = today.
 function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
-  const [favorite, setFavorite] = useFavoriteTeam();
-  const myTeam = standings.find((t) => t.team_abbrev === favorite);
+  const [following, { follow }] = useFollowedTeams();
+  const myTeams = following.map((abbrev) => standings.find((t) => t.team_abbrev === abbrev)).filter(Boolean);
   const [searchParams, setSearchParams] = useSearchParams();
   const today = todayISO();
   const param = searchParams.get("date");
@@ -58,14 +58,14 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
       {/* Scores first: the games lead, with your team's game pinned to the top.
           Your team's card and the headlines follow; the morning digest lives on News. */}
       <p className="page-subtitle scores-date">{longDateLabel(date)}</p>
-      <Scoreboard key={date} date={isToday ? null : date} pinTeam={favorite || null} />
+      <Scoreboard key={date} date={isToday ? null : date} pinTeams={following} />
       {isToday && <PickemCard />}
       {isToday && <SwingOfTheNight />}
-      {myTeam ? (
-        <MyTeamCard team={myTeam} odds={playoffOddsByTeam[myTeam.team_abbrev]} teams={standings} onChangeTeam={setFavorite} />
-      ) : standings.length > 0 && !favorite ? (
+      {myTeams.length > 0 ? (
+        <MyTeamCard followed={myTeams} oddsByTeam={playoffOddsByTeam} teams={standings} />
+      ) : standings.length > 0 && following.length === 0 ? (
         <div className="my-team-prompt">
-          <TeamPicker teams={standings} onPick={setFavorite} />
+          <TeamPicker teams={standings} onPick={(abbrev) => abbrev && follow(abbrev)} />
           <span>Pin your team's next game, results, and playoff odds here.</span>
         </div>
       ) : null}

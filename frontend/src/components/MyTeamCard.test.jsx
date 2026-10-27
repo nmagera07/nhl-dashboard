@@ -7,7 +7,9 @@ const PIT = {
   team_abbrev: "PIT", team_name: "Pittsburgh Penguins", division: "Metropolitan", logo_url: null,
   wins: 2, losses: 2, ot_losses: 0, points: 4, division_sequence: 5, streak_code: "L", streak_count: 2,
 };
-const TEAMS = [PIT, { ...PIT, team_abbrev: "BOS", team_name: "Boston Bruins" }];
+const BOS = { ...PIT, team_abbrev: "BOS", team_name: "Boston Bruins", wins: 6 };
+const FLA = { ...PIT, team_abbrev: "FLA", team_name: "Florida Panthers" };
+const TEAMS = [PIT, BOS, FLA];
 
 const game = (id, opponent, extra) => ({ id, opponent, home: true, opponent_logo: null, start_time_utc: "2026-10-09T23:00:00Z", ...extra });
 const SCHEDULE = {
@@ -29,13 +31,16 @@ function mockSchedule(schedule = SCHEDULE) {
 function renderCard(props = {}) {
   return render(
     <MemoryRouter>
-      <MyTeamCard team={PIT} odds={0.57} teams={TEAMS} onChangeTeam={vi.fn()} {...props} />
+      <MyTeamCard followed={[PIT]} oddsByTeam={{ PIT: 0.57 }} teams={TEAMS} {...props} />
     </MemoryRouter>
   );
 }
 
 describe("MyTeamCard", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
 
   it("shows the season, odds, next game, and recent results", async () => {
     const fetchMock = mockSchedule();
@@ -66,18 +71,41 @@ describe("MyTeamCard", () => {
     expect(await screen.findByText("Couldn't load the schedule.")).toBeInTheDocument();
   });
 
-  it("can switch teams or stop following", async () => {
+  it("adds a team, and stops following one", async () => {
     mockSchedule();
-    const onChangeTeam = vi.fn();
-    renderCard({ onChangeTeam });
+    window.localStorage.setItem("nhl-dash:followed-teams", JSON.stringify(["PIT"]));
+    renderCard();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument(); // one team: no tabs
 
-    await userEvent.click(screen.getByRole("button", { name: "Change team" }));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: /switch to/i }), "BOS");
-    expect(onChangeTeam).toHaveBeenLastCalledWith("BOS");
+    await userEvent.click(screen.getByRole("button", { name: "+ Add team" }));
+    const picker = screen.getByRole("combobox", { name: /add a team/i });
+    expect(within(picker).queryByRole("option", { name: "Pittsburgh Penguins" })).not.toBeInTheDocument(); // already followed
+    await userEvent.selectOptions(picker, "BOS");
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["PIT", "BOS"]);
 
-    await userEvent.click(screen.getByRole("button", { name: "Change team" }));
-    await userEvent.click(screen.getByRole("button", { name: "Stop following" }));
-    expect(onChangeTeam).toHaveBeenLastCalledWith(null);
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Stop following PIT" }));
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["BOS"]);
+  });
+
+  it("switches between followed teams with their logos, and can make one the main team", async () => {
+    mockSchedule();
+    window.localStorage.setItem("nhl-dash:followed-teams", JSON.stringify(["PIT", "BOS", "FLA"]));
+    renderCard({ followed: [PIT, BOS, FLA], oddsByTeam: { PIT: 0.57, BOS: 0.81 } });
+
+    const tabs = within(screen.getByRole("tablist", { name: "Your teams" })).getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["PIT", "BOS", "FLA"]);
+    expect(screen.getByRole("region", { name: "My team: Pittsburgh Penguins" })).toBeInTheDocument();
+
+    await userEvent.click(tabs[1]);
+    expect(screen.getByRole("region", { name: "Following: Boston Bruins" })).toBeInTheDocument();
+    expect(screen.getByText("81%")).toBeInTheDocument();
+    expect(screen.getByText(/^6-2-0/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Make my main team" }));
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["BOS", "PIT", "FLA"]);
+    expect(window.localStorage.getItem("nhl-dash:favorite-team")).toBe("BOS");
   });
 });
 

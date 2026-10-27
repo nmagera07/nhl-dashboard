@@ -8,6 +8,7 @@ import { gameTimeLabel } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import { formatPct, pointsPace } from "../utils/pointsPace.js";
 import GoalAlerts from "./GoalAlerts.jsx";
+import { MAX_FOLLOWED, useFollowedTeams } from "../hooks/useFavoriteTeam.js";
 
 const LIVE_REFRESH_MS = 30_000;
 
@@ -41,8 +42,8 @@ function useTeamSchedule(abbrev) {
     };
   }, [abbrev, url]);
 
-  // Ignore a previous team's data while the new team's loads.
-  return state.abbrev === abbrev ? state : { data: null, error: false };
+  // Ignore a previous team's data while the new team's loads (its last copy shows meanwhile, if there is one).
+  return state.abbrev === abbrev ? state : { data: cachedResponse(url) ?? null, error: false };
 }
 
 const STALE_LINE_DAYS = 7;
@@ -179,8 +180,8 @@ function RecentResults({ games }) {
   );
 }
 
-export function TeamPicker({ teams, value, onPick, label = "Follow a team" }) {
-  const sorted = [...teams].sort((a, b) => a.team_name.localeCompare(b.team_name));
+export function TeamPicker({ teams, value, onPick, label = "Follow a team", exclude = [] }) {
+  const sorted = teams.filter((t) => !exclude.includes(t.team_abbrev)).sort((a, b) => a.team_name.localeCompare(b.team_name));
   return (
     <label className="team-picker">
       <span>{label}</span>
@@ -194,12 +195,21 @@ export function TeamPicker({ teams, value, onPick, label = "Follow a team" }) {
   );
 }
 
-// Your team at a glance, at the top of the Scores page: the season so far,
-// playoff odds, the live or next game, and recent results.
-function MyTeamCard({ team, odds, teams, onChangeTeam }) {
+// Your teams at a glance, on the Scores page: the season so far, playoff
+// odds, the live or next game, and recent results. Following more than one
+// team adds a row of logos to switch between them (main team first); goal
+// alerts cover all of them.
+// followed: standings rows of the followed teams, main first.
+function MyTeamCard({ followed, oddsByTeam = {}, teams }) {
+  const [, { follow, unfollow, makeMain }] = useFollowedTeams();
+  const [selected, setSelected] = useState(null);
+  const [mode, setMode] = useState(null); // null | "add" | "edit"
+  const team = followed.find((t) => t.team_abbrev === selected) || followed[0];
+  const isMain = team === followed[0];
   const schedule = useTeamSchedule(team.team_abbrev);
   const playoffLine = usePlayoffLine();
-  const [changing, setChanging] = useState(false);
+  const odds = oddsByTeam[team.team_abbrev];
+  const abbrevs = followed.map((t) => t.team_abbrev);
 
   const facts = [
     `${team.wins}-${team.losses}-${team.ot_losses}`,
@@ -209,12 +219,24 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
   ].filter(Boolean);
 
   return (
-    <section className="my-team-card" aria-label={`My team: ${team.team_name}`}>
+    <section className="my-team-card" aria-label={`${isMain ? "My team" : "Following"}: ${team.team_name}`}>
+      {followed.length > 1 && (
+        <div className="my-team-tabs" role="tablist" aria-label="Your teams">
+          {followed.map((t) => (
+            <button key={t.team_abbrev} type="button" role="tab" aria-selected={t === team} title={t.team_name}
+                    className={t === team ? "my-team-tab my-team-tab-on" : "my-team-tab"}
+                    onClick={() => { setSelected(t.team_abbrev); setMode(null); }}>
+              {t.logo_url && <img src={teamLogo(t.logo_url)} alt="" />}
+              <span>{t.team_abbrev}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="my-team-header">
         <Link className="my-team-identity" to={`/teams/${team.team_abbrev}`}>
           {team.logo_url && <img className="my-team-logo" src={teamLogo(team.logo_url)} alt="" />}
           <span>
-            <span className="my-team-kicker">★ My team</span>
+            <span className="my-team-kicker">{isMain ? "★ My team" : "Following"}</span>
             <span className="my-team-name">{team.team_name}</span>
           </span>
         </Link>
@@ -240,24 +262,28 @@ function MyTeamCard({ team, odds, teams, onChangeTeam }) {
       )}
 
       <div className="my-team-footer">
-        {changing ? (
+        {mode === "add" ? (
           <>
-            <TeamPicker
-              teams={teams}
-              value={team.team_abbrev}
-              label="Switch to"
-              onPick={(abbrev) => {
-                setChanging(false);
-                if (abbrev) onChangeTeam(abbrev);
-              }}
-            />
-            <button type="button" className="link-button" onClick={() => onChangeTeam(null)}>Stop following</button>
+            <TeamPicker teams={teams} exclude={abbrevs} label="Add a team" onPick={(abbrev) => {
+              setMode(null);
+              if (abbrev) { follow(abbrev); setSelected(abbrev); }
+            }} />
+            <button type="button" className="link-button" onClick={() => setMode(null)}>Cancel</button>
+          </>
+        ) : mode === "edit" ? (
+          <>
+            {!isMain && <button type="button" className="link-button" onClick={() => { makeMain(team.team_abbrev); setMode(null); }}>Make my main team</button>}
+            <button type="button" className="link-button" onClick={() => { unfollow(team.team_abbrev); setSelected(null); setMode(null); }}>
+              Stop following {team.team_abbrev}
+            </button>
+            <button type="button" className="link-button" onClick={() => setMode(null)}>Done</button>
           </>
         ) : (
           <>
-            <GoalAlerts team={team.team_abbrev} />
+            <GoalAlerts teams={abbrevs} />
             <Link className="my-team-sim-link" to={`/teams/${team.team_abbrev}#season-sim`}>Sim the season ›</Link>
-            <button type="button" className="link-button" onClick={() => setChanging(true)}>Change team</button>
+            {followed.length < MAX_FOLLOWED && <button type="button" className="link-button" onClick={() => setMode("add")}>+ Add team</button>}
+            <button type="button" className="link-button" onClick={() => setMode("edit")}>Edit</button>
           </>
         )}
       </div>

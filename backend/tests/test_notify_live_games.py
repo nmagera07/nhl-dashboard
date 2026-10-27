@@ -58,7 +58,7 @@ class TestEvents:
             return {**_game("LIVE"), "periodDescriptor": {"number": period}, "clock": {"secondsRemaining": seconds_left}}
 
         (start,), _ = n.events_for([live(1150)], NOW)
-        assert start["key"] == "start:2026020068" and start["kind"] == "goals" and start["ttl"] == 900
+        assert start["key"] == "start:2026020068" and start["kind"] == "starts" and start["ttl"] == 900
         assert start["payload"]["title"] == "🏒 Puck drop: PIT @ CBJ" and start["payload"]["url"] == "/games/2026020068"
         assert n.events_for([live(800)], NOW) == ([], [])  # 13 minutes in: too late to announce
         assert n.events_for([live(1150, period=2)], NOW) == ([], [])
@@ -283,3 +283,31 @@ def test_precompute_asks_the_api_for_last_nights_swing():
     def down(url, timeout):
         raise n.requests.ConnectionError()
     assert not n.precompute_swing(now, get=down)
+
+
+class TestSubscribers:
+    """Which devices an event goes to, by their alert settings (the SQL's inputs)."""
+
+    class Cur:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params):
+            self.calls.append((" ".join(sql.split()), params))
+
+        def fetchall(self):
+            return []
+
+    def test_goals_split_for_and_against_by_the_scoring_team(self):
+        cur = self.Cur()
+        n.subscribers(cur, ["PIT", "CBJ"], "goals", scorer="CBJ")
+        sql, params = cur.calls[0]
+        assert "(notify_goals AND %s = ANY(teams)) OR (notify_goals_against AND NOT %s = ANY(teams))" in sql
+        assert params == (["PIT", "CBJ"], "CBJ", "CBJ")
+
+    def test_puck_drop_and_finals_have_their_own_settings(self):
+        cur = self.Cur()
+        n.subscribers(cur, ["PIT", "CBJ"], "starts")
+        n.subscribers(cur, ["PIT", "CBJ"], "finals")
+        assert cur.calls[0][0].endswith("AND notify_starts") and cur.calls[1][0].endswith("AND notify_finals")
+

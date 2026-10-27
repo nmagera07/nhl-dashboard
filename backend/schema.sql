@@ -457,7 +457,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
     p256dh                  TEXT NOT NULL,
     auth                    TEXT NOT NULL,
     teams                   TEXT[] NOT NULL,
-    notify_goals            BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_starts           BOOLEAN NOT NULL DEFAULT TRUE,   -- puck drop
+    notify_goals            BOOLEAN NOT NULL DEFAULT TRUE,   -- goals by the followed teams
+    notify_goals_against    BOOLEAN NOT NULL DEFAULT TRUE,   -- goals by their opponents
     notify_finals           BOOLEAN NOT NULL DEFAULT TRUE,
     created_at              TIMESTAMP DEFAULT NOW(),
     updated_at              TIMESTAMP DEFAULT NOW()

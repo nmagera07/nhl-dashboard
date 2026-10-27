@@ -129,3 +129,11 @@ a.my-team-game:hover { border-color: var(--border-strong); }
 .my-team-tab { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 6px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .my-team-tab img { width: 22px; height: 22px; object-fit: contain; }
 .my-team-tab-on { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
+/* Alert settings (GoalAlerts.jsx): a full row under the card's footer links. */
+.alert-settings { order: 10; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 4px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
+.alert-settings legend { padding: 0 4px; color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.alert-settings label { display: inline-flex; align-items: center; gap: 6px; color: var(--text); cursor: pointer; }
+.alert-settings input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.alert-settings-teams { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.alert-settings-teams > span { color: var(--text-dim); font-size: 12px; }
+.alert-settings > .link-button { margin-left: auto; }

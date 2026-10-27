@@ -66,11 +66,17 @@ function GameCard({ game, onOpen, mine }) {
 }
 
 // Your team's game goes first, then the usual order (live, upcoming, final).
-function orderGames(games, pinTeam) {
+// Where a game ranks among the followed teams' (main team first), or -1.
+const pinRank = (game, pinTeams) => {
+  const ranks = [game.awayTeam?.abbrev, game.homeTeam?.abbrev].map((t) => pinTeams.indexOf(t)).filter((i) => i >= 0);
+  return ranks.length ? Math.min(...ranks) : -1;
+};
+
+function orderGames(games, pinTeams) {
   const sorted = sortGames(games);
-  if (!pinTeam) return sorted;
-  const isMine = (g) => g.awayTeam?.abbrev === pinTeam || g.homeTeam?.abbrev === pinTeam;
-  return [...sorted.filter(isMine), ...sorted.filter((g) => !isMine(g))];
+  if (!pinTeams.length) return sorted;
+  const mine = sorted.filter((g) => pinRank(g, pinTeams) >= 0).sort((a, b) => pinRank(a, pinTeams) - pinRank(b, pinTeams));
+  return [...mine, ...sorted.filter((g) => pinRank(g, pinTeams) < 0)];
 }
 
 // date: "YYYY-MM-DD" for another day, or null for today (which also
@@ -78,7 +84,8 @@ function orderGames(games, pinTeam) {
 // Today is fetched by its date, not the NHL's "score/now" feed: that feed
 // keeps showing last night's games until late morning, which put
 // yesterday's finals under today's date.
-export default function Scoreboard({ date = null, pinTeam = null }) {
+// pinTeams: the followed teams, main first; their games lead the list.
+export default function Scoreboard({ date = null, pinTeams = [] }) {
   const navigate = useNavigate();
   const location = useLocation();
   // Coming back from a box score: show the scores we just had, then refresh.
@@ -120,9 +127,8 @@ export default function Scoreboard({ date = null, pinTeam = null }) {
         <p className="scoreboard-empty">{date ? "No games on this day." : "No games scheduled today."}</p>
       )}
       <div className="scoreboard-games">
-        {orderGames(games, pinTeam).map((game) => (
-          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)}
-            mine={!!pinTeam && (game.awayTeam?.abbrev === pinTeam || game.homeTeam?.abbrev === pinTeam)} />
+        {orderGames(games, pinTeams).map((game) => (
+          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)} mine={pinRank(game, pinTeams) >= 0} />
         ))}
       </div>
     </section>

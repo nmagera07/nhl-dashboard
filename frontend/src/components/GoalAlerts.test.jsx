@@ -15,7 +15,7 @@ describe("GoalAlerts", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("turns alerts on for the team, then off", async () => {
-    render(<GoalAlerts team="PIT" />);
+    render(<GoalAlerts teams={["PIT"]} />);
 
     await userEvent.click(screen.getByRole("button", { name: /goal alerts/i }));
     expect(push.enableAlerts).toHaveBeenCalledWith(["PIT"]);
@@ -28,7 +28,7 @@ describe("GoalAlerts", () => {
 
   it("shows alerts on for a subscribed device and keeps its team current", async () => {
     push.currentSubscription.mockResolvedValueOnce({ endpoint: "https://fcm.googleapis.com/x" });
-    render(<GoalAlerts team="BOS" />);
+    render(<GoalAlerts teams={["BOS"]} />);
 
     expect(await screen.findByRole("button", { name: /alerts on/i })).toBeInTheDocument();
     expect(push.updateAlertTeams).toHaveBeenCalledWith(["BOS"]);
@@ -36,26 +36,26 @@ describe("GoalAlerts", () => {
 
   it("explains the iPhone home-screen requirement", () => {
     push.pushSupport.mockReturnValue("ios-install");
-    render(<GoalAlerts team="PIT" />);
+    render(<GoalAlerts teams={["PIT"]} />);
     expect(screen.getByText(/add to home screen for goal alerts/i)).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("says when notifications are blocked, and hides itself where push can't work", () => {
     push.pushSupport.mockReturnValue("denied");
-    const { unmount } = render(<GoalAlerts team="PIT" />);
+    const { unmount } = render(<GoalAlerts teams={["PIT"]} />);
     expect(screen.getByText(/blocked in settings/i)).toBeInTheDocument();
     unmount();
 
     push.pushSupport.mockReturnValue("unsupported");
-    const { container } = render(<GoalAlerts team="PIT" />);
+    const { container } = render(<GoalAlerts teams={["PIT"]} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the error if subscribing fails", async () => {
     push.pushSupport.mockReturnValue("ready");
     push.enableAlerts.mockRejectedValueOnce(new Error("Notifications aren't set up on the server yet."));
-    render(<GoalAlerts team="PIT" />);
+    render(<GoalAlerts teams={["PIT"]} />);
 
     await userEvent.click(screen.getByRole("button", { name: /goal alerts/i }));
 

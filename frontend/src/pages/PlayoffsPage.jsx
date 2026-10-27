@@ -8,7 +8,7 @@ import OddsWhy from "../components/OddsWhy.jsx";
 import StatAbbr from "../components/StatAbbr.jsx";
 import StatGlossary from "../components/StatGlossary.jsx";
 import FavoriteStar from "../components/FavoriteStar.jsx";
-import { useFavoriteTeam } from "../hooks/useFavoriteTeam.js";
+import { useFollowedTeams } from "../hooks/useFavoriteTeam.js";
 import { teamLogo } from "../utils/teamLogo.js";
 import { formatSeasonLabel } from "../utils/formatSeasonLabel.js";
 import { buildSeries, clinchStatus, formatOdds, latestWithChange, raceGroups, seasonGames } from "../utils/playoffRace.js";
@@ -30,7 +30,7 @@ function Change({ value }) {
 
 function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChange }) {
   const columns = showChange ? 6 : 5;
-  const [favorite] = useFavoriteTeam();
+  const [following] = useFollowedTeams();
   return (
     <>
       <tr className="race-group">
@@ -58,7 +58,7 @@ function RaceRows({ label, teams, odds, highlighted, onHighlight, why, showChang
                 <span className="team-cell">
                   <img className="team-cell-logo" src={teamLogo(row.logo_url)} alt="" />
                   <span className="team-abbrev">{row.team_abbrev}</span>
-                  {row.team_abbrev === favorite && <FavoriteStar />}
+                  {following.includes(row.team_abbrev) && <FavoriteStar />}
                   {status && <span className={`race-badge race-badge-${status.tone}`} title={status.title}>{status.label}</span>}
                 </span>
               </td>

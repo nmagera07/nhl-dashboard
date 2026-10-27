@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { currentSubscription, disableAlerts, enableAlerts, pushSupport, updateAlertTeams } from "../utils/push.js";
 
-// "🔔 Goal alerts" for the followed team: a push notification at puck drop,
-// for every goal in its games, and the final score. Adapts to what this
-// device can do.
-function GoalAlerts({ team }) {
+// "🔔 Goal alerts" for the followed teams: a push notification at puck
+// drop, for every goal in their games, and the final score. Adapts to what
+// this device can do.
+function GoalAlerts({ teams }) {
+  const key = teams.join(",");
   const [support, setSupport] = useState(() => pushSupport());
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -17,13 +18,13 @@ function GoalAlerts({ team }) {
       .then((sub) => {
         if (!active) return;
         setOn(Boolean(sub));
-        if (sub) updateAlertTeams([team]).catch(() => {});
+        if (sub) updateAlertTeams(key.split(",")).catch(() => {});
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [team]);
+  }, [key]);
 
   if (support === "unsupported") return null;
   if (support === "ios-install") {
@@ -41,7 +42,7 @@ function GoalAlerts({ team }) {
         await disableAlerts();
         setOn(false);
       } else {
-        const permission = await enableAlerts([team]);
+        const permission = await enableAlerts(teams);
         if (permission === "granted") setOn(true);
         else setSupport(pushSupport());
       }
@@ -60,7 +61,7 @@ function GoalAlerts({ team }) {
         aria-pressed={on}
         disabled={busy}
         onClick={toggle}
-        title={on ? "Turn off game notifications" : `Get a notification at puck drop, for every ${team} goal (and goal against), and the final score`}
+        title={on ? "Turn off game notifications" : `Get a notification at puck drop, for every ${teams.join(", ")} goal (and goal against), and the final score`}
       >
         {busy ? "…" : on ? "🔔 Alerts on" : "🔔 Goal alerts"}
       </button>

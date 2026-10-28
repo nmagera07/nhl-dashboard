@@ -165,6 +165,22 @@ describe("PlayerPanel advanced stats", () => {
     expect(screen.queryByText(/Age \d+/)).not.toBeInTheDocument();
   });
 
+  it("opens WAR's breakdown on request, for skaters that have one", async () => {
+    const parts = { ev_offense: 3.12, ev_defense: -0.4, finishing: 1.2, power_play: 0.5, penalty_kill: 0, penalties: 0.3 };
+    renderPanel(skater({ war: { war: 0.77, gar: 4.75, games_played: 9, group: "forwards", rank: 1, of: 459, parts } }));
+    const toggle = screen.getByRole("button", { name: "What makes it up" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("5-on-5 offense")).not.toBeInTheDocument(); // hidden by default
+    await userEvent.click(toggle);
+    expect(screen.getByText("5-on-5 offense").nextSibling).toHaveTextContent("+3.1");
+    expect(screen.getByText("5-on-5 defense").nextSibling).toHaveTextContent("−0.4"); // a true minus sign, as formatSigned writes it
+  });
+
+  it("has no breakdown button before the parts exist", () => {
+    renderPanel(skater({ war: { war: 0.77, gar: 4.75, games_played: 9, group: "forwards", rank: 1, of: 459 } }));
+    expect(screen.queryByRole("button", { name: "What makes it up" })).not.toBeInTheDocument();
+  });
+
   it("shows this season's WAR and where it ranks in his position", () => {
     renderPanel(skater({ war: { war: 0.77, gar: 4.75, games_played: 9, group: "forwards", rank: 1, of: 459 } }));
     expect(screen.getByText("+0.77")).toBeInTheDocument();

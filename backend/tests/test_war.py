@@ -42,8 +42,9 @@ def test_store_replaces_the_season():
     war.store(cur, 20262027, {1: {"name": "Star", "team": "EDM", "pos": "C", "gp": 9, "gar": 4.75, "war": 0.77},
                               3: {"name": "Wall", "team": "BOS", "pos": "G", "gp": 5, "gar": 6.1, "war": 0.99}}, "2026-10-22")
     assert cur.sql[1] == ("DELETE FROM player_war WHERE season_id = %s", (20262027,))  # after CREATE TABLE
-    groups = [params[4] for sql, params in cur.sql if sql.startswith("INSERT")]
-    assert groups == ["F", "G"]
+    inserts = [params for sql, params in cur.sql if sql.startswith("INSERT")]
+    assert [p[4] for p in inserts] == ["F", "G"]
+    assert inserts[0][9:] == (None,) * 6  # v1-shaped rows store no parts
 
 
 class TestApi:
@@ -65,3 +66,16 @@ class TestApi:
         db_router.when("from player_season_history", [])
         body = client.get(f"/players/{player_bio_row['player_id']}").json()
         assert body["war"] == {"war": 0.77, "gar": 4.75, "games_played": 9, "group": "forwards", "rank": 1, "of": 459}
+
+    def test_skaters_get_the_v2_parts_once_stored(self, client, db_router, player_bio_row):
+        parts = {"ev_offense": 3.1, "ev_defense": -0.4, "finishing": 1.2, "power_play": 0.5, "penalty_kill": None,
+                 "penalties": 0.3}
+        db_router.when("from player_war where season_id", {"player_id": 8478402, "war": 0.77, "gar": 4.75, **parts,
+                                                           "games_played": 9, "position_group": "F", "rank": 1, "of": 459})
+        db_router.when("p.player_id = %s", player_bio_row)
+        db_router.when("from player_season_stats", [])
+        db_router.when("from player_advanced_stats", None)
+        db_router.when("from player_career_totals", [])
+        db_router.when("from player_season_history", [])
+        body = client.get(f"/players/{player_bio_row['player_id']}").json()
+        assert body["war"]["parts"] == {**parts, "penalty_kill": 0.0}

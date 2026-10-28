@@ -135,14 +135,51 @@ function AdvancedRanks({ stats, ranks }) {
   );
 }
 
+const WAR_PARTS = [
+  ["ev_offense", "5-on-5 offense"],
+  ["ev_defense", "5-on-5 defense"],
+  ["finishing", "Finishing"],
+  ["power_play", "Power play"],
+  ["penalty_kill", "Penalty kill"],
+  ["penalties", "Penalties drawn vs. taken"],
+];
+
 // "WAR +0.77 · 1st of 459 forwards": this season's wins above replacement, ranked within the position.
+// Skaters can open "What makes it up": the goals each part added (WAR v2's breakdown), hidden by default.
 function WarLine({ war }) {
+  const [open, setOpen] = useState(false);
   if (!war) return null;
   return (
-    <p className="player-war">
-      <StatAbbr term="WAR">WAR</StatAbbr> <strong>{formatSigned(war.war, 2)}</strong>
-      <span> · {ordinal(war.rank)} of {war.of} {war.group}</span>
-    </p>
+    <div className="player-war">
+      <p>
+        <StatAbbr term="WAR">WAR</StatAbbr> <strong>{formatSigned(war.war, 2)}</strong>
+        <span> · {ordinal(war.rank)} of {war.of} {war.group}</span>
+        {war.parts && (
+          <>
+            {" · "}
+            <button type="button" className="link-button" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+              What makes it up
+            </button>
+          </>
+        )}
+      </p>
+      {open && war.parts && (
+        <>
+          <ul className="war-parts">
+            {WAR_PARTS.map(([key, label]) => (
+              <li key={key}>
+                <span>{label}</span>
+                <strong>{formatSigned(war.parts[key], 1)}</strong>
+              </li>
+            ))}
+          </ul>
+          <p className="player-card-note">
+            Goals each part added over an average player. WAR also counts the gap to a replacement-level call-up, then turns
+            goals into wins.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

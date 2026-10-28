@@ -191,6 +191,83 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-27 — WAR v2: the fancier model lost the tests I cared about
+
+**What happened:** I built WAR v2 on RAPM (5v5 offense and defense with
+linemates and opponents separated out), plus finishing, special teams and
+penalties. Then I backtested it against v1 (Game Score) on four seasons of
+team wins, three ways:
+
+| | v1 | v2 |
+|---|---|---|
+| Same season (explains wins) | 0.888 | 0.909 |
+| Next season (predicts wins) | 0.672 | 0.563 |
+| Roster changes (predicts the change in wins) | 0.489 | 0.381 |
+
+v2 explains what happened better, and v1 predicts better, every way I tried.
+
+**What I tried before accepting it:**
+- Breaking v2 into parts: finishing and penalties carry over almost not at
+  all from one season to the next (r -0.06 and 0.02). Counting finishing at
+  half weight helped, but not enough.
+- A box-score prior (how Evolving-Hockey does it): each player's rating
+  starts from what his own stats suggest. Box stats explain RAPM offense
+  well (r 0.78 for forwards), but the prior didn't improve predictions on
+  unseen games. I also caught a bug where a setting wasn't passed through
+  and every "variant" was the same run, and added a test for it.
+- The roster-change test, to see whether v1 only looked good because team
+  context carried over. My theory was wrong: v1 still won.
+
+**What I learned:**
+- Individual production (goals, assists, shots) is a stronger signal of
+  talent from year to year than on-ice xG, even adjusted. A "more correct"
+  model isn't automatically a better predictor.
+- Decide what the number is for before choosing it. On the site, WAR is
+  "what a player has been worth so far"; projections come from a separate
+  model. For that job, v2 wins.
+- When a test result surprises you, check whether the test can actually
+  tell the options apart before believing it.
+
+**Interview angle:** "Tell me about a time your model didn't beat the
+baseline." This one: four tests, a theory that turned out wrong, and a
+decision based on what the number is used for.
+
+---
+
+## 2026-10-27 — RAPM: the "more repeatable" stat was the less honest one
+
+**What happened:** For WAR v2 I built RAPM: a ridge regression over every
+5-on-5 stint (about 450k a season) that rates each skater's offense and
+defense with his linemates and opponents accounted for. To check it, I
+compared how well each stat holds up year over year. Raw on-ice numbers
+won easily (net r 0.49 vs 0.39), which looked like RAPM was worse.
+
+**Why that was the wrong test:** Raw on-ice numbers carry a player's
+context: his linemates and his team. Most players keep the same team from
+one year to the next, so the context repeats and so does the number. Among
+the 126 players who changed teams, raw on-ice repeatability fell from 0.49
+to 0.26 net and RAPM's from 0.39 to 0.08 (a year earlier, RAPM won that
+group, 0.29 to 0.21): one season is too noisy for RAPM to hold up on its own. The fair test was out of sample: fit one season
+and predict the next season's stints. There, RAPM beat a players-free
+baseline, and starting each player from last season's rating (a ridge
+"prior") improved that gain by 17%.
+
+**What I learned:**
+- A stat can be repeatable because it measures something stable that
+  isn't the player. Check repeatability on the group where the context
+  changes.
+- Ridge regression with a prior is the standard fix for a noisy
+  single-season fit, and it's cheap: it only needs last season's ratings,
+  not last season's data.
+- With only 0/1 columns, the normal equations can be built by counting
+  (np.bincount), with no sparse-matrix library, and the same sums score
+  held-out data, so cross-validation never re-reads the rows.
+
+**Interview angle:** "How do you know your model works?" Pick the test that
+could prove you wrong, not the one that flatters the baseline.
+
+---
+
 ## 2026-10-24 — "Works on my machine": a setting read at import
 
 **What happened:** The first piece of user feedback asked for retired players, so I shipped

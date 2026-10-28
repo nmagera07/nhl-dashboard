@@ -8,8 +8,9 @@ name: Deploy Drift Check
 #
 # Production reports its commit at GET /health. It's up to date if the
 # newest commit on main that touched backend/ is that commit or one of
-# its ancestors, or if its backend/ code is identical to main's. Recent commits get a grace period so a deploy that's
-# still in progress isn't flagged.
+# its ancestors, or if its backend/ code is identical to main's. Changes
+# that reached main recently get a grace period so a deploy that's still
+# in progress isn't flagged.
 
 on:
   schedule:
@@ -35,7 +36,10 @@ jobs:
 
       - name: Compare production's commit to main
         run: |
-          latest=$(git log -1 --format=%H origin/main -- backend)
+          # --first-parent: the merge that brought the change into main, so
+          # the grace period runs from when it reached main, not from when it
+          # was written (a branch commit can be hours old by then).
+          latest=$(git log -1 --first-parent --format=%H origin/main -- backend)
           latest_time=$(git log -1 --format=%ct "$latest")
           echo "Latest backend commit on main: $latest ($(git log -1 --format='%ci %s' "$latest"))"
 

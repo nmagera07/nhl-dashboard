@@ -2,9 +2,18 @@
 
 from datetime import date
 
+import pytest
+
 import ingest_xg as ix
+import rapm_stints as rs
 import simulate_playoff_odds as sim
 import xg_model as xm
+
+
+@pytest.fixture(autouse=True)
+def no_toi_reports(monkeypatch):
+    """No real HTML time-on-ice report fetches: tests without a shift chart see none posted."""
+    monkeypatch.setattr(rs, "_get_text", lambda url: None)
 
 MODEL = {"version": 1, "coefficients": [-2.0] + [0.0] * (len(xm.FEATURE_NAMES) - 1)}  # every shot ~0.119
 
@@ -183,6 +192,14 @@ def test_stored_games_without_5v5_rows_get_filled_in():
     waiting = FakeCursor(missing_goalies=[2026020005])
     assert ix.fill_5v5(waiting, 20262027, get=lambda url: {"data": []} if "shiftcharts" in url else pbp, model=MODEL) == 0
     assert len(waiting.inserted) == 2 + 2  # goalies and teams still stored (no shooters in this fixture)
+
+
+def test_the_time_on_ice_reports_stand_in_for_a_missing_shift_chart(monkeypatch):
+    pbp = {**GOALIE_PBP, "rosterSpots": ROSTER}
+    monkeypatch.setattr(rs, "html_shifts", lambda game, get_text: SHIFTS if game is pbp else None)
+    cur = FakeCursor(missing_goalies=[2026020005])
+    assert ix.fill_5v5(cur, 20262027, get=lambda url: {"data": []} if "shiftcharts" in url else pbp, model=MODEL) == 1
+    assert len(cur.inserted) == 2 + 2 + 3  # goalies, teams, skaters with on-ice xG
 
 
 def test_a_past_season_backfills_from_cached_play_by_play(tmp_path):

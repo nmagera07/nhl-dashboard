@@ -11,11 +11,13 @@ typical night.
 
 Also stores each goalie's xG and goals against per game (goalie_game_xg),
 and each game's 5-on-5 team and skater rows (team_game_5v5,
-player_game_5v5; skaters from the shift chart) for ingest_advanced_stats.py.
+player_game_5v5; skaters from the shift chart, or the HTML time-on-ice
+reports when the NHL never posts one) for ingest_advanced_stats.py.
 
 Usage:
     python ingest_xg.py                 # the daily run
     python ingest_xg.py --since 2026-10-07
+    python ingest_xg.py --retry-days 30  # also retry older games still missing on-ice xG
     python ingest_xg.py --season 20252026 --goalies-from-cache ~/.cache/puckpulse/pbp
 """
 
@@ -30,6 +32,7 @@ import requests
 from dotenv import load_dotenv
 
 import goalie_starts
+import rapm_stints as rs
 import xg_model as xm
 from logging_config import setup_logging
 from seasons import current_season_id
@@ -311,14 +314,22 @@ def store_5v5(cur, game_id, season_id, game_type, pbp, shifts, model):
     return has_shifts
 
 
-def store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=_get):
-    """Goalies and 5-on-5 rows for one game; the skaters' on-ice xG once the shift chart is up."""
+def store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=_get, get_text=None):
+    """
+    Goalies and 5-on-5 rows for one game; the skaters' on-ice xG once the
+    shift chart is up, or from the HTML time-on-ice reports when it isn't.
+    """
     store_goalies(cur, game_id, season_id, game_type, pbp, model)
     try:
         shifts = get(SHIFTS_URL.format(game_id=game_id)).get("data", [])
     except requests.RequestException as exc:
-        logger.warning(f"Game {game_id}: no shift chart ({exc}); its on-ice xG will retry next run")
+        logger.warning(f"Game {game_id}: no shift chart ({exc})")
         shifts = []
+    if len(shifts) < MIN_SHIFTS:  # the NHL skips whole stretches of shift charts (2026-10-13 to 10-19)
+        try:
+            shifts = rs.html_shifts(pbp, get_text or rs._get_text) or []
+        except requests.RequestException as exc:
+            logger.warning(f"Game {game_id}: no time-on-ice reports ({exc}); its on-ice xG will retry next run")
     return store_5v5(cur, game_id, season_id, game_type, pbp, shifts, model)
 
 
@@ -333,7 +344,7 @@ def finished_games(since, until, get=_get):
     return out
 
 
-def update(cur, season_id, since=None, today=None, get=_get, model=None):
+def update(cur, season_id, since=None, today=None, get=_get, model=None, get_text=None, retry_days=SHIFT_RETRY_DAYS):
     """Score and store finished games not stored yet. Returns games added."""
     model = model or xm.load_model()
     cur.execute(TABLE_SQL)
@@ -373,22 +384,22 @@ def update(cur, season_id, since=None, today=None, get=_get, model=None):
                  t["goals_for"], t["goals_against"], t["shots_for"], t["shots_against"], model.get("version", 1),
                  starters.get(t["team"])),
             )
-        store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=get)
+        store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=get, get_text=get_text)
         added += 1
         time.sleep(0.3)  # polite to the NHL API
     fill_starters(cur, season_id, get=get)
-    fill_5v5(cur, season_id, get=get, model=model, today=today)
+    fill_5v5(cur, season_id, get=get, model=model, today=today, get_text=get_text, retry_days=retry_days)
     return added
 
 
-def fill_5v5(cur, season_id, get=_get, model=None, today=None):
+def fill_5v5(cur, season_id, get=_get, model=None, today=None, get_text=None, retry_days=SHIFT_RETRY_DAYS):
     """
     Stored games without 5-on-5 rows (stored before those tables existed),
-    or from the last SHIFT_RETRY_DAYS still missing their shift chart:
+    or from the last retry_days still missing their shift chart:
     fetch the play-by-play and shift chart once more and store their
     goalies and 5-on-5 rows.
     """
-    retry_since = (today or date.today()) - timedelta(days=SHIFT_RETRY_DAYS)
+    retry_since = (today or date.today()) - timedelta(days=retry_days)
     cur.execute(
         """
         SELECT DISTINCT t.game_id, t.game_type FROM team_game_xg t
@@ -405,7 +416,7 @@ def fill_5v5(cur, season_id, get=_get, model=None, today=None):
         except requests.RequestException as exc:
             logger.warning(f"Game {game_id}: no play-by-play for its 5-on-5 rows ({exc}); will retry next run")
             continue
-        if store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=get):
+        if store_game_extras(cur, game_id, season_id, game_type, pbp, model, get=get, get_text=get_text):
             filled += 1
         else:
             waiting += 1
@@ -462,6 +473,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--since", type=date.fromisoformat, default=None)
     parser.add_argument("--season", type=int, default=None)
+    parser.add_argument("--retry-days", type=int, default=SHIFT_RETRY_DAYS,
+                        help="Retry on-ice xG for games this many days back that are still missing it")
     parser.add_argument("--goalies-from-cache", default=None, metavar="DIR",
                         help="Backfill --season's goalie xG from cached play-by-play instead of the daily run")
     args = parser.parse_args()
@@ -473,7 +486,7 @@ def main():
             games = backfill_goalies_from_cache(cur, season_id, args.goalies_from_cache)
             logger.info(f"Stored goalie xG for {games} games of {season_id} from the cache")
             return
-        added = update(cur, season_id, since=args.since)
+        added = update(cur, season_id, since=args.since, retry_days=args.retry_days)
     logger.info(f"Scored xG for {added} new games")
 
 

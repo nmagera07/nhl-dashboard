@@ -35,7 +35,7 @@ import rapm_stints as rs
 import war
 import xg_model as xm
 
-SEASONS = [20222023, 20232024, 20242025, 20252026, 20262027]
+SEASONS = [20212022, 20222023, 20232024, 20242025, 20252026, 20262027]
 FRINGE_GP = (5, 29)  # war.py / player_values.py's replacement pool
 PP_SKATERS, PK_SKATERS = 5, 4
 
@@ -149,9 +149,15 @@ def skater_war(inputs, ev, goals_per_win=war.GOALS_PER_WIN, finishing_weight=1.0
     return out
 
 
-def ev_ratings(season, seasons=SEASONS):
-    """RAPM through `season` (a chain from the oldest cached season), with 5v5 hours in `season`."""
+def ev_ratings(season, seasons=SEASONS, box=False):
+    """
+    RAPM through `season` (a chain from the oldest cached season), with 5v5
+    hours in `season`; box=True adds the box-score prior (box_prior.py).
+    """
     chain = [s for s in seasons if s <= season and os.path.exists(os.path.join(rs.CACHE, "stints", f"{s}.json.gz"))]
+    if box:
+        import box_prior
+        return box_prior.chain_with_box(chain)[0][season]
     beta, design, sums = rapm.chain(chain)
     return rapm.ratings(beta, design, sums)
 
@@ -168,17 +174,21 @@ def _corr(rows):
     return {"r": round(r, 3), "wins_per_war": round(slope, 2), "n": len(rows)}
 
 
-def backtest(years=(2023, 2024, 2025)):
+def backtest(years=(2022, 2023, 2024, 2025)):
     """
     v1 vs v2, three ways, goals-per-win held out by season:
       same season: each team's summed WAR against its wins (war.backtest's test)
       next season: each player's WAR per game, times his games for his team
         the next season, summed by team, against that season's wins
+      roster changes: the same, minus what the team's players were worth for
+        it the season before, against its change in wins: whatever stayed
+        (coach, system, the players who stayed) cancels out, so a rating
+        can't get credit for team context that carried over
     """
     records = {y: war.team_records(y) for y in years}
     goalies = {y: war.moneypuck_goalies(y) for y in years}
     skaters = {y: war.pv.season_skaters(y) for y in years}
-    v1, v2, v2_half = {}, {}, {}
+    v1, v2, v2_half, v2_box = {}, {}, {}, {}
     for y in years:
         gpw, _ = war.fit_goals_per_win({o: records[o] for o in years if o != y})
         season = int(f"{y}{y + 1}")
@@ -189,8 +199,10 @@ def backtest(years=(2023, 2024, 2025)):
         inputs, ev = season_inputs(season), ev_ratings(season)
         v2[y] = {**skater_war(inputs, ev, gpw), **goalie}
         v2_half[y] = {**skater_war(inputs, ev, gpw, finishing_weight=0.5), **goalie}
+        v2_box[y] = {**skater_war(inputs, ev_ratings(season, box=True), gpw, finishing_weight=0.5), **goalie}
     results = {}
-    for name, by_year in (("v1", v1), ("v2", v2), ("v2, half finishing", v2_half)):
+    for name, by_year in (("v1", v1), ("v2", v2), ("v2, half finishing", v2_half),
+                          ("v2 + box prior, half finishing", v2_box)):
         same = [(_team_sums(by_year[y])[t], wins) for y in years for t, (wins, _, _) in records[y].items()]
         nxt = []
         for y, later in zip(years, years[1:]):
@@ -200,7 +212,19 @@ def backtest(years=(2023, 2024, 2025)):
                 if before and before["gp"]:
                     team[p["team"]] += before["war"] / before["gp"] * p["gp"]
             nxt += [(team[t], wins) for t, (wins, _, _) in records[later].items()]
-        results[name] = {"same season": _corr(same), "next season": _corr(nxt)}
+        changes = []
+        for y, later in zip(years, years[1:]):
+            before, after = defaultdict(float), defaultdict(float)
+            for p in by_year[y].values():
+                if p["gp"]:
+                    before[p["team"]] += p["war"]
+            for pid, p in by_year[later].items():
+                prior = by_year[y].get(pid)
+                if prior and prior["gp"]:
+                    after[p["team"]] += prior["war"] / prior["gp"] * p["gp"]
+            changes += [(after[t] - before[t], wins - records[y][t][0])
+                        for t, (wins, _, _) in records[later].items() if t in records[y]]
+        results[name] = {"same season": _corr(same), "next season": _corr(nxt), "roster changes": _corr(changes)}
     return results, v2
 
 

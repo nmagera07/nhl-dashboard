@@ -13,7 +13,6 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
@@ -216,6 +215,7 @@ def deliver(cur, key, sub, payload, ttl, urgency="high"):
     traced without the function's logs. A gone subscription is deleted.
     Returns True if the push service accepted it.
     """
+    payload = {**payload, "key": key}  # the service worker sends it back as a receipt (POST /push/receipts)
     try:
         status = push.send(sub, payload, ttl=ttl, urgency=urgency)
         outcome = "accepted" if status and status < 300 else "refused" if status else "no response"
@@ -234,9 +234,7 @@ def deliver(cur, key, sub, payload, ttl, urgency="high"):
     return outcome == "accepted"
 
 
-def device_label(endpoint):
-    """'fcm.googleapis.com ...a5Bq9': which push service, plus enough of the end to tell devices apart."""
-    return f"{urlparse(endpoint).hostname} ...{endpoint[-6:]}"
+device_label = push.device_label
 
 
 def subscribers(cur, teams, kind, scorer=None):

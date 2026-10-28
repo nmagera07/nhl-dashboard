@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import process from "node:process";
 
 // public/push-sw.js runs in the service worker, not the app: load the real
 // file against a fake `self` and fire a push at it.

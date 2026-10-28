@@ -11,7 +11,8 @@ import zipfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parent.parent
-MODULES = ("notify_live_games.py", "push.py", "market_odds.py", "goal_model.py", "logging_config.py")
+MODULES = ("notify_live_games.py", "push.py", "market_odds.py", "goal_model.py", "logging_config.py",
+           "pregame_briefs.py")
 
 
 def build(out):

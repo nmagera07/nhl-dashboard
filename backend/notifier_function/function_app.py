@@ -1,5 +1,5 @@
 """
-Four timers:
+Five timers:
 
   - live_notifier: goal and final-score push notifications, every minute
     (UTC hours 16-23 and 0-7, noon-4am ET).
@@ -11,6 +11,10 @@ Four timers:
   - swing_precompute: hourly, UTC 6-13 (2-9am ET); asks the API for last
     night's Swing of the Night so it's built and saved before the first
     visitor (notify_live_games.precompute_swing).
+  - pregame_briefs: 15:30 and 21:30 UTC (late morning and late afternoon
+    ET, the second once most starting goalies are confirmed); NHL
+    Intelligence's agent writes a brief for each game still to start
+    (pregame_briefs.py). Needs INTELLIGENCE_URL and DIGEST_TOKEN.
 
 It used to be the nhl-live-notifier Container Apps Job, which started a
 fresh container 960 times a day (about 25 s each, almost all startup) and
@@ -28,13 +32,14 @@ import azure.functions as func
 
 import market_odds
 import notify_live_games
+import pregame_briefs
 
 app = func.FunctionApp()
 
 # The Functions worker forwards log records that reach the root logger to
 # the host (and App Insights). setup_logging gives each module its own
 # console handler and turns propagation off, which would hide every line.
-for module in (notify_live_games, market_odds):
+for module in (notify_live_games, market_odds, pregame_briefs):
     module.logger.handlers.clear()
     module.logger.propagate = True
 
@@ -59,3 +64,8 @@ def post_reminder(timer: func.TimerRequest) -> None:
 @app.timer_trigger(arg_name="timer", schedule="0 40 6-13 * * *", run_on_startup=False, use_monitor=False)
 def swing_precompute(timer: func.TimerRequest) -> None:
     notify_live_games.precompute_swing()
+
+
+@app.timer_trigger(arg_name="timer", schedule="0 30 15,21 * * *", run_on_startup=False, use_monitor=False)
+def pregame_briefs_timer(timer: func.TimerRequest) -> None:
+    pregame_briefs.main()

@@ -504,6 +504,18 @@ CREATE TABLE IF NOT EXISTS daily_digest (
     created_at              TIMESTAMP DEFAULT NOW()
 );
 
+-- Pregame briefs: NHL Intelligence's brief agent, written twice a day for
+-- each game still to start (pregame_briefs.py, on the notifier function).
+CREATE TABLE IF NOT EXISTS game_briefs (
+    game_id     BIGINT PRIMARY KEY,
+    game_date   DATE NOT NULL,
+    text        TEXT NOT NULL,
+    model       VARCHAR(80),
+    tools       JSONB,
+    written_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+GRANT SELECT ON game_briefs TO nhl_api_readonly;
+
 -- Every game the model predicted, logged before puck drop and graded after
 -- (game_predictions.py, in the daily job). A prediction is never changed
 -- once logged, so the track record can't be quietly improved after the fact.

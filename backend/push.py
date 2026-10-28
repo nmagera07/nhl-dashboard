@@ -41,6 +41,11 @@ class SubscriptionGone(Exception):
     """The push service says this subscription no longer exists (404/410)."""
 
 
+def device_label(endpoint: str) -> str:
+    """'fcm.googleapis.com ...a5Bq9': which push service, plus enough of the end to tell devices apart (push_deliveries.device)."""
+    return f"{urlparse(endpoint).hostname} ...{endpoint[-6:]}"
+
+
 def is_allowed_endpoint(endpoint: str) -> bool:
     try:
         url = urlparse(endpoint)

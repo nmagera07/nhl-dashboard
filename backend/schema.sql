@@ -478,9 +478,13 @@ CREATE TABLE IF NOT EXISTS push_deliveries (
     status      SMALLINT,                      -- the push service's HTTP status; NULL when gone or no response
     outcome     TEXT NOT NULL,                 -- accepted, refused, gone, no response
     ttl         INTEGER,
-    sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    sent_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    received_at TIMESTAMPTZ                    -- when the device's service worker reported it (POST /push/receipts)
 );
 CREATE INDEX IF NOT EXISTS push_deliveries_sent ON push_deliveries (sent_at);
+-- Existing databases: ALTER TABLE push_deliveries ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+-- The API stamps receipts and may touch nothing else:
+--   GRANT SELECT (event_key, device, sent_at, received_at), UPDATE (received_at) ON push_deliveries TO nhl_api_readonly;
 
 -- Goals and finals already notified (notify_live_games.py), so overlapping
 -- runs never send twice. Rows older than a few days are pruned.

@@ -72,7 +72,7 @@ import win_probability
 from seasons import season_games
 from response_models.feedback import FeedbackIn
 from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn, PickemRenameIn
-from response_models.push import PushRenewIn, PushSubscriptionIn, PushUnsubscribeIn
+from response_models.push import PushReceiptIn, PushRenewIn, PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
 import news
 from nhl_games import (NHLGamesUnavailable, game_boxscore, game_play_by_play, games_on_date, month_calendar,
@@ -1459,6 +1459,43 @@ def push_renew(request: Request, body: PushRenewIn):
             conn.rollback()
             raise HTTPException(status_code=404, detail="That subscription isn't saved.")
         conn.commit()
+    finally:
+        conn.close()
+
+
+RECEIPT_RATE_LIMIT = "30/minute"  # a device gets a few alerts a minute at most, even on a busy night
+
+
+@app.post("/push/receipts", status_code=204)
+@limiter.limit(RECEIPT_RATE_LIMIT)
+def push_receipt(request: Request, body: PushReceiptIn):
+    """
+    The service worker's report that an alert reached the device: stamps
+    received_at on that alert's push_deliveries row, so the log shows how
+    long each one took (or that it never arrived: the push service can hold
+    alerts while a phone sleeps, then drop them when their TTL runs out).
+    Only a subscribed endpoint counts, and only its own row from the last
+    day, once. Best effort: 204 either way, so the worker never retries.
+    """
+    if not push.is_allowed_endpoint(body.endpoint):
+        raise HTTPException(status_code=400, detail="Not a browser push service endpoint.")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM push_subscriptions WHERE endpoint = %s", (body.endpoint,))
+            if cur.fetchone():
+                cur.execute(
+                    """
+                    UPDATE push_deliveries SET received_at = NOW()
+                    WHERE event_key = %s AND device = %s AND received_at IS NULL
+                      AND sent_at > NOW() - INTERVAL '1 day'
+                    """,
+                    (body.key, push.device_label(body.endpoint)),
+                )
+        conn.commit()
+    except psycopg2.Error as exc:  # no column or grant yet: a receipt isn't worth an error
+        conn.rollback()
+        logger.warning(f"Push receipt not recorded ({exc.__class__.__name__})")
     finally:
         conn.close()
 

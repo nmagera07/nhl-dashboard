@@ -169,6 +169,16 @@ class TestRun:
 
         assert count == 1 and sent == [(SUB["endpoint"], "🚨 PIT goal! PIT 1, CBJ 0", 60 * 60)]
 
+    def test_each_push_carries_its_event_key_for_the_receipt(self, monkeypatch):
+        payloads = []
+
+        def send(sub, payload, ttl=None, urgency=None):
+            payloads.append(payload)
+            return 201
+
+        _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB], send=send)
+        assert payloads[0]["key"] == "goal:2026020068:PIT:1-0"
+
     def test_never_sends_the_same_event_twice(self, monkeypatch):
         count, sent, _ = _run(
             monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])],

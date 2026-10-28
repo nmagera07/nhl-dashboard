@@ -2,7 +2,11 @@
 WAR: each player's wins above replacement this season.
 
 What a player has been worth so far, not a projection (player_values.py
-projects; this adds up what happened):
+projects; this adds up what happened).
+
+The daily step stores WAR v2 (war_v2.py: skaters from RAPM, finishing,
+special teams and penalties; goalies as below). The rest of this module is
+v1, kept for the goalies, the backtests, and the comparison:
 
   Skaters: this season's Game Score minus a replacement-level player's over
     the same games, times GS_TO_GOALS (team goal differential per point of
@@ -19,7 +23,7 @@ Box-score based, so it's an estimate: line-mates and team quality leak
 into the on-ice parts, and defense without the puck is mostly invisible.
 
 Usage:
-    python war.py                 # store this season's WAR (the daily ingest step)
+    python war.py                 # store this season's WAR v2 (the daily ingest step)
     python war.py --calibrate     # refit GOALS_PER_WIN
     python war.py --backtest      # team WAR vs. team wins, held out by season
     python war.py --top 20        # this season's leaders
@@ -84,16 +88,29 @@ CREATE TABLE IF NOT EXISTS player_war (
     PRIMARY KEY (season_id, player_id)
 );
 GRANT SELECT ON player_war TO nhl_api_readonly;
+-- WAR v2 (war_v2.py): each skater's goals above average by part; NULL for goalies.
+ALTER TABLE player_war
+    ADD COLUMN IF NOT EXISTS ev_offense   NUMERIC(6,2),
+    ADD COLUMN IF NOT EXISTS ev_defense   NUMERIC(6,2),
+    ADD COLUMN IF NOT EXISTS finishing    NUMERIC(6,2),
+    ADD COLUMN IF NOT EXISTS power_play   NUMERIC(6,2),
+    ADD COLUMN IF NOT EXISTS penalty_kill NUMERIC(6,2),
+    ADD COLUMN IF NOT EXISTS penalties    NUMERIC(6,2);
 """
+PARTS = ["ev_offense", "ev_defense", "finishing", "power_play", "penalty_kill", "penalties"]
+
+
+def season_goalies(season_id):
+    """This season's goalie WAR (GSAx from our stored xG); the same in v1 and v2."""
+    from simulate_playoff_odds import goalie_season, stored_goalie_xg
+
+    return goalie_war(goalie_season(season_id // 10000, stored_goalie_xg(season_id)))
 
 
 def season_war(season_id):
-    """This season's WAR for every skater and goalie: skater_war() and goalie_war() combined."""
-    from simulate_playoff_odds import goalie_season, stored_goalie_xg
-
-    start = season_id // 10000
-    players = skater_war(pv.season_skaters(start))
-    players.update(goalie_war(goalie_season(start, stored_goalie_xg(season_id))))
+    """v1: this season's WAR for every skater and goalie, skater_war() and goalie_war() combined."""
+    players = skater_war(pv.season_skaters(season_id // 10000))
+    players.update(season_goalies(season_id))
     return players
 
 
@@ -103,12 +120,15 @@ def store(cur, season_id, players, as_of):
     cur.execute("DELETE FROM player_war WHERE season_id = %s", (season_id,))
     for pid, p in players.items():
         group = "G" if p["pos"] == "G" else pv.position_group(p["pos"])
+        parts = p.get("parts") or {}
         cur.execute(
-            """
-            INSERT INTO player_war (season_id, player_id, name, team_abbrev, position_group, games_played, gar, war, as_of_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            f"""
+            INSERT INTO player_war (season_id, player_id, name, team_abbrev, position_group, games_played, gar, war,
+                                    as_of_date, {", ".join(PARTS)})
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, {", ".join(["%s"] * len(PARTS))})
             """,
-            (season_id, pid, p["name"], p["team"] or None, group, p["gp"], p["gar"], p["war"], as_of),
+            (season_id, pid, p["name"], p["team"] or None, group, p["gp"], p["gar"], p["war"], as_of,
+             *[parts.get(k) for k in PARTS]),
         )
 
 
@@ -187,10 +207,14 @@ def main():
     if not (args.calibrate or args.backtest or args.top):
         if not DATABASE_URL:
             raise SystemExit("DATABASE_URL is not set")
-        players = season_war(season_id)
-        with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
-            store(cur, season_id, players, date.today())
-        logger.info(f"Stored WAR for {len(players)} players ({season_id})")
+        import war_v2  # imports this module
+
+        with psycopg2.connect(DATABASE_URL) as conn:
+            players = war_v2.nightly(conn, season_id, date.today())
+            players.update(season_goalies(season_id))
+            with conn.cursor() as cur:
+                store(cur, season_id, players, date.today())
+        logger.info(f"Stored WAR v2 for {len(players)} players ({season_id})")
         return
     years = [start - 3, start - 2, start - 1]
     if args.calibrate:

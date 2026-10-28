@@ -2138,15 +2138,20 @@ def player_leaders(request: Request, view: Literal["full", "table"] = Query("ful
 
 
 WAR_GROUP_LABELS = {"F": "forwards", "D": "defensemen", "G": "goalies"}
+WAR_PARTS = ["ev_offense", "ev_defense", "finishing", "power_play", "penalty_kill", "penalties"]  # war.PARTS
 
 
 def _war(cur, player_id):
-    """This season's WAR row with its rank in the position group, or None (none yet, or no table)."""
+    """
+    This season's WAR row with its rank in the position group, or None
+    (none yet, or no table). Skaters also get `parts`: WAR v2's goals above
+    average by part (absent before the daily step adds the columns).
+    """
     try:
         cur.execute(
             """
             SELECT * FROM (
-                SELECT player_id, war, gar, games_played, position_group,
+                SELECT *,
                        RANK() OVER (PARTITION BY position_group ORDER BY war DESC) AS rank,
                        COUNT(*) OVER (PARTITION BY position_group) AS of
                 FROM player_war WHERE season_id = (SELECT MAX(season_id) FROM standings_snapshots)
@@ -2159,8 +2164,11 @@ def _war(cur, player_id):
         return None
     if not row:
         return None
-    return {"war": float(row["war"]), "gar": float(row["gar"]), "games_played": row["games_played"],
-            "group": WAR_GROUP_LABELS[row["position_group"]], "rank": row["rank"], "of": row["of"]}
+    out = {"war": float(row["war"]), "gar": float(row["gar"]), "games_played": row["games_played"],
+           "group": WAR_GROUP_LABELS[row["position_group"]], "rank": row["rank"], "of": row["of"]}
+    if any(row.get(k) is not None for k in WAR_PARTS):
+        out["parts"] = {k: float(row[k] or 0) for k in WAR_PARTS}
+    return out
 
 
 @app.get("/players/war")
@@ -2168,8 +2176,9 @@ def _war(cur, player_id):
 def war_leaders(position: Optional[Literal["F", "D", "G"]] = None, limit: int = Query(25, ge=1, le=100)):
     """
     This season's wins above replacement (war.py), best first, optionally
-    one position group (F, D, G). WAR is an estimate from box-score stats
-    and, for goalies, goals saved above PuckPulse's xG. Registered before
+    one position group (F, D, G). Skaters' WAR is v2 (war_v2.py: RAPM at
+    5v5 plus finishing, special teams and penalties); goalies' is goals
+    saved above PuckPulse's xG. Registered before
     /players/{player_id} so the literal path wins.
     """
     conn = get_connection()

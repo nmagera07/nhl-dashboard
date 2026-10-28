@@ -185,17 +185,15 @@ def _home_zone(play, home_id):
     return {"O": "D", "D": "O"}[zone]
 
 
-def stints(pbp, shifts, model):
+def _intervals(pbp, shifts, extra_marks=None):
     """
-    The game's 5-on-5 stints, in order: [{period, start, end, seconds, home,
-    away, home_xg, away_xg, home_goals, away_goals, home_shots, away_shots,
-    score, zone}], plus how many 5-on-5 shots (by the play-by-play's
-    situation code) didn't land in a 5-on-5 stint: (stints, unmatched).
+    Every stretch of the game with nobody coming or going, in order:
+    (period, start, end, home skaters, away skaters, home goalies, away
+    goalies). `extra_marks` ({period: {seconds}}) splits them further.
     """
     home_id = pbp["homeTeam"]["id"]
     roster = {r["playerId"]: (r["teamId"] == home_id, r.get("positionCode") == "G")
               for r in pbp.get("rosterSpots", [])}
-
     by_period = defaultdict(list)
     for s in shifts:
         if s.get("typeCode", SHIFT) != SHIFT or s.get("playerId") not in roster:
@@ -205,7 +203,24 @@ def stints(pbp, shifts, model):
         start, end = _clock(s["startTime"]), _clock(s["endTime"])
         if end > start:
             by_period[s["period"]].append((start, end, s["playerId"]))
+    for period in sorted(by_period):
+        rows = by_period[period]
+        marks = sorted({t for start, end, _ in rows for t in (start, end)} | (extra_marks or {}).get(period, set()))
+        for a, b in zip(marks, marks[1:]):
+            on = [pid for start, end, pid in rows if start <= a and end >= b]
+            yield (period, a, b,
+                   sorted(p for p in on if roster[p] == (True, False)), sorted(p for p in on if roster[p] == (False, False)),
+                   sum(1 for p in on if roster[p] == (True, True)), sum(1 for p in on if roster[p] == (False, True)))
 
+
+def stints(pbp, shifts, model):
+    """
+    The game's 5-on-5 stints, in order: [{period, start, end, seconds, home,
+    away, home_xg, away_xg, home_goals, away_goals, home_shots, away_shots,
+    score, zone}], plus how many 5-on-5 shots (by the play-by-play's
+    situation code) didn't land in a 5-on-5 stint: (stints, unmatched).
+    """
+    home_id = pbp["homeTeam"]["id"]
     faceoffs, goals = {}, []
     for play in pbp.get("plays", []):
         period = (play.get("periodDescriptor") or {}).get("number")
@@ -218,29 +233,23 @@ def stints(pbp, shifts, model):
             team = (play.get("details") or {}).get("eventOwnerTeamId")
             goals.append((period, t, 1 if team == home_id else -1))
 
+    draws = defaultdict(set)
+    for period, t in faceoffs:
+        draws[period].add(t)
     out = []
-    for period in sorted(by_period):
-        rows = by_period[period]
-        draws = {t for p, t in faceoffs if p == period}
-        marks = sorted({t for start, end, _ in rows for t in (start, end)} | draws)
-        for a, b in zip(marks, marks[1:]):
-            on = [pid for start, end, pid in rows if start <= a and end >= b]
-            home = sorted(p for p in on if roster[p] == (True, False))
-            away = sorted(p for p in on if roster[p] == (False, False))
-            home_g = sum(1 for p in on if roster[p] == (True, True))
-            away_g = sum(1 for p in on if roster[p] == (False, True))
-            if not (len(home) == 5 and len(away) == 5 and home_g == 1 and away_g == 1):
-                continue
-            last = out[-1] if out else None
-            if (last and last["period"] == period and last["end"] == a and a not in draws
-                    and last["home"] == home and last["away"] == away):
-                last["end"] = b  # same ten skaters, no faceoff in between: one stint
-                continue
-            score = sum(sign for p, t, sign in goals if (p, t) <= (period, a))
-            out.append({"period": period, "start": a, "end": b, "home": home, "away": away,
-                        "home_xg": 0.0, "away_xg": 0.0, "home_goals": 0, "away_goals": 0,
-                        "home_shots": 0, "away_shots": 0, "score": score,
-                        "zone": faceoffs.get((period, a))})
+    for period, a, b, home, away, home_g, away_g in _intervals(pbp, shifts, draws):
+        if not (len(home) == 5 and len(away) == 5 and home_g == 1 and away_g == 1):
+            continue
+        last = out[-1] if out else None
+        if (last and last["period"] == period and last["end"] == a and a not in draws[period]
+                and last["home"] == home and last["away"] == away):
+            last["end"] = b  # same ten skaters, no faceoff in between: one stint
+            continue
+        score = sum(sign for p, t, sign in goals if (p, t) <= (period, a))
+        out.append({"period": period, "start": a, "end": b, "home": home, "away": away,
+                    "home_xg": 0.0, "away_xg": 0.0, "home_goals": 0, "away_goals": 0,
+                    "home_shots": 0, "away_shots": 0, "score": score,
+                    "zone": faceoffs.get((period, a))})
 
     index = defaultdict(list)
     for s in out:
@@ -261,6 +270,38 @@ def stints(pbp, shifts, model):
     for s in out:
         s["home_xg"], s["away_xg"] = round(s["home_xg"], 4), round(s["away_xg"], 4)
     return out, unmatched
+
+
+def special_teams(pbp, shifts, model):
+    """
+    Each skater's power-play and penalty-kill time and on-ice xG: {player:
+    {pp_seconds, pp_xgf, pp_xga, pk_seconds, pk_xgf, pk_xga}}. A power play
+    is any stretch with both goalies in and more skaters than the other side
+    (5-on-4, 5-on-3, 4-on-3); shots are placed by time, like the stints.
+    """
+    spans = []
+    for period, a, b, home, away, home_g, away_g in _intervals(pbp, shifts):
+        if home_g == 1 and away_g == 1 and len(home) != len(away) and min(len(home), len(away)) >= 3:
+            spans.append((period, a, b, home, away))
+    out = defaultdict(lambda: dict.fromkeys(("pp_seconds", "pp_xgf", "pp_xga", "pk_seconds", "pk_xgf", "pk_xga"), 0.0))
+    for period, a, b, home, away in spans:
+        pp, pk = (home, away) if len(home) > len(away) else (away, home)
+        for p in pp:
+            out[p]["pp_seconds"] += b - a
+        for p in pk:
+            out[p]["pk_seconds"] += b - a
+    for shot in xm.shots_from_game(pbp):
+        span = next((s for s in spans if s[0] == shot["period"] and s[1] < shot["time"] <= s[2]), None)
+        if span is None:
+            continue
+        _, _, _, home, away = span
+        shooting, defending = (home, away) if shot["team_is_home"] else (away, home)
+        xg = xm.predict(shot, model)
+        for p in shooting:
+            out[p]["pp_xgf" if len(shooting) > len(defending) else "pk_xgf"] += xg
+        for p in defending:
+            out[p]["pp_xga" if len(defending) > len(shooting) else "pk_xga"] += xg
+    return dict(out)
 
 
 def _game_ids(season):

@@ -9,3 +9,4 @@ gunicorn==26.2.0
 slowapi==0.1.10
 sentry-sdk==2.72.0
 pywebpush==2.5.0
+numpy==2.5.4        # war_v2.py / rapm.py (the nightly WAR step); also train_xg.py

@@ -191,6 +191,49 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-27 — WAR v2: the fancier model lost the tests I cared about
+
+**What happened:** I built WAR v2 on RAPM (5v5 offense and defense with
+linemates and opponents separated out), plus finishing, special teams and
+penalties. Then I backtested it against v1 (Game Score) on four seasons of
+team wins, three ways:
+
+| | v1 | v2 |
+|---|---|---|
+| Same season (explains wins) | 0.888 | 0.909 |
+| Next season (predicts wins) | 0.672 | 0.563 |
+| Roster changes (predicts the change in wins) | 0.489 | 0.381 |
+
+v2 explains what happened better, and v1 predicts better, every way I tried.
+
+**What I tried before accepting it:**
+- Breaking v2 into parts: finishing and penalties carry over almost not at
+  all from one season to the next (r -0.06 and 0.02). Counting finishing at
+  half weight helped, but not enough.
+- A box-score prior (how Evolving-Hockey does it): each player's rating
+  starts from what his own stats suggest. Box stats explain RAPM offense
+  well (r 0.78 for forwards), but the prior didn't improve predictions on
+  unseen games. I also caught a bug where a setting wasn't passed through
+  and every "variant" was the same run, and added a test for it.
+- The roster-change test, to see whether v1 only looked good because team
+  context carried over. My theory was wrong: v1 still won.
+
+**What I learned:**
+- Individual production (goals, assists, shots) is a stronger signal of
+  talent from year to year than on-ice xG, even adjusted. A "more correct"
+  model isn't automatically a better predictor.
+- Decide what the number is for before choosing it. On the site, WAR is
+  "what a player has been worth so far"; projections come from a separate
+  model. For that job, v2 wins.
+- When a test result surprises you, check whether the test can actually
+  tell the options apart before believing it.
+
+**Interview angle:** "Tell me about a time your model didn't beat the
+baseline." This one: four tests, a theory that turned out wrong, and a
+decision based on what the number is used for.
+
+---
+
 ## 2026-10-27 — RAPM: the "more repeatable" stat was the less honest one
 
 **What happened:** For WAR v2 I built RAPM: a ridge regression over every

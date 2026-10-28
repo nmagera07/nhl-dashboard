@@ -19,9 +19,10 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from . import briefs
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
-from .providers import AllProvidersFailed, ProviderChain
+from .providers import AllProvidersFailed, ProviderChain, echo_tool_call as _echo
 from .tools import LABELS, TOOLS, ToolRunner
 
 
@@ -92,6 +93,20 @@ MAX_DIGEST_FACTS_CHARS = 12000
 DIGEST_MAX_TOKENS = 1500
 
 
+class BriefRequest(BaseModel):
+    game_id: int = Field(gt=0)
+    away: str = Field(min_length=2, max_length=3, pattern="^[A-Z]{2,3}$")
+    home: str = Field(min_length=2, max_length=3, pattern="^[A-Z]{2,3}$")
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class BriefResponse(BaseModel):
+    text: str | None  # None: no draft passed the checks (the page shows plain facts)
+    model: str | None
+    problems: list[str]
+    tools: list[str]
+
+
 class Evidence(BaseModel):
     label: str
     endpoint: str
@@ -142,17 +157,6 @@ def today_eastern() -> str:
     from zoneinfo import ZoneInfo
 
     return datetime.now(ZoneInfo("America/New_York")).strftime("%A, %B %-d, %Y")
-
-
-def _echo(call) -> dict:
-    """
-    A tool call exactly as the provider sent it, extra fields included:
-    Gemini attaches a "thought signature" (extra_content) to each call and
-    rejects the follow-up request (HTTP 400) if it isn't sent back.
-    """
-    if hasattr(call, "model_dump"):
-        return call.model_dump(exclude_none=True)
-    return {"id": call.id, "type": "function", "function": {"name": call.function.name, "arguments": call.function.arguments}}
 
 
 class IntelligenceService:
@@ -342,6 +346,16 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DigestResponse(text=(message.content or "").strip(), model=provider.label)
 
+    async def write_brief(self, request: BriefRequest) -> BriefResponse:
+        if not self.chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+        game = briefs.Game(request.game_id, request.away, request.home, request.date)
+        try:
+            brief = await briefs.write_brief(self.chain, ToolRunner(self.dashboard), game, today_eastern())
+        except AllProvidersFailed as exc:
+            raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
+        return BriefResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -385,6 +399,15 @@ async def health():
     }
 
 
+def _require_job_token(request: Request) -> None:
+    """Only the scheduled jobs (holding DIGEST_TOKEN) may spend the AI budget on writing."""
+    expected = request.app.state.intelligence.settings.digest_token
+    if not expected:
+        raise HTTPException(status_code=503, detail="Digest writing isn't configured.")
+    if not hmac.compare_digest(request.headers.get("X-Digest-Token", ""), expected):
+        raise HTTPException(status_code=401, detail="Unauthorized.")
+
+
 @app.post("/digest/write", response_model=DigestResponse)
 @limiter.limit("10/hour")
 async def digest_write(payload: DigestRequest, request: Request):
@@ -392,12 +415,19 @@ async def digest_write(payload: DigestRequest, request: Request):
     Write the morning digest from the daily job's facts. Private: requires
     the shared X-Digest-Token, so nobody else can spend the AI budget here.
     """
-    expected = request.app.state.intelligence.settings.digest_token
-    if not expected:
-        raise HTTPException(status_code=503, detail="Digest writing isn't configured.")
-    if not hmac.compare_digest(request.headers.get("X-Digest-Token", ""), expected):
-        raise HTTPException(status_code=401, detail="Unauthorized.")
+    _require_job_token(request)
     return await request.app.state.intelligence.write_digest(payload.facts)
+
+
+@app.post("/briefs/write", response_model=BriefResponse)
+@limiter.limit("60/hour")
+async def brief_write(payload: BriefRequest, request: Request):
+    """
+    Research one game and write its pregame brief (briefs.py). Private like
+    the digest: the scheduled job sends the shared X-Digest-Token.
+    """
+    _require_job_token(request)
+    return await request.app.state.intelligence.write_brief(payload)
 
 
 @app.post("/chat", response_model=ChatResponse)

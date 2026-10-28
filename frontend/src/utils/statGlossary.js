@@ -33,7 +33,7 @@ export const GLOSSARY = {
   // Goalies (all situations; PuckPulse xG)
   GSAX: { name: "Goals saved above expected", detail: "Expected goals against minus goals allowed: how many more goals an average goalie would have given up on the same shots. Above 0 is better than average." },
   GSAX60: { name: "GSAx per 60", detail: "Goals saved above expected per 60 minutes, so goalies with different workloads compare fairly." },
-  WAR: { name: "Wins above replacement", detail: "Wins a player has added this season over a call-up-level replacement. An estimate from PuckPulse's model: box-score stats for skaters, saves above expected for goalies. Goalies swing the most wins, so compare within a position." },
+  WAR: { name: "Wins above replacement", detail: "Wins a player has added this season over a call-up-level replacement. An estimate from PuckPulse's model: for skaters, 5-on-5 impact with linemates and opponents accounted for (RAPM), plus finishing, special teams and penalties; for goalies, saves above expected. Goalies swing the most wins, so compare within a position." },
   HD_GSAX: { name: "High-danger GSAx", detail: "GSAx on shots worth 0.20 expected goals or more, mostly from the slot and crease: the hardest saves." },
 
   // Skaters

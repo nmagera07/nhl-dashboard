@@ -44,7 +44,7 @@ LAMBDA = 15.0  # in hours of 5v5 (row weights are hours); --cv and --predict on 
 CHAIN_LAMBDA = 25.0  # a little stronger with a prior to lean on (best on 2026-27 so far)
 CONTROLS = ["intercept", "home", "trail2", "trail1", "lead1", "lead2", "ozone", "dzone"]
 WIDTH = 1 + 5 + 5 + 4  # intercept, 5 attackers, 5 defenders, home/score/zone (padded)
-CHUNK = 100_000
+CHUNK = 25_000  # rows per bincount pass: ~100 MB of temporaries, inside the 1 GiB ingest job
 
 
 def _score_col(lead):
@@ -132,13 +132,15 @@ class Sums:
         return (self.yty - 2 * beta @ self.xty + beta @ self.xtx @ beta) / self.weight
 
 
-def build(seasons, design=None, folds=1, weights=None):
+def build(seasons, design=None, folds=1, weights=None, loaded=None):
     """
     ({fold: Sums}, design) for the seasons' rows; games are split into
     `folds` groups by game id (for cross-validation). `weights` maps a
-    season to its row weight (default 1).
+    season to its row weight (default 1). `loaded` ({season: {game_id:
+    [stints]}}) skips the local cache (the nightly job's stints come from
+    the database).
     """
-    loaded = {season: rs.load_stints(season) for season in seasons}
+    loaded = loaded or {season: rs.load_stints(season) for season in seasons}
     if design is None:
         players = {p for games in loaded.values() for g in games.values() for s in g for p in s["home"] + s["away"]}
         design = Design(players)

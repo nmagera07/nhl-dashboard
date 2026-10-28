@@ -124,7 +124,13 @@
 .adv-rank-hint strong { color: var(--text); }
 .adv-luck { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 13px; }
 .player-war { margin: 10px 0 0; color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
-.player-war strong { color: var(--text); font-size: 15px; }
+.player-war > p { margin: 0; }
+.player-war > p strong { color: var(--text); font-size: 15px; }
+.player-war .link-button { padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; text-decoration: underline; cursor: pointer; }
+.player-war .link-button:hover { color: var(--accent); }
+.war-parts { list-style: none; margin: 8px 0 0; padding: 0; max-width: 320px; }
+.war-parts li { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.war-parts strong { color: var(--text); }
 
 /* Players page: matches beyond current rosters (AllPlayerSearch.jsx). */
 .all-players { margin: 18px var(--gutter) 0; }
@@ -136,3 +142,4 @@
 .all-players span { color: var(--text-dim); font-size: 12px; }
 .player-hof { padding: 2px 8px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .player-former { margin: 10px 0 0; color: var(--text-dim); font-size: 13px; }
+.player-war .player-card-note { margin-top: 6px; }

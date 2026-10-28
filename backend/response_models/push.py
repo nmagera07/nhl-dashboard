@@ -25,6 +25,13 @@ class PushUnsubscribeIn(BaseModel):
     endpoint: str = Field(..., max_length=1000)
 
 
+class PushReceiptIn(BaseModel):
+    """The service worker's report that a push arrived: its subscription, and the alert's event key."""
+
+    endpoint: str = Field(..., max_length=1000)
+    key: str = Field(..., max_length=100, pattern=r"^[a-z-]+:[A-Za-z0-9:-]+$")
+
+
 class PushRenewIn(BaseModel):
     """The service worker's pushsubscriptionchange: the browser replaced a subscription."""
 

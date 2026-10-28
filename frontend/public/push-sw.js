@@ -1,6 +1,6 @@
 // Push notification handling, loaded into the app's service worker
 // (vite.config.js -> workbox.importScripts). Payloads come from
-// backend/notify_live_games.py: { title, body, url, tag }.
+// backend/notify_live_games.py: { title, body, url, tag, key }.
 
 self.addEventListener("push", (event) => {
   let data;
@@ -9,7 +9,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { title: "PuckPulse", body: event.data ? event.data.text() : "" };
   }
-  event.waitUntil(
+  event.waitUntil(Promise.all([
     self.registration.showNotification(data.title || "PuckPulse", {
       body: data.body || "",
       icon: "/pwa-192x192.png",
@@ -21,9 +21,21 @@ self.addEventListener("push", (event) => {
       tag: data.tag,
       renotify: Boolean(data.tag),
       data: { url: data.url || "/" },
-    })
-  );
+    }),
+    receipt(data.key),
+  ]));
 });
+
+// Tell the API the alert arrived (POST /push/receipts), so the delivery log
+// shows how long each one took: on 2026-10-27 a sleeping phone got four of
+// six goal alerts only after they had expired. Never fails the push.
+function receipt(key) {
+  if (!key) return Promise.resolve();
+  return self.registration.pushManager
+    .getSubscription()
+    .then((subscription) => subscription && post("/push/receipts", { endpoint: subscription.endpoint, key }))
+    .catch(() => {});
+}
 
 // Tapping the notification opens that game's box score, reusing an open
 // app window if there is one.

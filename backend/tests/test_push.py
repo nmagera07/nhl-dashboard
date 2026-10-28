@@ -155,3 +155,25 @@ class TestRenewEndpoint:
     def test_new_endpoint_must_be_a_push_service(self, client, db_router):
         assert self._renew(client, endpoint="https://attacker.example/hook").status_code == 400
         assert not db_router.calls
+
+
+class TestReceipts:
+    def _receipt(self, client, **overrides):
+        return client.post("/push/receipts", json={"endpoint": FCM, "key": "goal:2026020194:FLA:4-1", **overrides})
+
+    def test_stamps_the_devices_own_delivery(self, client, db_router):
+        db_router.when("select 1 from push_subscriptions", {"?column?": 1})
+        db_router.when("update push_deliveries set received_at", None)
+        assert self._receipt(client).status_code == 204
+        update = next(p for q, p in db_router.calls if "UPDATE push_deliveries" in q)
+        assert update == ("goal:2026020194:FLA:4-1", push.device_label(FCM))
+
+    def test_an_unsubscribed_endpoint_changes_nothing(self, client, db_router):
+        db_router.when("select 1 from push_subscriptions", None)
+        assert self._receipt(client).status_code == 204
+        assert not any("UPDATE" in q for q, _ in db_router.calls)
+
+    def test_rejects_odd_keys_and_non_push_endpoints(self, client, db_router):
+        assert self._receipt(client, key="goal; DROP TABLE x").status_code == 422
+        assert self._receipt(client, endpoint="https://attacker.example/hook").status_code == 400
+        assert not db_router.calls

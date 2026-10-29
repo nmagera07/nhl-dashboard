@@ -375,3 +375,57 @@ def team_share_text(abbrev, team, playoff_pct=None):
     parts = [f"{record}, {team['points']} pts." if record and team.get("points") is not None else None,
              "Playoff odds, schedule, roster, and stats on PuckPulse."]
     return title, " ".join(p for p in parts if p)
+
+
+def _price(price):
+    return f"+{price}" if price > 0 else f"−{abs(price)}"
+
+
+def _pct(p):
+    return f"{round(p * 100)}%"
+
+
+def render_value(data):
+    """
+    Value of the night's card: the picked team in its color with the
+    price, the bet and the matchup, PuckPulse's chance vs. the books' and
+    the expected return, and the season's record of these picks (graded vs.
+    the closing line). data: value_pick.value_of_the_night()'s result.
+    """
+    p, rec = data["pick"], data.get("record") or {}
+    day = datetime.fromisoformat(data["date"])
+    img = _background()
+    draw = ImageDraw.Draw(img)
+    kicker = "VALUE OF THE NIGHT" if p["value"] else "CLOSEST TO VALUE"
+    _header(img, draw, {}, status=f"{kicker} · {day.strftime('%b %-d')}")
+    team = p["home"] if p["side"] == "home" else p["away"]
+    _panel(draw, (64, 150, 444, 520), team, _price(p["price"]), "puck line" if p["market"] == "puck_line" else "to win")
+
+    x = 500
+    bet = f"{team} {p['line']:+g}" if p["market"] == "puck_line" else f"{team} to win"
+    draw.text((x, 190), bet.replace("-", "−"), font=_font(64), fill=TEXT, anchor="lm")
+    where = f"{p['away']} @ {p['home']}" + (f" · {p['book']}" if p.get("book") else "")
+    draw.text((x, 250), where, font=_font(30, "Bold"), fill=DIM, anchor="lm")
+
+    tiles = (("PuckPulse", _pct(p["ours"]), TEXT), ("The books", _pct(p["market_prob"]), TEXT),
+             ("Expected return", f"{'+' if p['ev'] >= 0 else '−'}{abs(round(p['ev'] * 100))}%", GOOD if p["ev"] > 0 else TEXT))
+    tx, width = x, 200
+    for label, value, color in tiles:
+        draw.rounded_rectangle((tx, 300, tx + width - 16, 420), radius=20, fill=(22, 26, 34))
+        draw.text((tx + (width - 16) // 2, 348), value, font=_font(52), fill=color, anchor="mm")
+        draw.text((tx + (width - 16) // 2, 396), label, font=_font(22, "Bold"), fill=DIM, anchor="mm")
+        tx += width
+
+    if rec.get("nights"):
+        line = f"Season: {rec['wins']}-{rec['losses']}{'-' + str(rec['pushes']) if rec.get('pushes') else ''}, " \
+               f"{'+' if rec['units'] >= 0 else '−'}{abs(rec['units']):.2f}u"
+        if rec.get("clv_count"):
+            line += f", beat the close {rec['beat_close']} of {rec['clv_count']}"
+        draw.text((x, 470), line, font=_font(26, "Bold"), fill=TEXT, anchor="lm")
+    if not p["value"]:
+        draw.text((x, 510), "Nothing cleared the value bar; this is the closest.", font=_font(24, "Bold"), fill=DIM, anchor="lm")
+    draw.text((WIDTH // 2, 588), "puckpulse.io · Picked from the morning lines · Not betting advice · 21+ · 1-800-GAMBLER",
+              font=_font(22, "Bold"), fill=DIM, anchor="mm")
+    out = io.BytesIO()
+    img.save(out, "PNG", optimize=True)
+    return out.getvalue()

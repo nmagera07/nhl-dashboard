@@ -23,6 +23,14 @@ describe("ValueOfTheNight", () => {
       "This season: 7-6, +3.16u, beat the closing line 5 of 12. Last pick: WSH −1.5 +110, won.");
   });
 
+  it("shares the night's /v/ link with its card", async () => {
+    renderCard({ available: true, date: "2026-10-29", pick: PICK, record: RECORD });
+    await userEvent.click(screen.getByRole("button", { name: "Share" }));
+    const x = screen.getByRole("menuitem", { name: "Post on X" }).getAttribute("href");
+    expect(x).toContain(encodeURIComponent("https://puckpulse.io/v/2026-10-29"));
+    expect(x).toContain(encodeURIComponent("PuckPulse's value of the night: COL −150"));
+  });
+
   it("labels a night without value as the closest", () => {
     renderCard({ available: true, pick: { ...PICK, value: false, ev: -0.01 }, record: RECORD });
     expect(screen.getByText("Closest to value tonight")).toBeInTheDocument();

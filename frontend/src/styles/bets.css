@@ -68,3 +68,4 @@
 .votn-tracked { background: var(--accent); color: var(--card); }
 .votn-why, .votn-record { margin: 8px 0 0; color: var(--text-dim); font-size: 12px; }
 .votn-record strong { color: var(--text); }
+.votn-share { display: flex; justify-content: flex-end; margin-top: 10px; }

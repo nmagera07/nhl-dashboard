@@ -9,7 +9,8 @@
 // same way for a team, sending people on to the team page, and
 // /s/{YYYY-MM-DD} for that night's Swing of the Night, on to its game, and
 // /c/{player}-{player} for a player comparison, on to the compare page, and
-// /tm/{player}-{season}-{target} for a time machine result, on to its page.
+// /tm/{player}-{season}-{target} for a time machine result, on to its page,
+// and /v/{YYYY-MM-DD} for that day's value of the night, on to the Bets tab.
 
 const API = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io";
 const SITE = "https://puckpulse.io";
@@ -41,6 +42,13 @@ function teamAbbrev(req) {
 function swingDate(req) {
   const original = req.headers["x-ms-original-url"] || "";
   const day = (original.match(/\/s\/(\d{4}-\d{2}-\d{2})(?:[/?#]|$)/) || [])[1];
+  return day && !Number.isNaN(Date.parse(day)) ? day : null;
+}
+
+// "2026-10-29" for /v/2026-10-29 (the value of the night); null for anything that isn't a date.
+function valueDate(req) {
+  const original = req.headers["x-ms-original-url"] || "";
+  const day = (original.match(/\/v\/(\d{4}-\d{2}-\d{2})(?:[/?#]|$)/) || [])[1];
   return day && !Number.isNaN(Date.parse(day)) ? day : null;
 }
 
@@ -89,19 +97,27 @@ ${tags.join("\n")}
 }
 
 module.exports = async function (context, req) {
-  const tm = timeMachine(req);
-  const pair = tm ? null : comparePair(req);
-  const swing = tm || pair ? null : swingDate(req);
-  const team = !pair && !swing && isTeamLink(req) ? teamAbbrev(req) : null;
-  const id = tm || pair || swing || isTeamLink(req) ? null : gameId(req);
+  const value = valueDate(req);
+  const tm = value ? null : timeMachine(req);
+  const pair = value || tm ? null : comparePair(req);
+  const swing = value || tm || pair ? null : swingDate(req);
+  const team = !value && !pair && !swing && isTeamLink(req) ? teamAbbrev(req) : null;
+  const id = value || tm || pair || swing || isTeamLink(req) ? null : gameId(req);
   let meta = {
     title: "PuckPulse: NHL scores, playoff odds, and an AI hockey analyst",
     description: "Live NHL scores, playoff odds for every team, goal alerts, and an AI hockey analyst you can ask anything. Free.",
     image: `${SITE}/og-card.png`,
     url: id ? `${SITE}/games/${id}` : team ? `${SITE}/teams/${team}` : pair ? `${SITE}/compare?a=${pair[0]}&b=${pair[1]}`
-      : tm ? `${SITE}/time-machine?player=${tm[0]}&season=${tm[1]}&target=${tm[2]}` : SITE,
+      : tm ? `${SITE}/time-machine?player=${tm[0]}&season=${tm[1]}&target=${tm[2]}` : value ? `${SITE}/bets` : SITE,
   };
-  if (tm) {
+  if (value) {
+    try {
+      const response = await fetch(`${API}/value-of-the-night/${value}/share`, { signal: AbortSignal.timeout(8000) });
+      if (response.ok) meta = { ...meta, ...previewText(await response.json()) };
+    } catch (error) {
+      context.log.warn(`share value ${value}: ${error}`);
+    }
+  } else if (tm) {
     try {
       const response = await fetch(`${API}/time-machine/${tm.join("/")}/share`, { signal: AbortSignal.timeout(8000) });
       if (response.ok) meta = { ...meta, ...previewText(await response.json()) };

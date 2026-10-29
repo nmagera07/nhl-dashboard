@@ -44,6 +44,16 @@ describe("share function", () => {
     expect(html).not.toMatch(/bet|fair odds/i);
   });
 
+  it("serves the value of the night for /v/{date} and sends people to the Bets tab", async () => {
+    const { html, fetch } = await run("/v/2026-10-29", { title: "Closest to value, Oct 29: MTL +142 (to win)", description: "x",
+      url: "https://evil.example", image: "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/value/2026-10-29.png" });
+    expect(fetch.mock.calls[0][0]).toMatch(/\/value-of-the-night\/2026-10-29\/share$/);
+    expect(html).toContain('property="og:title" content="Closest to value, Oct 29: MTL +142 (to win)"');
+    expect(html).toContain('content="0; url=https://puckpulse.io/bets"');
+    expect(html).toContain("/og/value/2026-10-29.png");
+    expect(html).not.toContain("evil.example");
+  });
+
   it("still serves game cards for /g/{id}", async () => {
     const { html, fetch } = await run("/g/2026020150", { title: "PIT @ COL", description: "x", url: "https://puckpulse.io/games/2026020150" });
     expect(fetch.mock.calls[0][0]).toMatch(/\/games\/2026020150\/share$/);

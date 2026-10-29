@@ -1913,6 +1913,44 @@ def value_of_the_night(day: date = Query(..., alias="date")):
         conn.close()
 
 
+def _value_headline(p):
+    """'MTL +142 (to win)' or 'PIT +1.5 −175 (puck line)'."""
+    team = p["home"] if p["side"] == "home" else p["away"]
+    price = f"+{p['price']}" if p["price"] > 0 else f"−{abs(p['price'])}"
+    if p["market"] == "puck_line":
+        return f"{team} {p['line']:+g} {price} (puck line)".replace("-", "−")
+    return f"{team} {price} (to win)"
+
+
+@app.get("/value-of-the-night/{day}/share")
+def value_share(day: date):
+    """Title, description, and image for the value of the night's link preview (the site's /v/{date})."""
+    data = value_of_the_night(day)
+    if not data.get("available"):
+        raise HTTPException(status_code=404, detail="No pick that day")
+    p, rec = data["pick"], data["record"] or {}
+    label = "Value of the night" if p["value"] else "Closest to value"
+    ev = f"{'+' if p['ev'] >= 0 else '−'}{abs(round(p['ev'] * 100))}%"
+    record = (f" This season: {rec['wins']}-{rec['losses']}, {rec['units']:+.2f}u, beat the close {rec['beat_close']} of "
+              f"{rec['clv_count']}." if rec.get("nights") else "")
+    return {
+        "title": f"{label}, {day.strftime('%b %-d')}: {_value_headline(p)}",
+        "description": f"{p['away']} @ {p['home']}: PuckPulse {round(p['ours'] * 100)}% vs. the books' "
+                       f"{round(p['market_prob'] * 100)}%, expected return {ev}.{record} Not betting advice. 21+.",
+        "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/value/{day.isoformat()}.png",
+    }
+
+
+@app.get("/og/value/{day}.png")
+def value_image(day: date):
+    """The value of the night's share image (og_image.render_value). 1200x630 PNG."""
+    data = value_of_the_night(day)
+    if not data.get("available"):
+        raise HTTPException(status_code=404, detail="No pick that day")
+    png = daily_cache.get_or_compute(("og-value", day.isoformat()), lambda: og_image.render_value(data))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
 @app.get("/report-card")
 @daily_cached
 def report_card_summary():

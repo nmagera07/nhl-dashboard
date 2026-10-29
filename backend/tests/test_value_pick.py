@@ -85,3 +85,18 @@ def test_endpoint_without_a_morning_snapshot(client, db_router):
     db_router.when("from market_odds", [])
     body = client.get("/value-of-the-night?date=2026-10-29").json()
     assert body["available"] is False and body["pick"] is None and body["record"]["nights"] == 0
+
+
+def test_share_text_and_card(client, monkeypatch):
+    import api
+    from tests.test_og_image import VALUE
+    monkeypatch.setattr(api, "value_of_the_night", lambda day: VALUE)
+    body = client.get("/value-of-the-night/2026-10-29/share").json()
+    assert body["title"] == "Closest to value, Oct 29: MTL +142 (to win)"
+    assert body["description"] == ("MTL @ DAL: PuckPulse 42% vs. the books' 41%, expected return +1%. "
+                                   "This season: 7-6, +3.16u, beat the close 5 of 12. Not betting advice. 21+.")
+    assert body["image"].endswith("/og/value/2026-10-29.png")
+    image = client.get("/og/value/2026-10-29.png")
+    assert image.status_code == 200 and image.headers["content-type"] == "image/png"
+    monkeypatch.setattr(api, "value_of_the_night", lambda day: {"available": False})
+    assert client.get("/value-of-the-night/2026-10-30/share").status_code == 404

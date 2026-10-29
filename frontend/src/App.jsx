@@ -265,6 +265,7 @@ export default function NHLDashboard() {
           <Route path="/s/:day" element={<SwingShareRedirect />} />
           <Route path="/c/:pair" element={<CompareShareRedirect />} />
           <Route path="/tm/:spec" element={<TimeMachineShareRedirect />} />
+          <Route path="/v/:day" element={<Navigate to="/bets" replace />} />
           {/* Old URL, kept so existing bookmarks and installs still work. */}
           <Route path="/leaderboard" element={<Navigate to="/players" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

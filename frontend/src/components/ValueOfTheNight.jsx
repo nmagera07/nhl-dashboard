@@ -1,3 +1,5 @@
+import ShareButton from "./ShareButton.jsx";
+import { API_BASE } from "../config.js";
 import { betId, betLabel } from "../utils/myBets.js";
 import { formatEv, formatPct, formatPrice } from "../utils/odds.js";
 
@@ -53,6 +55,11 @@ export default function ValueOfTheNight({ data, game, today, tracked, onTrack })
       </p>
       {data.result && <p className="votn-why">Result: {OUTCOME[data.result.outcome]} {units(data.result.units)}.</p>}
       <Record record={data.record} last={data.last} />
+      <div className="votn-share">
+        <ShareButton url={`https://puckpulse.io/v/${data.date}`} image={`${API_BASE}/og/value/${data.date}.png`}
+                     title={`PuckPulse's ${p.value ? "value of the night" : "closest to value tonight"}: ${betLabel(p)} ${formatPrice(p.price)}`}
+                     event="share-value" label="Share" />
+      </div>
     </section>
   );
 }

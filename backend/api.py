@@ -59,6 +59,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import value_pick
 import draft_board
 import lottery
 import report_card
@@ -1891,6 +1892,63 @@ def bets_for_day(day: date = Query(..., alias="date")):
         raise
     finally:
         conn.close()
+
+
+@app.get("/value-of-the-night")
+@daily_cached
+def value_of_the_night(day: date = Query(..., alias="date")):
+    """
+    The card at the top of the Bets tab (value_pick.py): the day's best
+    value bet from the morning lines (or the closest one, value: false),
+    its result once graded, and the season's record of these picks, graded
+    against the final score and the closing line.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            return value_pick.value_of_the_night(cur, day)
+    except psycopg2.errors.UndefinedTable:
+        return {"date": str(day), "available": False, "pick": None, "result": None, "record": None, "last": None}
+    finally:
+        conn.close()
+
+
+def _value_headline(p):
+    """'MTL +142 (to win)' or 'PIT +1.5 −175 (puck line)'."""
+    team = p["home"] if p["side"] == "home" else p["away"]
+    price = f"+{p['price']}" if p["price"] > 0 else f"−{abs(p['price'])}"
+    if p["market"] == "puck_line":
+        return f"{team} {p['line']:+g} {price} (puck line)".replace("-", "−")
+    return f"{team} {price} (to win)"
+
+
+@app.get("/value-of-the-night/{day}/share")
+def value_share(day: date):
+    """Title, description, and image for the value of the night's link preview (the site's /v/{date})."""
+    data = value_of_the_night(day)
+    if not data.get("available"):
+        raise HTTPException(status_code=404, detail="No pick that day")
+    p, rec = data["pick"], data["record"] or {}
+    label = "Value of the night" if p["value"] else "Closest to value"
+    ev = f"{'+' if p['ev'] >= 0 else '−'}{abs(round(p['ev'] * 100))}%"
+    record = (f" This season: {rec['wins']}-{rec['losses']}, {rec['units']:+.2f}u, beat the close {rec['beat_close']} of "
+              f"{rec['clv_count']}." if rec.get("nights") else "")
+    return {
+        "title": f"{label}, {day.strftime('%b %-d')}: {_value_headline(p)}",
+        "description": f"{p['away']} @ {p['home']}: PuckPulse {round(p['ours'] * 100)}% vs. the books' "
+                       f"{round(p['market_prob'] * 100)}%, expected return {ev}.{record} Not betting advice. 21+.",
+        "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/value/{day.isoformat()}.png",
+    }
+
+
+@app.get("/og/value/{day}.png")
+def value_image(day: date):
+    """The value of the night's share image (og_image.render_value). 1200x630 PNG."""
+    data = value_of_the_night(day)
+    if not data.get("available"):
+        raise HTTPException(status_code=404, detail="No pick that day")
+    png = daily_cache.get_or_compute(("og-value", day.isoformat()), lambda: og_image.render_value(data))
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.get("/report-card")

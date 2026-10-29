@@ -53,3 +53,19 @@
 .my-bets-loss { color: var(--bad); }
 .my-bets-remove { padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: 11px; text-decoration: underline; cursor: pointer; }
 .my-bets-page .bets-legal { margin-top: 18px; }
+
+/* Value of the night: the top of the Bets tab. */
+.votn { margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.votn-value { border-color: var(--good-line); background: var(--good-soft); }
+.votn-kicker { margin: 0; color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.votn-value .votn-kicker { color: var(--good); }
+.votn-main { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 4px; }
+.votn-bet { margin: 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.votn-price { font-weight: 700; }
+.votn-book, .votn-game { color: var(--text-dim); font-size: 12px; font-weight: 400; }
+.votn-game { margin: 2px 0 0; }
+.votn-track { flex-shrink: 0; padding: 6px 14px; border: 1px solid var(--accent); border-radius: 999px; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.votn-tracked { background: var(--accent); color: var(--card); }
+.votn-why, .votn-record { margin: 8px 0 0; color: var(--text-dim); font-size: 12px; }
+.votn-record strong { color: var(--text); }
+.votn-share { display: flex; justify-content: flex-end; margin-top: 10px; }

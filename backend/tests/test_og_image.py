@@ -83,3 +83,16 @@ def test_teams_that_look_alike_get_told_apart():
     assert og._chart_colors("FLA", "OTT")[0] == og.DIM
     assert og._chart_colors("SJS", "MTL") == (og._rgb("#006D75"), og._rgb("#AF1E2D"))
     assert og._chart_colors("TOR", "BOS")[0] == (255, 255, 255)  # navy is too dark: its edge color
+
+
+VALUE = {"date": "2026-10-29", "available": True, "record": {"nights": 13, "wins": 7, "losses": 6, "pushes": 0, "units": 3.16,
+                                                            "beat_close": 5, "clv_count": 12},
+         "pick": {"game_id": 7, "away": "MTL", "home": "DAL", "market": "moneyline", "side": "away", "line": None, "price": 142,
+                  "book": "FanDuel", "ev": 0.0139, "ours": 0.419, "market_prob": 0.4057, "value": False}}
+
+
+def test_renders_the_value_card_for_both_markets():
+    for pick in (VALUE["pick"], {**VALUE["pick"], "market": "puck_line", "side": "home", "line": -1.5, "price": -120, "value": True}):
+        png = og.render_value({**VALUE, "pick": pick})
+        assert Image.open(io.BytesIO(png)).size == (1200, 630)
+    assert Image.open(io.BytesIO(og.render_value({**VALUE, "record": {"nights": 0}}))).format == "PNG"

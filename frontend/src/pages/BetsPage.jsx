@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { useMyBets } from "../hooks/useMyBets.js";
+import ValueOfTheNight from "../components/ValueOfTheNight.jsx";
 import { betId, sideLine } from "../utils/myBets.js";
 import { todayISO } from "../utils/dates.js";
 import { formatEv, formatPct, formatPrice, formatSpread } from "../utils/odds.js";
@@ -126,6 +127,7 @@ export default function BetsPage() {
   const today = todayISO();
   const { data: scoreboard, status: scoreStatus } = useFetchWithStatus(`${API_BASE}/games/date/${today}`);
   const { data: bets, status } = useFetchWithStatus(`${API_BASE}/bets?date=${today}`);
+  const { data: value } = useFetchWithStatus(`${API_BASE}/value-of-the-night?date=${today}`);
   const myBets = useMyBets();
   const tracked = new Set(myBets.bets.map((b) => b.id));
   const boards = bets?.games || {};
@@ -149,9 +151,13 @@ export default function BetsPage() {
       ) : games.length === 0 ? (
         <p className="bets-note">No games today. <Link className="accent-link" to="/">See the schedule.</Link></p>
       ) : (
-        <ul className="bets-list">
-          {games.map((g) => <BetCard key={g.id} game={g} board={{ ...boards[String(g.id)], date: today }} tracked={tracked} onTrack={myBets.toggle} />)}
-        </ul>
+        <>
+          <ValueOfTheNight data={value} game={games.find((g) => g.id === value?.pick?.game_id)} today={today}
+                           tracked={tracked} onTrack={myBets.toggle} />
+          <ul className="bets-list">
+            {games.map((g) => <BetCard key={g.id} game={g} board={{ ...boards[String(g.id)], date: today }} tracked={tracked} onTrack={myBets.toggle} />)}
+          </ul>
+        </>
       )}
       <section className="bets-about">
         <h2>How to read this</h2>

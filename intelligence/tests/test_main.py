@@ -220,6 +220,21 @@ def test_checks_explain_endpoint_requires_the_shared_token(monkeypatch):
         client.__exit__(None, None, None)
 
 
+def test_post_draft_endpoint_requires_the_shared_token(monkeypatch):
+    client = _digest_client(monkeypatch, "s3cret")
+    body = {"date": "2026-10-27", "candidates": [{"id": "swing", "kind": "Swing", "facts": {"scorer": "J. Drysdale"}}]}
+    try:
+        client.app.state.intelligence.chain = chain("PICK: swing\nX: J. Drysdale tied it late.\nREDDIT: J. Drysdale ties it late")
+        assert client.post("/posts/draft", json=body).status_code == 401
+        ok = client.post("/posts/draft", json=body, headers={"X-Digest-Token": "s3cret"}).json()
+        assert (ok["pick"], ok["x_text"], ok["reddit_title"]) == ("swing", "J. Drysdale tied it late.", "J. Drysdale ties it late")
+        bad = client.post("/posts/draft", json={**body, "candidates": [{**body["candidates"][0], "id": "x; drop"}]},
+                          headers={"X-Digest-Token": "s3cret"})
+        assert bad.status_code == 422
+    finally:
+        client.__exit__(None, None, None)
+
+
 def test_digest_endpoint_is_off_without_a_token(monkeypatch):
     client = _digest_client(monkeypatch, "")
     try:

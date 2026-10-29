@@ -55,6 +55,8 @@
 .post-kit-actions a, .post-kit-actions button { padding: 10px 16px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; }
 .post-kit-actions .post-kit-primary { border-color: var(--accent-fill); background: var(--accent-fill); color: #fff; }
 .post-kit-note { margin-top: 10px; font-size: 12px; }
+.post-kit-reddit { margin-top: 20px; padding-top: 4px; border-top: 1px solid var(--border); }
+.post-kit-reddit-title { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 15px; }
 /* The time machine (TimeMachinePage.jsx). */
 .time-machine { max-width: 720px; margin: 0 auto; padding: 0 var(--gutter); }
 .tm-card { margin-top: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }

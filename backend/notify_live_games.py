@@ -290,6 +290,19 @@ def run(now=None, fetch=None):
     return sent
 
 
+def post_draft(cur, day):
+    """The drafting agent's X post about `day` (post_drafts.py), or None: not drafted, or no table yet."""
+    try:
+        cur.execute("SAVEPOINT draft")
+        cur.execute("SELECT x_text FROM post_drafts WHERE day = %s", (day,))
+        row = cur.fetchone()
+        cur.execute("RELEASE SAVEPOINT draft")
+    except psycopg2.Error:
+        cur.execute("ROLLBACK TO SAVEPOINT draft")
+        return None
+    return row[0] if row else None
+
+
 def creators(cur):
     """The site owner's devices (push_subscriptions.is_creator), for the morning post reminder."""
     cur.execute("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE is_creator")
@@ -314,9 +327,10 @@ def precompute_swing(now=None, get=None):
 
 def creator_reminder(now=None, fetch=None):
     """
-    The morning after a game night, once: "Swing of the Night is ready, tap
-    to post", to the creator's devices only, opening the site's post kit
-    (the card, the post text, Post on X). Called every few minutes in the
+    The morning after a game night, once: "Today's post is ready" with the
+    drafting agent's post (post_drafts.py), or "Swing of the Night is
+    ready" if nothing was drafted, to the creator's devices only, opening
+    the site's post kit (the card, the post text, Post on X). Called every few minutes in the
     morning; push_events_sent makes it once a day. Returns pushes sent.
     """
     now = now or datetime.now(timezone.utc)
@@ -329,6 +343,16 @@ def creator_reminder(now=None, fetch=None):
         cur.execute("SELECT 1 FROM push_events_sent WHERE event_key = %s", (key,))
         if cur.fetchone():
             return 0
+        draft = post_draft(cur, day)
+        if draft:
+            if not claim(cur, [key]):
+                return 0
+            conn.commit()
+            payload = {"title": "Today's post is ready", "body": f"{draft} Tap to review it.", "url": f"/post-kit?date={day}",
+                       "tag": f"swing-ready-{day}"}
+            sent = sum(deliver(cur, key, sub, payload, 6 * 3600) for sub in creators(cur))
+            logger.info("%s (drafted post) -> %d creator device(s)", key, sent)
+            return sent
         try:
             swing = (fetch or (lambda d: requests.get(SWING_URL.format(day=d), timeout=30).json()))(day)
         except (requests.RequestException, ValueError) as exc:

@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from . import briefs, investigate, usage
+from . import briefs, investigate, posts, usage
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
 from .providers import AllProvidersFailed, ProviderChain, echo_tool_call as _echo
@@ -121,6 +121,26 @@ class CheckReport(BaseModel):
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     failures: list[CheckFailure] = Field(min_length=1, max_length=20)
     history: list[CheckDay] = Field(default_factory=list, max_length=7)
+
+
+class PostCandidate(BaseModel):
+    id: str = Field(pattern=r"^[a-z]+(-[A-Za-z0-9]+)?$", max_length=40)
+    kind: str = Field(max_length=200)
+    facts: dict
+
+
+class PostRequest(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    candidates: list[PostCandidate] = Field(min_length=1, max_length=8)
+
+
+class PostResponse(BaseModel):
+    pick: str | None  # None: no draft passed the checks
+    x_text: str | None
+    reddit_title: str | None
+    model: str | None
+    problems: list[str]
+    tools: list[str]
 
 
 class Evidence(BaseModel):
@@ -375,6 +395,20 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
 
+    async def draft_post(self, request: PostRequest) -> PostResponse:
+        if not self.chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+        candidates = [c.model_dump() for c in request.candidates]
+        if len(json.dumps(candidates)) > MAX_DIGEST_FACTS_CHARS:
+            raise HTTPException(status_code=413, detail="Too many facts for one post.")
+        try:
+            with usage.purpose("post"):
+                post, draft = await posts.draft_post(self.chain, ToolRunner(self.dashboard), request.date, candidates)
+        except AllProvidersFailed as exc:
+            raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
+        return PostResponse(pick=post and post["pick"], x_text=post and post["x"], reddit_title=post and post["reddit"],
+                            model=draft.model, problems=draft.problems, tools=draft.tools)
+
     async def explain_checks(self, report: CheckReport) -> DraftResponse:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
@@ -457,6 +491,17 @@ async def brief_write(payload: BriefRequest, request: Request):
     """
     _require_job_token(request)
     return await request.app.state.intelligence.write_brief(payload)
+
+
+@app.post("/posts/draft", response_model=PostResponse)
+@limiter.limit("10/hour")
+async def posts_draft(payload: PostRequest, request: Request):
+    """
+    Pick last night's best story and draft the creator's post (posts.py).
+    Private: the scheduled job's X-Digest-Token.
+    """
+    _require_job_token(request)
+    return await request.app.state.intelligence.draft_post(payload)
 
 
 @app.post("/checks/explain", response_model=DraftResponse)

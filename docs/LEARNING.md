@@ -10,6 +10,9 @@ and how I'd describe it on a resume or in an interview. Newest first.
 Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 **CI/CD and reliability**
+- Added push delivery receipts: the service worker reports each alert it actually shows, so
+  the delivery log separates "accepted by the push service" from "reached the phone", which
+  turned "I didn't get my alerts" into a measurable question.
 - Traced a missed push notification across every hop (detection, database claim, job logs,
   push service) to Android's idle batching plus a short expiry; fixed with high-urgency
   delivery, per-event expiry, and per-device delivery logging.
@@ -44,6 +47,19 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   ~50% lower monthly cost.
 
 **AI engineering**
+- Built three scheduled LLM agents into a live app, alongside its chat agent: pregame game
+  research, a data-quality investigator, and a social post drafter. They share one
+  research → write → verify loop: the model chooses which tools to call, and code checks
+  every output (each number traced to tool results, betting odds matched exactly with their
+  sign, no guessed first names or betting-tip wording). A failing draft gets one targeted
+  rewrite, then falls back to plain data, so nothing unverified reaches users.
+- Split a data-quality agent into deterministic checks (16 nightly checks, pushed to my phone
+  on failure) and an AI investigator with read-only diagnostic tools and a runbook. The first
+  live run got 2 of 3 diagnoses wrong; 3 of 3 were right after making tool output
+  self-describing (the NHL's "OFF" became `final: true`) and mapping each check to its script.
+- Instrumented per-call LLM token usage by agent and provider (including streamed responses).
+  The first measurement put a pregame brief at ~5.2K tokens, correcting my own cost estimate
+  by 10x (~3M tokens a month for briefs, well inside free tiers).
 - Built Wins Above Replacement for 770+ NHL players, validated on held-out seasons (team WAR
   tracks real wins at r = 0.885, 0.94 wins per WAR), and settled a choice the backtest couldn't
   separate with a direct measurement.
@@ -90,6 +106,13 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   holds a read-only credential, stored as a secret).
 
 **Data and modeling**
+- Built RAPM (ridge regression on 5-on-5 shift stints, with each season's ratings as the next
+  season's prior) and a WAR v2 on top of it. Backtested on four seasons, it explained team
+  wins better than the old WAR (r 0.909 vs. 0.888) but predicted the next season worse
+  (0.563 vs. 0.672); I shipped it for its descriptive purpose and kept projections on a
+  separate model.
+- Filled gaps in the NHL's shift data (a week of charts never posted) by parsing the official
+  HTML time-on-ice reports, verified identical to the shift charts on games that had both.
 - Built projected NHL starting goalies (recency-weighted starts, back-to-back rotation,
   current roster) calibrated on 10,112 team-games: the top pick started 66% of the time
   (78% on back-to-back nights), with stated chances accurate within a few points.
@@ -188,6 +211,48 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-28 — Four agents in a day: what they have in common
+
+**What happened:** In one session PuckPulse went from one AI feature (the
+chat agent) to four, three of them running on their own on a schedule:
+- **Pregame briefs:** research each game and write 3 bullets, twice a day.
+- **The data check:** plain code checks the 2 AM run; an AI investigator
+  explains any failure in a push to my phone.
+- **Social drafts:** pick last night's best story and draft an X post and a
+  Reddit title for me to approve in the post kit.
+- **A token counter,** so every agent's cost is measured, not guessed.
+
+**The pattern they share** (`intelligence/app/research.py`):
+1. Code gathers what it can do reliably: the schedule, the candidate
+   stories, the failed checks.
+2. The model decides what to look up with read-only tools, then writes.
+3. Code checks the output against what the tools returned.
+4. One rewrite, with the exact problems listed.
+5. If it still fails, there's no AI text: the page, push or post kit shows
+   plain data instead.
+
+**What each agent's first live run taught me:**
+- Briefs: a number written as a word ("four-game streak") slipped past a
+  digit check. Now numbers must be digits.
+- Investigator: it read the NHL's "OFF" as "not played yet." Tool output
+  has to explain itself.
+- Drafts: it wrote "Jamie Drysdale" from memory when the data said
+  "J. Drysdale." It was right, but it was a guess. Names now have to come
+  from the data too.
+- Tokens: one brief is ~5,200 tokens. I'd guessed 10x that. Measure before
+  deciding anything about cost (or about buying hardware to run a model).
+
+**What I learned:** an agent is an LLM in a loop with tools, and most of
+the engineering is around the model: what the tools say, what the
+instructions spell out, and what code verifies before anyone sees it.
+Every first run had a bug, and I caught each one by reading the output
+against the real data. That's the case for evals, which come next.
+
+**Interview angle:** "Walk me through an agent you've built." Pick any of
+the three, show the loop, then tell the first-run bug and its fix.
 
 ---
 

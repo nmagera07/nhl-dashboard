@@ -90,6 +90,17 @@ def providers_from_env(env: Mapping[str, str] = os.environ) -> list[Provider]:
     return chain
 
 
+def echo_tool_call(call) -> dict:
+    """
+    A tool call exactly as the provider sent it, extra fields included:
+    Gemini attaches a "thought signature" (extra_content) to each call and
+    rejects the follow-up request (HTTP 400) if it isn't sent back.
+    """
+    if hasattr(call, "model_dump"):
+        return call.model_dump(exclude_none=True)
+    return {"id": call.id, "type": "function", "function": {"name": call.function.name, "arguments": call.function.arguments}}
+
+
 class AllProvidersFailed(Exception):
     """Every configured provider refused or failed."""
 

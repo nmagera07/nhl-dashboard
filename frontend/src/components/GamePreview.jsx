@@ -5,6 +5,7 @@ import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import { winProbability } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import GameLineups from "./GameLineups.jsx";
+import PregameBrief from "./PregameBrief.jsx";
 
 const pct = (v, digits = 1) => (v == null ? "—" : `${(Number(v) * 100).toFixed(digits)}%`);
 const num = (v, digits = 2) => (v == null ? "—" : Number(v).toFixed(digits));
@@ -167,6 +168,8 @@ function GamePreview({ game, standingsByTeam = {}, playoffOddsByTeam = {} }) {
   return (
     <>
       <WinProbability away={away} home={home} date={game.gameDate} gameId={game.id} />
+
+      <PregameBrief gameId={game.id} />
 
       <section className="boxscore-card">
         <h2>Matchup</h2>

@@ -191,6 +191,38 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-28 — The pregame brief agent: checking an AI's numbers
+
+**What happened:** I built an agent that researches each NHL game on its
+own (it picks which tools to call: odds, goalies, injuries, recent results)
+and writes a 3-bullet pregame brief. Nobody reads a brief before it goes on
+the site, so it needs guardrails: every number in it has to appear in what
+the tools returned (rounding allowed; betting odds must match exactly, sign
+included), no "lock"-style wording, and 3 bullets only. A brief that fails
+gets one rewrite with the exact problems listed; if that fails too, the
+page shows plain facts instead.
+
+**What surprised me:** on the first real run, a brief said Calgary was "on
+a four-game win streak." It was true, but the model had counted it itself,
+and a number written as a word slips right past a digit check. Now numbers
+must be digits, and spelled-out counts are rejected.
+
+**What I learned:**
+- A check is only as good as what it can see. "Every number is sourced"
+  missed numbers that weren't written as digits.
+- A number check proves a number exists in the data, not that it's used
+  correctly: "4" could match a score and still be the wrong count. The
+  instructions ("never count streaks yourself") and the evals cover what
+  the check can't.
+- Build the agent so it fails safe. No brief is better than a wrong one,
+  and the page still works without it.
+
+**Interview angle:** "How do you stop an agent from making things up?"
+Ground it in tool results, check its output against those results in code,
+give it one chance to fix the specific problems, and fall back to plain data.
+
+---
+
 ## 2026-10-27 — WAR v2: the fancier model lost the tests I cared about
 
 **What happened:** I built WAR v2 on RAPM (5v5 offense and defense with

@@ -189,6 +189,23 @@ def test_digest_endpoint_requires_the_shared_token(monkeypatch):
         client.__exit__(None, None, None)
 
 
+BRIEF = {"game_id": 2026020200, "away": "CGY", "home": "EDM", "date": "2026-10-28"}
+
+
+def test_brief_endpoint_requires_the_shared_token(monkeypatch):
+    client = _digest_client(monkeypatch, "s3cret")
+    try:
+        client.app.state.intelligence.chain = chain("- EDM hosts CGY.")
+        assert client.post("/briefs/write", json=BRIEF).status_code == 401
+        ok = client.post("/briefs/write", json=BRIEF, headers={"X-Digest-Token": "s3cret"})
+        assert ok.status_code == 200
+        assert ok.json() == {"text": "- EDM hosts CGY.", "model": "Groq", "problems": [], "tools": []}
+        bad = client.post("/briefs/write", json={**BRIEF, "home": "edm; drop"}, headers={"X-Digest-Token": "s3cret"})
+        assert bad.status_code == 422
+    finally:
+        client.__exit__(None, None, None)
+
+
 def test_digest_endpoint_is_off_without_a_token(monkeypatch):
     client = _digest_client(monkeypatch, "")
     try:

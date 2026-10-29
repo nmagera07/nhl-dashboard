@@ -1,7 +1,7 @@
 """Tests for the in-memory TTL response cache (daily_cache.py) and its wiring in api.py."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -156,6 +156,14 @@ class TestFreshnessLoopInvalidation:
             asyncio.run(api.check_ingestion_freshness_loop())
         # first read just records the stamp, second is unchanged, third is new
         assert cleared == [1]
+
+    def test_checks_hourly_after_the_nightly_ingest_and_rarely_otherwise(self):
+        # Each check wakes the database (Neon bills compute hours), so outside 06-10 UTC it waits up to 6 hours.
+        at = lambda h, m=0: datetime(2026, 10, 29, h, m, tzinfo=timezone.utc)
+        assert api.next_freshness_check(at(7)) == 3600
+        assert api.next_freshness_check(at(12)) == 6 * 3600
+        assert api.next_freshness_check(at(3)) == 3 * 3600 + 5 * 60  # lands at 06:05, the start of the window
+        assert api.next_freshness_check(at(23, 30)) == 6 * 3600
 
 
 class TestDecoratorSpecifics:

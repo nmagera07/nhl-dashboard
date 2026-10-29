@@ -122,7 +122,8 @@ EASTERN = ZoneInfo("America/New_York")
 # (an Azure Container Apps Job `nhl-standings-ingest`, not something api.py ever calls --
 # see the architecture note in the top-level README) -- so there's no
 # in-process signal if it silently stops running. This periodic check is
-# the one exception to "api.py only reads on request": once an hour it
+# the one exception to "api.py only reads on request": now and then (see
+# next_freshness_check: hourly after the nightly ingest, else every 6 hours) it
 # reads MAX(created_at) off standings_snapshots and logs an ERROR line if
 # it's older than INGESTION_STALE_THRESHOLD_HOURS, the same
 # scanned-for-a-traceback mechanism already used for
@@ -133,6 +134,25 @@ GIT_SHA = os.environ.get("GIT_SHA") or "unknown"
 
 INGESTION_STALE_THRESHOLD_HOURS = float(os.environ.get("INGESTION_STALE_THRESHOLD_HOURS") or "30")
 INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS = 60 * 60
+INGESTION_QUIET_INTERVAL_SECONDS = 6 * 60 * 60
+INGEST_WINDOW_UTC = range(6, 10)  # the 2 AM ET ingest finishes in here
+
+
+def next_freshness_check(now):
+    """
+    Seconds until the next freshness check: hourly in the hours after the
+    nightly ingest (new standings mean clearing the cache), otherwise every
+    6 hours, landing at the start of the next window. Each check wakes
+    Neon's compute for 5 minutes, which counts against the free plan's
+    compute hours; an hourly check all day was 2 hours a day of it. A stale
+    ingest isn't an error until 30 hours old, so 6 hours is plenty.
+    """
+    if now.hour in INGEST_WINDOW_UTC:
+        return INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS
+    window = now.replace(hour=INGEST_WINDOW_UTC.start, minute=5, second=0, microsecond=0)
+    if window <= now:
+        window += timedelta(days=1)
+    return min(INGESTION_QUIET_INTERVAL_SECONDS, (window - now).total_seconds())
 
 
 def as_utc(dt):
@@ -195,7 +215,7 @@ async def check_ingestion_freshness_loop():
         except Exception:
             logger.error("Ingestion freshness check itself failed", exc_info=True)
 
-        await asyncio.sleep(INGESTION_FRESHNESS_CHECK_INTERVAL_SECONDS)
+        await asyncio.sleep(next_freshness_check(datetime.now(timezone.utc)))
 
 
 FANTASY_POLL_SECONDS = 3 * 60

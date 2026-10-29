@@ -208,10 +208,14 @@ class TestRun:
 
 
 class _ReminderCursor(_Cursor):
+    draft = None
+
     def execute(self, query, params=None):
         super().execute(query, params)
         if "FROM push_events_sent" in query:
             self._one = (1,) if params[0] in self.already_sent else None
+        if "FROM post_drafts" in query:
+            self._one = (self.draft,) if self.draft else None
 
     def fetchone(self):
         return self._one
@@ -222,8 +226,9 @@ SWING = {"available": True, "goal": {"scorer": "R. Rakell", "team": "PIT", "effe
 MORNING = datetime(2026, 10, 25, 14, 30, tzinfo=timezone.utc)  # 10:30 AM ET
 
 
-def _remind(monkeypatch, now=MORNING, swing=SWING, already_sent=()):
+def _remind(monkeypatch, now=MORNING, swing=SWING, already_sent=(), draft=None):
     cur = _ReminderCursor(already_sent, [SUB])
+    cur.draft = draft
 
     def fake_execute_values(cursor, query, rows, fetch=False):
         fresh = [(k,) for (k,) in rows if k not in cursor.already_sent]
@@ -247,6 +252,14 @@ class TestCreatorReminder:
         assert sent[0]["body"] == "R. Rakell ties it with 1:06 left in the 3rd · PIT 7% → 55%. Tap to post it."
         assert sent[0]["url"] == "/post-kit?date=2026-10-24"
         assert any("WHERE is_creator" in q for q, _ in cur.sql)  # the creator's devices only
+
+    def test_a_drafted_post_is_announced_instead(self, monkeypatch):
+        draft = "R. Rakell tied it with 1:06 left, and PIT went from 7% to 55%."
+        count, sent, asked, _ = _remind(monkeypatch, draft=draft)
+        assert count == 1 and asked == []  # no need to build the swing message
+        assert sent[0]["title"] == "Today's post is ready"
+        assert sent[0]["body"] == f"{draft} Tap to review it."
+        assert sent[0]["url"] == "/post-kit?date=2026-10-24"
 
     def test_once_a_day(self, monkeypatch):
         count, sent, asked, _ = _remind(monkeypatch, already_sent={"swing-ready:2026-10-24"})

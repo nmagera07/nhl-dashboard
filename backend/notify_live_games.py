@@ -261,11 +261,22 @@ def subscribers(cur, teams, kind, scorer=None):
     return [{"endpoint": e, "p256dh": p, "auth": a} for e, p, a in cur.fetchall()]
 
 
+# Event keys this instance has claimed (or found claimed). The function app
+# keeps its instance warm across the every-minute runs, so a run with
+# nothing new skips the database. Neon bills while its compute is awake and
+# naps after 5 idle minutes; claiming every goal again each minute kept it
+# awake for 6 hours after every puck drop. A new instance starts empty and
+# its first claim asks the database, so nothing is sent twice.
+_claimed = set()
+CLAIMED_MAX = 5000
+
+
 def run(now=None, fetch=None):
     now = now or datetime.now(timezone.utc)
     games = (fetch or (lambda: requests.get(SCORE_URL, timeout=15).json()))().get("games", [])
     candidates, claim_only = events_for(games, now)
-    if not candidates:
+    keys = {e["key"] for e in candidates + claim_only}
+    if not candidates or keys <= _claimed:
         return 0
 
     sent = 0
@@ -273,6 +284,9 @@ def run(now=None, fetch=None):
         claim(cur, [e["key"] for e in claim_only])
         fresh = claim(cur, [e["key"] for e in candidates])
         conn.commit()  # claimed before sending: a crash mid-send can't cause a duplicate later
+        if len(_claimed) > CLAIMED_MAX:
+            _claimed.clear()
+        _claimed.update(keys)
         record_results(cur, [e["result"] for e in candidates if e["key"] in fresh and e.get("result")])
         conn.commit()
         for event in (e for e in candidates if e["key"] in fresh):
@@ -339,15 +353,19 @@ def creator_reminder(now=None, fetch=None):
         return 0
     day = (et.date() - timedelta(days=1)).isoformat()
     key = f"swing-ready:{day}"
+    if key in _claimed:
+        return 0  # done this morning: no need to wake the database to ask again
     with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
         cur.execute("SELECT 1 FROM push_events_sent WHERE event_key = %s", (key,))
         if cur.fetchone():
+            _claimed.add(key)
             return 0
         draft = post_draft(cur, day)
         if draft:
             if not claim(cur, [key]):
                 return 0
             conn.commit()
+            _claimed.add(key)
             payload = {"title": "Today's post is ready", "body": f"{draft} Tap to review it.", "url": f"/post-kit?date={day}",
                        "tag": f"swing-ready-{day}"}
             sent = sum(deliver(cur, key, sub, payload, 6 * 3600) for sub in creators(cur))
@@ -361,6 +379,7 @@ def creator_reminder(now=None, fetch=None):
         if not claim(cur, [key]):
             return 0
         conn.commit()
+        _claimed.add(key)
         if not swing.get("available"):
             return 0  # no games that night: nothing to post
         g = swing["goal"]

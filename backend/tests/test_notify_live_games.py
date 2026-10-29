@@ -2,10 +2,18 @@
 
 from datetime import datetime, timezone
 
+import pytest
+
 import notify_live_games as n
 import push
 
 NOW = datetime(2026, 10, 10, 1, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_instance():
+    """Each test is a new function instance: nothing claimed in memory yet."""
+    n._claimed.clear()
 
 
 def _goal(team, period, time, away_score, home_score, name="S. Crosby", to_date=5, assists=("E. Malkin",), strength="ev"):
@@ -192,6 +200,18 @@ class TestRun:
 
         assert n.run(now=NOW, fetch=lambda: {"games": [_game("FUT")]}) == 0
 
+    def test_a_minute_with_nothing_new_doesnt_wake_the_database(self, monkeypatch):
+        games = [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])]
+        assert _run(monkeypatch, games, subs=[SUB])[0] == 1
+        monkeypatch.setattr(n.psycopg2, "connect", lambda url: (_ for _ in ()).throw(AssertionError("connected")))
+        assert n.run(now=NOW, fetch=lambda: {"games": games}) == 0
+
+    def test_the_next_goal_still_goes_out(self, monkeypatch):
+        _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB])
+        count, sent, _ = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 2, "03:00", 1, 1)])],
+                               already_sent={"goal:2026020068:PIT:1-0"}, subs=[SUB])
+        assert count == 1 and sent[0][1].startswith("🚨 CBJ goal!")
+
     def test_removes_subscriptions_the_browser_dropped(self, monkeypatch):
         def gone(sub, payload, ttl=None, urgency=None):
             raise push.SubscriptionGone("410")
@@ -264,6 +284,11 @@ class TestCreatorReminder:
     def test_once_a_day(self, monkeypatch):
         count, sent, asked, _ = _remind(monkeypatch, already_sent={"swing-ready:2026-10-24"})
         assert (count, sent, asked) == (0, [], [])
+
+    def test_after_sending_later_runs_dont_wake_the_database(self, monkeypatch):
+        assert _remind(monkeypatch)[0] == 1
+        monkeypatch.setattr(n.psycopg2, "connect", lambda url: (_ for _ in ()).throw(AssertionError("connected")))
+        assert n.creator_reminder(now=MORNING) == 0
 
     def test_only_in_the_morning_and_not_after_a_night_without_games(self, monkeypatch):
         assert _remind(monkeypatch, now=datetime(2026, 10, 25, 3, 0, tzinfo=timezone.utc))[0] == 0

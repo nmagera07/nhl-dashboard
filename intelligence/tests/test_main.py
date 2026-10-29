@@ -206,6 +206,20 @@ def test_brief_endpoint_requires_the_shared_token(monkeypatch):
         client.__exit__(None, None, None)
 
 
+def test_checks_explain_endpoint_requires_the_shared_token(monkeypatch):
+    client = _digest_client(monkeypatch, "s3cret")
+    report = {"date": "2026-10-29", "failures": [{"name": "WAR updated", "detail": "last updated 2026-10-28"}]}
+    try:
+        client.app.state.intelligence.chain = chain("war.py failed on 2026-10-28.\nAction: check war.py in the job's logs.")
+        assert client.post("/checks/explain", json=report).status_code == 401
+        ok = client.post("/checks/explain", json=report, headers={"X-Digest-Token": "s3cret"})
+        assert ok.status_code == 200 and ok.json()["text"].startswith("war.py failed")
+        empty = client.post("/checks/explain", json={**report, "failures": []}, headers={"X-Digest-Token": "s3cret"})
+        assert empty.status_code == 422
+    finally:
+        client.__exit__(None, None, None)
+
+
 def test_digest_endpoint_is_off_without_a_token(monkeypatch):
     client = _digest_client(monkeypatch, "")
     try:

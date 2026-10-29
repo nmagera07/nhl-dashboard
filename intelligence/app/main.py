@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from . import briefs
+from . import briefs, investigate
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
 from .providers import AllProvidersFailed, ProviderChain, echo_tool_call as _echo
@@ -100,11 +100,27 @@ class BriefRequest(BaseModel):
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
-class BriefResponse(BaseModel):
-    text: str | None  # None: no draft passed the checks (the page shows plain facts)
+class DraftResponse(BaseModel):
+    text: str | None  # None: no draft passed the checks (the caller falls back to plain facts)
     model: str | None
     problems: list[str]
     tools: list[str]
+
+
+class CheckFailure(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    detail: str = Field(default="", max_length=500)
+
+
+class CheckDay(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    failed: list[str] = Field(default_factory=list, max_length=30)
+
+
+class CheckReport(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    failures: list[CheckFailure] = Field(min_length=1, max_length=20)
+    history: list[CheckDay] = Field(default_factory=list, max_length=7)
 
 
 class Evidence(BaseModel):
@@ -165,6 +181,7 @@ class IntelligenceService:
         self.settings = settings
         self.dashboard = dashboard or DashboardClient(settings.dashboard_api_url)
         self.chain = chain if chain is not None else ProviderChain(settings.providers)
+        self.lookups = investigate.Lookups()  # the data-check investigator's NHL lookups
         self._answers: OrderedDict = OrderedDict()  # question key -> (saved_at, text, evidence, model label)
         self._clock = clock
 
@@ -346,7 +363,7 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DigestResponse(text=(message.content or "").strip(), model=provider.label)
 
-    async def write_brief(self, request: BriefRequest) -> BriefResponse:
+    async def write_brief(self, request: BriefRequest) -> DraftResponse:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         game = briefs.Game(request.game_id, request.away, request.home, request.date)
@@ -354,7 +371,16 @@ class IntelligenceService:
             brief = await briefs.write_brief(self.chain, ToolRunner(self.dashboard), game, today_eastern())
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
-        return BriefResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
+        return DraftResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
+
+    async def explain_checks(self, report: CheckReport) -> DraftResponse:
+        if not self.chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+        try:
+            draft = await investigate.explain(self.chain, self.lookups, report.model_dump())
+        except AllProvidersFailed as exc:
+            raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
+        return DraftResponse(text=draft.text, model=draft.model, problems=draft.problems, tools=draft.tools)
 
 
 @asynccontextmanager
@@ -419,7 +445,7 @@ async def digest_write(payload: DigestRequest, request: Request):
     return await request.app.state.intelligence.write_digest(payload.facts)
 
 
-@app.post("/briefs/write", response_model=BriefResponse)
+@app.post("/briefs/write", response_model=DraftResponse)
 @limiter.limit("60/hour")
 async def brief_write(payload: BriefRequest, request: Request):
     """
@@ -428,6 +454,17 @@ async def brief_write(payload: BriefRequest, request: Request):
     """
     _require_job_token(request)
     return await request.app.state.intelligence.write_brief(payload)
+
+
+@app.post("/checks/explain", response_model=DraftResponse)
+@limiter.limit("10/hour")
+async def checks_explain(payload: CheckReport, request: Request):
+    """
+    Investigate a failed morning data check (investigate.py) and explain it in
+    2 lines for the owner's push. Private: the scheduled job's X-Digest-Token.
+    """
+    _require_job_token(request)
+    return await request.app.state.intelligence.explain_checks(payload)
 
 
 @app.post("/chat", response_model=ChatResponse)

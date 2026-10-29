@@ -12,6 +12,9 @@ right every time.
 
 Each run stores its results in data_checks, and anything that failed is
 pushed to the creator's devices (once a day). A clean run sends nothing.
+Before a push, NHL Intelligence's investigator (POST /checks/explain)
+looks into the failures and explains them in 2 lines (cause, "Action:");
+without it the push lists the failures as they are.
 Runs on the notifier function (function_app.py) after the 2 AM job.
 """
 
@@ -33,18 +36,23 @@ load_dotenv()
 logger = setup_logging("data_checks")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+INTELLIGENCE_URL = (os.getenv("INTELLIGENCE_URL") or "").rstrip("/")
+DIGEST_TOKEN = os.getenv("DIGEST_TOKEN", "")  # the scheduled jobs' token for NHL Intelligence
 SCORE_URL = "https://api-web.nhle.com/v1/score/{date}"
 GAME_TYPES = (2, 3)  # regular season and playoffs; the nightly run skips preseason
 XG_RANGE = (0.3, 9.0)  # one team's xG in one game; outside this, the model or the feed is off
 PLAYOFF_SPOTS = 16
+HISTORY_DAYS = 7  # earlier days the investigator sees, to tell a new failure from a recurring one
 
 TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS data_checks (
     run_date    DATE PRIMARY KEY,
     ok          BOOLEAN NOT NULL,
     results     JSONB NOT NULL,   -- [{name, ok, detail}]
+    explanation TEXT,             -- the investigator's 2 lines, when something failed
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)
+);
+ALTER TABLE data_checks ADD COLUMN IF NOT EXISTS explanation TEXT
 """
 
 # (label, table, date column): each should have today's date after the 2 AM run.
@@ -167,8 +175,32 @@ def save(cur, today: date, results: list[Result]) -> None:
     )
 
 
-def alert(cur, today: date, results: list[Result]) -> int:
-    """Push the failures to the creator's devices, once a day. Returns pushes sent."""
+def history(cur, today: date) -> list[dict]:
+    """The earlier days' failures, newest first: [{date, failed: [names]}]."""
+    cur.execute("SELECT run_date, results FROM data_checks WHERE run_date < %s ORDER BY run_date DESC LIMIT %s",
+                (today, HISTORY_DAYS))
+    return [{"date": row["run_date"].isoformat(), "failed": [r["name"] for r in row["results"] if not r["ok"]]}
+            for row in cur.fetchall()]
+
+
+def explain(today: date, failed: list[Result], past: list[dict], post=requests.post) -> str | None:
+    """The investigator's 2 lines for the push, or None (not configured, unreachable, or no draft passed its checks)."""
+    if not (INTELLIGENCE_URL and DIGEST_TOKEN):
+        return None
+    report = {"date": today.isoformat(), "failures": [{"name": r.name, "detail": r.detail} for r in failed][:20],
+              "history": past}
+    try:
+        response = post(f"{INTELLIGENCE_URL}/checks/explain", json=report, headers={"X-Digest-Token": DIGEST_TOKEN},
+                        timeout=120)
+        response.raise_for_status()
+        return response.json().get("text")
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning(f"Couldn't get the failures explained ({exc}); pushing them as they are")
+        return None
+
+
+def alert(cur, today: date, results: list[Result], explanation: str | None = None) -> int:
+    """Push the failures (explained, if the investigator could) to the creator's devices, once a day. Returns pushes sent."""
     failed = [r for r in results if not r.ok]
     if not failed:
         return 0
@@ -177,14 +209,14 @@ def alert(cur, today: date, results: list[Result]) -> int:
         return 0
     payload = {
         "title": f"Data check: {len(failed)} problem{'s' if len(failed) != 1 else ''}",
-        "body": "; ".join(f"{r.name}: {r.detail}" if r.detail else r.name for r in failed)[:240],
+        "body": (explanation or "; ".join(f"{r.name}: {r.detail}" if r.detail else r.name for r in failed))[:240],
         "url": "/",
         "tag": key.replace(":", "-"),
     }
     return sum(nlg.deliver(cur, key, sub, payload, 12 * 3600) for sub in nlg.creators(cur))
 
 
-def main(now=None, get=requests.get) -> list[Result]:
+def main(now=None, get=requests.get, post=requests.post) -> list[Result]:
     if not DATABASE_URL:
         raise SystemExit("DATABASE_URL is not set")
     today = (now or datetime.now(nlg.EASTERN)).date()
@@ -192,9 +224,13 @@ def main(now=None, get=requests.get) -> list[Result]:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             results = run_checks(cur, today, get)
             save(cur, today, results)
+            failed = [r for r in results if not r.ok]
+            explanation = explain(today, failed, history(cur, today), post) if failed else None
+            if explanation:
+                cur.execute("UPDATE data_checks SET explanation = %s WHERE run_date = %s", (explanation, today))
         conn.commit()
         with conn.cursor() as cur:  # the push helpers read plain tuple rows
-            sent = alert(cur, today, results)
+            sent = alert(cur, today, results, explanation)
     failed = [r for r in results if not r.ok]
     logger.info(f"Data check {today}: {len(results) - len(failed)}/{len(results)} passed"
                 + (f"; pushed {sent}: " + "; ".join(f"{r.name} ({r.detail})" for r in failed) if failed else ""))

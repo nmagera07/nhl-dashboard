@@ -120,3 +120,62 @@ def test_results_are_saved_and_failures_pushed_once(monkeypatch):
 def test_a_clean_run_pushes_nothing(monkeypatch):
     monkeypatch.setattr(dc.nlg, "claim", lambda cur, keys: (_ for _ in ()).throw(AssertionError("claimed")))
     assert dc.alert(Cursor({}), TODAY, [dc.Result("WAR updated", True)]) == 0
+
+
+FAILED = [dc.Result("Last night: 5-on-5 shift data", False, "missing FLA @ WPG (2)")]
+EXPLAINED = "Shift chart missing for FLA @ WPG (2), but the time-on-ice reports are posted.\nAction: none, it fixes itself on the next run."
+
+
+def test_history_lists_each_earlier_days_failures():
+    cur = Cursor({"FROM data_checks WHERE run_date < %s": [
+        {"run_date": date(2026, 10, 28), "results": [{"name": "WAR updated", "ok": False}, {"name": "Standings updated", "ok": True}]},
+        {"run_date": date(2026, 10, 27), "results": [{"name": "WAR updated", "ok": True}]}]})
+    assert dc.history(cur, TODAY) == [{"date": "2026-10-28", "failed": ["WAR updated"]}, {"date": "2026-10-27", "failed": []}]
+    assert cur.sql[-1][1] == (TODAY, dc.HISTORY_DAYS)
+
+
+def test_the_investigator_gets_the_failures_and_history(monkeypatch):
+    monkeypatch.setattr(dc, "INTELLIGENCE_URL", "https://intel.test")
+    monkeypatch.setattr(dc, "DIGEST_TOKEN", "s3cret")
+    asked = []
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"text": EXPLAINED, "model": "Groq", "problems": [], "tools": []}
+
+    def post(url, json, headers, timeout):
+        asked.append((url, json, headers))
+        return Response()
+
+    past = [{"date": "2026-10-28", "failed": []}]
+    assert dc.explain(TODAY, FAILED, past, post) == EXPLAINED
+    url, body, headers = asked[0]
+    assert url == "https://intel.test/checks/explain" and headers == {"X-Digest-Token": "s3cret"}
+    assert body == {"date": "2026-10-29", "failures": [{"name": "Last night: 5-on-5 shift data", "detail": "missing FLA @ WPG (2)"}],
+                    "history": past}
+
+
+def test_without_the_investigator_the_push_lists_the_failures(monkeypatch):
+    import requests
+    monkeypatch.setattr(dc, "INTELLIGENCE_URL", "")
+    assert dc.explain(TODAY, FAILED, [], lambda *a, **k: (_ for _ in ()).throw(AssertionError("posted"))) is None
+    monkeypatch.setattr(dc, "INTELLIGENCE_URL", "https://intel.test")
+    monkeypatch.setattr(dc, "DIGEST_TOKEN", "s3cret")
+
+    def down(*args, **kwargs):
+        raise requests.ConnectionError("cold start")
+    assert dc.explain(TODAY, FAILED, [], down) is None
+
+
+def test_the_push_carries_the_explanation(monkeypatch):
+    sent = []
+    monkeypatch.setattr(dc.nlg, "claim", lambda cur, keys: set(keys))
+    monkeypatch.setattr(dc.nlg, "creators", lambda cur: [{"endpoint": "e"}])
+    monkeypatch.setattr(dc.nlg, "deliver", lambda cur, key, sub, payload, ttl: sent.append(payload) or True)
+    dc.alert(Cursor({}), TODAY, FAILED, EXPLAINED)
+    dc.alert(Cursor({}), TODAY, FAILED, None)
+    assert sent[0]["body"] == EXPLAINED
+    assert sent[1]["body"] == "Last night: 5-on-5 shift data: missing FLA @ WPG (2)"

@@ -13,12 +13,12 @@ A brief that fails gets one rewrite with the problems listed (no more
 tools); if that fails too, there's no brief and the page shows plain facts.
 """
 
-import asyncio
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from .providers import ProviderChain, echo_tool_call
+from .providers import ProviderChain
+from .research import Draft, research_and_write
 from .tools import TOOLS, ToolRunner
 
 logger = logging.getLogger(__name__)
@@ -62,12 +62,7 @@ class Game:
     date: str  # YYYY-MM-DD
 
 
-@dataclass
-class Brief:
-    text: str | None  # None: no brief passed the checks
-    model: str | None
-    problems: list[str] = field(default_factory=list)  # why the last draft failed, if it did
-    tools: list[str] = field(default_factory=list)  # what the agent looked up
+Brief = Draft  # text None: no brief passed the checks
 
 
 def numbers(text: str) -> list[tuple[str, float, int]]:
@@ -99,22 +94,28 @@ def check_brief(text: str, sources: str) -> list[str]:
         problems.append(f"Write numbers as digits from the tool results, not words ({', '.join(words)}); "
                         "drop any you counted yourself.")
 
+    unsourced = unsourced_numbers(text, sources)
+    if unsourced:
+        problems.append("These numbers aren't in the tool results: " + ", ".join(unsourced)
+                        + ". Use only numbers from the results, as given.")
+    return problems
+
+
+def unsourced_numbers(text: str, sources: str) -> list[str]:
+    """Numbers in text that don't appear in sources (rounding allowed; American odds exact, sign included)."""
     source = numbers(sources)
     odds = {(sign, value) for sign, value, _ in source if sign}
     unsourced = []
     for sign, value, decimals in numbers(text):
         if value in FREE_NUMBERS:
             continue
-        if sign and value >= 100:  # American odds: exact, sign included
+        if sign and value >= 100:
             ok = (sign, value) in odds
         else:
             ok = any(round(v, decimals) == value for _, v, _ in source)
         if not ok:
             unsourced.append(f"{sign}{value:g}")
-    if unsourced:
-        problems.append("These numbers aren't in the tool results: " + ", ".join(dict.fromkeys(unsourced))
-                        + ". Use only numbers from the results, as given.")
-    return problems
+    return list(dict.fromkeys(unsourced))
 
 
 def _prompt(game: Game, today: str) -> str:
@@ -127,39 +128,9 @@ async def write_brief(chain: ProviderChain, runner: ToolRunner, game: Game, toda
     Research one game and write its brief (see the module docstring). Raises
     AllProvidersFailed if no provider answers.
     """
-    prompt = _prompt(game, today)
-    messages = [{"role": "system", "content": BRIEF_INSTRUCTIONS}, {"role": "user", "content": prompt}]
-    results, tools_used, start = [], [], 0
-    for round_number in range(MAX_BRIEF_ROUNDS + 1):
-        last_round = round_number == MAX_BRIEF_ROUNDS
-        if last_round:
-            messages.append({"role": "user", "content": "Write the brief now from the results you have; no more tools."})
-        message, provider, start = await chain.complete_with_tools(
-            messages, None if last_round else BRIEF_TOOLS, BRIEF_MAX_TOKENS, start=start)
-        calls = [] if last_round else list(message.tool_calls or [])
-        if not calls:
-            break
-        messages.append({"role": "assistant", "content": message.content, "tool_calls": [echo_tool_call(c) for c in calls]})
-        outputs = await asyncio.gather(*(runner.run(c.function.name, c.function.arguments) for c in calls))
-        for call, output in zip(calls, outputs):
-            messages.append({"role": "tool", "tool_call_id": call.id, "content": output})
-            results.append(output)
-            tools_used.append(f"{call.function.name}({call.function.arguments})")
-
-    # The game line (teams, date, id) counts as a source; the instructions don't.
-    sources = "\n".join([prompt, *results])
-    text = (message.content or "").strip()
-    problems = check_brief(text, sources)
-    if problems:
-        logger.info("Brief for %s failed checks (%s); asking for a rewrite", game.game_id, "; ".join(problems))
-        messages += [{"role": "assistant", "content": text},
-                     {"role": "user", "content": "Fix these problems and reply with only the corrected bullets:\n- "
-                      + "\n- ".join(problems)}]
-        message, provider, _ = await chain.complete_with_tools(messages, None, BRIEF_MAX_TOKENS, start=start)
-        text = (message.content or "").strip()
-        problems = check_brief(text, sources)
-    if problems:
-        logger.warning("No brief for %s: %s", game.game_id, "; ".join(problems))
-        return Brief(None, provider.label, problems, tools_used)
-    return Brief(text, provider.label, [], tools_used)
-
+    draft = await research_and_write(
+        chain, runner, BRIEF_INSTRUCTIONS, _prompt(game, today), BRIEF_TOOLS, check_brief, MAX_BRIEF_ROUNDS,
+        BRIEF_MAX_TOKENS, "Write the brief now from the results you have; no more tools.")
+    if draft.text is None:
+        logger.warning("No brief for %s: %s", game.game_id, "; ".join(draft.problems))
+    return draft

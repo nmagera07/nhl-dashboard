@@ -194,3 +194,25 @@ class TestSwingOfTheNight:
         monkeypatch.setattr(api, "games_on_date", lambda day: [])
         assert client.get("/swing-of-the-night?date=2026-07-01").json() == {"available": False, "date": "2026-07-01"}
         assert client.get("/swing/2026-07-01/share").status_code == 404
+
+
+class TestBrief:
+    def test_a_written_brief(self, client, db_router):
+        db_router.when("from game_briefs", {"text": "- EDM is -180.", "model": "Google Gemini",
+                                            "written_at": "2026-10-28T21:30:04Z"})
+        body = client.get("/games/2026020200/brief").json()
+        assert body == {"available": True, "text": "- EDM is -180.", "model": "Google Gemini",
+                        "written_at": "2026-10-28T21:30:04Z"}
+        assert db_router.calls[-1][1] == (2026020200,)
+
+    def test_no_brief_yet(self, client, db_router):
+        db_router.when("from game_briefs", None)
+        assert client.get("/games/2026020200/brief").json() == {"available": False}
+
+    def test_before_the_table_exists(self, client, db_router):
+        import psycopg2.errors
+
+        def missing(params):
+            raise psycopg2.errors.UndefinedTable("relation \"game_briefs\" does not exist")
+        db_router.when("from game_briefs", missing)
+        assert client.get("/games/2026020200/brief").json() == {"available": False}

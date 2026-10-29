@@ -31,6 +31,8 @@
 .preview-lines-team { display: grid; gap: 8px; min-width: 0; }
 .preview-lines-team h3 { margin: 0; font-size: 13px; color: var(--text-dim); }
 .preview-rest { margin: 8px 0 0; font-size: 12px; color: var(--text); }
+/* Pregame brief: collapsed under the win probability. */
+.pregame-brief ul { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.45; }
 /* Market view: collapsed under the win probability. */
 .preview-market-view { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .preview-market-view summary h3 { margin: 0; font-size: 14px; }

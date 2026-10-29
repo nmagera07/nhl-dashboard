@@ -583,6 +583,27 @@ def game_lineup(game_id: int = Path(..., gt=0)):
             "away": {"abbrev": away, **found["away"]}, "home": {"abbrev": home, **found["home"]}}
 
 
+@app.get("/games/{game_id}/brief")
+def game_brief(game_id: int = Path(..., gt=0)):
+    """
+    The pregame brief for one game: 3 bullets from NHL Intelligence's brief
+    agent, every number checked against its research (pregame_briefs.py).
+    {"available": false} until one is written, late morning on game day.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT text, model, written_at FROM game_briefs WHERE game_id = %s", (game_id,))
+            row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        row = None  # before the first brief run creates the table
+    finally:
+        conn.close()
+    if not row:
+        return {"available": False}
+    return {"available": True, "text": row["text"], "model": row["model"], "written_at": row["written_at"]}
+
+
 def _pregame_goals(game_id):
     """(home win prob, home goals, away goals) logged before the game, or None."""
     conn = get_connection()

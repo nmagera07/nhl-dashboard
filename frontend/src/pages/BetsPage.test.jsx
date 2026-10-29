@@ -1,7 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import BetsPage from "./BetsPage.jsx";
+import { loadBets } from "../utils/myBets.js";
 
 const side = (over) => ({ ours: 0.5, fair: 100, market: 0.5, edge: 0, price: -110, ev: -0.05, value: false, ...over });
 const BOARD = {
@@ -23,7 +25,10 @@ function mockFetch(games, boards) {
 }
 
 describe("BetsPage", () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
 
   it("shows the best moneyline, fair odds, and a value badge for an open game", async () => {
     mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: BOARD });
@@ -58,6 +63,27 @@ describe("BetsPage", () => {
     render(<MemoryRouter><BetsPage /></MemoryRouter>);
     await screen.findByText(/last lines before puck drop/);
     expect(screen.queryByText(/^Value/, { selector: ".bets-badge" })).not.toBeInTheDocument();
+  });
+
+  it("tracks a bet at the price shown, and a second tap stops tracking it", async () => {
+    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: BOARD });
+    render(<MemoryRouter><BetsPage /></MemoryRouter>);
+    const pl = await screen.findByRole("button", { name: "Track PIT +1.5 at −175" });
+    await userEvent.click(pl);
+    expect(pl).toHaveAttribute("aria-pressed", "true");
+    expect(within(pl).getByText("✓ Tracking")).toBeInTheDocument();
+    expect(loadBets()).toEqual([expect.objectContaining({
+      id: "7:puck_line:away", gameId: 7, away: "PIT", home: "COL", market: "puck_line", side: "away", line: 1.5, price: -175,
+    })]);
+    await userEvent.click(screen.getByRole("button", { name: "Stop tracking PIT +1.5 at −175" }));
+    expect(loadBets()).toEqual([]);
+  });
+
+  it("can't track a game that has started", async () => {
+    mockFetch([game(7, "LIVE", "2026-10-17T23:00:00Z")], { 7: BOARD });
+    render(<MemoryRouter><BetsPage /></MemoryRouter>);
+    await screen.findByText(/last lines before puck drop/);
+    expect(screen.queryByRole("button", { name: /^Track/ })).not.toBeInTheDocument();
   });
 
   it("keeps the responsible-gambling note on the page", async () => {

@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
+import { useMyBets } from "../hooks/useMyBets.js";
+import { betId, sideLine } from "../utils/myBets.js";
 import { todayISO } from "../utils/dates.js";
 import { formatEv, formatPct, formatPrice, formatSpread } from "../utils/odds.js";
 
@@ -9,16 +11,27 @@ const startTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric
 
 // One side of a bet: the price to bet at, PuckPulse's fair price, and a
 // value badge when the price pays more than the fair odds by enough.
-function Side({ label, side, showBook, open }) {
+// Before puck drop, tapping it tracks the bet at this price (My bets).
+function Side({ label, side, showBook, open, tracked, onTrack }) {
   if (!side) return <td />;
   const title = `${label}: PuckPulse's model ${formatPct(side.model ?? side.ours)}${side.market != null ? `, books ${formatPct(side.market)}, fair ${formatPct(side.ours)}` : ""}`;
-  return (
-    <td className={side.value && open ? "bets-side bets-side-value" : "bets-side"} title={title}>
+  const body = (
+    <>
       <span className="bets-label">{label}</span>
       <strong className="bets-price">{formatPrice(side.price)}</strong>
       {showBook && side.book && <span className="bets-book">{side.book}</span>}
       <span className="bets-fair">PuckPulse {formatPrice(side.fair)}</span>
       {side.value && open && <span className="bets-badge">Value {formatEv(side.ev)}</span>}
+      {tracked && <span className="bets-tracked">✓ Tracking</span>}
+    </>
+  );
+  const classes = ["bets-side", side.value && open && "bets-side-value", tracked && "bets-side-tracked"].filter(Boolean).join(" ");
+  return (
+    <td className={classes} title={title}>
+      {open && onTrack && side.price != null ? (
+        <button type="button" className="bets-track" aria-pressed={Boolean(tracked)} onClick={onTrack}
+                aria-label={`${tracked ? "Stop tracking" : "Track"} ${label} at ${formatPrice(side.price)}`}>{body}</button>
+      ) : body}
     </td>
   );
 }
@@ -42,7 +55,7 @@ function Starter({ goalie }) {
   return <>{goalie.name} <span className="bets-goalie-note">{goalie.note}</span></>;
 }
 
-function BetCard({ game, board }) {
+function BetCard({ game, board, tracked, onTrack }) {
   const open = NOT_STARTED.has(game.gameState);
   const away = game.awayTeam.abbrev;
   const home = game.homeTeam.abbrev;
@@ -51,6 +64,17 @@ function BetCard({ game, board }) {
   const total = board.total;
   const hasMarket = board.moneyline.home.price != null;
   const goalies = { away: starter(board, "away"), home: starter(board, "home") };
+  // The props that make a side trackable: {tracked, onTrack}.
+  const track = (market, side) => {
+    const id = betId(game.id, market, side);
+    return {
+      tracked: tracked.has(id),
+      onTrack: () => onTrack({
+        id, gameId: game.id, date: board.date, away, home, market, side,
+        line: sideLine(board, market, side), price: board[market][side].price, placedAt: new Date().toISOString(),
+      }),
+    };
+  };
   return (
     <li className={open ? "bets-card" : "bets-card bets-card-closed"}>
       <div className="bets-head">
@@ -73,21 +97,21 @@ function BetCard({ game, board }) {
           <tbody>
             <tr>
               <th scope="row">Moneyline<span className="bets-row-hint">to win</span></th>
-              <Side label={away} side={board.moneyline.away} showBook open={open} />
-              <Side label={home} side={board.moneyline.home} showBook open={open} />
+              <Side label={away} side={board.moneyline.away} showBook open={open} {...track("moneyline", "away")} />
+              <Side label={home} side={board.moneyline.home} showBook open={open} {...track("moneyline", "home")} />
             </tr>
             {pl && pl.home.price != null && (
               <tr>
                 <th scope="row">Puck line<span className="bets-row-hint">−1.5: win by 2+</span></th>
-                <Side label={`${away} ${formatSpread(-pl.home_spread)}`} side={pl.away} open={open} />
-                <Side label={`${home} ${formatSpread(pl.home_spread)}`} side={pl.home} open={open} />
+                <Side label={`${away} ${formatSpread(-pl.home_spread)}`} side={pl.away} open={open} {...track("puck_line", "away")} />
+                <Side label={`${home} ${formatSpread(pl.home_spread)}`} side={pl.home} open={open} {...track("puck_line", "home")} />
               </tr>
             )}
             {total && total.over.price != null && (
               <tr>
                 <th scope="row">Total<span className="bets-row-hint">both teams&apos; goals</span><span className="bets-exp">beta</span></th>
-                <Side label={`Over ${total.line}`} side={total.over} open={open} />
-                <Side label={`Under ${total.line}`} side={total.under} open={open} />
+                <Side label={`Over ${total.line}`} side={total.over} open={open} {...track("total", "over")} />
+                <Side label={`Under ${total.line}`} side={total.under} open={open} {...track("total", "under")} />
               </tr>
             )}
           </tbody>
@@ -102,6 +126,8 @@ export default function BetsPage() {
   const today = todayISO();
   const { data: scoreboard, status: scoreStatus } = useFetchWithStatus(`${API_BASE}/games/date/${today}`);
   const { data: bets, status } = useFetchWithStatus(`${API_BASE}/bets?date=${today}`);
+  const myBets = useMyBets();
+  const tracked = new Set(myBets.bets.map((b) => b.id));
   const boards = bets?.games || {};
   const games = (scoreboard?.games || [])
     .filter((g) => boards[String(g.id)])
@@ -113,7 +139,8 @@ export default function BetsPage() {
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
         The best price for each side, with PuckPulse&apos;s own odds under it. <strong>Value</strong> means the price
-        beats ours by enough to matter. <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
+        beats ours by enough to matter. Tap a price to track it in <Link className="accent-link" to="/my-bets">My bets</Link>.{" "}
+        <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
       </p>
       {status === "error" ? (
         <p className="bets-note">Couldn&apos;t load today&apos;s lines.</p>
@@ -123,7 +150,7 @@ export default function BetsPage() {
         <p className="bets-note">No games today. <Link className="accent-link" to="/">See the schedule.</Link></p>
       ) : (
         <ul className="bets-list">
-          {games.map((g) => <BetCard key={g.id} game={g} board={boards[String(g.id)]} />)}
+          {games.map((g) => <BetCard key={g.id} game={g} board={{ ...boards[String(g.id)], date: today }} tracked={tracked} onTrack={myBets.toggle} />)}
         </ul>
       )}
       <section className="bets-about">

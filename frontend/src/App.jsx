@@ -25,6 +25,7 @@ import LeaderboardPage from "./pages/LeaderboardPage.jsx";
 import GamePage from "./pages/GamePage.jsx";
 import PickemPage from "./pages/PickemPage.jsx";
 import BetsPage from "./pages/BetsPage.jsx";
+import MyBetsPage from "./pages/MyBetsPage.jsx";
 import ReportCardPage from "./pages/ReportCardPage.jsx";
 import DraftLotteryPage from "./pages/DraftLotteryPage.jsx";
 import { useParams } from "react-router-dom";
@@ -141,7 +142,7 @@ export default function NHLDashboard() {
   // "On: ..." label (the service gets the same league context for all of them).
   const chatTopic = useMemo(() => {
     const path = location.pathname;
-    if (path.startsWith("/bets") || path.startsWith("/report-card")) return "bets";
+    if (path.startsWith("/bets") || path.startsWith("/my-bets") || path.startsWith("/report-card")) return "bets";
     if (path.startsWith("/news")) return "news";
     if (path.startsWith("/standings")) return "standings";
     if (path.startsWith("/playoffs") || path.startsWith("/draft-lottery")) return "playoffs";
@@ -251,6 +252,7 @@ export default function NHLDashboard() {
           <Route path="/track-record" element={<TrackRecordPage />} />
           <Route path="/pickem" element={<PickemPage />} />
           <Route path="/bets" element={<BetsPage />} />
+          <Route path="/my-bets" element={<MyBetsPage />} />
           <Route path="/report-card" element={<ReportCardPage />} />
           <Route path="/draft-lottery" element={<DraftLotteryPage standings={standings} />} />
           <Route path="/games/:gameId" element={<GamePage standings={standings} playoffOddsByTeam={playoffOddsByTeam} />} />

@@ -191,6 +191,44 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-28 — The data-check investigator: "OFF" means the game is over
+
+**What happened:** I split the data-quality agent in two. Plain code runs
+the morning checks (did every nightly table update, does every game from
+last night have its data), because a check has to be right every time.
+When one fails, an AI investigator looks into why, with three read-only
+NHL lookups and a runbook, and writes 2 lines for my phone: the likely
+cause, and "Action:".
+
+**What went wrong on the first run:** 2 of 3 explanations were wrong.
+- The NHL marks a finished game "OFF". The model read that as "not
+  played yet" and said the data would come later. It also skipped the one
+  lookup that mattered: whether the shift chart had been posted.
+- For a stale WAR table, it blamed the playoff-odds script, because
+  nothing told it which script writes which table.
+
+**The fixes weren't smarter prompts. They were clearer tools:**
+- The lookup now says `"status": "final", "final": true` instead of the
+  NHL's code.
+- The runbook names the script behind every check.
+- For missing game data, the instructions say to always check the shift
+  chart and the game status.
+After that, all 3 were right, including "shift chart missing, but the
+time-on-ice reports are posted, so it fixes itself on the next run."
+
+**What I learned:**
+- When an agent gets something wrong, look at what its tools told it
+  before blaming the model. Jargon in a tool result is a trap.
+- Spell out the facts the agent can't know: which script writes which
+  table, and what fixes itself.
+- I only caught this because I read the output against the real data.
+  That's the case for evals (step 3).
+
+**Interview angle:** "Tell me about debugging an agent." The model wasn't
+the problem; its tools spoke in codes, and its runbook had a gap.
+
+---
+
 ## 2026-10-28 — The pregame brief agent: checking an AI's numbers
 
 **What happened:** I built an agent that researches each NHL game on its

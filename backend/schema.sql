@@ -516,6 +516,16 @@ CREATE TABLE IF NOT EXISTS game_briefs (
 );
 GRANT SELECT ON game_briefs TO nhl_api_readonly;
 
+-- The morning data check (data_checks.py, on the notifier function): did
+-- the 2 AM run produce everything? One row per day; failures are pushed
+-- to the creator's devices. Not read by the API.
+CREATE TABLE IF NOT EXISTS data_checks (
+    run_date    DATE PRIMARY KEY,
+    ok          BOOLEAN NOT NULL,
+    results     JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Every game the model predicted, logged before puck drop and graded after
 -- (game_predictions.py, in the daily job). A prediction is never changed
 -- once logged, so the track record can't be quietly improved after the fact.

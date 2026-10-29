@@ -30,6 +30,8 @@ from typing import Mapping
 import httpx
 from openai import AsyncOpenAI, OpenAIError
 
+from . import usage
+
 logger = logging.getLogger(__name__)
 
 CONNECT_TIMEOUT = 5.0  # seconds to open a connection to a provider
@@ -158,6 +160,7 @@ class ProviderChain:
                     response = await self._client(provider).chat.completions.create(
                         model=provider.model, messages=messages, max_tokens=max_tokens, **extra,
                     )
+                    usage.record(provider, getattr(response, "usage", None))
                     message = response.choices[0].message if response.choices else None
                     if message and (message.tool_calls or (message.content or "").strip()):
                         return message, provider, index
@@ -189,10 +192,12 @@ class ProviderChain:
                 try:
                     extra = {"tools": tools} if tools else {}
                     stream = await self._client(provider).chat.completions.create(
-                        model=provider.model, messages=messages, max_tokens=max_tokens, stream=True, **extra,
+                        model=provider.model, messages=messages, max_tokens=max_tokens, stream=True,
+                        stream_options={"include_usage": True}, **extra,  # usage arrives in the last chunk
                     )
                     text, calls = [], {}
                     async for chunk in stream:
+                        usage.record(provider, getattr(chunk, "usage", None))
                         delta = chunk.choices[0].delta if chunk.choices else None
                         if delta is None:
                             continue

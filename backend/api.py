@@ -773,6 +773,27 @@ def swing_image(day: date):
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
+@app.get("/post-kit/{day}")
+def post_kit(day: date):
+    """
+    The drafting agent's post about a night (post_drafts.py) for the creator's
+    post kit: the story, its link and card, the X post, and the Reddit title.
+    {"available": false} if nothing was drafted (the kit falls back to Swing of the Night).
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT story, link, image, x_text, reddit_title, model FROM post_drafts WHERE day = %s", (day,))
+            row = cur.fetchone()
+    except psycopg2.errors.UndefinedTable:
+        row = None  # before the first draft creates the table
+    finally:
+        conn.close()
+    if not row:
+        return {"available": False}
+    return {"available": True, **row}
+
+
 @app.get("/swing/{day}/share")
 def swing_share(day: date):
     """Title, description, and image for Swing of the Night's link preview (the site's /s/{date})."""

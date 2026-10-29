@@ -216,3 +216,19 @@ class TestBrief:
             raise psycopg2.errors.UndefinedTable("relation \"game_briefs\" does not exist")
         db_router.when("from game_briefs", missing)
         assert client.get("/games/2026020200/brief").json() == {"available": False}
+
+
+class TestPostKit:
+    def test_a_drafted_post(self, client, db_router):
+        db_router.when("from post_drafts", {"story": "upset-2026020197", "link": "https://puckpulse.io/g/2026020197",
+                                            "image": "https://api.test/og/game/2026020197.png", "x_text": "VAN won 6-5.",
+                                            "reddit_title": "VAN steals one", "model": "Groq"})
+        body = client.get("/post-kit/2026-10-27").json()
+        assert body["available"] is True and body["story"] == "upset-2026020197" and body["reddit_title"] == "VAN steals one"
+
+    def test_nothing_drafted(self, client, db_router):
+        db_router.when("from post_drafts", None)
+        assert client.get("/post-kit/2026-10-27").json() == {"available": False}
+
+    def test_a_bad_date(self, client):
+        assert client.get("/post-kit/yesterday").status_code == 422

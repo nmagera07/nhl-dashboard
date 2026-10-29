@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from . import briefs, investigate
+from . import briefs, investigate, usage
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
 from .providers import AllProvidersFailed, ProviderChain, echo_tool_call as _echo
@@ -358,7 +358,8 @@ class IntelligenceService:
             # Reasoning models (Groq's gpt-oss) think from the same budget they
             # write from: at 600 tokens the digest came back empty, and cutting
             # reasoning effort instead made the evals catch it garbling facts.
-            message, provider, _ = await self.chain.complete_with_tools(messages, None, DIGEST_MAX_TOKENS)
+            with usage.purpose("digest"):
+                message, provider, _ = await self.chain.complete_with_tools(messages, None, DIGEST_MAX_TOKENS)
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DigestResponse(text=(message.content or "").strip(), model=provider.label)
@@ -368,7 +369,8 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         game = briefs.Game(request.game_id, request.away, request.home, request.date)
         try:
-            brief = await briefs.write_brief(self.chain, ToolRunner(self.dashboard), game, today_eastern())
+            with usage.purpose("brief"):
+                brief = await briefs.write_brief(self.chain, ToolRunner(self.dashboard), game, today_eastern())
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
@@ -377,7 +379,8 @@ class IntelligenceService:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         try:
-            draft = await investigate.explain(self.chain, self.lookups, report.model_dump())
+            with usage.purpose("investigate"):
+                draft = await investigate.explain(self.chain, self.lookups, report.model_dump())
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=draft.text, model=draft.model, problems=draft.problems, tools=draft.tools)

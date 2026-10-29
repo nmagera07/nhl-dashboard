@@ -30,6 +30,10 @@
       "rewrite": "/api/share"
     },
     {
+      "route": "/v/*",
+      "rewrite": "/api/share"
+    },
+    {
       "route": "/sw.js",
       "headers": {
         "cache-control": "no-cache"

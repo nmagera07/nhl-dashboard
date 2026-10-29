@@ -59,6 +59,7 @@ from response_models import (
     SeasonFinalStanding,
 )
 import bets
+import value_pick
 import draft_board
 import lottery
 import report_card
@@ -1889,6 +1890,25 @@ def bets_for_day(day: date = Query(..., alias="date")):
     except Exception:
         logger.error(f"Failed to build the bets board for {day}", exc_info=True)
         raise
+    finally:
+        conn.close()
+
+
+@app.get("/value-of-the-night")
+@daily_cached
+def value_of_the_night(day: date = Query(..., alias="date")):
+    """
+    The card at the top of the Bets tab (value_pick.py): the day's best
+    value bet from the morning lines (or the closest one, value: false),
+    its result once graded, and the season's record of these picks, graded
+    against the final score and the closing line.
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            return value_pick.value_of_the_night(cur, day)
+    except psycopg2.errors.UndefinedTable:
+        return {"date": str(day), "available": False, "pick": None, "result": None, "record": None, "last": None}
     finally:
         conn.close()
 

@@ -1,5 +1,5 @@
 """
-Six timers:
+Seven timers:
 
   - live_notifier: goal and final-score push notifications, every minute
     (UTC hours 16-23 and 0-7, noon-4am ET).
@@ -18,6 +18,9 @@ Six timers:
   - data_check: 08:30 UTC, after the 2 AM job; checks it produced
     everything the site needs and pushes any problem to the creator's
     devices (data_checks.py).
+  - post_draft: 13:20 UTC, after Swing of the Night is saved and before the
+    creator's reminder; NHL Intelligence's agent picks last night's best
+    story and drafts the post for the post kit (post_drafts.py).
 
 It used to be the nhl-live-notifier Container Apps Job, which started a
 fresh container 960 times a day (about 25 s each, almost all startup) and
@@ -36,6 +39,7 @@ import azure.functions as func
 import data_checks
 import market_odds
 import notify_live_games
+import post_drafts
 import pregame_briefs
 
 app = func.FunctionApp()
@@ -43,7 +47,7 @@ app = func.FunctionApp()
 # The Functions worker forwards log records that reach the root logger to
 # the host (and App Insights). setup_logging gives each module its own
 # console handler and turns propagation off, which would hide every line.
-for module in (notify_live_games, market_odds, pregame_briefs, data_checks):
+for module in (notify_live_games, market_odds, pregame_briefs, data_checks, post_drafts):
     module.logger.handlers.clear()
     module.logger.propagate = True
 
@@ -78,3 +82,8 @@ def pregame_briefs_timer(timer: func.TimerRequest) -> None:
 @app.timer_trigger(arg_name="timer", schedule="0 30 8 * * *", run_on_startup=False, use_monitor=False)
 def data_check(timer: func.TimerRequest) -> None:
     data_checks.main()
+
+
+@app.timer_trigger(arg_name="timer", schedule="0 20 13 * * *", run_on_startup=False, use_monitor=False)
+def post_draft(timer: func.TimerRequest) -> None:
+    post_drafts.main()

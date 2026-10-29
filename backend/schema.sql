@@ -516,6 +516,22 @@ CREATE TABLE IF NOT EXISTS game_briefs (
 );
 GRANT SELECT ON game_briefs TO nhl_api_readonly;
 
+-- The morning post draft (post_drafts.py, on the notifier function): the
+-- story the agent picked from last night's candidates, and its X post and
+-- Reddit title, for the creator to approve in the post kit.
+CREATE TABLE IF NOT EXISTS post_drafts (
+    day           DATE PRIMARY KEY,
+    story         VARCHAR(40) NOT NULL,
+    link          TEXT NOT NULL,
+    image         TEXT,
+    x_text        TEXT NOT NULL,
+    reddit_title  TEXT NOT NULL,
+    model         VARCHAR(80),
+    candidates    JSONB NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+GRANT SELECT ON post_drafts TO nhl_api_readonly;
+
 -- The morning data check (data_checks.py, on the notifier function): did
 -- the 2 AM run produce everything? One row per day; failures are pushed
 -- to the creator's devices. Not read by the API.

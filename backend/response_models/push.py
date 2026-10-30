@@ -19,6 +19,7 @@ class PushSubscriptionIn(BaseModel):
     goals: bool = True          # goals by the followed teams
     goals_against: bool = True  # goals by their opponents
     finals: bool = True
+    value: bool = False         # the value of the night, on nights there is one (any team)
 
 
 class PushUnsubscribeIn(BaseModel):

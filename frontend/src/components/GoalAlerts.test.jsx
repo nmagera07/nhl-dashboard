@@ -9,7 +9,7 @@ vi.mock("../utils/push.js", () => ({
   enableAlerts: vi.fn(async () => "granted"),
   disableAlerts: vi.fn(async () => {}),
   updateAlertTeams: vi.fn(async () => {}),
-  alertPrefs: vi.fn(() => ({ starts: true, goals: true, goals_against: true, finals: true, muted: [] })),
+  alertPrefs: vi.fn(() => ({ starts: true, goals: true, goals_against: true, finals: true, value: false, muted: [] })),
   setAlertPrefs: vi.fn(),
 }));
 
@@ -36,6 +36,11 @@ describe("GoalAlerts", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: "Goals against" }));
     expect(push.setAlertPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ goals_against: false, starts: true }));
     expect(push.updateAlertTeams).toHaveBeenLastCalledWith(["PIT", "VGK"]);
+
+    const value = screen.getByRole("checkbox", { name: "Value of the night (any team)" });
+    expect(value).not.toBeChecked(); // opt-in
+    await userEvent.click(value);
+    expect(push.setAlertPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ value: true }));
 
     await userEvent.click(screen.getByRole("checkbox", { name: "VGK" }));
     expect(push.setAlertPrefs).toHaveBeenLastCalledWith(expect.objectContaining({ muted: ["VGK"] }));

@@ -6,6 +6,7 @@ const KINDS = [
   ["goals", "Goals by my teams"],
   ["goals_against", "Goals against"],
   ["finals", "Final scores"],
+  ["value", "Value of the night (any team)"],
 ];
 
 // What this device is alerted about, and for which followed teams. Each

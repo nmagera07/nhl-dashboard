@@ -359,3 +359,59 @@ class TestSubscribers:
         n.subscribers(cur, ["PIT", "CBJ"], "finals")
         assert cur.calls[0][0].endswith("AND notify_starts") and cur.calls[1][0].endswith("AND notify_finals")
 
+
+
+VALUE = {"date": "2026-10-24", "available": True, "pick": {
+    "game_id": 7, "away": "CAR", "home": "NJD", "market": "puck_line", "side": "away", "line": -1.5, "price": 160,
+    "book": "FanDuel", "ev": 0.0512, "edge": 0.034, "ours": 0.404, "model": 0.41, "market_prob": 0.370, "value": True}}
+NOON = datetime(2026, 10, 24, 16, 0, tzinfo=timezone.utc)
+
+
+def _value(monkeypatch, data=VALUE, already_sent=(), subs=(SUB,)):
+    cur = _ReminderCursor(already_sent, subs)
+
+    def fake_execute_values(cursor, query, rows, fetch=False):
+        fresh = [(k,) for (k,) in rows if k not in cursor.already_sent]
+        cursor.already_sent.update(k for (k,) in rows)
+        return fresh
+
+    monkeypatch.setattr(n.psycopg2, "connect", lambda url: _Conn(cur))
+    monkeypatch.setattr(n.psycopg2.extras, "execute_values", fake_execute_values)
+    sent = []
+    monkeypatch.setattr(push, "send", lambda sub, payload, ttl=None, urgency=None: sent.append((payload, ttl)) or 201)
+    asked = []
+    count = n.value_alert(now=NOON, fetch=lambda day: asked.append(day) or data)
+    return count, sent, asked, cur
+
+
+class TestValueAlert:
+    def test_a_value_night_alerts_the_devices_that_asked(self, monkeypatch):
+        count, sent, asked, cur = _value(monkeypatch)
+        assert count == 1 and asked == ["2026-10-24"]
+        payload, ttl = sent[0]
+        assert payload["title"] == "💰 Value of the night: CAR −1.5 at +160"
+        assert payload["body"] == ("CAR @ NJD · PuckPulse 40% vs. the books' 37%, expected return +5.1% at FanDuel. "
+                                   "Morning line: check your price. 21+")
+        assert payload["url"] == "/bets" and payload["key"] == "value:2026-10-24" and ttl == 6 * 3600
+        assert any("WHERE notify_value" in q for q, _ in cur.sql)
+
+    def test_a_moneyline_pick_reads_to_win(self):
+        assert n._value_bet({**VALUE["pick"], "market": "moneyline", "side": "home", "price": -150}) == "NJD −150 to win"
+
+    def test_closest_to_value_nights_stay_quiet_without_waking_the_database(self, monkeypatch):
+        monkeypatch.setattr(n.psycopg2, "connect", lambda url: (_ for _ in ()).throw(AssertionError("connected")))
+        closest = {**VALUE, "pick": {**VALUE["pick"], "value": False}}
+        assert n.value_alert(now=NOON, fetch=lambda day: closest) == 0
+        assert n.value_alert(now=NOON, fetch=lambda day: {"available": False, "pick": None}) == 0
+
+    def test_once_a_day(self, monkeypatch):
+        assert _value(monkeypatch, already_sent={"value:2026-10-24"})[:2] == (0, [])
+        n._claimed.clear()
+        assert _value(monkeypatch)[0] == 1
+        monkeypatch.setattr(n.psycopg2, "connect", lambda url: (_ for _ in ()).throw(AssertionError("connected")))
+        assert n.value_alert(now=NOON, fetch=lambda day: VALUE) == 0
+
+    def test_an_api_outage_skips_the_day_quietly(self, monkeypatch):
+        def down(day):
+            raise n.requests.ConnectionError()
+        assert n.value_alert(now=NOON, fetch=down) == 0

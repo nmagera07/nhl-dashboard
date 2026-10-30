@@ -1,5 +1,5 @@
 """
-Seven timers:
+Eight timers:
 
   - live_notifier: goal and final-score push notifications, every minute
     (UTC hours 16-23 and 0-7, noon-4am ET).
@@ -21,6 +21,9 @@ Seven timers:
   - post_draft: 13:20 UTC, after Swing of the Night is saved and before the
     creator's reminder; NHL Intelligence's agent picks last night's best
     story and drafts the post for the post kit (post_drafts.py).
+  - value_alert: 16:00 UTC (noon ET in summer time, 11 in winter); on a
+    value night, alerts the devices that turned on value alerts
+    (notify_live_games.value_alert).
 
 It used to be the nhl-live-notifier Container Apps Job, which started a
 fresh container 960 times a day (about 25 s each, almost all startup) and
@@ -87,3 +90,8 @@ def data_check(timer: func.TimerRequest) -> None:
 @app.timer_trigger(arg_name="timer", schedule="0 20 13 * * *", run_on_startup=False, use_monitor=False)
 def post_draft(timer: func.TimerRequest) -> None:
     post_drafts.main()
+
+
+@app.timer_trigger(arg_name="timer", schedule="0 0 16 * * *", run_on_startup=False, use_monitor=False)
+def value_alert(timer: func.TimerRequest) -> None:
+    notify_live_games.value_alert()

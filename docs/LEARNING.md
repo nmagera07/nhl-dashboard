@@ -214,6 +214,43 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-10-30 — Missed alerts, solved: test one hop at a time
+
+**What happened:** My game alerts kept going missing: 1 of 10 goal alerts
+reached my Pixel over two weeks, and others came 22 minutes late. Every
+alert left the server within a minute and Google's push service accepted
+every one (HTTP 201), so the delivery log alone couldn't say where they
+died. I had already "fixed" this twice on the server (high urgency,
+longer expiry).
+
+**How we found it:** one controlled test per suspect, each ruling one out.
+- **The server:** built a real request without sending it and checked the
+  headers. `urgency: high` and `ttl: 3600` were there.
+- **The signing key:** the notifier runs in a separate Azure Function with
+  its own settings. Compared its key with the one the phone subscribed
+  with (printing only "match"/"no match", never the key). They matched.
+- **The payload:** sent an alert built exactly like a goal alert from my
+  machine. It arrived only when I touched the screen. So the contents were
+  fine, and it wasn't the Function: it was the phone while the screen is
+  off.
+- **The phone:** website alerts on Android are delivered to Chrome, not to
+  the installed app. Setting the PuckPulse app's battery to Unrestricted
+  did nothing; setting Chrome's did. The next screen-off test arrived
+  instantly, and the rest of the night went 10 of 10, mostly in 2 seconds.
+
+**Why it matters:** "It's accepted" isn't "it arrived." Receipts from the
+device (added 10-28) gave a number to every guess, and the A/B tests
+turned a week of hunches into an hour of elimination. I'd also been wrong
+twice in the same session (idle phone, then Adaptive Battery), and the
+tests are what corrected me, not more theorizing.
+
+**Resume line:** Diagnosed silently dropped web-push notifications by
+isolating each hop (request headers, signing keys across services,
+payload A/B, device settings) with controlled tests and device delivery
+receipts; delivery went from 1 in 10 to 10 of 10 in about 2 seconds.
+
+---
+
 ## 2026-10-28 — Four agents in a day: what they have in common
 
 **What happened:** In one session PuckPulse went from one AI feature (the

@@ -34,7 +34,7 @@ describe("alert teams for the service worker", () => {
 
   it("saving the subscription remembers its settings; turning alerts off forgets them", async () => {
     await updateAlertTeams(["FLA"]);
-    const settings = { teams: ["FLA"], starts: true, goals: true, goals_against: true, finals: true };
+    const settings = { teams: ["FLA"], starts: true, goals: true, goals_against: true, finals: true, value: false };
     await vi.waitFor(() => expect(store.get("/alert-settings")).toEqual(settings));
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ endpoint: subscription.endpoint, keys: { p256dh: "p", auth: "a" }, ...settings });
 
@@ -43,9 +43,9 @@ describe("alert teams for the service worker", () => {
   });
 
   it("sends the device's alert settings, leaving out muted teams", async () => {
-    setAlertPrefs({ starts: false, goals: true, goals_against: false, finals: true, muted: ["VGK"] });
+    setAlertPrefs({ starts: false, goals: true, goals_against: false, finals: true, value: true, muted: ["VGK"] });
     await updateAlertTeams(["PIT", "FLA", "VGK"]);
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ teams: ["PIT", "FLA"], starts: false, goals_against: false });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ teams: ["PIT", "FLA"], starts: false, goals_against: false, value: true });
     localStorage.clear();
   });
 

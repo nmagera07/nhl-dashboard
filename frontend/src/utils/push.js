@@ -38,7 +38,7 @@ export async function currentSubscription() {
 // teams to leave out ("muted"). Saved with the subscription, so the
 // notifier filters before sending.
 const PREFS_KEY = "pp-alert-prefs";
-export const DEFAULT_ALERT_PREFS = { starts: true, goals: true, goals_against: true, finals: true, muted: [] };
+export const DEFAULT_ALERT_PREFS = { starts: true, goals: true, goals_against: true, finals: true, value: false, muted: [] };
 
 export function alertPrefs() {
   try {
@@ -58,10 +58,10 @@ export function setAlertPrefs(prefs) {
 }
 
 // The subscription body's settings: followed teams minus muted ones (never
-// none: muting is stopped at the last team), and the four switches.
+// none: muting is stopped at the last team), and the five switches.
 export function alertSettings(teams, prefs = alertPrefs()) {
   const kept = teams.filter((t) => !prefs.muted.includes(t));
-  return { teams: kept.length ? kept : teams, starts: prefs.starts, goals: prefs.goals, goals_against: prefs.goals_against, finals: prefs.finals };
+  return { teams: kept.length ? kept : teams, starts: prefs.starts, goals: prefs.goals, goals_against: prefs.goals_against, finals: prefs.finals, value: prefs.value };
 }
 
 async function save(subscription, teams) {

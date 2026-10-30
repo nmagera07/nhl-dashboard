@@ -1465,8 +1465,8 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
             cur.execute(
                 """
                 INSERT INTO push_subscriptions (endpoint, p256dh, auth, teams, notify_starts, notify_goals,
-                                                notify_goals_against, notify_finals)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                                notify_goals_against, notify_finals, notify_value)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (endpoint) DO UPDATE SET
                     p256dh = EXCLUDED.p256dh,
                     auth = EXCLUDED.auth,
@@ -1475,10 +1475,11 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
                     notify_goals = EXCLUDED.notify_goals,
                     notify_goals_against = EXCLUDED.notify_goals_against,
                     notify_finals = EXCLUDED.notify_finals,
+                    notify_value = EXCLUDED.notify_value,
                     updated_at = NOW()
                 """,
                 (body.endpoint, body.keys.p256dh, body.keys.auth, teams, body.starts, body.goals, body.goals_against,
-                 body.finals),
+                 body.finals, body.value),
             )
         conn.commit()
     except HTTPException:

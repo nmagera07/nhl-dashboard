@@ -469,6 +469,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 -- goes only to these (notify_live_games.creator_reminder). Set by hand.
 ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS is_creator BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- "💰 Value of the night" alerts (notify_live_games.value_alert): opt-in, any team.
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS notify_value BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- What the push service said for each alert to each device (notify_live_games.deliver),
 -- for tracing missed alerts without the function's logs. Kept 14 days.
 CREATE TABLE IF NOT EXISTS push_deliveries (

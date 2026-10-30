@@ -30,6 +30,7 @@ logger = setup_logging("notify_live_games", log_to_file=False)
 
 SCORE_URL = "https://api-web.nhle.com/v1/score/now"
 SWING_URL = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/swing-of-the-night?date={day}"
+VALUE_URL = "https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/value-of-the-night?date={day}"
 EASTERN = ZoneInfo("America/New_York")
 REMINDER_HOURS = range(10, 14)  # ET: the morning after, once the nightly run has finished
 RECENT = timedelta(hours=6)  # ignore games that started longer ago (yesterday's finals linger in the feed)
@@ -393,6 +394,58 @@ def creator_reminder(now=None, fetch=None):
         # "high": at "normal" the first one sat unshown in Android's batching.
         sent = sum(deliver(cur, key, sub, payload, 6 * 3600) for sub in creators(cur))
         logger.info("%s -> %d creator device(s)", key, sent)
+        return sent
+
+
+def _value_bet(p):
+    """'MTL +142 to win' or 'PIT +1.5 at −175'."""
+    team = p["home"] if p["side"] == "home" else p["away"]
+    price = f"+{p['price']}" if p["price"] > 0 else f"−{abs(p['price'])}"
+    if p["market"] == "puck_line":
+        return f"{team} {p['line']:+g} at {price}".replace("-", "−")
+    return f"{team} {price} to win"
+
+
+def value_alert(now=None, fetch=None):
+    """
+    "💰 Value of the night" to devices that turned it on (notify_value),
+    once a day, on nights the pick clears the value bar (value_pick.py;
+    the closest-to-value nights stay quiet). The pick comes from the API,
+    so a night without one never wakes the database. Called once around
+    noon ET, hours before the first puck drop. Returns pushes sent.
+    """
+    day = (now or datetime.now(timezone.utc)).astimezone(EASTERN).date().isoformat()
+    key = f"value:{day}"
+    if key in _claimed:
+        return 0
+    try:
+        data = (fetch or (lambda d: requests.get(VALUE_URL.format(day=d), timeout=30).json()))(day)
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Value of the night for %s unavailable (%s)", day, exc.__class__.__name__)
+        return 0
+    p = data.get("pick") if data.get("available") else None
+    if not p or not p.get("value"):
+        _claimed.add(key)
+        return 0
+    with psycopg2.connect(DATABASE_URL) as conn, conn.cursor() as cur:
+        if not claim(cur, [key]):
+            _claimed.add(key)
+            return 0
+        conn.commit()
+        _claimed.add(key)
+        ours, books = round(p["ours"] * 100), round(p["market_prob"] * 100)
+        ev = f"{'+' if p['ev'] >= 0 else '−'}{abs(p['ev'] * 100):.1f}%"
+        payload = {
+            "title": f"💰 Value of the night: {_value_bet(p)}",
+            "body": f"{p['away']} @ {p['home']} · PuckPulse {ours}% vs. the books' {books}%, expected return {ev}"
+                    f"{' at ' + p['book'] if p.get('book') else ''}. Morning line: check your price. 21+",
+            "url": "/bets",
+            "tag": f"value-{day}",
+        }
+        cur.execute("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE notify_value")
+        subs = [{"endpoint": e, "p256dh": pk, "auth": a} for e, pk, a in cur.fetchall()]
+        sent = sum(deliver(cur, key, sub, payload, 6 * 3600) for sub in subs)
+        logger.info("%s -> %s [%d of %d accepted]", key, payload["title"], sent, len(subs))
         return sent
 
 

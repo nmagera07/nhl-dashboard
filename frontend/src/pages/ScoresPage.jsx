@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import GameCalendar from "../components/GameCalendar.jsx";
 import Scoreboard from "../components/Scoreboard.jsx";
@@ -9,10 +9,19 @@ import TopHeadlines from "../components/TopHeadlines.jsx";
 import { useFollowedTeams } from "../hooks/useFavoriteTeam.js";
 import { isValidISODate, longDateLabel, relativeDayLabel, shiftDate, todayISO } from "../utils/dates.js";
 
+const UNDO_MS = 8000;
+
 // The selected day lives in the URL (/?date=2026-10-06), so the back
 // button, refreshes, and shared links all keep it. No date = today.
 function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
-  const [following, { follow }] = useFollowedTeams();
+  const [following, { follow, restore }] = useFollowedTeams();
+  // "Stopped following PIT · Undo" for a few seconds after an unfollow on the card.
+  const [undo, setUndo] = useState(null); // { team, before }
+  useEffect(() => {
+    if (!undo) return undefined;
+    const timer = setTimeout(() => setUndo(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [undo]);
   const myTeams = following.map((abbrev) => standings.find((t) => t.team_abbrev === abbrev)).filter(Boolean);
   const [searchParams, setSearchParams] = useSearchParams();
   const today = todayISO();
@@ -62,13 +71,20 @@ function ScoresPage({ standings = [], playoffOddsByTeam = {} }) {
       {isToday && <PickemCard />}
       {isToday && <SwingOfTheNight />}
       {myTeams.length > 0 ? (
-        <MyTeamCard followed={myTeams} oddsByTeam={playoffOddsByTeam} teams={standings} />
+        <MyTeamCard followed={myTeams} oddsByTeam={playoffOddsByTeam} teams={standings}
+                    onUnfollow={(team, before) => setUndo({ team, before })} />
       ) : standings.length > 0 && following.length === 0 ? (
         <div className="my-team-prompt">
           <TeamPicker teams={standings} onPick={(abbrev) => abbrev && follow(abbrev)} />
           <span>Pin your team's next game, results, and playoff odds here.</span>
         </div>
       ) : null}
+      {undo && (
+        <p className="my-team-undo" role="status">
+          Stopped following {undo.team} ·{" "}
+          <button type="button" className="link-button" onClick={() => { restore(undo.before); setUndo(null); }}>Undo</button>
+        </p>
+      )}
       {isToday && <TopHeadlines />}
     </main>
   );

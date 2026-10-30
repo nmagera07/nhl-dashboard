@@ -199,9 +199,11 @@ export function TeamPicker({ teams, value, onPick, label = "Follow a team", excl
 // odds, the live or next game, and recent results. Following more than one
 // team adds a row of logos to switch between them (main team first); goal
 // alerts cover all of them.
-// followed: standings rows of the followed teams, main first.
-function MyTeamCard({ followed, oddsByTeam = {}, teams }) {
-  const [, { follow, unfollow, makeMain }] = useFollowedTeams();
+// followed: standings rows of the followed teams, main first. onUnfollow
+// (team, the followed list before) lets the page offer an undo, which
+// outlives the card when the last team goes.
+function MyTeamCard({ followed, oddsByTeam = {}, teams, onUnfollow }) {
+  const [following, { follow, unfollow, makeMain }] = useFollowedTeams();
   const [selected, setSelected] = useState(null);
   const [mode, setMode] = useState(null); // null | "add" | "edit"
   const team = followed.find((t) => t.team_abbrev === selected) || followed[0];
@@ -272,8 +274,15 @@ function MyTeamCard({ followed, oddsByTeam = {}, teams }) {
           </>
         ) : mode === "edit" ? (
           <>
+            {/* Without a label, the swapped-in links read as if Edit did nothing, and the next tap unfollowed. */}
+            <span className="my-team-editing">Editing {team.team_abbrev}:</span>
             {!isMain && <button type="button" className="link-button" onClick={() => { makeMain(team.team_abbrev); setMode(null); }}>Make my main team</button>}
-            <button type="button" className="link-button" onClick={() => { unfollow(team.team_abbrev); setSelected(null); setMode(null); }}>
+            <button type="button" className="link-button" onClick={() => {
+              unfollow(team.team_abbrev);
+              onUnfollow?.(team.team_abbrev, following);
+              setSelected(null);
+              setMode(null);
+            }}>
               Stop following {team.team_abbrev}
             </button>
             <button type="button" className="link-button" onClick={() => setMode(null)}>Done</button>

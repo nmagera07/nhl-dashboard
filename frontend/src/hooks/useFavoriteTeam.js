@@ -55,8 +55,9 @@ function subscribe(onChange) {
   };
 }
 
-// [teams, { follow, unfollow, makeMain }]: follow adds a team at the end
-// (the main team if it's the first), makeMain moves (or adds) it to the front.
+// [teams, { follow, unfollow, makeMain, restore }]: follow adds a team at the
+// end (the main team if it's the first), makeMain moves (or adds) it to the
+// front, restore puts back an earlier list (undoing an unfollow).
 export function useFollowedTeams() {
   const raw = useSyncExternalStore(subscribe, read, () => "[]");
   const teams = useMemo(() => parse(raw), [raw]);
@@ -76,6 +77,9 @@ export function useFollowedTeams() {
         const now = current();
         if (!now.includes(abbrev)) track("follow-team", { team: abbrev });
         write([abbrev, ...now.filter((t) => t !== abbrev)].slice(0, MAX_FOLLOWED));
+      },
+      restore(teams) {
+        write(parse(JSON.stringify(teams)));
       },
     };
   }, []);

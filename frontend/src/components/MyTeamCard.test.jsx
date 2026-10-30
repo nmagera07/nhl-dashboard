@@ -84,6 +84,7 @@ describe("MyTeamCard", () => {
     expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["PIT", "BOS"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByText("Editing PIT:")).toBeInTheDocument(); // the tap visibly worked
     await userEvent.click(screen.getByRole("button", { name: "Stop following PIT" }));
     expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["BOS"]);
   });

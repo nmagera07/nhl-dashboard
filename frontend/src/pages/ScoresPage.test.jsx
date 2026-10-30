@@ -89,4 +89,31 @@ describe("ScoresPage", () => {
       expect(screen.getByRole("region", { name: "My team: Boston Bruins" })).toBeInTheDocument();
     });
   });
+
+  it("an unfollow from the card can be undone, even the last team, main team first again", async () => {
+    const row = (team_abbrev, team_name) => ({
+      team_abbrev, team_name, division: "Metropolitan", logo_url: null, wins: 2, losses: 2, ot_losses: 0, points: 4,
+      division_sequence: 5, streak_code: "L", streak_count: 2,
+    });
+    window.localStorage.setItem("nhl-dash:followed-teams", JSON.stringify(["PIT", "BOS"]));
+    renderAt("/", { standings: [row("PIT", "Pittsburgh Penguins"), row("BOS", "Boston Bruins")] });
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Stop following PIT" }));
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["BOS"]);
+    expect(screen.getByRole("status")).toHaveTextContent("Stopped following PIT · Undo");
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["PIT", "BOS"]);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    window.localStorage.setItem("nhl-dash:followed-teams", JSON.stringify(["PIT"]));
+    window.dispatchEvent(new Event("storage"));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Stop following PIT" }));
+    expect(screen.queryByRole("region", { name: /My team/ })).not.toBeInTheDocument(); // the card is gone...
+    await userEvent.click(screen.getByRole("button", { name: "Undo" })); // ...but the undo isn't
+    expect(JSON.parse(window.localStorage.getItem("nhl-dash:followed-teams"))).toEqual(["PIT"]);
+    window.localStorage.clear();
+  });
 });

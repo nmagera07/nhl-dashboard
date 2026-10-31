@@ -20,6 +20,7 @@ class PushSubscriptionIn(BaseModel):
     goals_against: bool = True  # goals by their opponents
     finals: bool = True
     value: bool = False         # the value of the night, on nights there is one (any team)
+    creator_key: str | None = Field(None, max_length=200)  # the site owner's devices (push.is_creator_key)
 
 
 class PushUnsubscribeIn(BaseModel):

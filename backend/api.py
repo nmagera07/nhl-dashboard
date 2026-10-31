@@ -1450,6 +1450,8 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
     Save (or update) a browser's push subscription and the teams it
     follows. Only real browser push services are accepted as endpoints,
     and only known team abbreviations.
+    The site owner's key (push.is_creator_key) marks it as theirs; a
+    save without it never unmarks one.
     """
     if not push.is_allowed_endpoint(body.endpoint):
         raise HTTPException(status_code=400, detail="Not a browser push service endpoint.")
@@ -1465,8 +1467,8 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
             cur.execute(
                 """
                 INSERT INTO push_subscriptions (endpoint, p256dh, auth, teams, notify_starts, notify_goals,
-                                                notify_goals_against, notify_finals, notify_value)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                notify_goals_against, notify_finals, notify_value, is_creator)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (endpoint) DO UPDATE SET
                     p256dh = EXCLUDED.p256dh,
                     auth = EXCLUDED.auth,
@@ -1476,10 +1478,11 @@ def push_subscribe(request: Request, body: PushSubscriptionIn):
                     notify_goals_against = EXCLUDED.notify_goals_against,
                     notify_finals = EXCLUDED.notify_finals,
                     notify_value = EXCLUDED.notify_value,
+                    is_creator = push_subscriptions.is_creator OR EXCLUDED.is_creator,
                     updated_at = NOW()
                 """,
                 (body.endpoint, body.keys.p256dh, body.keys.auth, teams, body.starts, body.goals, body.goals_against,
-                 body.finals, body.value),
+                 body.finals, body.value, push.is_creator_key(body.creator_key)),
             )
         conn.commit()
     except HTTPException:

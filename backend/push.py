@@ -8,6 +8,7 @@ with this app's VAPID key pair; the public half is given to browsers when
 they subscribe, the private half only lives in the notifier job's secrets.
 """
 
+import hmac
 import json
 import logging
 import os
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
 VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
 VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:nhl-dashboard@users.noreply.github.com")
+# The site owner's devices get the morning post reminder. A device proves
+# it's theirs by sending this key with its subscription (saved on the phone
+# from a private #creator= link), so the flag survives re-subscribing.
+CREATOR_KEY = os.getenv("CREATOR_KEY", "")
 
 # The server POSTs to whatever endpoint a subscription names, so only real
 # browser push services are accepted -- otherwise anyone could register an
@@ -35,6 +40,10 @@ PUSH_SERVICE_HOSTS = (
 )
 
 _B64URL = re.compile(r"^[A-Za-z0-9_-]+={0,2}$")
+
+
+def is_creator_key(key: str | None) -> bool:
+    return bool(CREATOR_KEY and key) and hmac.compare_digest(key.encode(), CREATOR_KEY.encode())
 
 
 class SubscriptionGone(Exception):

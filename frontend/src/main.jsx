@@ -6,7 +6,10 @@ import './index.css'
 import App from './App.jsx'
 import ErrorFallback from './components/ErrorFallback.jsx'
 import { track } from './utils/analytics.js'
-import { isStandalone } from './utils/push.js'
+import { captureCreatorKey, isStandalone } from './utils/push.js'
+
+// Before Sentry or analytics can see the address: the owner's #creator= link.
+captureCreatorKey()
 
 // Error tracking (Sentry) is optional -- a missing VITE_SENTRY_DSN just
 // means errors aren't reported anywhere, not a broken build. Sentry's

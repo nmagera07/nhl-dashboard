@@ -29,6 +29,10 @@ BRIEF_TOOLS = [t for t in TOOLS if t["function"]["name"] in BRIEF_TOOL_NAMES]
 MAX_BRIEF_ROUNDS = 3  # each round can ask for several tools at once
 # Reasoning models (Groq's gpt-oss) think from the same budget they write from.
 BRIEF_MAX_TOKENS = 2000
+# Briefs are published unread, and a missing brief is harmless (the card just
+# doesn't show), so they skip the backup: in the 10-31 evals Groq made up
+# value, goalie confirmations and back-to-backs in 7 of 10 briefs.
+BRIEF_PROVIDERS = ("gemini",)
 MAX_BULLETS = 3
 MAX_WORDS = 90
 
@@ -52,6 +56,21 @@ FREE_NUMBERS = {0.0, 1.0}  # "one", "a 1-goal lead": too common to need a source
 # Spelled-out counts ("a four-game streak") would slip past the number check,
 # and are usually ones the model tallied itself.
 NUMBER_WORDS = re.compile(r"\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b", re.IGNORECASE)
+# "a 1-5 loss": the tools give scores team-first, and a model copies them as
+# is. A W-L record ("2-3 in recent games") is one it tallied itself. Not
+# odds (-110), a date (2026-10-26), or a W-L-OTL line (5-3-1).
+SCORE = re.compile(r"(?<![\w.+\-−])(\d{1,2})[-‑–](\d{1,2})(?![\w.]|[-‑–]\d)")
+# A sentence's parts, so a claim stays with the goalie or team it was written
+# about ("A is confirmed for X, while B is projected for Y"). Not at an
+# abbreviation's period: "St. Louis", "Oct. 29".
+CLAUSE = re.compile(r",?\s+(?:while|whereas|but|against|and)\s+|;\s*|(?<!\b[A-Z][a-z])(?<!\b[A-Z][a-z]{2})\.\s+|,\s+with\s+")
+SENTENCE = re.compile(r"\n|;\s*|(?<!\b[A-Z][a-z])(?<!\b[A-Z][a-z]{2})\.\s+")
+OTHER_STATUS = re.compile(r"\b(expected|projected|likely|probable|projection|slated|unconfirmed|not confirmed)\b", re.I)
+# get_bets says this when nothing on the board is value; a brief then can't claim any.
+NO_VALUE = "no price beats PuckPulse's fair odds by enough"
+VALUE_TALK = re.compile(r"(?<!\bno )(?<!\bnot )\b(value|edge|overlay|underpriced|mispriced)\b", re.IGNORECASE)
+# How get_lineup and get_bets state a starter (tools._starter): "Name: confirmed by beat reporters".
+STARTER = re.compile(r"([A-Z][\w'.\-]+(?: [A-Z][\w'.\-]+)+): (confirmed|expected|likely|probable|projected|PuckPulse's projection)")
 
 
 @dataclass(frozen=True)
@@ -94,11 +113,41 @@ def check_brief(text: str, sources: str) -> list[str]:
         problems.append(f"Write numbers as digits from the tool results, not words ({', '.join(words)}); "
                         "drop any you counted yourself.")
 
+    low_first = [m.group(0) for m in SCORE.finditer(text) if int(m.group(1)) < int(m.group(2))]
+    if low_first:
+        problems.append(f"Write scores with the higher number first ({', '.join(low_first)}); "
+                        "drop any win-loss record you counted yourself.")
+
+    if NO_VALUE in sources and VALUE_TALK.search(text):
+        problems.append("The results say no price is value tonight; don't call anything value or an edge.")
+    overclaimed = overclaimed_starters(text, sources)
+    if overclaimed:
+        problems.append(f"Only call a goalie confirmed if the results say so; {', '.join(overclaimed)} "
+                        "isn't confirmed (say expected or projected, as the results do).")
+
     unsourced = unsourced_numbers(text, sources)
     if unsourced:
         problems.append("These numbers aren't in the tool results: " + ", ".join(unsourced)
                         + ". Use only numbers from the results, as given.")
     return problems
+
+
+def overclaimed_starters(text: str, sources: str) -> list[str]:
+    """Goalies the text calls confirmed whom the results only expect or project."""
+    status = {}
+    for name, word in STARTER.findall(sources):
+        status[name] = "confirmed" if word == "confirmed" or status.get(name) == "confirmed" else word
+    wrong = []
+    for sentence in SENTENCE.split(text):
+        if "confirmed" not in sentence.lower():
+            continue
+        for name, word in status.items():
+            last = name.split()[-1]
+            # "A and B are confirmed" covers both; "A is confirmed, while B is projected" doesn't cover B.
+            own = next((c for c in CLAUSE.split(sentence) if last in c), None)
+            if word != "confirmed" and own is not None and not OTHER_STATUS.search(own) and name not in wrong:
+                wrong.append(name)
+    return wrong
 
 
 def unsourced_numbers(text: str, sources: str) -> list[str]:

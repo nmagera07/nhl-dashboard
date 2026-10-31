@@ -195,11 +195,16 @@ BRIEF = {"game_id": 2026020200, "away": "CGY", "home": "EDM", "date": "2026-10-2
 def test_brief_endpoint_requires_the_shared_token(monkeypatch):
     client = _digest_client(monkeypatch, "s3cret")
     try:
-        client.app.state.intelligence.chain = chain("- EDM hosts CGY.")
+        providers = [Provider("groq", "Groq", None, "k", "m"), Provider("gemini", "Google Gemini", None, "k", "m")]
+        client.app.state.intelligence.chain = ProviderChain(providers, client_factory=fake_factory(
+            {"groq": "- Groq's brief.", "gemini": "- EDM hosts CGY."}, []))
         assert client.post("/briefs/write", json=BRIEF).status_code == 401
         ok = client.post("/briefs/write", json=BRIEF, headers={"X-Digest-Token": "s3cret"})
         assert ok.status_code == 200
-        assert ok.json() == {"text": "- EDM hosts CGY.", "model": "Groq", "problems": [], "tools": []}
+        # Gemini only, though Groq comes first: briefs skip the backup.
+        assert ok.json() == {"text": "- EDM hosts CGY.", "model": "Google Gemini", "problems": [], "tools": []}
+        client.app.state.intelligence.chain = chain("- Groq's brief.")
+        assert client.post("/briefs/write", json=BRIEF, headers={"X-Digest-Token": "s3cret"}).status_code == 503
         bad = client.post("/briefs/write", json={**BRIEF, "home": "edm; drop"}, headers={"X-Digest-Token": "s3cret"})
         assert bad.status_code == 422
     finally:

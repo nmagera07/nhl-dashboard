@@ -110,3 +110,125 @@ def tool_called(trace, names, args=None) -> CheckResult:
     called = [f"{n}({a})" for n, a, _ in trace] or ["no tools"]
     want = f"{'/'.join(names)}{args or ''}"
     return CheckResult("tool", False, f"wanted {want}, called {', '.join(called)}")
+
+
+# Agent checks: the pregame brief and the data-check investigator. A brief's
+# numbers are already checked in code before it's published (briefs.py);
+# these check what that can't: a real fact attached to the wrong thing.
+
+ODDS = re.compile(r"(?<![\w.])([+\-−])(\d{3,})(?![\d.])")
+from app.briefs import CLAUSE  # noqa: E402 -- the same clauses the brief's own checks use
+STATUS = re.compile(r"\b(confirmed|expected|projected|likely|probable)\b", re.I)
+
+
+def _clauses(text: str):
+    """[(line, clause)] for each clause of each line."""
+    return [(i, c) for i, line in enumerate(text.splitlines()) for c in CLAUSE.split(line) if c.strip()]
+
+
+def team_aliases(standings) -> dict[str, list[str]]:
+    """{abbrev: names a writer uses}: PIT, Pittsburgh Penguins, Penguins, Pittsburgh (and Montreal for Montréal)."""
+    import unicodedata
+    out = {}
+    for row in standings:
+        full, common = row.get("team_name") or "", row.get("common_name") or ""
+        names = [full, common, full.replace(common, "").strip()]
+        names += [unicodedata.normalize("NFKD", n).encode("ascii", "ignore").decode() for n in names]
+        out[row["team_abbrev"]] = list(dict.fromkeys(n for n in names if n))
+    return out
+
+
+def teams_in(text: str, aliases: dict[str, list[str]]) -> set[str]:
+    found = set()
+    for abbrev, names in aliases.items():
+        if re.search(rf"\b{abbrev}\b", text) or any(re.search(rf"\b{re.escape(n)}\b", text, re.I) for n in names):
+            found.add(abbrev)
+    return found
+
+
+def goalie_status(brief: str, starters: dict[str, str]) -> CheckResult:
+    """
+    A goalie called "confirmed" really is (starters: {name: status} with
+    status confirmed / expected / projected). Calling a confirmed starter
+    "projected" undersells it but isn't wrong, so only overclaiming fails.
+    """
+    wrong, notes = [], []
+    for _, clause in _clauses(brief):
+        for name, status in starters.items():
+            if name.split()[-1].lower() not in clause.lower():
+                continue
+            said = {w.lower() for w in STATUS.findall(clause)}
+            if "confirmed" in said and status != "confirmed":
+                wrong.append(f"{name} called confirmed, really {status}")
+            elif said and status == "confirmed" and "confirmed" not in said:
+                notes.append(f"{name} called {'/'.join(sorted(said))}, really confirmed")
+    detail = "; ".join(wrong or notes) or "no overclaimed starters"
+    return CheckResult("goalie_status", not wrong, detail)
+
+
+def goalies_named(brief: str, starters: dict[str, str]) -> CheckResult:
+    """Coverage: every known starter is named (by last name). Informational."""
+    missing = [n for n in starters if n.split()[-1].lower() not in brief.lower()]
+    return CheckResult("goalies_named", not missing, f"missing {missing}" if missing else f"{len(starters)} named")
+
+
+def back_to_back(brief: str, b2b_teams: set[str], aliases) -> CheckResult:
+    """A bullet that says back-to-back names a team that really is on one."""
+    bad = [line.strip() for line in brief.splitlines()
+           if re.search(r"back[-‐‑ ]to[-‐‑ ]back", line, re.I) and not (teams_in(line, aliases) & b2b_teams)]
+    return CheckResult("back_to_back", not bad, f"no team on one in: {bad[0][:80]}" if bad else "ok")
+
+
+def odds_on_team(brief: str, prices: dict[str, set[str]], aliases) -> CheckResult:
+    """
+    Every American price is one the tools gave for a team named in the same
+    clause (or the clause before it on that line, for "..., with PuckPulse's
+    fair price at -194"). prices: {abbrev: {"-225", "-194", ...}}.
+    """
+    wrong, line_teams, last_line = [], set(), None
+    for line, clause in _clauses(brief):
+        if line != last_line:
+            line_teams, last_line = set(), line
+        named = teams_in(clause, aliases)
+        scope = named or line_teams
+        line_teams = named or line_teams
+        for sign, digits in ODDS.findall(clause):
+            price = ("-" if sign in "-−" else "+") + digits
+            if scope and not any(price in prices.get(t, set()) for t in scope):
+                wrong.append(f"{price} for {'/'.join(sorted(scope))}")
+    return CheckResult("odds_on_team", not wrong, f"wrong team: {wrong}" if wrong else "every price on its team")
+
+
+def bet_prices(tool_results) -> dict[str, set[str]]:
+    """{abbrev: prices} from the get_bets results an agent saw (moneyline and puck line, best and fair)."""
+    out = {}
+    for raw in tool_results:
+        try:
+            data = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        for game in data.get("games", []) if isinstance(data, dict) else []:
+            for market in ("moneyline", "puck_line"):
+                for key, side in (game.get(market) or {}).items():
+                    if isinstance(side, dict):
+                        team = key.split()[0]
+                        out.setdefault(team, set()).update(
+                            p for p in (side.get("best_price"), side.get("puckpulse_fair_price")) if p)
+    return out
+
+
+def action_matches(text: str, expected: str) -> CheckResult:
+    """
+    The investigator's "Action:" line: expected "none" (it fixes itself, or
+    nothing to do), "investigate" (anything but none), or a script name it
+    should point at.
+    """
+    action = next((line for line in text.splitlines() if line.strip().startswith("Action:")), "")
+    says_none = bool(re.search(r"\bnone\b|fix(es)? itself|no action|nothing to do", action, re.I))
+    if expected == "none":
+        ok = says_none
+    elif expected == "investigate":
+        ok = bool(action) and not says_none
+    else:
+        ok = expected.lower() in action.lower()
+    return CheckResult("action", ok, f"wanted {expected!r}, got {action[:90]!r}")

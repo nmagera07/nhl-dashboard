@@ -21,6 +21,7 @@ AI_PROVIDERS as name:model (e.g. "gemini,gemini:gemini-2.5-flash-lite,groq").
 """
 
 import asyncio
+import copy
 import logging
 import os
 from dataclasses import dataclass
@@ -120,6 +121,12 @@ class ProviderChain:
 
     def __bool__(self) -> bool:
         return bool(self.providers)
+
+    def only(self, names) -> "ProviderChain":
+        """This chain limited to some providers (by name, any model), sharing its connections."""
+        limited = copy.copy(self)
+        limited.providers = [p for p in self.providers if p.name.partition(":")[0] in names]
+        return limited
 
     def _client(self, provider: Provider):
         if provider.name not in self._clients:

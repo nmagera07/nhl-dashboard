@@ -64,9 +64,37 @@ export function alertSettings(teams, prefs = alertPrefs()) {
   return { teams: kept.length ? kept : teams, starts: prefs.starts, goals: prefs.goals, goals_against: prefs.goals_against, finals: prefs.finals, value: prefs.value };
 }
 
+// The site owner's key, from a private puckpulse.io/#creator=... link opened
+// once on their phone. Sent with every save, so the server keeps that phone
+// marked for the morning post reminder even after alerts are turned off and
+// on or the browser replaces the subscription. The key is in the #fragment,
+// which browsers never send; it's removed from the address bar right away.
+const CREATOR_KEY = "pp-creator-key";
+
+export function captureCreatorKey(location = window.location, history = window.history) {
+  const match = /^#creator=([A-Za-z0-9_-]{16,200})$/.exec(location.hash);
+  if (!match) return false;
+  try {
+    window.localStorage.setItem(CREATOR_KEY, match[1]);
+  } catch {
+    // storage blocked: nothing to remember it in
+  }
+  history.replaceState(history.state, "", location.pathname + location.search);
+  return true;
+}
+
+function creatorKey() {
+  try {
+    return window.localStorage.getItem(CREATOR_KEY);
+  } catch {
+    return null;
+  }
+}
+
 async function save(subscription, teams) {
   const { endpoint, keys } = subscription.toJSON();
-  const settings = alertSettings(teams);
+  const key = creatorKey();
+  const settings = { ...alertSettings(teams), ...(key && { creator_key: key }) };
   const res = await fetch(`${API_BASE}/push/subscriptions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

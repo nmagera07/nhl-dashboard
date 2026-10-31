@@ -53,14 +53,29 @@ class TestSubscribeEndpoint:
 
         assert response.status_code == 204
         _, params = db_router.calls[-1]
-        assert params[0] == FCM and params[3] == ["BOS", "PIT"] and params[4:] == (True, True, True, True, False)  # game alerts on, value alerts opt-in
+        assert params[0] == FCM and params[3] == ["BOS", "PIT"] and params[4:] == (True, True, True, True, False, False)  # game alerts on, value alerts opt-in, not the owner's
 
     def test_saves_the_alert_settings(self, client, db_router):
         db_router.when("from teams where team_abbrev = any", lambda params: [{"team_abbrev": t} for t in params[0]])
         db_router.when("insert into push_subscriptions", None)
         body = _body(starts=False, goals=True, goals_against=False, finals=True, value=True)
         assert client.post("/push/subscriptions", json=body).status_code == 204
-        assert db_router.calls[-1][1][4:] == (False, True, False, True, True)  # starts, goals, goals against, finals, value
+        assert db_router.calls[-1][1][4:9] == (False, True, False, True, True)  # starts, goals, goals against, finals, value
+
+    @pytest.mark.parametrize("key, owner", [("right-key", True), ("wrong-key", False), (None, False), ("", False)])
+    def test_the_owners_key_marks_the_device(self, client, db_router, monkeypatch, key, owner):
+        monkeypatch.setattr(push, "CREATOR_KEY", "right-key")
+        db_router.when("from teams where team_abbrev = any", lambda params: [{"team_abbrev": t} for t in params[0]])
+        db_router.when("insert into push_subscriptions", None)
+        assert client.post("/push/subscriptions", json=_body(creator_key=key)).status_code == 204
+        query, params = db_router.calls[-1]
+        assert params[-1] is owner
+        assert "push_subscriptions.is_creator OR EXCLUDED.is_creator" in query  # a save without the key keeps the mark
+
+    def test_no_key_configured_marks_no_one(self, monkeypatch):
+        monkeypatch.setattr(push, "CREATOR_KEY", "")
+        assert not push.is_creator_key("")
+        assert not push.is_creator_key("anything")
 
     def test_rejects_a_non_push_endpoint_before_touching_the_database(self, client, db_router):
         response = client.post("/push/subscriptions", json=_body(endpoint="https://attacker.example/hook"))

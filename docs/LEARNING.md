@@ -47,6 +47,12 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   ~50% lower monthly cost.
 
 **AI engineering**
+- Built evals for two scheduled LLM agents: live runs on the day's real games scored by
+  rule-based fact checks (goalie status, back-to-backs, each price on the right team) plus an
+  LLM judge that sees the same data the writer had, and replayed known failures with fixed
+  lookups. They found failures the existing guardrails passed (scores written loser-first,
+  invented "value", an investigator telling me to ignore a real gap), which I turned into new
+  code checks, and they showed the backup model failing 7 of 10 briefs, so briefs now skip it.
 - Built three scheduled LLM agents into a live app, alongside its chat agent: pregame game
   research, a data-quality investigator, and a social post drafter. They share one
   research → write → verify loop: the model chooses which tools to call, and code checks
@@ -211,6 +217,58 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-10-31 — Evals for the agents: what the guardrails can't see
+
+**What happened:** The pregame briefs and the data-check investigator
+already had code checks: every number must appear in the data, odds must
+match exactly, no "lock" wording. Those prove a number is *real*, not that
+it's *used right*. So I built evals (`intelligence/evals/agents.py`):
+- **Briefs** run live on tonight's games, exactly as the scheduled job
+  does. Each is scored by plain rules (is a goalie called "confirmed"
+  really confirmed? is the back-to-back team really on one? is each price
+  on the team it's written about?) plus an AI judge from the *other*
+  provider that sees the same data the writer had.
+- **The investigator** replays 8 known failures (a late shift chart, a
+  postponed game, a final game with no result...) against fixed lookups,
+  so every run is the same test.
+
+**What they found:**
+- Reading the 13 stored briefs by hand: 3 wrote scores loser-first ("a 1-5
+  loss"), because the data lists each team's goals first. And one counted
+  a record itself ("2-3 in recent games"), which passed the number check
+  because 2 and 3 were both in the data. New check: scores higher-first.
+- The investigator said "Action: none, it fixes itself" for a final game
+  with no result. Reading the code, nothing refills that, and the runbook
+  never said so. Worse, the instructions offered "Action: none, it fixes
+  itself" as a ready-made line, and the model just copied it. It passed
+  once the runbook explained it and that line was limited to checks that
+  really fix themselves.
+- Groq (the free backup) failed 7 of 10 briefs: "slight extra value" when
+  the data says there's none, goalies called confirmed who were only
+  projected, back-to-backs that weren't. Gemini passed 8 of 10. Briefs are
+  published unread and a missing brief is harmless, so briefs now skip the
+  backup, and two new code checks catch value talk on a no-value night and
+  overclaimed "confirmed" goalies, for any model.
+
+**My own bugs, caught the same way:** my price check split "St. Louis" at
+the period and blamed Detroit; the judge used Groq's per-minute budget and
+crashed the run; two of my rubrics failed correct answers; and the judge
+once failed a brief for a misspelling it didn't contain. Judges get things
+wrong too, so now they must quote the failing words.
+
+**Why it matters:** A guardrail can only check what you thought of in
+advance. Evals on real data find the rest, and each one found becomes a
+cheap code check that runs on every brief. This is the
+measure → find a failure → add a guardrail → measure again loop.
+
+**Interview angle:** "How do you evaluate an LLM feature?" Layered: plain
+code checks for anything checkable (they're free and never flaky), an LLM
+judge given the writer's own sources for the fuzzy rest, fixed fixtures for
+repeatable cases and live runs for real-world ones, and a judge you don't
+fully trust either.
 
 ---
 

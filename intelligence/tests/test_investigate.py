@@ -106,3 +106,10 @@ def test_runbook_covers_every_check_the_backend_runs():
                  "Last night: Result", "Last night: predictions graded", "Today: predictions logged",
                  "Swing of the Night saved", "Playoff odds add up", "Last night's xG in range"):
         assert name in investigate.RUNBOOK, name
+
+
+@pytest.mark.asyncio
+async def test_the_runbooks_own_numbers_can_be_repeated():
+    text = "The 2 AM job retries the game for 14 days until the NHL posts it.\nAction: none, it fixes itself on the next run."
+    draft = await explain(chain((text,), []), lookups(), REPORT)
+    assert draft.text == text and draft.first_problems == []

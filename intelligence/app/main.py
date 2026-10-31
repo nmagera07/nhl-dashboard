@@ -387,10 +387,13 @@ class IntelligenceService:
     async def write_brief(self, request: BriefRequest) -> DraftResponse:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+        chain = self.chain.only(briefs.BRIEF_PROVIDERS)
+        if not chain:
+            raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         game = briefs.Game(request.game_id, request.away, request.home, request.date)
         try:
             with usage.purpose("brief"):
-                brief = await briefs.write_brief(self.chain, ToolRunner(self.dashboard), game, today_eastern())
+                brief = await briefs.write_brief(chain, ToolRunner(self.dashboard), game, today_eastern())
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)

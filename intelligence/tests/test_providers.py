@@ -141,3 +141,13 @@ class TestWarm:
         chain = ProviderChain([provider("gemini")])
         timeout = chain._client(provider("gemini")).timeout
         assert timeout.connect == 5.0 and timeout.read == 20.0
+
+
+def test_only_limits_the_chain_and_shares_its_connections():
+    from app.providers import Provider, ProviderChain
+    chain = ProviderChain([Provider("groq", "Groq", None, "k", "m"), Provider("gemini", "Google Gemini", None, "k", "m"),
+                           Provider("gemini:gemini-lite", "Google Gemini (lite)", None, "k", "lite")])
+    gemini = chain.only(("gemini",))
+    assert [p.name for p in gemini.providers] == ["gemini", "gemini:gemini-lite"]
+    assert gemini._clients is chain._clients and len(chain.providers) == 3
+    assert not chain.only(("ollama",))

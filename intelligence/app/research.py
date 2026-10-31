@@ -18,6 +18,7 @@ class Draft:
     model: str | None
     problems: list[str] = field(default_factory=list)  # why the last draft failed, if it did
     tools: list[str] = field(default_factory=list)  # what the agent looked up
+    first_problems: list[str] = field(default_factory=list)  # why the first draft needed a rewrite, if it did
 
 
 async def research_and_write(chain: ProviderChain, runner, instructions: str, prompt: str, tools: list[dict],
@@ -47,7 +48,7 @@ async def research_and_write(chain: ProviderChain, runner, instructions: str, pr
 
     sources = "\n".join([prompt, *results])
     text = (message.content or "").strip()
-    problems = check(text, sources)
+    problems = first_problems = check(text, sources)
     if problems:
         messages += [{"role": "assistant", "content": text},
                      {"role": "user", "content": "Fix these problems and reply with only the corrected text:\n- "
@@ -56,5 +57,5 @@ async def research_and_write(chain: ProviderChain, runner, instructions: str, pr
         text = (message.content or "").strip()
         problems = check(text, sources)
     if problems:
-        return Draft(None, provider.label, problems, used)
-    return Draft(text, provider.label, [], used)
+        return Draft(None, provider.label, problems, used, first_problems)
+    return Draft(text, provider.label, [], used, first_problems)

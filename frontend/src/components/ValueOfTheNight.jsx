@@ -59,7 +59,7 @@ export default function ValueOfTheNight({ data, game, today, tracked, onTrack })
       </div>
       <p className="votn-meter-labels"><span><strong>{formatEv(p.ev)}</strong> expected return</span><span>value at +2%</span></p>
       <p className="votn-why">
-        PuckPulse {formatPct(p.ours)} vs. the books&apos; {formatPct(p.market_prob)}.
+        Fair chance {formatPct(p.ours)} vs. the books&apos; {formatPct(p.market_prob)}.
         {!p.value && " Nothing cleared the value bar tonight; this is the closest."}
         {" "}Picked from the morning lines.
       </p>

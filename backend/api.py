@@ -1967,7 +1967,7 @@ def value_share(day: date):
               f"{rec['clv_count']}." if rec.get("nights") else "")
     return {
         "title": f"{label}, {day.strftime('%b %-d')}: {_value_headline(p)}",
-        "description": f"{p['away']} @ {p['home']}: PuckPulse {round(p['ours'] * 100)}% vs. the books' "
+        "description": f"{p['away']} @ {p['home']}: PuckPulse's fair chance {round(p['ours'] * 100)}% vs. the books' "
                        f"{round(p['market_prob'] * 100)}%, expected return {ev}.{record} Not betting advice. 21+.",
         "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/value/{day.isoformat()}.png",
     }

@@ -20,7 +20,7 @@ describe("ValueOfTheNight", () => {
     expect(screen.getByText("−150").closest("p")).toHaveTextContent("COL −150");
     expect(screen.getByText(/best at DraftKings/)).toHaveTextContent("To win · best at DraftKings · PIT @ COL");
     expect(screen.getByRole("img", { name: "Expected return +4%; value starts at +2%" })).toBeInTheDocument();
-    expect(screen.getByText(/PuckPulse 62% vs. the books/)).toHaveTextContent("PuckPulse 62% vs. the books' 58%. Picked from the morning lines.");
+    expect(screen.getByText(/Fair chance 62% vs. the books/)).toHaveTextContent("Fair chance 62% vs. the books' 58%. Picked from the morning lines.");
     expect(screen.getByText("Season").nextSibling).toHaveTextContent("7-6");
     expect(screen.getByText("Units").nextSibling).toHaveTextContent("+3.16u");
     expect(screen.getByText("Beat the close").nextSibling).toHaveTextContent("5/12");

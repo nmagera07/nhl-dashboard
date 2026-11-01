@@ -47,6 +47,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   ~50% lower monthly cost.
 
 **AI engineering**
+- Closed the loop on an AI drafting agent: the app records what the owner actually posts,
+  edits, or skips, and the next morning's agent gets two weeks of those choices as style
+  examples, kept out of its fact-check sources so old numbers can't leak into new posts.
 - Built evals for two scheduled LLM agents: live runs on the day's real games scored by
   rule-based fact checks (goalie status, back-to-backs, each price on the right team) plus an
   LLM judge that sees the same data the writer had, and replayed known failures with fixed
@@ -217,6 +220,39 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-11-01 — Teaching the post agent from what I actually post
+
+**What happened.** The morning post agent drafts an X post, I fix it up and post it, and
+the agent never finds out. Every draft was long, and it always picked Swing of the Night.
+Now the post kit records what I do (Post on X, Copy, the text as I edited it), and the
+next morning the agent sees the last 2 weeks: the draft, and whether I posted it as is,
+edited it (with my version), or skipped it. Given 2 of my short edits as examples, the
+same story went from 2 long sentences and an emoji to 3 short lines in my style.
+
+**Three decisions worth explaining.**
+- *No fine-tuning: examples in the prompt.* This is "in-context learning": the model
+  copies patterns from examples you show it. It's free, instant, and easy to undo.
+  Fine-tuning would need paid training and far more examples than one post a day.
+- *Where the examples go matters.* The agent's fact check treats everything in the user
+  message as a source ("every number must come from the facts"). If old posts went
+  there, last week's numbers would count as sourced and could end up in today's post.
+  So the history goes in the system instructions, which the checker ignores.
+- *Missing data isn't a "no."* I've posted every day, but nothing was recorded before
+  this shipped, so those days would have read as "skipped" and taught the agent that I
+  skip everything. History starts on the first day anything was recorded.
+
+**Security.** The post kit is a public page, and whatever it records ends up in the AI's
+instructions. So saves are only accepted with a secret creator key that lives on my
+phone (from a private link). The text is length-capped and framed as examples, never as
+instructions.
+
+**Interview version.** "I built a feedback loop for an LLM agent without fine-tuning:
+the app logs the user's accept, edit, or skip decisions, and they're fed back as
+few-shot examples. Two details: keep that history out of the fact checker's sources, and
+don't treat 'no data yet' as a negative signal."
 
 ---
 

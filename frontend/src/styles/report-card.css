@@ -1,7 +1,7 @@
 /* Report card: PuckPulse vs. the sportsbooks. */
 .rc-tile-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .rc-tile { display: grid; gap: 2px; padding: 12px; border-radius: 10px; background: var(--neutral-soft); text-align: center; }
-.rc-tile strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.rc-tile strong { font-size: 28px; font-variant-numeric: tabular-nums; }
 .rc-tile span { color: var(--text-dim); font-size: 12px; }
 .rc-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .rc-table th, .rc-table td { padding: 8px 4px; border-bottom: 1px solid var(--border); text-align: right; }

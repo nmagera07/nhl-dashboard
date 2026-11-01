@@ -3,7 +3,7 @@
 .preview-odds-teams strong { font-size: 20px; }
 .preview-odds-bar { height: 8px; margin: 8px 0 4px; border-radius: 4px; background: var(--accent); overflow: hidden; }
 .preview-odds-bar span { display: block; height: 100%; background: var(--text-dim); }
-.preview-note { margin: 10px 0 0; color: var(--text-dim); font-size: 11px; line-height: 1.45; }
+.preview-note { margin: 10px 0 0; color: var(--text-dim); font-size: 12px; line-height: 1.45; }
 .preview-better { color: var(--good); font-weight: 700; }
 /* Text values (division, players, goalies) need wider side columns than numbers. */
 .preview-compare .team-stats-row { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
@@ -13,7 +13,7 @@
 .team-stats-row > .preview-form:last-child ol { justify-content: flex-end; }
 .preview-form-record { font-size: 12px; }
 .preview-form ol { display: flex; flex-wrap: wrap; gap: 3px; margin: 0; padding: 0; list-style: none; }
-.preview-result { min-width: 20px; padding: 2px 3px; box-sizing: border-box; border-radius: 4px; background: var(--neutral-soft); font-size: 10px; font-weight: 800; text-align: center; }
+.preview-result { min-width: 20px; padding: 2px 3px; box-sizing: border-box; border-radius: 4px; background: var(--neutral-soft); font-size: 12px; font-weight: 800; text-align: center; }
 .preview-result-w { color: var(--good); }
 .preview-result-l { color: var(--bad); }
 .preview-result-ot, .preview-result-so { color: var(--warn); }
@@ -49,9 +49,9 @@
 /* Lines as a depth chart (LineupGrid): each line a row of player chips. */
 .lineup-grid { display: grid; gap: 14px; }
 .lineup-group { display: grid; gap: 5px; }
-.lineup-group-title { margin: 0; color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.lineup-group-title { margin: 0; color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .lineup-cols, .lineup-row { display: grid; grid-template-columns: 30px repeat(var(--cols), minmax(0, 1fr)); align-items: center; gap: 4px; }
-.lineup-cols { color: var(--text-dim); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-align: center; }
+.lineup-cols { color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-align: center; }
 .lineup-rows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .lineup-row { align-items: start; padding: 7px 4px 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-raised); }
 .lineup-row-label { align-self: center; text-align: center; color: var(--accent); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -60,10 +60,10 @@ a.lineup-chip:hover .lineup-chip-name { color: var(--accent); }
 .lineup-chip-photo-wrap { position: relative; }
 .lineup-chip-photo { display: block; width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 50%; background: var(--card); object-fit: cover; }
 .lineup-chip-initials { display: grid; place-items: center; color: var(--text-dim); font-size: 13px; font-weight: 700; }
-.lineup-chip-number { position: absolute; right: -8px; bottom: -2px; min-width: 18px; padding: 0 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text-dim); font-size: 9px; font-weight: 800; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+.lineup-chip-number { position: absolute; right: -8px; bottom: -2px; min-width: 18px; padding: 0 4px; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text-dim); font-size: 12px; font-weight: 800; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
 .lineup-chip-name { display: -webkit-box; max-width: 100%; overflow: hidden; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.lineup-chip-badge { padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.lineup-chip-badge { padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .lineup-extra { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; font-size: 12px; }
-.lineup-extra-label { margin-right: 2px; color: var(--text-dim); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.lineup-extra-label { margin-right: 2px; color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .lineup-tag { padding: 2px 8px; border-radius: 999px; background: var(--neutral-soft); }
 .lineup-tag-hurt { background: var(--bad-soft); }

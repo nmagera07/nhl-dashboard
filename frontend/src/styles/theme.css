@@ -1,23 +1,25 @@
-/* The Rink palette: two themes on the same color roles. Dark ("black +
-   ice") keeps the near-black background with ice-blue and goal-red
-   accents; light is ice white and navy. Dark is the
-   default; [data-theme="light"] on <html> switches (set before first paint
-   by public/theme-init.js, from the saved choice or the system's). */
+/* The "Night rink" palette (2026-11 redesign): two themes on the same
+   color roles. Dark is a navy-black rink with sky-blue and amber accents;
+   light is ice white and navy. Dark is the default for everyone;
+   [data-theme="light"] on <html> switches (set before first paint by
+   public/theme-init.js, from the saved choice). */
 :root {
   color-scheme: dark;
-  --bg: #0a0b0f;            /* page: near-black */
-  --card: #13151c;
-  --card-raised: #1a1d26;   /* popovers, highlighted rows, tooltips */
-  --card-tint: #121b2c;     /* the start of a card's accent gradient */
-  --border: #21252f;
-  --border-strong: #2e3442;
-  --text: #e8eef7;
-  --text-dim: #8b93a3;
-  --text-faint: #4b5263;    /* disabled text, chart gridlines */
-  --accent: #4cc2ff;        /* ice blue */
+  /* Titles, scores, and big numbers: tall and narrow, like a scoreboard. */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --bg: #0b1220;            /* page: near-black */
+  --card: #121a2b;
+  --card-raised: #1a2438;   /* popovers, highlighted rows, tooltips */
+  --card-tint: #13203a;     /* the start of a card's accent gradient */
+  --border: #1e2a40;
+  --border-strong: #2a3a57;
+  --text: #e6edf7;
+  --text-dim: #93a3b8;
+  --text-faint: #4a5a75;    /* disabled text, chart gridlines */
+  --accent: #38bdf8;        /* ice blue */
   --accent-strong: #7dd3fc; /* links and accent text */
-  --accent-fill: #1d8fd6;   /* solid buttons */
-  --on-accent: #06213a;     /* text on --accent */
+  --accent-fill: #0ea5e9;   /* solid buttons */
+  --on-accent: #04121f;     /* text on --accent */
   --accent-soft: rgba(76, 194, 255, 0.13);
   --accent-mid: rgba(76, 194, 255, 0.26);
   --accent-line: rgba(76, 194, 255, 0.55);
@@ -37,27 +39,27 @@
   --neutral-soft: rgba(143, 161, 187, 0.13);
   --neutral-mid: rgba(143, 161, 187, 0.24);
   --hover-faint: rgba(255, 255, 255, 0.03);
-  --header-bg: rgba(10, 11, 15, 0.92);
-  --tabbar-bg: rgba(19, 21, 28, 0.96);
+  --header-bg: rgba(11, 18, 32, 0.92);
+  --tabbar-bg: rgba(18, 26, 43, 0.96);
   --scrim: rgba(3, 8, 16, 0.6);
-  --scrim-soft: rgba(10, 11, 15, 0.5);
+  --scrim-soft: rgba(11, 18, 32, 0.5);
   --shadow: rgba(0, 0, 0, 0.45);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f4f7fb;            /* ice white */
+  --bg: #eef2f7;            /* ice white */
   --card: #ffffff;
-  --card-raised: #eef3f9;
+  --card-raised: #f3f6fa;
   --card-tint: #e6f0fb;
-  --border: #dde5ef;
-  --border-strong: #c3d0e0;
-  --text: #0f1b2d;
-  --text-dim: #55657c;
+  --border: #d8dee8;
+  --border-strong: #c3cddb;
+  --text: #0b1220;
+  --text-dim: #4b5a70;
   --text-faint: #a3b0c2;
-  --accent: #0a6fd6;
-  --accent-strong: #0a63c0;
-  --accent-fill: #0a6fd6;
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-fill: #0369a1;
   --on-accent: #ffffff;
   --accent-soft: rgba(10, 111, 214, 0.09);
   --accent-mid: rgba(10, 111, 214, 0.2);
@@ -89,7 +91,7 @@
   --gutter: 24px;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
   /* Installed as a full-screen app (black-translucent status bar), the page
      runs under the iPhone notch/status bar and home indicator -- the
      safe-area insets keep content clear of them. They're 0 in a browser. */

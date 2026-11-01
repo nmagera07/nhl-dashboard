@@ -1,7 +1,7 @@
 /* Track record page. */
 .record-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 var(--gutter) 12px; }
 .record-tile { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
-.record-tile-label { color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.record-tile-label { color: var(--text-dim); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 .record-tile-value { font-size: 28px; font-variant-numeric: tabular-nums; }
 .record-tile-detail { color: var(--text-dim); font-size: 12px; }
 .record-sample-note { margin: 0 var(--gutter) 16px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--text-dim); font-size: 13px; line-height: 1.45; }
@@ -30,5 +30,5 @@
 @media (max-width: 640px) {
   .record-tiles { gap: 8px; }
   .record-tile { padding: 10px; }
-  .record-tile-value { font-size: 22px; }
+  .record-tile-value { font-size: 24px; }
 }

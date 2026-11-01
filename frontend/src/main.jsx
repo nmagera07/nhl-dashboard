@@ -2,6 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
+// Self-hosted (the CSP allows only our own fonts): Inter for text, Barlow
+// Condensed for titles and big numbers. Latin only, the two weights used.
+import '@fontsource-variable/inter/wght.css'
+import '@fontsource/barlow-condensed/latin-700.css'
+import '@fontsource/barlow-condensed/latin-800.css'
 import './index.css'
 import App from './App.jsx'
 import ErrorFallback from './components/ErrorFallback.jsx'

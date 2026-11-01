@@ -50,7 +50,7 @@
 .game-calendar-header button { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--text); font-size: 16px; cursor: pointer; }
 .game-calendar-header button:disabled { opacity: 0.3; cursor: default; }
 .game-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.game-calendar-weekday { padding: 4px 0; color: var(--text-dim); font-size: 11px; text-align: center; }
+.game-calendar-weekday { padding: 4px 0; color: var(--text-dim); font-size: 12px; text-align: center; }
 .game-calendar-day {
   display: grid;
   justify-items: center;
@@ -66,13 +66,13 @@
   font-weight: 600;
   cursor: pointer;
 }
-.game-calendar-day small { color: var(--accent); font-size: 9px; font-weight: 700; line-height: 1; }
+.game-calendar-day small { color: var(--accent); font-size: 12px; font-weight: 700; line-height: 1; }
 .game-calendar-day:hover:not(:disabled) { background: var(--accent-soft); }
 .game-calendar-day:disabled { color: var(--text-faint); font-weight: 400; cursor: default; }
 .game-calendar-day.is-today { border-color: var(--border); }
 .game-calendar-day.is-selected { background: var(--accent); color: var(--on-accent); }
 .game-calendar-day.is-selected small { color: var(--accent-bg-text); }
-.game-calendar-note { margin: 8px 0 0; color: var(--text-dim); font-size: 11px; text-align: center; }
+.game-calendar-note { margin: 8px 0 0; color: var(--text-dim); font-size: 12px; text-align: center; }
 .scoreboard-games {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -92,17 +92,17 @@
 }
 .scoreboard-game:hover { border-color: var(--accent); }
 .game-card-wrap { position: relative; display: grid; }
-.game-card-recap { position: absolute; top: 9px; right: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; text-decoration: none; }
+.game-card-recap { position: absolute; top: 9px; right: 10px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; text-decoration: none; }
 .game-card-recap:hover { background: var(--accent-mid); }
 .game-card-live { border-color: var(--bad-line); }
-.game-card-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 11px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.game-card-status { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-dim); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 .game-card-live .game-card-status { color: var(--live); }
 .game-card-tv { margin-left: auto; overflow: hidden; font-weight: 500; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
 .game-card-team { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 15px; }
 .game-card-logo { width: 26px; height: 26px; flex: 0 0 26px; object-fit: contain; }
-.game-card-abbrev { font-weight: 700; }
+.game-card-abbrev { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
 .game-card-record { color: var(--text-dim); font-size: 12px; }
-.game-card-score { margin-left: auto; font-size: 18px; font-variant-numeric: tabular-nums; }
+.game-card-score { margin-left: auto; font-family: var(--font-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .game-card-team.is-loser { color: var(--text-dim); }
 .game-card-team.is-loser .game-card-logo { opacity: 0.6; }
 .scoreboard-empty { margin: 0 0 12px; color: var(--text-dim); font-size: 13px; }
@@ -122,7 +122,7 @@
 .swing-spark-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
 .swing-spark-dot { fill: var(--warn); stroke: var(--card); stroke-width: 2; }
 .swing-text { display: grid; gap: 2px; min-width: 0; }
-.swing-eyebrow { color: var(--warn); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.swing-eyebrow { color: var(--warn); font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .swing-text strong { font-size: 14px; line-height: 1.3; }
 .swing-detail { color: var(--text-dim); font-size: 12px; }
 .swing-card .share-button { flex: none; }

@@ -22,7 +22,6 @@
 .team-cell { display: inline-flex; align-items: center; gap: 10px; line-height: 1.2; }
 .team-cell .team-abbrev { margin-right: 0; min-width: 34px; }
 .team-cell-logo { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
-.standings-team-logo { width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain; }
 .division-tab {
   background: var(--card);
   border: 1px solid var(--border);
@@ -87,6 +86,7 @@
 .row-selected .team-abbrev { color: var(--accent); }
 .col-rank { color: var(--text-dim); width: 28px; }
 .col-pts { font-weight: 700; color: var(--accent); }
+.standings-table td.col-pts { font-family: var(--font-display); font-size: 20px; }
 .team-abbrev {
   font-weight: 700;
   margin-right: 10px;

@@ -76,16 +76,22 @@
   .leaderboard-player-card-stats strong { font-size: 13px; white-space: nowrap; }
   .leaderboard-mobile-empty { padding: 24px 14px; color: var(--text-dim); text-align: center; }
   .standings-table-card { display: none; }
-  .standings-mobile-list { display: grid; gap: 10px; margin: 0 var(--gutter); }
-  .standings-team-card { display: grid; gap: 12px; width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); text-align: left; cursor: pointer; }
-  .standings-team-card:active, .standings-team-card-selected { border-color: var(--accent); }
-  .standings-team-card-header { display: flex; align-items: center; gap: 9px; min-width: 0; }
-  .standings-team-rank { width: 20px; color: var(--text-dim); font-size: 12px; }
-  .standings-team-identity { display: grid; gap: 3px; min-width: 0; flex: 1; }
-  .standings-team-identity strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-  .standings-team-identity small, .standings-team-points small, .standings-team-card-stats small { color: var(--text-dim); font-size: 12px; }
-  .standings-team-points { display: grid; justify-items: end; color: var(--accent); font-size: 20px; }
-  .standings-team-card-stats { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid var(--border); padding-top: 10px; }
+  .standings-mobile-list { display: grid; margin: 0 var(--gutter); border: 1px solid var(--border); border-radius: 18px; background: var(--card); overflow: hidden; }
+  .standings-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 10px 14px; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .standings-row:first-child { border-top: 0; }
+  .standings-row:active { background: var(--card-raised); }
+  .standings-row-rank { width: 18px; flex: 0 0 18px; color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .standings-row-logo { width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain; }
+  .standings-row-team { display: grid; gap: 2px; min-width: 0; flex: 1; }
+  .standings-row-team strong { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+  .standings-row-team small, .standings-row-po small, .standings-row-pts small { color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .standings-row-team small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .standings-row-po, .standings-row-pts { display: grid; justify-items: end; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .standings-row-po { min-width: 42px; color: var(--text-dim); font-size: 14px; }
+  .standings-row-po.po-in { color: var(--text); }
+  .standings-row-pts { min-width: 36px; color: var(--accent); }
+  .standings-row-pts strong { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; }
+  .standings-cutoff { padding: 6px 14px; border-top: 1px dashed var(--border-strong); background: var(--bg); color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
   .standings-controls .view-toggle { display: none; }
   .standings-controls .division-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 100%; }
   .standings-controls .division-tab { padding: 7px 2px; font-size: 12px; letter-spacing: 0.02em; }
@@ -95,8 +101,6 @@
   .intelligence-toggle { padding: 10px 14px; }
   .intelligence-toggle-full { display: none; }
   .intelligence-toggle-short { display: inline; }
-  .standings-team-card-stats span { display: grid; gap: 2px; justify-items: center; min-width: 0; }
-  .standings-team-card-stats strong { font-size: 12px; white-space: nowrap; }
   .standings-mobile-empty { padding: 24px 14px; color: var(--text-dim); text-align: center; }
   .division-tabs { flex-wrap: wrap; }
   .standings-table { font-size: 12px; }

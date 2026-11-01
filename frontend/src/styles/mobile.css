@@ -140,7 +140,7 @@
   .game-hero, .boxscore-card { margin-top: 12px; padding: 14px; }
   .game-scoreboard { gap: 8px; }
   .game-team-logo { width: 44px; height: 44px; }
-  .game-team-abbrev { font-size: 16px; }
+  .game-team-abbrev { font-size: 28px; }
   .game-team-name { display: none; }
   .boxscore-table th, .boxscore-table td { padding: 7px 6px; }
   .goal-row { grid-template-columns: 40px 36px minmax(0, 1fr); gap: 8px; }

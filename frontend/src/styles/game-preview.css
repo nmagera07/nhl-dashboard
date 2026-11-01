@@ -1,6 +1,7 @@
 /* Game preview (before puck drop). */
 .preview-odds-teams { display: flex; justify-content: space-between; font-size: 14px; }
-.preview-odds-teams strong { font-size: 20px; }
+.preview-odds-teams { align-items: baseline; }
+.preview-odds-teams strong { font-family: var(--font-display); font-size: 36px; font-weight: 800; line-height: 1; }
 .preview-odds-bar { height: 8px; margin: 8px 0 4px; border-radius: 4px; background: var(--accent); overflow: hidden; }
 .preview-odds-bar span { display: block; height: 100%; background: var(--text-dim); }
 .preview-note { margin: 10px 0 0; color: var(--text-dim); font-size: 12px; line-height: 1.45; }

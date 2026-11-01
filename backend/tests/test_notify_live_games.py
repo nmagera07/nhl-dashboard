@@ -43,7 +43,7 @@ class TestEvents:
             "title": "🚨 PIT goal! PIT 2, CBJ 1",
             "body": "S. Crosby (5) from E. Malkin, K. Letang · power play · 2nd 12:34",
             "url": "/games/2026020068",
-            "tag": "goal-2026020068-2-1",
+            "tag": "goal-2026020068-p2-2-1",
         }
 
     def test_two_goals_posted_together_both_alert(self):
@@ -52,7 +52,7 @@ class TestEvents:
 
         candidates, claim_only = n.events_for([game], NOW)
 
-        assert [e["key"] for e in candidates] == ["goal:2026020068:PIT:1-0", "goal:2026020068:CBJ:1-1"]  # oldest first
+        assert [e["key"] for e in candidates] == ["goal:2026020068:PIT:p1:1-0", "goal:2026020068:CBJ:p1:1-1"]  # oldest first
         assert claim_only == []
 
     def test_an_outage_backlog_sends_only_the_newest_few(self):
@@ -80,6 +80,12 @@ class TestEvents:
         first = n.events_for([_game("LIVE", [_goal("CHI", 1, "17:49", 1, 2)])], NOW)[0][0]
         fixed = n.events_for([_game("LIVE", [_goal("CHI", 1, "17:50", 1, 2)])], NOW)[0][0]
         assert first["key"] == fixed["key"]
+
+    def test_a_goal_after_an_overturned_one_still_alerts(self):
+        # 2026-10-31: MTL's 3-2 in the 1st was taken back; the real 3-2 came in the 2nd.
+        overturned = n.events_for([_game("LIVE", [_goal("MTL", 1, "09:30", 2, 3)])], NOW)[0][0]
+        real = n.events_for([_game("LIVE", [_goal("MTL", 2, "01:54", 2, 3)])], NOW)[0][0]
+        assert overturned["key"] != real["key"] and overturned["payload"]["tag"] != real["payload"]["tag"]
 
     def test_each_goal_is_its_own_notification(self):
         game = _game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 1, "06:10", 1, 1)])
@@ -185,12 +191,12 @@ class TestRun:
             return 201
 
         _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB], send=send)
-        assert payloads[0]["key"] == "goal:2026020068:PIT:1-0"
+        assert payloads[0]["key"] == "goal:2026020068:PIT:p1:1-0"
 
     def test_never_sends_the_same_event_twice(self, monkeypatch):
         count, sent, _ = _run(
             monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])],
-            already_sent={"goal:2026020068:PIT:1-0"}, subs=[SUB],
+            already_sent={"goal:2026020068:PIT:p1:1-0"}, subs=[SUB],
         )
 
         assert count == 0 and sent == []
@@ -209,7 +215,7 @@ class TestRun:
     def test_the_next_goal_still_goes_out(self, monkeypatch):
         _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0)])], subs=[SUB])
         count, sent, _ = _run(monkeypatch, [_game("LIVE", [_goal("PIT", 1, "05:00", 1, 0), _goal("CBJ", 2, "03:00", 1, 1)])],
-                               already_sent={"goal:2026020068:PIT:1-0"}, subs=[SUB])
+                               already_sent={"goal:2026020068:PIT:p1:1-0"}, subs=[SUB])
         assert count == 1 and sent[0][1].startswith("🚨 CBJ goal!")
 
     def test_removes_subscriptions_the_browser_dropped(self, monkeypatch):

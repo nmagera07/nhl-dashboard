@@ -4,7 +4,7 @@
   margin: 0 var(--gutter) 16px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 18px;
   overflow: hidden;
 }
 .race-card-header {
@@ -14,7 +14,7 @@
   gap: 12px;
   padding: 12px 14px 0;
 }
-.race-card-header h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.race-card-header h2 { margin: 0; font-size: 16px; font-weight: 700; }
 .race-empty { margin: 0; padding: 28px 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .link-button:hover { text-decoration: underline; }
@@ -51,11 +51,13 @@
 .race-badge { padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
 .race-badge-in { background: var(--good-soft); color: var(--good); }
 .race-badge-out { background: var(--neutral-soft); color: var(--text-dim); }
-.race-odds { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; font-weight: 700; }
+/* The odds are this page's story: big, in the display font; points step back. */
+.race-odds { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; font-family: var(--font-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.race-table td.col-pts { color: var(--text); font-family: inherit; font-size: 14px; font-weight: 600; }
 .race-odds-bar { width: 64px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
 .race-odds-bar span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
-.race-col-odds { min-width: 72px; }
-.race-change { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.race-col-odds { min-width: 96px; }
+.race-change { color: var(--text-dim); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .race-change-up { color: var(--good); }
 .race-change-down { color: var(--bad); }
 .race-hint { margin: 0; color: var(--text-dim); font-size: 12px; }

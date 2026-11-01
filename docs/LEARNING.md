@@ -180,6 +180,10 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   gains were noise, e.g. goalie performance correlates only r ≈ 0.1 year to year.
 
 **Frontend**
+- Led a site-wide redesign without a designer: audited the real pages (15 font sizes, 109
+  text items under 12px on one phone page, a font that was never loaded), compared 3
+  mocked-up directions built from live data, then shipped the chosen one in 8 reviewed
+  steps; phone standings and player lists got about 50% shorter.
 - Added link preview cards to a single-page app: Open Graph tags, a site-wide card, and
   per-game cards drawn server-side (Pillow) and served by a serverless share page
   (Azure Static Web Apps function) that link previewers can read without JavaScript.
@@ -220,6 +224,45 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-11-01 — Redesigning the site when I'm not a designer
+
+**What happened.** The site worked, but it looked cluttered and generic, and some text was
+hard to read. I'm not a designer, so I didn't start with a vision. I started by measuring.
+Then I looked at 3 different directions mocked up with that night's real numbers, picked
+one ("Night rink": dark, a condensed scoreboard font, sky blue and amber), and shipped it
+one page at a time over 8 pull requests.
+
+**The audit found real problems, not just taste.**
+- 15 different font sizes, from 9 to 28px, with 11-13px the most common. On a phone, the
+  bets page had 109 pieces of text at 10-11px.
+- The CSS asked for the Inter font, but nothing ever downloaded it, so every phone showed
+  its own default font. That's a big part of why it looked generic.
+- Every bet card showed about 18 numbers at the same weight, so nothing told you where to
+  look. Standings and player lists were tall cards: one page of 50 players was 7,080px.
+
+**What I'd explain in an interview.**
+- *Pick from options, don't invent.* Reacting to 3 concrete mockups is much easier than
+  describing a look from scratch. I saw a direction "pop" before any code changed.
+- *Foundations first.* One pull request set the fonts, colors, a 12px minimum text size,
+  and dark by default across the whole site. Each page after that was a small change.
+- *Self-host fonts.* The site's Content Security Policy only allows its own fonts, and
+  loading from Google would tell Google about every visitor. Serving them from npm
+  packages kept the policy strict and the visitors private.
+- *Hierarchy is the fix for clutter.* Each page got one big number: the odds on the
+  playoff page, the score on a game page, points in standings. The rest stepped back.
+- *One word, one meaning.* The redesign showed two different numbers both labelled
+  "PuckPulse" (the model's 66% and a blended 61%). Now "PuckPulse" always means the model
+  and the blend is called "fair", including in share images and alerts.
+- *Verify like a user.* Every step was checked with screenshots at phone size against
+  real data, with automated checks for text under 12px and sideways scrolling.
+
+**Interview version.** "I redesigned a live product without a designer: I measured the
+problems first, chose between mocked-up directions, put the foundations in one change,
+and then fixed hierarchy page by page. Standings and player lists got about half as long
+on phones, and nothing on the site is smaller than 12px."
 
 ---
 

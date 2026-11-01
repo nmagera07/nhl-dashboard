@@ -20,7 +20,7 @@ function Side({ label, side, showBook, open, tracked, onTrack }) {
     <>
       <span className="bets-label">{label}{showBook && side.book && <span className="bets-book">{side.book}</span>}</span>
       <strong className="bets-price">{formatPrice(side.price)}</strong>
-      <span className="bets-fair">PuckPulse {formatPrice(side.fair)}</span>
+      <span className="bets-fair">Fair {formatPrice(side.fair)}</span>
       {side.value && open && <span className="bets-badge">Value {formatEv(side.ev)}</span>}
       {tracked && <span className="bets-tracked">✓ Tracking</span>}
     </>
@@ -65,7 +65,9 @@ function Market({ name, hint, beta, children }) {
   );
 }
 
-// PuckPulse's chance for each team (its fair odds, to win), as one split bar.
+// PuckPulse's chance for each team to win, as one split bar: the model alone,
+// the same number as the score tiles, game page, and pick'em (not the fair
+// odds under the prices, which blend in the books).
 function WinChance({ away, home, chance }) {
   if (chance == null) return null;
   const pct = Math.round(chance * 100);
@@ -109,7 +111,7 @@ function BetCard({ game, board, tracked, onTrack }) {
         </Link>
         <span className="bets-time">{open ? startTime(game.startTimeUTC) : game.gameState === "LIVE" || game.gameState === "CRIT" ? "Live" : "Final"}</span>
       </div>
-      <WinChance away={away} home={home} chance={board.moneyline.away.ours} />
+      <WinChance away={away} home={home} chance={board.moneyline.away.model ?? board.moneyline.away.ours} />
       {tired.length > 0 && <p className="bets-chip">{tired.join(" & ")} on the 2nd night of a back-to-back</p>}
       {open && (goalies.away || goalies.home) && (
         <p className="bets-goalies">
@@ -161,7 +163,7 @@ export default function BetsPage() {
     <main className="page bets-page">
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
-        The best price for each side, with PuckPulse&apos;s own odds under it. <strong>Value</strong> means the price
+        The best price for each side, with our fair odds under it. <strong>Value</strong> means the price
         beats ours by enough to matter. Tap a price to track it in <Link className="accent-link" to="/my-bets">My bets</Link>.{" "}
         <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
       </p>
@@ -185,7 +187,8 @@ export default function BetsPage() {
         <summary>How to read the board</summary>
         <ul>
           <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
-          <li><strong>PuckPulse</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
+          <li><strong>PuckPulse win chance</strong> (the bar): our model alone, the same number as on the scores and game pages.</li>
+          <li><strong>Fair</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
           <li><strong>In net</strong>: <em>confirmed</em> or <em>expected</em> is the word from beat reporters at morning skate, via{" "}
             <a className="accent-link" href="https://www.rotowire.com/hockey/" target="_blank" rel="noreferrer">RotoWire</a>. Before that, <em>NHL.com</em> is its

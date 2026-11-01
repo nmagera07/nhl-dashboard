@@ -35,7 +35,7 @@ describe("BetsPage", () => {
     render(<MemoryRouter><BetsPage /></MemoryRouter>);
     const card = (await screen.findByRole("link", { name: /PIT @ COL/ })).closest("li");
     expect(within(card).getByText("DraftKings")).toBeInTheDocument();
-    expect(within(card).getByText("PuckPulse −194")).toBeInTheDocument();
+    expect(within(card).getByText("Fair −194")).toBeInTheDocument();
     expect(within(card).getByText("Value +10%")).toBeInTheDocument();
     expect(within(card).getByText(/PIT on the 2nd night of a back-to-back/)).toBeInTheDocument();
     expect(within(card).getByText("COL −1.5")).toBeInTheDocument();
@@ -100,5 +100,15 @@ describe("BetsPage", () => {
     render(<MemoryRouter><BetsPage /></MemoryRouter>);
     expect(await screen.findByText(/No games today/)).toBeInTheDocument();
     expect(screen.getByText(/1-800-GAMBLER/)).toBeInTheDocument();
+  });
+});
+
+describe("BetsPage win chance", () => {
+  it("shows the model's chance, the same as the score tiles, not the fair odds' blend", async () => {
+    const board = { ...BOARD, moneyline: { home: { ...BOARD.moneyline.home, model: 0.71 }, away: { ...BOARD.moneyline.away, model: 0.29 } } };
+    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: board });
+    render(<MemoryRouter><BetsPage /></MemoryRouter>);
+    expect(await screen.findByRole("img", { name: "PuckPulse win chance: PIT 29%, COL 71%" })).toBeInTheDocument();
+    expect(screen.getByText("Fair −194")).toBeInTheDocument(); // the fair odds stay the blend
   });
 });

@@ -396,7 +396,7 @@ class TestValueAlert:
         assert count == 1 and asked == ["2026-10-24"]
         payload, ttl = sent[0]
         assert payload["title"] == "💰 Value of the night: CAR −1.5 at +160"
-        assert payload["body"] == ("CAR @ NJD · PuckPulse 40% vs. the books' 37%, expected return +5.1% at FanDuel. "
+        assert payload["body"] == ("CAR @ NJD · fair chance 40% vs. the books' 37%, expected return +5.1% at FanDuel. "
                                    "Morning line: check your price. 21+")
         assert payload["url"] == "/bets" and payload["key"] == "value:2026-10-24" and ttl == 6 * 3600
         assert any("WHERE notify_value" in q for q, _ in cur.sql)

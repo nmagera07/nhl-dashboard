@@ -441,7 +441,7 @@ def value_alert(now=None, fetch=None):
         ev = f"{'+' if p['ev'] >= 0 else '−'}{abs(p['ev'] * 100):.1f}%"
         payload = {
             "title": f"💰 Value of the night: {_value_bet(p)}",
-            "body": f"{p['away']} @ {p['home']} · PuckPulse {ours}% vs. the books' {books}%, expected return {ev}"
+            "body": f"{p['away']} @ {p['home']} · fair chance {ours}% vs. the books' {books}%, expected return {ev}"
                     f"{' at ' + p['book'] if p.get('book') else ''}. Morning line: check your price. 21+",
             "url": "/bets",
             "tag": f"value-{day}",

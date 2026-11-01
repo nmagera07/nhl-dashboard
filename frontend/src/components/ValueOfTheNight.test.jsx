@@ -17,10 +17,14 @@ describe("ValueOfTheNight", () => {
   it("shows the pick, why, and the season's record", () => {
     renderCard({ available: true, pick: PICK, result: null, record: RECORD, last: LAST });
     expect(screen.getByText("Value of the night")).toBeInTheDocument();
-    expect(screen.getByText(/^COL/)).toHaveTextContent("COL −150 DraftKings");
-    expect(screen.getByText(/PuckPulse 62% vs. the books/)).toHaveTextContent("expected return +4% at this price. Picked from the morning lines.");
-    expect(screen.getByText(/This season/)).toHaveTextContent(
-      "This season: 7-6, +3.16u, beat the closing line 5 of 12. Last pick: WSH −1.5 +110, won.");
+    expect(screen.getByText("−150").closest("p")).toHaveTextContent("COL −150");
+    expect(screen.getByText(/best at DraftKings/)).toHaveTextContent("To win · best at DraftKings · PIT @ COL");
+    expect(screen.getByRole("img", { name: "Expected return +4%; value starts at +2%" })).toBeInTheDocument();
+    expect(screen.getByText(/PuckPulse 62% vs. the books/)).toHaveTextContent("PuckPulse 62% vs. the books' 58%. Picked from the morning lines.");
+    expect(screen.getByText("Season").nextSibling).toHaveTextContent("7-6");
+    expect(screen.getByText("Units").nextSibling).toHaveTextContent("+3.16u");
+    expect(screen.getByText("Beat the close").nextSibling).toHaveTextContent("5/12");
+    expect(screen.getByText(/Last pick/)).toHaveTextContent("Last pick: WSH −1.5 +110, won.");
   });
 
   it("shares the night's /v/ link with its card", async () => {
@@ -35,6 +39,16 @@ describe("ValueOfTheNight", () => {
     renderCard({ available: true, pick: { ...PICK, value: false, ev: -0.01 }, record: RECORD });
     expect(screen.getByText("Closest to value tonight")).toBeInTheDocument();
     expect(screen.getByText(/Nothing cleared the value bar tonight/)).toBeInTheDocument();
+  });
+
+  it("fills the meter toward the +2% value bar, never past it or below empty", () => {
+    const width = (ev) => {
+      const { container, unmount } = renderCard({ available: true, pick: { ...PICK, value: false, ev }, record: RECORD });
+      const w = container.querySelector(".votn-meter span").style.width;
+      unmount();
+      return w;
+    };
+    expect([width(0.008), width(0.05), width(-0.03)]).toEqual(["40%", "100%", "0%"]);
   });
 
   it("tracks the pick in My bets, until puck drop", async () => {

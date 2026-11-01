@@ -46,6 +46,15 @@ describe("BetsPage", () => {
     expect(within(card).getAllByText(/^Value/)).toHaveLength(1); // the totals' positive EV is never badged
   });
 
+  it("shows PuckPulse's win chance as a split bar, and each market as its own group", async () => {
+    mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: BOARD });
+    render(<MemoryRouter><BetsPage /></MemoryRouter>);
+    expect(await screen.findByRole("img", { name: "PuckPulse win chance: PIT 34%, COL 66%" })).toBeInTheDocument();
+    const puckLine = screen.getByRole("group", { name: "Puck line" });
+    expect(within(puckLine).getByText("+150")).toBeInTheDocument();
+    expect(within(puckLine).queryByText("−150")).not.toBeInTheDocument(); // the moneyline price stays in its own group
+  });
+
   it("names each starter by the best word so far: reporters, then NHL.com, then ours", async () => {
     mockFetch([game(7, "FUT", "2026-10-17T23:00:00Z")], { 7: {
       ...BOARD,

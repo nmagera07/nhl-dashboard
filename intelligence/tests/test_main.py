@@ -233,6 +233,10 @@ def test_post_draft_endpoint_requires_the_shared_token(monkeypatch):
         assert client.post("/posts/draft", json=body).status_code == 401
         ok = client.post("/posts/draft", json=body, headers={"X-Digest-Token": "s3cret"}).json()
         assert (ok["pick"], ok["x_text"], ok["reddit_title"]) == ("swing", "J. Drysdale tied it late.", "J. Drysdale ties it late")
+        past = {"day": "2026-10-26", "story": "Upset", "draft": "d", "outcome": "edited", "posted": "p"}
+        assert client.post("/posts/draft", json={**body, "history": [past]}, headers={"X-Digest-Token": "s3cret"}).status_code == 200
+        assert client.post("/posts/draft", json={**body, "history": [{**past, "outcome": "deleted"}]},
+                           headers={"X-Digest-Token": "s3cret"}).status_code == 422
         bad = client.post("/posts/draft", json={**body, "candidates": [{**body["candidates"][0], "id": "x; drop"}]},
                           headers={"X-Digest-Token": "s3cret"})
         assert bad.status_code == 422

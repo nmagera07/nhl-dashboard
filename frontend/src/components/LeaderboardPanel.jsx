@@ -120,14 +120,11 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
   const rangeStart = sorted.length === 0 ? 0 : startIdx + 1;
   const rangeEnd = Math.min(startIdx + LEADERBOARD_PAGE_SIZE, sorted.length);
 
-  // Mobile cards show the headline stat up top and six supporting stats below.
+  // Phone rows: the headline stat big on the right, WAR beside it, and a
+  // few supporting stats on the line under the name.
   const headlineKey = group === "goalies" ? "wins" : "points";
-  const mobileColumns = columns.filter((col) =>
-    (group === "goalies"
-      ? ["games_played", "wins", "goals_against_avg", "save_pctg", "shutouts", "war"]
-      : ["games_played", "goals", "assists", "plus_minus", "avg_toi_seconds", "war"]  // points is already the card's headline
-    ).includes(col.key)
-  );
+  const lineKeys = group === "goalies" ? ["save_pctg", "goals_against_avg", "shutouts"] : ["goals", "assists", "avg_toi_seconds"];
+  const lineColumns = lineKeys.map((key) => columns.find((col) => col.key === key));
 
   return (
     <div className="leaderboard-panel">
@@ -208,28 +205,27 @@ function LeaderboardPanel({ players, onSelectPlayer }) {
         {paged.length === 0 && <div className="leaderboard-mobile-empty">No players match your search.</div>}
         {paged.map((p, i) => (
           <button
-            className="leaderboard-player-card"
+            className="leaderboard-row"
             key={p.player_id}
             type="button"
             aria-label={`Open ${p.first_name} ${p.last_name} profile`}
             onClick={() => onSelectPlayer(p.player_id)}
           >
-            <span className="leaderboard-player-card-header">
-              <span className="leaderboard-player-rank">{startIdx + i + 1}</span>
-              {p.team_logo_url && <img className="leaderboard-team-logo" src={teamLogo(p.team_logo_url)} alt="" />}
-              <span className="leaderboard-player-identity">
-                <strong>{p.first_name} {p.last_name}</strong>
-                <small>{p.team_abbrev} · {p.position_code}</small>
-              </span>
-              <span className="leaderboard-player-points">
-                {formatStatValue(headlineKey, p[headlineKey])}
-                <small>{group === "goalies" ? "W" : "PTS"}</small>
-              </span>
+            <span className="leaderboard-row-rank">{startIdx + i + 1}</span>
+            {p.team_logo_url ? <img className="leaderboard-team-logo" src={teamLogo(p.team_logo_url)} alt="" /> : <span className="leaderboard-team-logo" />}
+            <span className="leaderboard-row-player">
+              <strong>{p.first_name} {p.last_name}</strong>
+              <small>
+                <span>{p.team_abbrev} · {p.position_code}</span>
+                {lineColumns.map((col) => (
+                  <span key={col.key}><b>{formatStatValue(col.key, p[col.key])}</b> {col.label}</span>
+                ))}
+              </small>
             </span>
-            <span className="leaderboard-player-card-stats">
-              {mobileColumns.map((col) => (
-                <span key={col.key}><strong>{formatStatValue(col.key, p[col.key])}</strong><small>{col.label}</small></span>
-              ))}
+            <span className="leaderboard-row-war"><strong>{formatStatValue("war", p.war)}</strong><small>WAR</small></span>
+            <span className="leaderboard-row-headline">
+              <strong>{formatStatValue(headlineKey, p[headlineKey])}</strong>
+              <small>{group === "goalies" ? "W" : "PTS"}</small>
             </span>
           </button>
         ))}

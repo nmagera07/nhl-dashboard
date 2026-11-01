@@ -22,12 +22,11 @@
 .team-cell { display: inline-flex; align-items: center; gap: 10px; line-height: 1.2; }
 .team-cell .team-abbrev { margin-right: 0; min-width: 34px; }
 .team-cell-logo { width: 24px; height: 24px; flex: 0 0 24px; object-fit: contain; }
-.standings-team-logo { width: 30px; height: 30px; flex: 0 0 30px; object-fit: contain; }
 .division-tab {
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
   padding: 6px 14px;
@@ -66,7 +65,7 @@
   text-align: right;
   font-weight: 500;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.05em;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
@@ -87,6 +86,7 @@
 .row-selected .team-abbrev { color: var(--accent); }
 .col-rank { color: var(--text-dim); width: 28px; }
 .col-pts { font-weight: 700; color: var(--accent); }
+.standings-table td.col-pts { font-family: var(--font-display); font-size: 20px; }
 .team-abbrev {
   font-weight: 700;
   margin-right: 10px;
@@ -98,7 +98,7 @@
 .diff-pos { color: var(--good); }
 .diff-neg { color: var(--live); }
 .streak {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 4px;
@@ -109,7 +109,7 @@
 .streak-none { color: var(--text-dim); }
 .playoff-badge {
   display: inline-block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
   padding: 4px 10px;

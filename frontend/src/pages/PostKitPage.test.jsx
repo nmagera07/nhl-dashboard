@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PostKitPage from "./PostKitPage.jsx";
 import { clearResponseCache } from "../utils/responseCache.js";
@@ -48,6 +48,27 @@ describe("PostKitPage", () => {
     expect(reddit).toContain(`title=${encodeURIComponent(UPSET.reddit_title)}`);
     expect(screen.getByText(/Drafted by PuckPulse AI \(Google Gemini\)/)).toBeInTheDocument();
     expect(globalThis.fetch).not.toHaveBeenCalledWith(expect.stringContaining("/swing-of-the-night"));
+  });
+
+  it("on the owner's device, records what was posted, as edited", async () => {
+    localStorage.setItem("pp-creator-key", "abcdefghijklmnop1234");
+    serve({ "/post-kit/": UPSET });
+    renderKit();
+    fireEvent.change(await screen.findByLabelText(/Post text/), { target: { value: "VAN steals it, 6-5 in OT." } });
+    fireEvent.click(screen.getByRole("link", { name: "Post on X" }));
+    const [url, init] = fetch.mock.calls.find(([u]) => u.includes("/actions"));
+    expect(url).toMatch(/\/post-kit\/2026-10-24\/actions$/);
+    expect(JSON.parse(init.body)).toEqual({ action: "posted_x", text: "VAN steals it, 6-5 in OT.", creator_key: "abcdefghijklmnop1234" });
+    expect(screen.queryByText(/isn.t remembered/)).not.toBeInTheDocument();
+    localStorage.clear();
+  });
+
+  it("on anyone else's device, records nothing and says so", async () => {
+    serve({ "/post-kit/": UPSET });
+    renderKit();
+    fireEvent.click(await screen.findByRole("link", { name: "Post on X" }));
+    expect(fetch.mock.calls.some(([u]) => u.includes("/actions"))).toBe(false);
+    expect(screen.getByText(/isn.t remembered for future drafts/)).toBeInTheDocument();
   });
 
   it("a story without a card has no image or Save image", async () => {

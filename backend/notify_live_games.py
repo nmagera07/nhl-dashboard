@@ -69,12 +69,16 @@ def goal_event(game, goal):
     credit = f"{scorer} from {', '.join(assists)}" if assists else f"{scorer}, unassisted"
     when = f"{_period(goal.get('periodDescriptor'))} {goal.get('timeInPeriod', '')}".strip()
     strength = STRENGTH.get(goal.get("strength"))
-    # Keyed by the score it made, not its clock time: the NHL corrects a
-    # goal's time a few seconds after posting it (17:49 -> 17:50), and a
-    # time-based key sent the corrected goal again as a new one.
+    # Keyed by the score it made and its period, not its clock time: the NHL
+    # corrects a goal's time a few seconds after posting it (17:49 -> 17:50),
+    # and a time-based key sent the corrected goal again as a new one. The
+    # period is there for overturned goals: MTL's 3-2 in the 1st was taken
+    # back, and the real 3-2 in the 2nd went unsent as "already sent"
+    # (2026-10-31). The feed has no goal ids to key on.
     score = f"{goal.get('awayScore')}-{goal.get('homeScore')}"
+    period = (goal.get("periodDescriptor") or {}).get("number", goal.get("period"))
     return {
-        "key": f"goal:{game['id']}:{goal.get('teamAbbrev')}:{score}",
+        "key": f"goal:{game['id']}:{goal.get('teamAbbrev')}:p{period}:{score}",
         "kind": "goals",
         "scorer": goal.get("teamAbbrev"),  # a goal for a subscriber who follows this team, against one who doesn't
         # An idle Android phone can hold even high-urgency pushes until it's
@@ -89,7 +93,7 @@ def goal_event(game, goal):
             # One notification per goal (they stack, grouped under the app):
             # a shared per-game tag replaced the last goal, and Android often
             # played the replacement silently, so it felt like one alert a game.
-            "tag": f"goal-{game['id']}-{score}",
+            "tag": f"goal-{game['id']}-p{period}-{score}",
         },
     }
 
@@ -437,7 +441,7 @@ def value_alert(now=None, fetch=None):
         ev = f"{'+' if p['ev'] >= 0 else '−'}{abs(p['ev'] * 100):.1f}%"
         payload = {
             "title": f"💰 Value of the night: {_value_bet(p)}",
-            "body": f"{p['away']} @ {p['home']} · PuckPulse {ours}% vs. the books' {books}%, expected return {ev}"
+            "body": f"{p['away']} @ {p['home']} · fair chance {ours}% vs. the books' {books}%, expected return {ev}"
                     f"{' at ' + p['book'] if p.get('book') else ''}. Morning line: check your price. 21+",
             "url": "/bets",
             "tag": f"value-{day}",

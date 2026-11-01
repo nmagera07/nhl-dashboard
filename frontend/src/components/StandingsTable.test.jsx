@@ -156,8 +156,8 @@ describe("StandingsTable", () => {
     expect(container.querySelector("table img.team-cell-logo")).toHaveAttribute("src", "https://example.com/pit.svg");
   });
 
-  describe("mobile cards", () => {
-    const cardList = () => within(screen.getByLabelText("Team standings cards"));
+  describe("phone rows", () => {
+    const cardList = () => within(screen.getByLabelText("Team standings"));
 
     it("clicking a team card calls onSelectTeam with that team's abbreviation", async () => {
       const onSelectTeam = vi.fn();
@@ -166,6 +166,25 @@ describe("StandingsTable", () => {
       await userEvent.click(cardList().getByRole("button", { name: /open colorado avalanche team page/i }));
 
       expect(onSelectTeam).toHaveBeenCalledWith("COL");
+    });
+
+    it("shows the record, last 10, streak, playoff odds, and points on one row", () => {
+      render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} playoffOddsByTeam={{ PIT: 0.62 }} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+      const pit = cardList().getByRole("button", { name: /open pittsburgh penguins/i });
+      expect(pit).toHaveTextContent("40-30-12 · L10 5-3-2 · W2");
+      expect(within(pit).getByText("62%").parentElement).toHaveClass("po-in");
+      expect(within(pit).getByText("92")).toBeInTheDocument();
+    });
+
+    it("marks the wild-card race under a division's top 3, only when asked", () => {
+      const division = [1, 2, 3, 4, 5].map((n) => team({ team_abbrev: `T${n}`, team_name: `Team ${n}`, division_sequence: n }));
+      const { rerender } = render(<StandingsTable rows={division} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} cutoff />);
+      const separator = cardList().getByRole("separator");
+      expect(separator).toHaveTextContent("Wild-card race");
+      expect(separator.previousElementSibling).toHaveAccessibleName(/team 3/i);
+      expect(separator.nextElementSibling).toHaveAccessibleName(/team 4/i);
+      rerender(<StandingsTable rows={division} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={vi.fn()} />);
+      expect(cardList().queryByRole("separator")).not.toBeInTheDocument();
     });
 
     it("shows an empty message when rows is empty", () => {

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { teamLogo } from "../utils/teamLogo.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import { useFollowedTeams } from "../hooks/useFavoriteTeam.js";
@@ -50,7 +51,9 @@ function TeamCell({ row, following }) {
   );
 }
 
-function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard", rankBy = "division_sequence" }) {
+// cutoff: mark where the division's guaranteed playoff spots end (a
+// division tab, not searching): the top 3 are in, the rest race for the wild cards.
+function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard", rankBy = "division_sequence", cutoff = false }) {
   const [following] = useFollowedTeams();
   // Rows arrive already ordered by the API when a column sort is active
   // (?sort_by=... on GET /standings/latest) -- only fall back to the
@@ -142,31 +145,34 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
         </tbody>
       </table>
     </div>
-    <div className="standings-mobile-list" aria-label="Team standings cards">
+    <div className="standings-mobile-list" aria-label="Team standings">
       {displayRows.length === 0 && <div className="standings-mobile-empty">No teams match your search.</div>}
-      {displayRows.map((row) => (
-        <button
-          className="standings-team-card"
-          key={row.team_abbrev}
-          type="button"
-          aria-label={`Open ${row.team_name} team page`}
-          onClick={() => onSelectTeam(row.team_abbrev)}
-        >
-          <span className="standings-team-card-header">
-            <span className="standings-team-rank">{row[rankBy]}</span>
-            {row.logo_url && <img className="standings-team-logo" src={teamLogo(row.logo_url)} alt="" />}
-            <span className="standings-team-identity"><strong>{row.team_name}{following.includes(row.team_abbrev) && <FavoriteStar />}</strong><small>{row.wins}-{row.losses}-{row.ot_losses} · {row.games_played} GP</small></span>
-            <span className="standings-team-points"><strong>{row.points}</strong><small>PTS</small></span>
-          </span>
-          <span className="standings-team-card-stats">
-            <span><strong>{row.goal_for}-{row.goal_against}</strong><small>GF-GA</small></span>
-            <span><strong>{row.goal_differential > 0 ? "+" : ""}{row.goal_differential}</strong><small>DIFF</small></span>
-            <span><strong>{row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}</strong><small>L10</small></span>
-            <span><strong>{row.streak_code ? `${row.streak_code}${row.streak_count}` : "—"}</strong><small>STRK</small></span>
-            <span><strong>{formatOdds(playoffOddsByTeam?.[row.team_abbrev])}</strong><small>PO%</small></span>
-          </span>
-        </button>
-      ))}
+      {displayRows.map((row, i) => {
+        const odds = playoffOddsByTeam?.[row.team_abbrev];
+        const streak = row.streak_code ? ` · ${row.streak_code}${row.streak_count}` : "";
+        return (
+          <Fragment key={row.team_abbrev}>
+            {cutoff && i === 3 && <div className="standings-cutoff" role="separator">Wild-card race</div>}
+            <button
+              className="standings-row"
+              type="button"
+              aria-label={`Open ${row.team_name} team page`}
+              onClick={() => onSelectTeam(row.team_abbrev)}
+            >
+              <span className="standings-row-rank">{row[rankBy]}</span>
+              {row.logo_url ? <img className="standings-row-logo" src={teamLogo(row.logo_url)} alt="" /> : <span className="standings-row-logo" />}
+              <span className="standings-row-team">
+                <strong>{row.team_name}{following.includes(row.team_abbrev) && <FavoriteStar />}</strong>
+                <small>{row.wins}-{row.losses}-{row.ot_losses} · L10 {row.l10_wins}-{row.l10_losses}-{row.l10_ot_losses}{streak}</small>
+              </span>
+              <span className={odds != null && Number(odds) >= 0.5 ? "standings-row-po po-in" : "standings-row-po"}>
+                <strong>{formatOdds(odds)}</strong><small>PO%</small>
+              </span>
+              <span className="standings-row-pts"><strong>{row.points}</strong><small>PTS</small></span>
+            </button>
+          </Fragment>
+        );
+      })}
     </div>
     </>
   );

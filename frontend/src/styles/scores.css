@@ -103,6 +103,7 @@
 .game-card-abbrev { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
 .game-card-record { color: var(--text-dim); font-size: 12px; }
 .game-card-score { margin-left: auto; font-family: var(--font-display); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.game-card-chance { margin-left: auto; color: var(--text-dim); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .game-card-team.is-loser { color: var(--text-dim); }
 .game-card-team.is-loser .game-card-logo { opacity: 0.6; }
 .scoreboard-empty { margin: 0 0 12px; color: var(--text-dim); font-size: 13px; }

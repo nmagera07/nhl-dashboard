@@ -58,6 +58,7 @@ function StandingsPage({
       <StandingsTable
         rows={visibleRows}
         rankBy={activeDivision === LEAGUE_TAB && !isSearching ? "league_sequence" : "division_sequence"}
+        cutoff={activeDivision !== LEAGUE_TAB && !isSearching && !sortBy}
         onSelectTeam={onSelectTeam}
         playoffOddsByTeam={playoffOddsByTeam}
         view={view}

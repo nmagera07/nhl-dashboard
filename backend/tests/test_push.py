@@ -192,3 +192,24 @@ class TestReceipts:
         assert self._receipt(client, key="goal; DROP TABLE x").status_code == 422
         assert self._receipt(client, endpoint="https://attacker.example/hook").status_code == 400
         assert not db_router.calls
+
+
+class TestPostKitActions:
+    BODY = {"action": "posted_x", "text": "  Kreider made it 4-2.  ", "creator_key": "right-key"}
+
+    def test_the_owner_records_what_they_posted(self, client, db_router, monkeypatch):
+        monkeypatch.setattr(push, "CREATOR_KEY", "right-key")
+        db_router.when("insert into post_actions", None)
+        assert client.post("/post-kit/2026-10-31/actions", json=self.BODY).status_code == 204
+        query, params = db_router.calls[-1]
+        assert "INSERT INTO post_actions" in query and params[1:] == ("posted_x", "Kreider made it 4-2.")
+
+    @pytest.mark.parametrize("key", ["wrong-key", ""])
+    def test_anyone_else_is_refused_before_the_database(self, client, db_router, monkeypatch, key):
+        monkeypatch.setattr(push, "CREATOR_KEY", "right-key")
+        assert client.post("/post-kit/2026-10-31/actions", json={**self.BODY, "creator_key": key}).status_code == 403
+        assert db_router.calls == []
+
+    def test_only_known_actions(self, client, monkeypatch):
+        monkeypatch.setattr(push, "CREATOR_KEY", "right-key")
+        assert client.post("/post-kit/2026-10-31/actions", json={**self.BODY, "action": "deleted"}).status_code == 422

@@ -407,7 +407,7 @@ def render_value(data):
     where = f"{p['away']} @ {p['home']}" + (f" · {p['book']}" if p.get("book") else "")
     draw.text((x, 250), where, font=_font(30, "Bold"), fill=DIM, anchor="lm")
 
-    tiles = (("PuckPulse", _pct(p["ours"]), TEXT), ("The books", _pct(p["market_prob"]), TEXT),
+    tiles = (("Fair chance", _pct(p["ours"]), TEXT), ("The books", _pct(p["market_prob"]), TEXT),
              ("Expected return", f"{'+' if p['ev'] >= 0 else '−'}{abs(round(p['ev'] * 100))}%", GOOD if p["ev"] > 0 else TEXT))
     tx, width = x, 200
     for label, value, color in tiles:

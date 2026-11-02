@@ -129,9 +129,20 @@ class PostCandidate(BaseModel):
     facts: dict
 
 
+class PastPost(BaseModel):
+    """One recent day: the story drafted, the draft, and what the owner did with it (backend post_drafts.history)."""
+    day: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    story: str = Field(max_length=60)
+    passed_over: list[str] = Field(default_factory=list, max_length=8)
+    draft: str = Field(max_length=600)
+    outcome: Literal["as drafted", "edited", "skipped"]
+    posted: str | None = Field(None, max_length=600)
+
+
 class PostRequest(BaseModel):
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     candidates: list[PostCandidate] = Field(min_length=1, max_length=8)
+    history: list[PastPost] = Field(default_factory=list, max_length=21)
 
 
 class PostResponse(BaseModel):
@@ -406,7 +417,8 @@ class IntelligenceService:
             raise HTTPException(status_code=413, detail="Too many facts for one post.")
         try:
             with usage.purpose("post"):
-                post, draft = await posts.draft_post(self.chain, ToolRunner(self.dashboard), request.date, candidates)
+                post, draft = await posts.draft_post(self.chain, ToolRunner(self.dashboard), request.date, candidates,
+                                                   [h.model_dump(exclude_none=True) for h in request.history])
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return PostResponse(pick=post and post["pick"], x_text=post and post["x"], reddit_title=post and post["reddit"],

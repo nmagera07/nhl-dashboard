@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
+import { creatorKey } from "../utils/push.js";
 
 const pct = (p) => `${Math.round(p * 100)}%`;
 
@@ -24,6 +25,20 @@ async function copyText(value, done) {
   } catch {
     window.prompt("Copy this", value);
   }
+}
+
+// What the owner did with the post (posted or copied it, as edited), so the
+// drafting agent learns from it (backend post_drafts.history). Only from a
+// device holding the creator key; keepalive lets it finish as X opens.
+function record(day, action, text) {
+  const key = creatorKey();
+  if (!key) return;
+  fetch(`${API_BASE}/post-kit/${day}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, text, creator_key: key }),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 // The morning post kit (opened from the creator's "Today's post is ready"
@@ -77,9 +92,9 @@ export default function PostKitPage() {
       <textarea id="post-kit-text" rows={4} value={body} onChange={(e) => setText(e.target.value)} />
       <div className="post-kit-actions">
         <a className="post-kit-primary" href={`https://x.com/intent/tweet?text=${encodeURIComponent(body)}&url=${encodeURIComponent(post.link)}`}
-           target="_blank" rel="noopener noreferrer">Post on X</a>
+           target="_blank" rel="noopener noreferrer" onClick={() => record(day, "posted_x", body)}>Post on X</a>
         {post.image && <button type="button" onClick={save}>Save image</button>}
-        <button type="button" onClick={() => copyText(`${body} ${post.link}`, flash("post"))}>{copied === "post" ? "Copied" : "Copy text"}</button>
+        <button type="button" onClick={() => { record(day, "copied_x", body); copyText(`${body} ${post.link}`, flash("post")); }}>{copied === "post" ? "Copied" : "Copy text"}</button>
       </div>
       <p className="muted post-kit-note">
         {post.image ? "The link shows this card on X. Or save the image and attach it yourself." : "The link shows the page's preview on X."}
@@ -90,12 +105,13 @@ export default function PostKitPage() {
           <p className="post-kit-reddit-title">{post.reddit}</p>
           <div className="post-kit-actions">
             <a href={`https://www.reddit.com/submit?url=${encodeURIComponent(post.link)}&title=${encodeURIComponent(post.reddit)}`}
-               target="_blank" rel="noopener noreferrer">Post on Reddit</a>
-            <button type="button" onClick={() => copyText(post.reddit, flash("reddit"))}>{copied === "reddit" ? "Copied" : "Copy title"}</button>
+               target="_blank" rel="noopener noreferrer" onClick={() => record(day, "posted_reddit", post.reddit)}>Post on Reddit</a>
+            <button type="button" onClick={() => { record(day, "copied_reddit", post.reddit); copyText(post.reddit, flash("reddit")); }}>{copied === "reddit" ? "Copied" : "Copy title"}</button>
           </div>
         </section>
       )}
       {drafted && <p className="muted post-kit-note">Drafted by PuckPulse AI{drafted.model ? ` (${drafted.model})` : ""}. Check it before posting.</p>}
+      {drafted && !creatorKey() && <p className="muted post-kit-note">This device doesn&apos;t have your creator link, so what you post here isn&apos;t remembered for future drafts.</p>}
     </main>
   );
 }

@@ -535,6 +535,20 @@ CREATE TABLE IF NOT EXISTS post_drafts (
 );
 GRANT SELECT ON post_drafts TO nhl_api_readonly;
 
+-- What the owner did with each night's post in the post kit (POST
+-- /post-kit/{day}/actions): posted or copied it, with the text as edited.
+-- Fed back to the drafting agent (post_drafts.history). Insert-only for the API.
+CREATE TABLE IF NOT EXISTS post_actions (
+    id          SERIAL PRIMARY KEY,
+    day         DATE NOT NULL,
+    action      VARCHAR(20) NOT NULL,
+    text        TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS post_actions_day ON post_actions (day);
+GRANT INSERT ON post_actions TO nhl_api_readonly;
+GRANT USAGE ON SEQUENCE post_actions_id_seq TO nhl_api_readonly;
+
 -- The morning data check (data_checks.py, on the notifier function): did
 -- the 2 AM run produce everything? One row per day; failures are pushed
 -- to the creator's devices. Not read by the API.

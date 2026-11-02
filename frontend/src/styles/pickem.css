@@ -37,7 +37,7 @@
 .pickem-promo-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); }
 .pickem-promo-icon svg { width: 26px; height: 26px; fill: none; stroke: var(--on-accent); stroke-width: 2; }
 .pickem-promo-body { display: grid; gap: 3px; min-width: 0; }
-.pickem-promo-eyebrow { color: var(--accent-strong); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.pickem-promo-eyebrow { color: var(--accent-strong); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .pickem-promo-headline { font-size: 18px; line-height: 1.2; }
 .pickem-promo-detail { color: var(--text-dim); font-size: 13px; }
 .pickem-promo-progress { display: block; height: 6px; margin-top: 6px; overflow: hidden; border-radius: 3px; background: var(--neutral-mid); }
@@ -45,7 +45,7 @@
 .pickem-promo-leaders { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; }
 .pickem-promo-leader { display: inline-flex; align-items: center; gap: 5px; color: var(--text-dim); }
 .pickem-promo-leader b { color: var(--text); font-variant-numeric: tabular-nums; }
-.pickem-medal { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: #1a1306; font-size: 10px; font-weight: 800; }
+.pickem-medal { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; color: #1a1306; font-size: 12px; font-weight: 800; }
 .pickem-medal-1 { background: #f5c542; }
 .pickem-medal-2 { background: #c9d1dc; }
 .pickem-medal-3 { background: #d99a5b; }
@@ -56,7 +56,7 @@
 }
 @media (prefers-reduced-motion: reduce) { .pickem-promo, .pickem-promo-progress span { transition: none; } .pickem-promo:hover { transform: none; } }
 .pickem-name { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
-.pickem-name strong { font-size: 17px; }
+.pickem-name strong { font-size: 18px; }
 .pickem-name .pickem-edit { font-size: 12px; }
 .pickem-rename { margin-bottom: 6px; }
 .pickem-rename .pickem-join-row .link-button { padding: 0 4px; border: 0; background: none; color: var(--text-dim); font-size: 13px; }

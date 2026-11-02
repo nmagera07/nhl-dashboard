@@ -1,23 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-// Light or dark. Until someone picks, the page follows the system setting
-// (and keeps following it); once they toggle, the choice is saved on this
-// device. Toggling back to what the system shows clears it, so the page
-// follows the phone again. public/theme-init.js applies the same rule before
-// first paint.
+// Light or dark. Dark for everyone until they pick light, which is saved on
+// this device; toggling back to dark clears it. public/theme-init.js applies
+// the same rule before first paint.
 const KEY = "pp-theme";
-const BAR_COLORS = { light: "#f4f7fb", dark: "#0a0b0f" };
+const BAR_COLORS = { light: "#eef2f7", dark: "#0b1220" };
 
 function saved() {
   try {
-    const value = localStorage.getItem(KEY);
-    return value === "light" || value === "dark" ? value : null;
+    return localStorage.getItem(KEY) === "light" ? "light" : "dark";
   } catch {
-    return null;
+    return "dark";
   }
 }
-
-const systemTheme = () => (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
 
 export function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -26,31 +21,20 @@ export function applyTheme(theme) {
 }
 
 export function useTheme() {
-  const [choice, setChoice] = useState(saved);
-  const [system, setSystem] = useState(systemTheme);
-  const theme = choice || system;
+  const [theme, setTheme] = useState(saved);
   // Set on <html> during render (not after), so components rendering now
   // (team logos) already see the new theme.
   if (typeof document !== "undefined" && document.documentElement.dataset.theme !== theme) applyTheme(theme);
 
-  useEffect(() => {
-    const query = window.matchMedia?.("(prefers-color-scheme: light)");
-    if (!query) return undefined;
-    const onChange = () => setSystem(query.matches ? "light" : "dark");
-    query.addEventListener?.("change", onChange);
-    return () => query.removeEventListener?.("change", onChange);
-  }, []);
-
   const toggle = () => {
     const next = theme === "light" ? "dark" : "light";
-    const follow = next === system; // back to the phone's theme: follow it again
     try {
-      if (follow) localStorage.removeItem(KEY);
-      else localStorage.setItem(KEY, next);
+      if (next === "light") localStorage.setItem(KEY, "light");
+      else localStorage.removeItem(KEY);
     } catch {
       /* not saved; it still switches for this visit */
     }
-    setChoice(follow ? null : next);
+    setTheme(next);
   };
   return [theme, toggle];
 }

@@ -22,8 +22,9 @@ MOVERS = [{"team_abbrev": "OTT", "before": 0.5901, "after": 0.4835}, {"team_abbr
 
 
 class Cursor:
-    def __init__(self, swing=SWING, games=GAMES, movers=MOVERS):
-        self.answers = {"swing_of_the_night": [swing] if swing else [], "game_predictions": games, "playoff_odds": movers}
+    def __init__(self, swing=SWING, games=GAMES, movers=MOVERS, drafts=(), actions=()):
+        self.answers = {"swing_of_the_night": [swing] if swing else [], "game_predictions": games, "playoff_odds": movers,
+                        "post_drafts": list(drafts), "post_actions": list(actions)}
         self.sql, self.rows = [], []
 
     def __enter__(self):
@@ -34,6 +35,10 @@ class Cursor:
 
     def execute(self, sql, params=None):
         self.sql.append((sql, params))
+        if "MIN(day)" in sql:
+            days = [a["day"] for a in self.answers["post_actions"]]
+            self.rows = [{"first": min(days) if days else None}]
+            return
         self.rows = next((rows for table, rows in self.answers.items() if f"FROM {table}" in sql), [])
 
     def fetchone(self):
@@ -118,3 +123,48 @@ def test_nothing_is_stored_without_a_passing_draft(monkeypatch):
 def test_a_night_without_games_drafts_nothing():
     cur = Cursor(swing=None, games=[], movers=[])
     assert pd.run(Conn(cur), DAY, lambda *a, **k: (_ for _ in ()).throw(AssertionError("asked"))) is None
+
+
+def _drafted(day, story, text):
+    candidates = [{"id": "swing", "kind": "Swing of the Night: the goal that moved..."},
+                  {"id": "upset-1", "kind": "Upset: the night's least likely winner..."}]
+    return {"day": day, "story": story, "x_text": text, "candidates": candidates}
+
+
+def test_history_says_what_the_owner_did_with_each_draft():
+    drafts = [_drafted(date(2026, 10, 24), "swing", "Draft one."),
+              _drafted(date(2026, 10, 25), "upset-1", "Draft  two."),
+              _drafted(date(2026, 10, 26), "swing", "Draft three, too long.")]
+    # The query keeps each day's latest X action (DISTINCT ON); the fake returns those.
+    actions = [{"day": date(2026, 10, 25), "text": "Draft two."}, {"day": date(2026, 10, 26), "text": "Draft three."}]
+    past = pd.history(Cursor(drafts=drafts, actions=actions), DAY)
+    assert past == [
+        {"day": "2026-10-24", "story": "Swing of the Night", "passed_over": ["Upset"], "draft": "Draft one.", "outcome": "skipped"},
+        {"day": "2026-10-25", "story": "Upset", "passed_over": ["Swing of the Night"], "draft": "Draft  two.",
+         "outcome": "as drafted"},  # only spacing differs
+        {"day": "2026-10-26", "story": "Swing of the Night", "passed_over": ["Upset"], "draft": "Draft three, too long.",
+         "outcome": "edited", "posted": "Draft three."},
+    ]
+
+
+def test_the_history_goes_to_the_agent(monkeypatch):
+    monkeypatch.setattr(pd, "INTELLIGENCE_URL", "https://intel.test")
+    monkeypatch.setattr(pd, "DIGEST_TOKEN", "s3cret")
+    sent = []
+
+    def post(url, json, headers, timeout):
+        sent.append(json)
+        return Response({"pick": None, "problems": []})
+
+    actions = [{"day": date(2026, 10, 26), "text": "Posted."}]
+    pd.run(Conn(Cursor(drafts=[_drafted(date(2026, 10, 26), "swing", "Draft.")], actions=actions)), DAY, post)
+    assert [h["outcome"] for h in sent[0]["history"]] == ["edited"]
+
+
+def test_no_history_before_anything_was_recorded():
+    # The owner posted before recording existed; those days aren't skips.
+    cur = Cursor(drafts=[_drafted(date(2026, 10, 24), "swing", "Draft.")])
+    assert pd.history(cur, DAY) == []
+    cur = Cursor(drafts=[_drafted(date(2026, 10, 26), "swing", "Draft.")], actions=[{"day": date(2026, 10, 25), "text": "x"}])
+    pd.history(cur, DAY)
+    assert next(p for s, p in cur.sql if "FROM post_drafts" in s)[0] == date(2026, 10, 25)  # starts at the first recorded day

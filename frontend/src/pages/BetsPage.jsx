@@ -14,26 +14,25 @@ const startTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric
 // value badge when the price pays more than the fair odds by enough.
 // Before puck drop, tapping it tracks the bet at this price (My bets).
 function Side({ label, side, showBook, open, tracked, onTrack }) {
-  if (!side) return <td />;
+  if (!side) return <div />;
   const title = `${label}: PuckPulse's model ${formatPct(side.model ?? side.ours)}${side.market != null ? `, books ${formatPct(side.market)}, fair ${formatPct(side.ours)}` : ""}`;
   const body = (
     <>
-      <span className="bets-label">{label}</span>
+      <span className="bets-label">{label}{showBook && side.book && <span className="bets-book">{side.book}</span>}</span>
       <strong className="bets-price">{formatPrice(side.price)}</strong>
-      {showBook && side.book && <span className="bets-book">{side.book}</span>}
-      <span className="bets-fair">PuckPulse {formatPrice(side.fair)}</span>
+      <span className="bets-fair">Fair {formatPrice(side.fair)}</span>
       {side.value && open && <span className="bets-badge">Value {formatEv(side.ev)}</span>}
       {tracked && <span className="bets-tracked">✓ Tracking</span>}
     </>
   );
   const classes = ["bets-side", side.value && open && "bets-side-value", tracked && "bets-side-tracked"].filter(Boolean).join(" ");
   return (
-    <td className={classes} title={title}>
+    <div className={classes} title={title}>
       {open && onTrack && side.price != null ? (
         <button type="button" className="bets-track" aria-pressed={Boolean(tracked)} onClick={onTrack}
                 aria-label={`${tracked ? "Stop tracking" : "Track"} ${label} at ${formatPrice(side.price)}`}>{body}</button>
       ) : body}
-    </td>
+    </div>
   );
 }
 
@@ -54,6 +53,34 @@ function starter(board, side) {
 function Starter({ goalie }) {
   if (!goalie) return "?";
   return <>{goalie.name} <span className="bets-goalie-note">{goalie.note}</span></>;
+}
+
+// One market's two sides, under a small label ("MONEYLINE · to win").
+function Market({ name, hint, beta, children }) {
+  return (
+    <div className="bets-market" role="group" aria-label={name}>
+      <p className="bets-market-name">{name} <span className="bets-row-hint">{hint}</span>{beta && <span className="bets-exp">beta</span>}</p>
+      <div className="bets-sides">{children}</div>
+    </div>
+  );
+}
+
+// PuckPulse's chance for each team to win, as one split bar: the model alone,
+// the same number as the score tiles, game page, and pick'em (not the fair
+// odds under the prices, which blend in the books).
+function WinChance({ away, home, chance }) {
+  if (chance == null) return null;
+  const pct = Math.round(chance * 100);
+  return (
+    <div className="bets-chance">
+      <div className="bets-chance-bar" role="img" aria-label={`PuckPulse win chance: ${away} ${pct}%, ${home} ${100 - pct}%`}>
+        <span style={{ flexGrow: pct }} /><span style={{ flexGrow: 100 - pct }} />
+      </div>
+      <p className="bets-chance-labels" aria-hidden="true">
+        <span>{away} <strong>{pct}%</strong></span><span>PuckPulse win chance</span><span><strong>{100 - pct}%</strong> {home}</span>
+      </p>
+    </div>
+  );
 }
 
 function BetCard({ game, board, tracked, onTrack }) {
@@ -84,6 +111,7 @@ function BetCard({ game, board, tracked, onTrack }) {
         </Link>
         <span className="bets-time">{open ? startTime(game.startTimeUTC) : game.gameState === "LIVE" || game.gameState === "CRIT" ? "Live" : "Final"}</span>
       </div>
+      <WinChance away={away} home={home} chance={board.moneyline.away.model ?? board.moneyline.away.ours} />
       {tired.length > 0 && <p className="bets-chip">{tired.join(" & ")} on the 2nd night of a back-to-back</p>}
       {open && (goalies.away || goalies.home) && (
         <p className="bets-goalies">
@@ -94,29 +122,24 @@ function BetCard({ game, board, tracked, onTrack }) {
       {!hasMarket ? (
         <p className="bets-note">No lines yet. PuckPulse: {home} {formatPct(board.moneyline.home.ours)} ({formatPrice(board.moneyline.home.fair)}).</p>
       ) : (
-        <table className="bets-table">
-          <tbody>
-            <tr>
-              <th scope="row">Moneyline<span className="bets-row-hint">to win</span></th>
-              <Side label={away} side={board.moneyline.away} showBook open={open} {...track("moneyline", "away")} />
-              <Side label={home} side={board.moneyline.home} showBook open={open} {...track("moneyline", "home")} />
-            </tr>
-            {pl && pl.home.price != null && (
-              <tr>
-                <th scope="row">Puck line<span className="bets-row-hint">−1.5: win by 2+</span></th>
-                <Side label={`${away} ${formatSpread(-pl.home_spread)}`} side={pl.away} open={open} {...track("puck_line", "away")} />
-                <Side label={`${home} ${formatSpread(pl.home_spread)}`} side={pl.home} open={open} {...track("puck_line", "home")} />
-              </tr>
-            )}
-            {total && total.over.price != null && (
-              <tr>
-                <th scope="row">Total<span className="bets-row-hint">both teams&apos; goals</span><span className="bets-exp">beta</span></th>
-                <Side label={`Over ${total.line}`} side={total.over} open={open} {...track("total", "over")} />
-                <Side label={`Under ${total.line}`} side={total.under} open={open} {...track("total", "under")} />
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <>
+          <Market name="Moneyline" hint="to win">
+            <Side label={away} side={board.moneyline.away} showBook open={open} {...track("moneyline", "away")} />
+            <Side label={home} side={board.moneyline.home} showBook open={open} {...track("moneyline", "home")} />
+          </Market>
+          {pl && pl.home.price != null && (
+            <Market name="Puck line" hint="−1.5: win by 2+">
+              <Side label={`${away} ${formatSpread(-pl.home_spread)}`} side={pl.away} open={open} {...track("puck_line", "away")} />
+              <Side label={`${home} ${formatSpread(pl.home_spread)}`} side={pl.home} open={open} {...track("puck_line", "home")} />
+            </Market>
+          )}
+          {total && total.over.price != null && (
+            <Market name="Total" hint={"both teams' goals"} beta>
+              <Side label={`Over ${total.line}`} side={total.over} open={open} {...track("total", "over")} />
+              <Side label={`Under ${total.line}`} side={total.under} open={open} {...track("total", "under")} />
+            </Market>
+          )}
+        </>
       )}
       {!open && <p className="bets-note">Started: these were the last lines before puck drop.</p>}
     </li>
@@ -140,7 +163,7 @@ export default function BetsPage() {
     <main className="page bets-page">
       <div className="page-header"><h1>Bets</h1></div>
       <p className="page-subtitle">
-        The best price for each side, with PuckPulse&apos;s own odds under it. <strong>Value</strong> means the price
+        The best price for each side, with our fair odds under it. <strong>Value</strong> means the price
         beats ours by enough to matter. Tap a price to track it in <Link className="accent-link" to="/my-bets">My bets</Link>.{" "}
         <Link className="accent-link" to="/report-card">How we&apos;ve done vs. the books ›</Link>
       </p>
@@ -160,10 +183,12 @@ export default function BetsPage() {
         </>
       )}
       <section className="bets-about">
-        <h2>How to read this</h2>
+        <details>
+        <summary>How to read the board</summary>
         <ul>
           <li><strong>Price</strong>: the moneyline is the best price at a state-licensed US sportsbook (the book is named); the puck line and total are the typical price.</li>
-          <li><strong>PuckPulse</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
+          <li><strong>PuckPulse win chance</strong> (the bar): our model alone, the same number as on the scores and game pages.</li>
+          <li><strong>Fair</strong> (under each price): the odds we think are right. For now it&apos;s 30% PuckPulse&apos;s model and 70% the books: they&apos;re sharp, and our edge on them is still being tested against the closing line. The model gets more say as it earns it.</li>
           <li><strong>Value +3%</strong>: the expected return per bet at that price, by our fair odds, shown when it&apos;s at least +2% and our model leans that way. It usually takes one book paying more than the rest. It&apos;s an estimate, not a sure thing.</li>
           <li><strong>In net</strong>: <em>confirmed</em> or <em>expected</em> is the word from beat reporters at morning skate, via{" "}
             <a className="accent-link" href="https://www.rotowire.com/hockey/" target="_blank" rel="noreferrer">RotoWire</a>. Before that, <em>NHL.com</em> is its
@@ -171,6 +196,7 @@ export default function BetsPage() {
             backup the second night). In our tests the starter mattered less to who wins than rest did, so it isn&apos;t in our odds.</li>
           <li><strong>Totals (beta)</strong>: in testing, our totals didn&apos;t beat a league-average guess, so they never get a value badge.</li>
         </ul>
+        </details>
         <p className="bets-legal">
           Odds via The Odds API, refreshed each morning and about 15 minutes before puck drop. For information and
           entertainment, not betting advice. 21+. If you bet, bet responsibly: gambling problem? Call{" "}

@@ -50,8 +50,19 @@ CREATE TABLE IF NOT EXISTS post_drafts (
     candidates    JSONB NOT NULL,        -- every story it chose from, for review
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-GRANT SELECT ON post_drafts TO nhl_api_readonly
+GRANT SELECT ON post_drafts TO nhl_api_readonly;
+CREATE TABLE IF NOT EXISTS post_actions (
+    id          SERIAL PRIMARY KEY,
+    day         DATE NOT NULL,
+    action      VARCHAR(20) NOT NULL,  -- posted_x, copied_x, posted_reddit, copied_reddit
+    text        TEXT NOT NULL,         -- the X text as edited, or the Reddit title
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS post_actions_day ON post_actions (day);
+GRANT INSERT ON post_actions TO nhl_api_readonly;
+GRANT USAGE ON SEQUENCE post_actions_id_seq TO nhl_api_readonly
 """
+HISTORY_DAYS = 14
 
 
 def pct(p) -> int:
@@ -145,16 +156,61 @@ def mover_stories(cur, day) -> list[dict]:
     return out
 
 
+def _label(kind: str) -> str:
+    return kind.split(":")[0]  # "Swing of the Night", "Upset", "Playoff odds move"
+
+
+def history(cur, day) -> list[dict]:
+    """
+    The owner's last HISTORY_DAYS of drafted posts, oldest first: the kind
+    of story drafted (and the kinds passed over), the draft, and what they
+    did with it in the post kit (post_actions): posted as drafted, edited
+    (with their text), or skipped. Copying the text counts as posting it.
+    Starts at the first day anything was recorded: drafts from before the
+    post kit recorded anything would all read as skipped.
+    """
+    cur.execute("SELECT MIN(day) AS first FROM post_actions")
+    first = (cur.fetchall() or [{}])[0].get("first")
+    if not first:
+        return []
+    cur.execute(
+        "SELECT day, story, x_text, candidates FROM post_drafts WHERE day >= %s AND day < %s ORDER BY day",
+        (max(first, day - timedelta(days=HISTORY_DAYS)), day),
+    )
+    drafts = cur.fetchall()
+    cur.execute(
+        """
+        SELECT DISTINCT ON (day) day, text FROM post_actions
+        WHERE day >= %s AND day < %s AND action IN ('posted_x', 'copied_x')
+        ORDER BY day, created_at DESC
+        """,
+        (day - timedelta(days=HISTORY_DAYS), day),
+    )
+    posted = {r["day"]: r["text"] for r in cur.fetchall()}
+    out = []
+    for d in drafts:
+        kinds = {c["id"]: _label(c["kind"]) for c in d["candidates"]}
+        text = posted.get(d["day"])
+        outcome = "skipped" if text is None else "as drafted" if " ".join(text.split()) == " ".join(d["x_text"].split()) else "edited"
+        out.append({
+            "day": d["day"].isoformat(), "story": kinds.get(d["story"], d["story"]),
+            "passed_over": sorted({k for i, k in kinds.items() if i != d["story"]}),
+            "draft": d["x_text"], "outcome": outcome, **({"posted": text} if outcome == "edited" else {}),
+        })
+    return out
+
+
 def candidates(cur, day) -> list[dict]:
     return [s for s in (swing_story(cur, day), upset_story(cur, day)) if s] + mover_stories(cur, day)
 
 
-def draft(day, stories: list[dict], post=requests.post) -> dict | None:
+def draft(day, stories: list[dict], post=requests.post, past: list[dict] = ()) -> dict | None:
     """The agent's pick and text ({pick, x_text, reddit_title, model, ...}), or None."""
     if not (INTELLIGENCE_URL and DIGEST_TOKEN):
         logger.warning("INTELLIGENCE_URL/DIGEST_TOKEN not set; no draft")
         return None
-    body = {"date": day.isoformat(), "candidates": [{k: s[k] for k in ("id", "kind", "facts")} for s in stories]}
+    body = {"date": day.isoformat(), "candidates": [{k: s[k] for k in ("id", "kind", "facts")} for s in stories],
+            "history": list(past)}
     try:
         response = post(f"{INTELLIGENCE_URL}/posts/draft", json=body, headers={"X-Digest-Token": DIGEST_TOKEN},
                         timeout=120)
@@ -188,11 +244,12 @@ def run(conn, day, post=requests.post) -> str | None:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(TABLE_SQL)
         stories = candidates(cur, day)
+        past = history(cur, day)
     conn.commit()
     if not stories:
         logger.info(f"No stories for {day}")
         return None
-    result = draft(day, stories, post)
+    result = draft(day, stories, post, past)
     story = next((s for s in stories if result and s["id"] == result["pick"]), None)
     if not story:
         return None

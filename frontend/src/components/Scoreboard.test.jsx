@@ -76,6 +76,17 @@ describe("Scoreboard", () => {
     expect(card.querySelector(".game-card-score")).toBeNull();
   });
 
+  it("shows PuckPulse's pregame chance on upcoming games only, from the season-sim model", async () => {
+    const inputs = { model: { home_edge: 0, scale: 1 }, teams: { BOS: { rating: 0.4 }, UTA: { rating: 0 }, PIT: { rating: 0 }, WSH: { rating: 0 } }, games: [] };
+    globalThis.fetch = vi.fn((url) => Promise.resolve({ ok: true, json: () => Promise.resolve(url.includes("/season-sim") ? inputs : { games: [upcoming, live] }) }));
+    render(<MemoryRouter><Scoreboard /></MemoryRouter>);
+    const card = await screen.findByRole("button", { name: /^UTA at BOS, .*PuckPulse: UTA 40%, BOS 60%$/ });
+    expect(within(card).getByText("40%")).toBeInTheDocument();
+    expect(within(card).getByText("60%")).toBeInTheDocument();
+    const liveCard = screen.getByRole("button", { name: /^PIT at WSH/ });
+    expect(liveCard.querySelector(".game-card-chance")).toBeNull();
+  });
+
   it("shows live games first, with scores and the clock", async () => {
     const cards = await renderWith([upcoming, finalOT, live]);
 

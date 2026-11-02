@@ -35,6 +35,19 @@ export function winProbability(home, away, model, homeB2b = false, awayB2b = fal
   return 1 / (1 + Math.exp(-(home - away + homeMargin(model, homeB2b, awayB2b)) / model.scale));
 }
 
+// PuckPulse's pregame chance for one game from the season-sim inputs (GET
+// /season-sim): {home, homeB2b, awayB2b}, home being the home team's chance
+// to win, or null if either team is missing. The schedule rows are
+// [date, home, away, home_b2b, away_b2b]; a game not in them is rested.
+export function pregameChance(inputs, date, homeAbbrev, awayAbbrev) {
+  const h = inputs?.teams?.[homeAbbrev];
+  const a = inputs?.teams?.[awayAbbrev];
+  if (!h || !a || !inputs.model) return null;
+  const row = (inputs.games || []).find(([d, hm, aw]) => d === date && hm === homeAbbrev && aw === awayAbbrev);
+  const [homeB2b, awayB2b] = row ? [Boolean(row[3]), Boolean(row[4])] : [false, false];
+  return { home: winProbability(h.rating, a.rating, inputs.model, homeB2b, awayB2b), homeB2b, awayB2b };
+}
+
 // Points, then regulation wins, then regulation + OT wins, then wins.
 function compareTeams(a, b) {
   return b.points - a.points || b.regulation_wins - a.regulation_wins || b.row - a.row || b.wins - a.wins;

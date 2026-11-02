@@ -72,6 +72,7 @@ import season_scenarios
 import win_probability
 from seasons import season_games
 from response_models.feedback import FeedbackIn
+from response_models.post_kit import PostActionIn
 from response_models.pickem import PickemJoinIn, PickemMeIn, PickemPickIn, PickemRenameIn
 from response_models.push import PushReceiptIn, PushRenewIn, PushSubscriptionIn, PushUnsubscribeIn
 from prediction_record import track_record
@@ -813,6 +814,33 @@ def post_kit(day: date):
     if not row:
         return {"available": False}
     return {"available": True, **row}
+
+
+POST_ACTION_RATE_LIMIT = "30/hour"
+
+
+@app.post("/post-kit/{day}/actions", status_code=204)
+@limiter.limit(POST_ACTION_RATE_LIMIT)
+def post_kit_action(request: Request, day: date, body: PostActionIn):
+    """
+    What the owner did with a night's post in the post kit (posted or
+    copied it, with the text as edited), so the drafting agent can learn
+    from it (post_drafts.history). Only from the owner's devices: the
+    creator key, as for the morning reminder. Insert-only.
+    """
+    if not push.is_creator_key(body.creator_key):
+        raise HTTPException(status_code=403, detail="Not the owner's device.")
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO post_actions (day, action, text) VALUES (%s, %s, %s)",
+                        (day, body.action, body.text.strip()))
+        conn.commit()
+    except psycopg2.errors.UndefinedTable:
+        conn.rollback()
+        raise HTTPException(status_code=503, detail="Post actions aren't set up yet.")
+    finally:
+        conn.close()
 
 
 @app.get("/swing/{day}/share")
@@ -1939,7 +1967,7 @@ def value_share(day: date):
               f"{rec['clv_count']}." if rec.get("nights") else "")
     return {
         "title": f"{label}, {day.strftime('%b %-d')}: {_value_headline(p)}",
-        "description": f"{p['away']} @ {p['home']}: PuckPulse {round(p['ours'] * 100)}% vs. the books' "
+        "description": f"{p['away']} @ {p['home']}: PuckPulse's fair chance {round(p['ours'] * 100)}% vs. the books' "
                        f"{round(p['market_prob'] * 100)}%, expected return {ev}.{record} Not betting advice. 21+.",
         "image": f"https://nhl-dashboard-api.bravecoast-a5240643.westus2.azurecontainerapps.io/og/value/{day.isoformat()}.png",
     }

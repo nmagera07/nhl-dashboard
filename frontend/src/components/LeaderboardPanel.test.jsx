@@ -219,6 +219,12 @@ describe("LeaderboardPanel", () => {
       expect(cardList("goalies").getByText("+1.92")).toBeInTheDocument();
     });
 
+    it("puts a skater's goals, assists, and ice time on one line under the name", () => {
+      render(<LeaderboardPanel players={[player({ first_name: "Leon", last_name: "Draisaitl", team_abbrev: "EDM", position_code: "C", goals: 12, assists: 14, avg_toi_seconds: 1294 })]} onSelectPlayer={vi.fn()} />);
+      const row = cardList().getByRole("button", { name: /open leon draisaitl profile/i });
+      expect(row.querySelector(".leaderboard-row-player small")).toHaveTextContent("EDM · C12 G14 A21:34 TOI");
+    });
+
     it("shows an empty message when the search matches nobody", async () => {
       render(<LeaderboardPanel players={skaters} onSelectPlayer={vi.fn()} />);
 

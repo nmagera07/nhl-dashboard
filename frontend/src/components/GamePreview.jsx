@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { API_BASE } from "../config.js";
 import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
-import { winProbability } from "../utils/seasonSim.js";
+import { pregameChance } from "../utils/seasonSim.js";
 import { formatOdds } from "../utils/playoffRace.js";
 import GameLineups from "./GameLineups.jsx";
 import PregameBrief from "./PregameBrief.jsx";
@@ -73,15 +73,10 @@ function MarketView(props) {
 
 function WinProbability({ away, home, date, gameId }) {
   const { data: inputs } = useFetchWithStatus(`${API_BASE}/season-sim`);
-  const a = inputs?.teams?.[away.abbrev];
-  const h = inputs?.teams?.[home.abbrev];
-  if (!a || !h || !inputs.model) return null;
-  // The model's schedule rows: [date, home, away, home_b2b, away_b2b].
-  const row = (inputs.games || []).find(([d, hm, aw]) => d === date && hm === home.abbrev && aw === away.abbrev);
-  const [homeB2b, awayB2b] = row ? [Boolean(row[3]), Boolean(row[4])] : [false, false];
-  const tired = [homeB2b && home.abbrev, awayB2b && away.abbrev].filter(Boolean);
-  const homeWin = winProbability(h.rating, a.rating, inputs.model, homeB2b, awayB2b);
-  const homePct = Math.round(homeWin * 100);
+  const chance = pregameChance(inputs, date, home.abbrev, away.abbrev);
+  if (!chance) return null;
+  const tired = [chance.homeB2b && home.abbrev, chance.awayB2b && away.abbrev].filter(Boolean);
+  const homePct = Math.round(chance.home * 100);
   return (
     <section className="boxscore-card preview-odds" aria-label="Win probability">
       <h2>Win probability</h2>
@@ -101,7 +96,7 @@ function WinProbability({ away, home, date, gameId }) {
         A lean, not a lock: single games are close to coin flips.{" "}
         <Link className="accent-link" to="/track-record">How the model&apos;s done ›</Link>
       </p>
-      <MarketView gameId={gameId} date={date} away={away} home={home} homeWin={homeWin} />
+      <MarketView gameId={gameId} date={date} away={away} home={home} homeWin={chance.home} />
     </section>
   );
 }

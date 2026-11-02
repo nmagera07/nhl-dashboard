@@ -96,7 +96,7 @@
 .chat-markdown-heading { margin-top: 10px !important; }
 .chat-markdown code { padding: 1px 4px; border-radius: 4px; background: var(--bg); font-size: 12px; }
 .intelligence-typing { margin: 0; color: var(--text-dim); font-style: italic; }
-.intelligence-meta { display: grid; gap: 2px; margin-top: 8px; color: var(--text-dim); font-size: 11px; }
+.intelligence-meta { display: grid; gap: 2px; margin-top: 8px; color: var(--text-dim); font-size: 12px; }
 .intelligence-model { opacity: 0.8; }
 .intelligence-error { margin: 0; color: var(--bad); font-size: 13px; }
 .intelligence-composer {
@@ -141,8 +141,8 @@
 .intelligence-footnote {
   margin: 8px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 
-.chat-divider { align-self: center; margin: 4px 0; padding: 2px 10px; border-radius: 999px; background: var(--neutral-soft); color: var(--text-dim); font-size: 11px; font-weight: 600; }
+.chat-divider { align-self: center; margin: 4px 0; padding: 2px 10px; border-radius: 999px; background: var(--neutral-soft); color: var(--text-dim); font-size: 12px; font-weight: 600; }

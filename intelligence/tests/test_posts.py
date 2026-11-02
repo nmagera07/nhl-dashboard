@@ -74,3 +74,28 @@ async def test_no_draft_when_the_rewrite_fails_too():
     post, draft = await draft_post(chain(("PICK: odds-FLA\nX: x\nREDDIT: r", "PICK: odds-FLA\nX: x\nREDDIT: r"), []),
                                    Runner(), "2026-10-27", CANDIDATES)
     assert post is None and draft.problems
+
+
+HISTORY = [
+    {"day": "2026-10-29", "story": "Swing of the Night", "passed_over": ["Upset"], "draft": "Long draft with 7 numbers.",
+     "outcome": "edited", "posted": "Short one."},
+    {"day": "2026-10-30", "story": "Upset", "draft": "Upset draft.", "outcome": "skipped"},
+]
+
+
+def test_learned_tallies_and_lists_each_day():
+    text = posts.learned(HISTORY)
+    assert "Posted by kind of story: Swing of the Night 1 of 1; Upset 0 of 1." in text
+    assert '- 2026-10-29 Swing of the Night (over Upset): edited. Draft: "Long draft with 7 numbers." Posted: "Short one."' in text
+    assert '- 2026-10-30 Upset: skipped. Draft: "Upset draft."' in text
+    assert posts.learned([]) == ""
+
+
+@pytest.mark.asyncio
+async def test_history_goes_in_the_instructions_not_the_sources():
+    calls = []
+    post, draft = await draft_post(chain((GOOD,), calls), Runner(), "2026-10-27", CANDIDATES, HISTORY)
+    system, prompt = calls[0][1]["messages"][0]["content"], calls[0][1]["messages"][1]["content"]
+    assert "Short one." in system and "Short one." not in prompt
+    # A number only in a past post isn't a source for tonight's.
+    assert any("7" in p for p in check(GOOD.replace("from 1% to 50%", "from 7% to 50%"), SOURCES))

@@ -93,7 +93,7 @@ def test_share_text_and_card(client, monkeypatch):
     monkeypatch.setattr(api, "value_of_the_night", lambda day: VALUE)
     body = client.get("/value-of-the-night/2026-10-29/share").json()
     assert body["title"] == "Closest to value, Oct 29: MTL +142 (to win)"
-    assert body["description"] == ("MTL @ DAL: PuckPulse 42% vs. the books' 41%, expected return +1%. "
+    assert body["description"] == ("MTL @ DAL: PuckPulse's fair chance 42% vs. the books' 41%, expected return +1%. "
                                    "This season: 7-6, +3.16u, beat the close 5 of 12. Not betting advice. 21+.")
     assert body["image"].endswith("/og/value/2026-10-29.png")
     image = client.get("/og/value/2026-10-29.png")

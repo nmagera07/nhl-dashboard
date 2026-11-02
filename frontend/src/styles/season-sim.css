@@ -27,7 +27,7 @@
 .sim-result { display: grid; gap: 14px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 .sim-final { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .sim-final > div { display: grid; gap: 2px; }
-.sim-kicker { color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.sim-kicker { color: var(--text-dim); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .sim-record { font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .sim-points { color: var(--text-dim); font-size: 13px; }
 .sim-outcome { padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
@@ -47,6 +47,6 @@
 .sim-histogram-bars { position: relative; height: 64px; border-bottom: 1px solid var(--border); }
 .sim-bar { position: absolute; bottom: 0; box-sizing: border-box; border-left: 1px solid var(--card); background: var(--text-faint); }
 .sim-bar-mark { background: var(--accent); }
-.sim-histogram-axis { display: flex; justify-content: space-between; margin-top: 4px; color: var(--text-dim); font-size: 11px; }
+.sim-histogram-axis { display: flex; justify-content: space-between; margin-top: 4px; color: var(--text-dim); font-size: 12px; }
 .my-team-sim-link { margin-right: auto; margin-left: 4px; color: var(--accent); font-weight: 700; text-decoration: none; }
 .my-team-sim-link:hover { text-decoration: underline; }

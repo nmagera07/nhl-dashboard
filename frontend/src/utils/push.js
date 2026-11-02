@@ -83,7 +83,7 @@ export function captureCreatorKey(location = window.location, history = window.h
   return true;
 }
 
-function creatorKey() {
+export function creatorKey() {
   try {
     return window.localStorage.getItem(CREATOR_KEY);
   } catch {

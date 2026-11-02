@@ -6,6 +6,8 @@ import { teamLogo } from "../utils/teamLogo.js";
 import { todayISO } from "../utils/dates.js";
 import { cachedResponse, rememberResponse } from "../utils/responseCache.js";
 import { nhlVideoUrl } from "../utils/highlights.js";
+import { pregameChance } from "../utils/seasonSim.js";
+import { useFetchWithStatus } from "../hooks/useFetchWithStatus.js";
 import FavoriteStar from "./FavoriteStar.jsx";
 
 const scoresUrl = (date) => `${API_BASE}/games/date/${date || todayISO()}`;
@@ -16,7 +18,8 @@ function networks(game) {
   return [...new Set(names)].slice(0, 2).join(", ");
 }
 
-function TeamLine({ team, phase: gamePhase, isWinner, isLoser }) {
+// chance: PuckPulse's pregame chance for this team (upcoming games only).
+function TeamLine({ team, phase: gamePhase, isWinner, isLoser, chance }) {
   const showScore = gamePhase !== "upcoming";
   return (
     <span className={`game-card-team${isWinner ? " is-winner" : ""}${isLoser ? " is-loser" : ""}`}>
@@ -24,11 +27,12 @@ function TeamLine({ team, phase: gamePhase, isWinner, isLoser }) {
       <span className="game-card-abbrev">{team?.abbrev || "—"}</span>
       {gamePhase === "upcoming" && team?.record && <span className="game-card-record">{team.record}</span>}
       {showScore && <strong className="game-card-score">{team?.score ?? 0}</strong>}
+      {!showScore && chance != null && <span className="game-card-chance">{Math.round(chance * 100)}%</span>}
     </span>
   );
 }
 
-function GameCard({ game, onOpen, mine }) {
+function GameCard({ game, onOpen, mine, inputs }) {
   const p = phase(game);
   const away = game.awayTeam;
   const home = game.homeTeam;
@@ -36,6 +40,8 @@ function GameCard({ game, onOpen, mine }) {
   const awayWon = decided && away.score > home.score;
   const tv = p === "upcoming" ? networks(game) : "";
   const recap = p === "final" ? nhlVideoUrl(game.threeMinRecap) : null;
+  const chance = p === "upcoming" ? pregameChance(inputs, game.gameDate, home?.abbrev, away?.abbrev) : null;
+  const odds = chance ? `, PuckPulse: ${away?.abbrev} ${Math.round((1 - chance.home) * 100)}%, ${home?.abbrev} ${Math.round(chance.home * 100)}%` : "";
 
   return (
     <div className="game-card-wrap">
@@ -43,7 +49,7 @@ function GameCard({ game, onOpen, mine }) {
         className={`scoreboard-game game-card-${p}${mine ? " game-card-mine" : ""}`}
         type="button"
         onClick={onOpen}
-        aria-label={`${away?.abbrev} at ${home?.abbrev}, ${statusLabel(game)}`}
+        aria-label={`${away?.abbrev} at ${home?.abbrev}, ${statusLabel(game)}${odds}`}
       >
         <span className="game-card-status">
           {p === "live" && <span className="live-dot" />}
@@ -51,8 +57,8 @@ function GameCard({ game, onOpen, mine }) {
           {tv && <span className="game-card-tv">{tv}</span>}
           {mine && <FavoriteStar />}
         </span>
-        <TeamLine team={away} phase={p} isWinner={decided && awayWon} isLoser={decided && !awayWon} />
-        <TeamLine team={home} phase={p} isWinner={decided && !awayWon} isLoser={decided && awayWon} />
+        <TeamLine team={away} phase={p} isWinner={decided && awayWon} isLoser={decided && !awayWon} chance={chance && 1 - chance.home} />
+        <TeamLine team={home} phase={p} isWinner={decided && !awayWon} isLoser={decided && awayWon} chance={chance?.home} />
       </button>
       {/* A sibling, not inside the button: links can't nest in buttons. */}
       {recap && (
@@ -116,6 +122,11 @@ export default function Scoreboard({ date = null, pinTeams = [] }) {
     return () => { active = false; if (timer) window.clearInterval(timer); };
   }, [date]);
 
+  // PuckPulse's pregame chances for upcoming games: the same model inputs the
+  // game page and pick'em use (small, and cached), fetched only when needed.
+  const anyUpcoming = games.some((g) => phase(g) === "upcoming");
+  const { data: inputs } = useFetchWithStatus(anyUpcoming ? `${API_BASE}/season-sim` : null);
+
   // Remember which day we came from, so the box score's back link returns there.
   const openGame = (id) => navigate(`/games/${id}`, { state: { from: `${location.pathname}${location.search}` } });
 
@@ -128,7 +139,7 @@ export default function Scoreboard({ date = null, pinTeams = [] }) {
       )}
       <div className="scoreboard-games">
         {orderGames(games, pinTeams).map((game) => (
-          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)} mine={pinRank(game, pinTeams) >= 0} />
+          <GameCard key={game.id} game={game} onOpen={() => openGame(game.id)} mine={pinRank(game, pinTeams) >= 0} inputs={inputs} />
         ))}
       </div>
     </section>

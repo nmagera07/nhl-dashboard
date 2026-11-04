@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import run_daily_ingest
-from run_daily_ingest import run_all
+from run_daily_ingest import retry_failed, run_all
 
 
 def _fake_runner(exit_codes):
@@ -54,6 +54,21 @@ class TestRunAll:
         assert len(calls) == 12
 
 
+class TestRetryFailed:
+    def test_a_script_that_works_the_second_time_is_not_a_failure(self):
+        runner, calls = _fake_runner({"game_predictions.py": 0, "market_odds.py": 1})
+
+        assert retry_failed(["game_predictions.py", "market_odds.py"], started=0, runner=runner, clock=lambda: 60) == ["market_odds.py"]
+        assert [cmd[-1] for cmd in calls] == ["game_predictions.py", "market_odds.py"]
+
+    def test_no_retry_once_the_run_is_near_the_job_timeout(self):
+        runner, calls = _fake_runner({"game_predictions.py": 0})
+
+        late = run_daily_ingest.RETRY_UNTIL_SECONDS + 1
+        assert retry_failed(["game_predictions.py"], started=0, runner=runner, clock=lambda: late) == ["game_predictions.py"]
+        assert calls == []
+
+
 @pytest.fixture
 def pings(monkeypatch):
     """Records heartbeat pings instead of sending them."""
@@ -66,12 +81,21 @@ def pings(monkeypatch):
 class TestMain:
     def test_exits_non_zero_when_any_script_fails(self, monkeypatch, pings):
         monkeypatch.setattr(run_daily_ingest, "run_all", lambda: ["ingest_player_stats.py"])
+        monkeypatch.setattr(run_daily_ingest, "retry_failed", lambda failed, started: failed)
 
         with pytest.raises(SystemExit) as exc:
             run_daily_ingest.main()
 
         assert exc.value.code == 1
         assert pings == ["https://hc-ping.com/abc/start", "https://hc-ping.com/abc/fail"]
+
+    def test_succeeds_when_the_retry_fixes_every_failure(self, monkeypatch, pings):
+        monkeypatch.setattr(run_daily_ingest, "run_all", lambda: ["game_predictions.py"])
+        monkeypatch.setattr(run_daily_ingest, "retry_failed", lambda failed, started: [])
+
+        run_daily_ingest.main()
+
+        assert pings == ["https://hc-ping.com/abc/start", "https://hc-ping.com/abc"]
 
     def test_pings_start_then_success(self, monkeypatch, pings):
         monkeypatch.setattr(run_daily_ingest, "run_all", lambda: [])

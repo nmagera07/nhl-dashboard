@@ -34,6 +34,14 @@ problem shouldn't also leave rosters stale. The process exits non-zero if any
 script failed, so the job execution shows as Failed and the job's retry
 kicks in (re-running is safe, everything is upserts).
 
+Before giving up, the failed scripts get one more try at the end of the
+run. Most failures are the NHL API timing out for a few minutes (11-04:
+predictions, goalie starts, and odds all failed at 1 AM ET), and by the end
+of the run (~25 min) it's usually back. The job's own retry restarts the
+whole run instead, which then hits the 30-minute replica timeout before
+reaching the steps that failed. A retry is skipped once the run is past
+RETRY_UNTIL_SECONDS, so it can't push the run into that timeout.
+
 Heartbeat: if HEALTHCHECK_URL is set (a healthchecks.io ping URL), the
 run pings /start when it begins, the bare URL on success, and /fail on
 failure. healthchecks.io emails if a run fails, takes too long, or never
@@ -43,6 +51,7 @@ happens at all -- the last one is the case log-based alerts can't see.
 import os
 import subprocess
 import sys
+import time
 
 import requests
 
@@ -51,6 +60,10 @@ from logging_config import setup_logging
 logger = setup_logging("run_daily_ingest")
 
 HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
+
+# The job's replica timeout is 1800s; the scripts that fail on an NHL API
+# hiccup take seconds to a minute or two, so leave ~4 minutes of room.
+RETRY_UNTIL_SECONDS = 26 * 60
 
 SCRIPTS = [
     "ingest_standings.py",
@@ -81,6 +94,23 @@ def run_all(scripts=SCRIPTS, runner=subprocess.run):
     return failed
 
 
+def retry_failed(failed, started, runner=subprocess.run, clock=time.monotonic):
+    """One more try for each failed script, in run order, while there's time. Returns what still failed."""
+    still_failed = []
+    for script in failed:
+        if clock() - started > RETRY_UNTIL_SECONDS:
+            logger.warning(f"No time left to retry {script}")
+            still_failed.append(script)
+            continue
+        logger.info(f"Retrying {script}")
+        if runner([sys.executable, script]).returncode == 0:
+            logger.info(f"Finished {script} on retry")
+        else:
+            logger.error(f"{script} failed again")
+            still_failed.append(script)
+    return still_failed
+
+
 def ping(suffix="", body=None, post=None):
     """Best-effort heartbeat. Never lets a monitoring hiccup fail the run."""
     if not HEALTHCHECK_URL:
@@ -93,7 +123,10 @@ def ping(suffix="", body=None, post=None):
 
 def main():
     ping("/start")
+    started = time.monotonic()
     failed = run_all()
+    if failed:
+        failed = retry_failed(failed, started)
     if failed:
         message = f"Daily ingest finished with failures: {', '.join(failed)}"
         logger.error(message)

@@ -3,10 +3,10 @@ defusedxml==0.7.1  # parsing third-party RSS feeds (news.py)
 psycopg2-binary==2.9.13
 pillow==13.0.0          # link preview images (og_image.py)
 python-dotenv==1.2.4
-fastapi==0.156.4
+fastapi==0.162.0
 uvicorn[standard]==0.54.0
 gunicorn==26.2.0
 slowapi==0.1.10
-sentry-sdk==2.72.0
+sentry-sdk==2.73.0
 pywebpush==2.5.0
 numpy==2.5.4        # war_v2.py / rapm.py (the nightly WAR step); also train_xg.py

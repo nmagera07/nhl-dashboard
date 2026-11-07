@@ -64,15 +64,34 @@ describe("StandingsTable", () => {
     expect(within(rendered[1]).getByText("COL")).toBeInTheDocument();
   });
 
-  it("trusts the given row order (does not re-sort) when a sort is active", () => {
-    // rows arrive pre-sorted by the API in this case -- COL first despite
-    // its higher division_sequence -- the table must not silently
-    // override that with its own division-rank sort.
-    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy="xgoals_for_pct" sortDir="desc" onSort={vi.fn()} />);
+  it("sorts by the active column and ranks by place in it", () => {
+    const league = [
+      team({ team_abbrev: "PIT", team_name: "Pittsburgh Penguins", league_sequence: 1, goal_for: 40 }),
+      team({ team_abbrev: "COL", team_name: "Colorado Avalanche", league_sequence: 2, goal_for: 55 }),
+      team({ team_abbrev: "SJS", team_name: "San Jose Sharks", league_sequence: 3, goal_for: 31 }),
+    ];
+    render(<StandingsTable rows={league} rankBy="league_sequence" onSelectTeam={vi.fn()} sortBy="goal_for" sortDir="desc" onSort={vi.fn()} />);
 
     const rendered = dataRows();
-    expect(within(rendered[0]).getByText("COL")).toBeInTheDocument();
-    expect(within(rendered[1]).getByText("PIT")).toBeInTheDocument();
+    expect(rendered.map((r) => within(r).getByText(/^(PIT|COL|SJS)$/).textContent)).toEqual(["COL", "PIT", "SJS"]);
+    expect(within(rendered[0]).getAllByRole("cell")[0]).toHaveTextContent("1");
+  });
+
+  it("sorts PO% from the playoff odds, missing odds last either way", () => {
+    const odds = { PIT: 0.3, COL: 0.9 };
+    const three = [rows[0], rows[1], team({ team_abbrev: "SJS", team_name: "San Jose Sharks", division_sequence: 3, league_sequence: 30 })];
+    render(<StandingsTable rows={three} playoffOddsByTeam={odds} onSelectTeam={vi.fn()} sortBy="playoff_odds" sortDir="asc" onSort={vi.fn()} />);
+
+    expect(dataRows().map((r) => within(r).getByText(/^(PIT|COL|SJS)$/).textContent)).toEqual(["PIT", "COL", "SJS"]);
+  });
+
+  it("clicking a standard-stat column header calls onSort with that column's key", async () => {
+    const onSort = vi.fn();
+    render(<StandingsTable rows={rows} onSelectTeam={vi.fn()} sortBy={null} sortDir="desc" onSort={onSort} />);
+
+    await userEvent.click(screen.getByRole("columnheader", { name: /GF/ }));
+
+    expect(onSort).toHaveBeenCalledWith("goal_for");
   });
 
   it("clicking an advanced-stat column header calls onSort with that column's key", async () => {

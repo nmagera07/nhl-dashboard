@@ -38,6 +38,39 @@ function formatAdvancedValue(key, value) {
   return value; // shots_on_goal_for/against are plain integer counts
 }
 
+// Sorted here, not by the API: every row already has every stat, and PO%
+// comes from the playoff odds, not the standings. Ties keep league order,
+// and a missing value sorts last either way.
+function sortValue(row, key, playoffOddsByTeam) {
+  const value = key === "playoff_odds" ? playoffOddsByTeam?.[row.team_abbrev] : row[key];
+  return value == null ? null : Number(value);
+}
+
+function sortRows(rows, sortBy, sortDir, playoffOddsByTeam) {
+  const sign = sortDir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const x = sortValue(a, sortBy, playoffOddsByTeam);
+    const y = sortValue(b, sortBy, playoffOddsByTeam);
+    if (x === y) return a.league_sequence - b.league_sequence;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return sign * (x - y);
+  });
+}
+
+function SortHeader({ sortKey, sortBy, sortDir, onSort, className = "", children }) {
+  const active = sortKey === sortBy;
+  return (
+    <th
+      className={`${className} sortable-col${active ? " sortable-col-active" : ""}`.trim()}
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+      onClick={() => onSort(sortKey)}
+    >
+      {children}{active ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+    </th>
+  );
+}
+
 function TeamCell({ row, following }) {
   return (
     <td className="col-team">
@@ -55,11 +88,11 @@ function TeamCell({ row, following }) {
 // division tab, not searching): the top 3 are in, the rest race for the wild cards.
 function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir, onSort, view = "standard", rankBy = "division_sequence", cutoff = false }) {
   const [following] = useFollowedTeams();
-  // Rows arrive already ordered by the API when a column sort is active
-  // (?sort_by=... on GET /standings/latest) -- only fall back to the
-  // default division-rank ordering when no custom sort is in effect.
   // Copy before sorting so this never mutates the rows prop in place.
-  const displayRows = sortBy ? rows : [...rows].sort((a, b) => a[rankBy] - b[rankBy]);
+  const displayRows = sortBy ? sortRows(rows, sortBy, sortDir, playoffOddsByTeam) : [...rows].sort((a, b) => a[rankBy] - b[rankBy]);
+  // While sorted by a stat, the rank is the place in that stat.
+  const rank = (row, i) => (sortBy ? i + 1 : row[rankBy]);
+  const sort = { sortBy, sortDir, onSort };
   const advanced = view === "advanced";
   // rank + team + the view's stat columns
   const columnCount = 2 + (advanced ? 2 + ADVANCED_SORT_COLUMNS.length : 12);
@@ -72,32 +105,26 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
           <tr>
             <th className="col-rank"></th>
             <th className="col-team">TEAM</th>
-            <th><StatAbbr term="GP" /></th>
+            <SortHeader sortKey="games_played" {...sort}><StatAbbr term="GP" /></SortHeader>
             {advanced ? (
               <>
-                <th className="col-pts"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
+                <SortHeader sortKey="points" className="col-pts" {...sort}><StatAbbr term="TEAM_PTS">PTS</StatAbbr></SortHeader>
                 {ADVANCED_SORT_COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    className={col.key === sortBy ? "sortable-col sortable-col-active" : "sortable-col"}
-                    onClick={() => onSort(col.key)}
-                  >
-                    <StatAbbr term={col.label} />{col.key === sortBy ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
-                  </th>
+                  <SortHeader key={col.key} sortKey={col.key} {...sort}><StatAbbr term={col.label} /></SortHeader>
                 ))}
               </>
             ) : (
               <>
-                <th><StatAbbr term="W" /></th>
-                <th><StatAbbr term="TEAM_L">L</StatAbbr></th>
-                <th><StatAbbr term="OT" /></th>
-                <th className="col-pts"><StatAbbr term="TEAM_PTS">PTS</StatAbbr></th>
-                <th><StatAbbr term="GF" /></th>
-                <th><StatAbbr term="GA" /></th>
-                <th><StatAbbr term="DIFF" /></th>
+                <SortHeader sortKey="wins" {...sort}><StatAbbr term="W" /></SortHeader>
+                <SortHeader sortKey="losses" {...sort}><StatAbbr term="TEAM_L">L</StatAbbr></SortHeader>
+                <SortHeader sortKey="ot_losses" {...sort}><StatAbbr term="OT" /></SortHeader>
+                <SortHeader sortKey="points" className="col-pts" {...sort}><StatAbbr term="TEAM_PTS">PTS</StatAbbr></SortHeader>
+                <SortHeader sortKey="goal_for" {...sort}><StatAbbr term="GF" /></SortHeader>
+                <SortHeader sortKey="goal_against" {...sort}><StatAbbr term="GA" /></SortHeader>
+                <SortHeader sortKey="goal_differential" {...sort}><StatAbbr term="DIFF" /></SortHeader>
                 <th><StatAbbr term="L10" /></th>
                 <th><StatAbbr term="STRK" /></th>
-                <th className="col-po" title="Playoff odds from a daily Monte Carlo simulation"><StatAbbr term="PO%" /></th>
+                <SortHeader sortKey="playoff_odds" className="col-po" {...sort}><StatAbbr term="PO%" /></SortHeader>
               </>
             )}
           </tr>
@@ -110,9 +137,9 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
               </td>
             </tr>
           )}
-          {displayRows.map((row) => (
+          {displayRows.map((row, i) => (
             <tr key={row.team_abbrev} onClick={() => onSelectTeam(row.team_abbrev)}>
-              <td className="col-rank">{row[rankBy]}</td>
+              <td className="col-rank">{rank(row, i)}</td>
               <TeamCell row={row} following={following} />
               <td>{row.games_played}</td>
               {advanced ? (
@@ -159,7 +186,7 @@ function StandingsTable({ rows, onSelectTeam, playoffOddsByTeam, sortBy, sortDir
               aria-label={`Open ${row.team_name} team page`}
               onClick={() => onSelectTeam(row.team_abbrev)}
             >
-              <span className="standings-row-rank">{row[rankBy]}</span>
+              <span className="standings-row-rank">{rank(row, i)}</span>
               {row.logo_url ? <img className="standings-row-logo" src={teamLogo(row.logo_url)} alt="" /> : <span className="standings-row-logo" />}
               <span className="standings-row-team">
                 <strong>{row.team_name}{following.includes(row.team_abbrev) && <FavoriteStar />}</strong>

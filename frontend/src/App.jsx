@@ -85,16 +85,10 @@ export default function NHLDashboard() {
   // (team logos pick their version by theme as they render).
   const [theme, toggleTheme] = useTheme();
 
-  const standingsUrl = standingsSortBy
-    ? `${API_BASE}/standings/latest?sort_by=${standingsSortBy}&sort_dir=${standingsSortDir}`
-    : `${API_BASE}/standings/latest`;
-
-  const { data: standings, status } = useFetchWithStatus(standingsUrl, {
+  const { data: standings, status } = useFetchWithStatus(`${API_BASE}/standings/latest`, {
     initialData: [],
     onSuccess: (data) => {
-      // Only seed the default division tab on first load -- re-fetches
-      // triggered by clicking a sortable column reorder the same teams,
-      // they don't mean "switch the user's selected division tab."
+      // Only seed the default division tab on first load, not on a re-fetch.
       if (activeDivision != null) return;
       const division = defaultDivision(data, favoriteTeam);
       if (division) setActiveDivision(division);
@@ -121,7 +115,7 @@ export default function NHLDashboard() {
   // the sort -- otherwise teams would stay ordered by a hidden column.
   const handleStandingsViewChange = (view) => {
     setStandingsView(view);
-    if (view === "standard") setStandingsSortBy(null);
+    setStandingsSortBy(null); // the views have different columns
   };
 
   const intelligenceContext = useMemo(() => {

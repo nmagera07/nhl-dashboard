@@ -9,6 +9,7 @@ draft that still fails comes back as text None for the caller to fall back.
 import asyncio
 from dataclasses import dataclass, field
 
+from . import tracing
 from .providers import ProviderChain, echo_tool_call
 
 
@@ -40,7 +41,8 @@ async def research_and_write(chain: ProviderChain, runner, instructions: str, pr
         if not calls:
             break
         messages.append({"role": "assistant", "content": message.content, "tool_calls": [echo_tool_call(c) for c in calls]})
-        outputs = await asyncio.gather(*(runner.run(c.function.name, c.function.arguments) for c in calls))
+        trace = tracing.current()
+        outputs = await asyncio.gather(*(tracing.tool(trace, runner, c.function.name, c.function.arguments) for c in calls))
         for call, output in zip(calls, outputs):
             messages.append({"role": "tool", "tool_call_id": call.id, "content": output})
             results.append(output)
@@ -48,14 +50,25 @@ async def research_and_write(chain: ProviderChain, runner, instructions: str, pr
 
     sources = "\n".join([prompt, *results])
     text = (message.content or "").strip()
-    problems = first_problems = check(text, sources)
+    problems = first_problems = _checked(check, text, sources, "check")
     if problems:
         messages += [{"role": "assistant", "content": text},
                      {"role": "user", "content": "Fix these problems and reply with only the corrected text:\n- "
                       + "\n- ".join(problems)}]
         message, provider, _ = await chain.complete_with_tools(messages, None, max_tokens, start=start)
         text = (message.content or "").strip()
-        problems = check(text, sources)
+        problems = _checked(check, text, sources, "recheck")
     if problems:
         return Draft(None, provider.label, problems, used, first_problems)
     return Draft(text, provider.label, [], used, first_problems)
+
+
+def _checked(check, text: str, sources: str, name: str) -> list[str]:
+    """Run the code checks on a draft, as a guardrail step in the trace."""
+    problems = check(text, sources)
+    step = tracing.current().child(name, as_type="guardrail", input=text)
+    if problems:
+        step.end(output={"problems": problems}, level="WARNING", status_message=f"{len(problems)} problem(s)")
+    else:
+        step.end(output={"problems": []})
+    return problems

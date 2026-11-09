@@ -19,7 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
-from . import briefs, investigate, posts, usage
+from . import briefs, investigate, posts, tracing, usage
 from .config import Settings, get_settings
 from .dashboard import ContextBundle, DashboardClient, DashboardUnavailable
 from .providers import AllProvidersFailed, ProviderChain, echo_tool_call as _echo
@@ -267,6 +267,27 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     async def run_agent(self, request: ChatRequest):
+        """_agent_steps(), as one trace: the question in, the answer out, every model and tool call inside."""
+        trace = tracing.start("chat", input=request.message, metadata={
+            "context": request.context.model_dump(exclude_none=True), "history_turns": len(request.history),
+        })
+        try:
+            async for event in self._agent_steps(request, trace):
+                if event[0] == "answer":
+                    _, text, provider, evidence = event
+                    trace.end(output=text, metadata={"answered_by": provider.label,
+                                                     "evidence": [e["label"] for e in evidence]})
+                yield event
+        except GeneratorExit:  # the reader stopped early (after the answer, or the visitor left)
+            trace.fail("stopped before the answer", level="WARNING")
+            raise
+        except BaseException as exc:
+            trace.fail(type(exc).__name__)
+            raise
+        finally:
+            trace.end()
+
+    async def _agent_steps(self, request: ChatRequest, trace: tracing.Span):
         """
         The agent loop. The model sees the page data and the tools; each round
         it either answers or asks for tools, which run here (in parallel) and
@@ -291,7 +312,7 @@ class IntelligenceService:
                 messages.append({"role": "user", "content": "Answer now using the results you have; no more tools."})
             streamed = False
             async for event in self.chain.stream_with_tools(
-                messages, None if last_round else TOOLS, self.settings.max_output_tokens, start=start,
+                messages, None if last_round else TOOLS, self.settings.max_output_tokens, start=start, trace=trace,
             ):
                 if event[0] == "text":
                     streamed = True
@@ -310,7 +331,7 @@ class IntelligenceService:
                 yield ("tool", status)
                 if not any(e["label"] == source for e in evidence):
                     evidence.append({"label": source, "endpoint": f"tool:{call.function.name}"})
-            results = await asyncio.gather(*(runner.run(c.function.name, c.function.arguments) for c in calls))
+            results = await asyncio.gather(*(tracing.tool(trace, runner, c.function.name, c.function.arguments) for c in calls))
             messages.extend({"role": "tool", "tool_call_id": c.id, "content": r} for c, r in zip(calls, results))
             for c, r in zip(calls, results):
                 yield ("tool_result", c.function.name, c.function.arguments, r)
@@ -389,8 +410,9 @@ class IntelligenceService:
             # Reasoning models (Groq's gpt-oss) think from the same budget they
             # write from: at 600 tokens the digest came back empty, and cutting
             # reasoning effort instead made the evals catch it garbling facts.
-            with usage.purpose("digest"):
+            with usage.purpose("digest"), tracing.job("digest", input=facts) as trace:
                 message, provider, _ = await self.chain.complete_with_tools(messages, None, DIGEST_MAX_TOKENS)
+                trace.update(output=message.content, metadata={"answered_by": provider.label})
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DigestResponse(text=(message.content or "").strip(), model=provider.label)
@@ -403,8 +425,9 @@ class IntelligenceService:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         game = briefs.Game(request.game_id, request.away, request.home, request.date)
         try:
-            with usage.purpose("brief"):
+            with usage.purpose("brief"), tracing.job("brief", input=request.model_dump()) as trace:
                 brief = await briefs.write_brief(chain, ToolRunner(self.dashboard), game, today_eastern())
+                trace.update(output=brief.text, metadata={"answered_by": brief.model, "problems": brief.problems})
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=brief.text, model=brief.model, problems=brief.problems, tools=brief.tools)
@@ -416,9 +439,11 @@ class IntelligenceService:
         if len(json.dumps(candidates)) > MAX_DIGEST_FACTS_CHARS:
             raise HTTPException(status_code=413, detail="Too many facts for one post.")
         try:
-            with usage.purpose("post"):
+            with usage.purpose("post"), tracing.job("post", input={"date": request.date, "candidates": candidates,
+                                                                    "history_days": len(request.history)}) as trace:
                 post, draft = await posts.draft_post(self.chain, ToolRunner(self.dashboard), request.date, candidates,
                                                    [h.model_dump(exclude_none=True) for h in request.history])
+                trace.update(output=post, metadata={"answered_by": draft.model, "problems": draft.problems})
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return PostResponse(pick=post and post["pick"], x_text=post and post["x"], reddit_title=post and post["reddit"],
@@ -428,8 +453,9 @@ class IntelligenceService:
         if not self.chain:
             raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
         try:
-            with usage.purpose("investigate"):
+            with usage.purpose("investigate"), tracing.job("investigate", input=report.model_dump()) as trace:
                 draft = await investigate.explain(self.chain, self.lookups, report.model_dump())
+                trace.update(output=draft.text, metadata={"answered_by": draft.model, "problems": draft.problems})
         except AllProvidersFailed as exc:
             raise HTTPException(status_code=503, detail=ALL_BUSY) from exc
         return DraftResponse(text=draft.text, model=draft.model, problems=draft.problems, tools=draft.tools)
@@ -437,6 +463,7 @@ class IntelligenceService:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    tracing.configure()
     service = IntelligenceService(get_settings())
     app.state.intelligence = service
     # Connect to the AI providers and the API in the background, so the first
@@ -445,6 +472,7 @@ async def lifespan(app: FastAPI):
     yield
     warming.cancel()
     await service.dashboard.aclose()
+    tracing.shutdown()
 
 
 settings = get_settings()

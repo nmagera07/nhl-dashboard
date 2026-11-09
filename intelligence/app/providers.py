@@ -31,7 +31,7 @@ from typing import Mapping
 import httpx
 from openai import AsyncOpenAI, OpenAIError
 
-from . import usage
+from . import tracing, usage
 
 logger = logging.getLogger(__name__)
 
@@ -151,17 +151,22 @@ class ProviderChain:
         status = getattr(exc, "status_code", None)
         return f"HTTP {status}" if status else type(exc).__name__
 
-    async def complete_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0):
+    async def complete_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0,
+                                  trace: tracing.Span | None = None):
         """
         One agent turn: the reply message (text and/or tool calls) and the
         provider that gave it, plus its index so later turns of the same
         question start there (a provider that just failed isn't retried
         every round). The message list is plain OpenAI format, so a turn
         that falls back mid-conversation continues it on the next provider.
+        Each attempt is a generation in the trace (the given one, else
+        tracing.current()), failures included.
         """
+        parent = trace if trace is not None else tracing.current()
         for index in range(start, len(self.providers)):
             provider = self.providers[index]
             for attempt in (1, 2):
+                generation = self._generation(parent, provider, messages, tools, max_tokens, attempt)
                 try:
                     extra = {"tools": tools} if tools else {}
                     response = await self._client(provider).chat.completions.create(
@@ -169,11 +174,15 @@ class ProviderChain:
                     )
                     usage.record(provider, getattr(response, "usage", None))
                     message = response.choices[0].message if response.choices else None
+                    details = tracing.usage_details(getattr(response, "usage", None))
                     if message and (message.tool_calls or (message.content or "").strip()):
+                        generation.end(output=tracing.reply(message), usage_details=details)
                         return message, provider, index
+                    generation.end(usage_details=details, level="WARNING", status_message="empty turn")
                     logger.warning("%s returned an empty turn; trying the next provider", provider.name)
                     break
                 except OpenAIError as exc:
+                    generation.fail(self._why(exc))
                     # Groq rejects a turn (HTTP 400 "tool_use_failed") when the
                     # model writes a malformed tool call; it's a sampling
                     # hiccup, and asking again usually works.
@@ -182,33 +191,43 @@ class ProviderChain:
                         continue
                     logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
                     break
+                except BaseException as exc:  # cancelled, or a bug: still close the step
+                    generation.fail(type(exc).__name__)
+                    raise
         raise AllProvidersFailed()
 
-    async def stream_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0):
+    async def stream_with_tools(self, messages: list[dict], tools: list[dict], max_tokens: int, start: int = 0,
+                                trace: tracing.Span | None = None):
         """
         complete_with_tools(), streamed: yields ("text", piece) as the
         answer is written, then ("done", message, provider, index). Falls
         back to the next provider like complete_with_tools() as long as no
         text has gone out yet; a failure after that is re-raised (the
-        caller reports a mid-answer failure).
+        caller reports a mid-answer failure). Traced like complete_with_tools(),
+        with the time the first piece arrived (time to first token).
         """
+        parent = trace if trace is not None else tracing.current()
         for index in range(start, len(self.providers)):
             provider = self.providers[index]
             for attempt in (1, 2):
                 emitted = False
+                generation = self._generation(parent, provider, messages, tools, max_tokens, attempt)
                 try:
                     extra = {"tools": tools} if tools else {}
                     stream = await self._client(provider).chat.completions.create(
                         model=provider.model, messages=messages, max_tokens=max_tokens, stream=True,
                         stream_options={"include_usage": True}, **extra,  # usage arrives in the last chunk
                     )
-                    text, calls = [], {}
+                    text, calls, details, first = [], {}, None, None
                     async for chunk in stream:
                         usage.record(provider, getattr(chunk, "usage", None))
+                        details = tracing.usage_details(getattr(chunk, "usage", None)) or details
                         delta = chunk.choices[0].delta if chunk.choices else None
                         if delta is None:
                             continue
                         piece = getattr(delta, "content", None)
+                        if (piece or getattr(delta, "tool_calls", None)) and first is None:
+                            first = tracing.now()
                         if piece:
                             text.append(piece)
                             emitted = True
@@ -217,11 +236,14 @@ class ProviderChain:
                             _merge_tool_call(calls, call)
                     message = StreamedMessage("".join(text) or None, [StreamedToolCall(c) for c in calls.values()] or None)
                     if message.tool_calls or (message.content or "").strip():
+                        generation.end(output=tracing.reply(message), usage_details=details, completion_start_time=first)
                         yield ("done", message, provider, index)
                         return
+                    generation.end(usage_details=details, level="WARNING", status_message="empty turn")
                     logger.warning("%s returned an empty turn; trying the next provider", provider.name)
                     break
                 except OpenAIError as exc:
+                    generation.fail(self._why(exc) + (" mid-answer" if emitted else ""))
                     if emitted:
                         raise
                     if attempt == 1 and self._malformed_tool_call(exc):
@@ -229,7 +251,20 @@ class ProviderChain:
                         continue
                     logger.warning("%s failed (%s); trying the next provider", provider.name, self._why(exc))
                     break
+                except BaseException as exc:  # the reader went away (GeneratorExit), cancelled, or a bug
+                    generation.fail(type(exc).__name__, level="WARNING" if isinstance(exc, GeneratorExit) else "ERROR")
+                    raise
         raise AllProvidersFailed()
+
+    @staticmethod
+    def _generation(parent, provider: Provider, messages, tools, max_tokens: int, attempt: int):
+        """One model call as a step of the trace: the exact messages sent, which tools were offered."""
+        return parent.child(
+            provider.name, as_type="generation", model=provider.model, input=messages,
+            model_parameters={"max_tokens": max_tokens},
+            metadata={"provider": provider.label, "attempt": attempt,
+                      "tools_offered": [t["function"]["name"] for t in tools or []]},
+        )
 
     @staticmethod
     def _malformed_tool_call(exc: Exception) -> bool:

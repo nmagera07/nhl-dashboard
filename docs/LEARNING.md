@@ -227,6 +227,64 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-11-08 — Langfuse: seeing what the AI actually did
+
+**What it is.** Langfuse is an "LLM observability" tool: a place where every AI request
+gets recorded as a *trace*, which is a timed tree of everything that happened for one question
+(each model call, each tool call, the exact prompt sent, what came back, tokens, cost,
+and which provider answered). It's open source and can be self-hosted, but we'll use its
+free cloud plan: 50,000 units a month (each trace and each step inside it count as
+units), 30 days of history, no credit card.
+
+**Why PuckPulse needs it.** The AI is a chain of steps, not one call: the model picks tools,
+we run them, the model writes the answer, and if Gemini is rate-limited, Groq takes
+over. Today we only have one log line per call (`AI usage: purpose=post ... prompt=1630
+completion=86`). That tells us a call happened, but not *what* it saw or said. When
+I wanted to know whether the post agent had received my edits, we had to rebuild its prompt
+from the database by hand. A trace would have shown it in one click.
+
+**What it unlocks.**
+- *Debugging.* Open one bad answer and see exactly which tool returned what.
+- *Cost and speed per question*, not just per call (the missing item from the gap check).
+- *Evals connected to real traffic.* Our LLM-as-judge scores can be attached to traces, so
+  a low score points straight at the request that caused it.
+- *Fallback visibility.* How often Groq is actually answering instead of Gemini.
+
+**Alternatives considered.** OpenTelemetry into Azure Application Insights (standard,
+already in our cloud, but built for web requests, so prompts and tokens are awkward to read);
+LangSmith (similar, but tied to the LangChain ecosystem, which we don't use); or
+a homemade trace ID in our logs (free, but no viewer). Langfuse won because it's
+built for LLM apps, it's free at our size, and its SDK is built on OpenTelemetry, so the
+data isn't locked in.
+
+**How it's built (app/tracing.py).** The first real traced question, "Who leads the league
+in goals?", came back as a 3.0s trace: Gemini 0.82s (3,643 tokens in, 16 out, which is a tool call),
+`get_leaders` 0.93s, then Gemini 0.83s (3,850 in, 50 out, which is the answer). Three choices made it work:
+- *One place per kind of step.* Model calls are recorded inside the provider chain, so every
+  agent gets them for free, fallbacks and failures included. Tool calls are recorded where
+  the agent runs them, and the code checks on drafts are recorded as "guardrail" steps.
+- *Pass the trace by hand in the chat agent.* The chat answer is streamed by an async
+  generator (a function that pauses at every `yield`). The usual "current span" trick
+  relies on context that isn't safe to carry across those pauses, so the chat code passes
+  the trace along explicitly. The scheduled jobs are ordinary functions, so they can use
+  a `with tracing.job("post"):` block.
+- *Tracing can never break an answer.* With no keys it's a do-nothing object. Every call to
+  Langfuse is wrapped so an error is ignored, and the SDK sends traces in the background. A
+  test runs a full question against a Langfuse that throws on every call, and the answer
+  still comes back.
+
+**Interview version.** "I added LLM tracing with Langfuse, so every AI answer is a timed
+tree of model and tool calls with prompts, tokens and cost. That turned 'why did the
+agent say that?' from an afternoon of log digging into opening one trace, and it gave
+us cost and latency per question."
+
+**Likely follow-up:** "What about sensitive data in prompts?" Answer: traces store the
+full prompt, so you decide what gets sent. Ours is public hockey data and the user's
+question, with no accounts or personal info. In a company setting you'd mask fields
+before sending, or self-host Langfuse so the data never leaves your network.
+
+---
+
 ## 2026-11-01 — Redesigning the site when I'm not a designer
 
 **What happened.** The site worked, but it looked cluttered and generic, and some text was

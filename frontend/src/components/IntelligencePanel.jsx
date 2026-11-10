@@ -230,7 +230,10 @@ export default function IntelligencePanel({ context, label, topic, favoriteTeamN
           type="button"
           aria-expanded={false}
           aria-label="Ask PuckPulse"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            track("ai-panel-open", { page: context.page });
+            setOpen(true);
+          }}
           onPointerEnter={() => warmUpChat()}
           onPointerDown={() => warmUpChat()}
           onFocus={() => warmUpChat()}

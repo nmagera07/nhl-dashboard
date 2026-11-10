@@ -52,6 +52,17 @@ describe("IntelligencePanel", () => {
     expect(within(drawer).getByRole("button", { name: "How did this game go?" })).toBeInTheDocument();
   });
 
+  it("counts opening the chat in analytics, with the page it was opened on", async () => {
+    globalThis.umami = { track: vi.fn() };
+    try {
+      render(<IntelligencePanel context={{ page: "standings" }} label="the standings" />);
+      await open();
+      expect(globalThis.umami.track).toHaveBeenCalledWith("ai-panel-open", { page: "standings" });
+    } finally {
+      delete globalThis.umami;
+    }
+  });
+
   it("builds the answer from streamed pieces, dropping text the model took back", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
       Promise.resolve(String(url).endsWith("/chat/stream")

@@ -52,6 +52,15 @@ def test_better_offenses_raise_the_total_but_only_partly():
     assert high - base < 0.6 * (2 * 0.6 + 2 * 0.4)  # pulled toward the league's total
 
 
+def test_a_higher_scoring_season_raises_every_total():
+    # The same matchup (both teams average for their league) in a season
+    # scoring like 2023-26 and in one scoring 5% more.
+    usual, high = gm.LEAGUE_GOALS, gm.LEAGUE_GOALS * 1.05
+    base = gm.expected_total({"offense": usual, "defense": usual}, {"offense": usual, "defense": usual}, usual)
+    more = gm.expected_total({"offense": high, "defense": high}, {"offense": high, "defense": high}, high)
+    assert more == pytest.approx(base * 1.05)
+
+
 def test_tired_teams_score_less():
     team = {"offense": 3.0, "defense": 3.0}
     assert gm.expected_total(team, team, 3.0, home_b2b=True) < gm.expected_total(team, team, 3.0)

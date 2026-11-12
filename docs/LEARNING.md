@@ -115,6 +115,9 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   holds a read-only credential, stored as a secret).
 
 **Data and modeling**
+- Diagnosed a one-directional miss in an over/under model (it never saw the season's scoring
+  level), fixed it, and proved the gain out of sample before shipping, which showed
+  goaltending, not scoring level, was the bigger gap.
 - Built RAPM (ridge regression on 5-on-5 shift stints, with each season's ratings as the next
   season's prior) and a WAR v2 on top of it. Backtested on four seasons, it explained team
   wins better than the old WAR (r 0.909 vs. 0.888) but predicted the next season worse
@@ -224,6 +227,51 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
   preserves player history.
 - Rebuilt the live game box score by merging three NHL API endpoints in
   parallel, with graceful degradation when the optional feeds fail.
+
+---
+
+## 2026-11-12 — Totals: the model couldn't see how much the league is scoring
+
+**What happened.** The report card showed our over/under picks a little worse than the
+sportsbooks' (season Brier 0.258 vs 0.250). Before touching the model, I split the misses
+(171 graded totals). The miss went one way: we gave the over a 45% chance on average, the
+books 51%, and 53% of games went over. In the 106 games where we leaned under the books by
+more than 5 points we lost (0.263 vs 0.251); where we agreed with them we tied.
+
+**Why.** The goal model rates each team *relative to the league* ("Tampa scores 20% more
+than average"), then pulls every total toward a fixed league average learned from
+2023-26. Both steps cancel out the league's level, so a season where everyone scores more
+looks exactly like an average one. Seasons really do move: 5.47 to 5.79 regulation goals
+a game in the last four years, and this one is running high.
+
+**The fix.** Scale each game's total by how this season is scoring compared with 2023-26.
+The model already had that number: the league average it rates teams against, which starts
+at last season's and moves as this season's games come in. So the fix is one constant
+(2023-26 goals per team-game, 3.058) and one line in `goal_model.expected_total`.
+
+**Test before shipping.** A walk-forward backtest (each game predicted only from games
+before it, constants fit on the other seasons) on 2023-24 to 2025-26:
+- average miss on the total went from up to 0.2 goals to about 0;
+- Brier, over 5.5: 0.2457 → 0.2451; over 6.5: 0.2467 → 0.2463.
+
+Real, but small. On today's data this season is scoring 2.4% above 2023-26, so tonight's
+totals rose about 0.13 goals and the over 2-3 points a game.
+
+**What the test taught me.** The bigger gap isn't the level, it's that our totals barely
+change from game to game (spread 0.11 goals vs 0.40 for the books' lines). The model pulls
+totals hard toward average on purpose, because team ratings predict pace badly. The books
+move their line for a reason we can't see, most likely who's in net. So the next lever is
+starting-goalie quality. The Kings showed the same gap: better than their opponents by
+expected goals (+2.7), worse by real goals (-10), mostly from goals allowed above expected.
+
+**Interview line.** "My totals model was slightly worse than the books. I traced it to a
+one-directional miss: it measured teams relative to the league and never knew the league's
+current scoring level. I fixed it and backtested it out of sample. It helped, but only
+about a tenth of the gap, which told me the real missing input was goaltending, so I didn't
+oversell the fix."
+- *Follow-up: "How did you know it wasn't variance?"* The miss was the same on every line
+  and in both halves of the season, and the code explained it. I still required the
+  backtest before shipping.
 
 ---
 

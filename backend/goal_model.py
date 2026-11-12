@@ -48,6 +48,14 @@ TEAM_COEFFICIENTS = {"home": 1.0653, "away": 1.0034, "offense": 0.8019, "defense
 # predict, so the total is pulled that far toward the league's.
 LEAGUE_TOTAL = 5.59
 TOTAL_SHRINK = 0.432
+# The coefficients only see teams relative to the league, so on their own
+# every season scores like 2023-26. The total is scaled by how this season
+# is scoring (the ratings' league average, which starts at last season's and
+# moves with this season's games) against 2023-26 on the same scale: all
+# goals but shootouts, per team-game. Out of sample on 2023-24 to 2025-26
+# this took the totals' average miss from up to 0.2 goals to about 0 and
+# improved their Brier a little (over 5.5: 0.2457 -> 0.2451).
+LEAGUE_GOALS = 3.058
 
 
 def poisson(lam, top=MAX_GOALS):
@@ -153,7 +161,8 @@ def expected_total(home, away, league, home_b2b=False, away_b2b=False, c=TEAM_CO
     """
     The game's expected non-EN regulation goals, both teams, shrunk toward
     the league's. home/away: {"offense", "defense"} goals per game (scored,
-    allowed); league: the league's goals per team-game on the same scale.
+    allowed); league: the league's goals per team-game on the same scale
+    (all goals but shootouts), which also sets this season's scoring level.
     """
     def goals(side, team, opponent, own_b2b, opp_b2b):
         return math.exp(c[side] + c["offense"] * math.log(team["offense"] / league)
@@ -161,7 +170,8 @@ def expected_total(home, away, league, home_b2b=False, away_b2b=False, c=TEAM_CO
                         + c["own_b2b"] * own_b2b + c["opp_b2b"] * opp_b2b)
 
     raw = goals("home", home, away, home_b2b, away_b2b) + goals("away", away, home, away_b2b, home_b2b)
-    return LEAGUE_TOTAL + TOTAL_SHRINK * (raw - LEAGUE_TOTAL)
+    season_scale = league / LEAGUE_GOALS
+    return season_scale * (LEAGUE_TOTAL + TOTAL_SHRINK * (raw - LEAGUE_TOTAL))
 
 
 def split_for_win_prob(total, home_win_prob, tolerance=1e-4):

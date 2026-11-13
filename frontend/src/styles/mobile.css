@@ -137,6 +137,7 @@
   .player-stats-table th, .player-stats-table td { padding: 8px 6px; }
   .player-stats-table .col-team { width: auto; }
   .player-stats-table .col-optional { display: none; }
+  .player-stats-table .col-season-team { padding-left: 0; padding-right: 2px; }  /* fits "LAK / STL" at 390px */
   .game-hero, .boxscore-card { margin-top: 12px; padding: 14px; }
   .game-scoreboard { gap: 8px; }
   .game-team-logo { width: 44px; height: 44px; }
@@ -172,4 +173,10 @@
     border-top: 1px solid var(--border);
     border-radius: 16px 16px 0 0;
   }
+}
+
+/* Small phones (360px): a traded season's "LAK / STL" wraps to two lines so the table fits. */
+@media (max-width: 370px) {
+  .player-stats-table thead th, .player-stats-table td { padding-left: 5px; padding-right: 5px; }
+  .player-stats-table .col-season-team { white-space: normal; }
 }

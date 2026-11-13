@@ -59,6 +59,7 @@
 .player-stats-table tbody tr { cursor: default; }
 .player-stats-table tbody tr:hover { background: none; }
 .player-stats-table .col-team { width: 30%; color: var(--text-dim); }
+.player-stats-table .col-season-team { text-align: left; white-space: nowrap; color: var(--text-dim); }
 .show-more-btn {
   display: block;
   margin: 10px var(--gutter) 0;

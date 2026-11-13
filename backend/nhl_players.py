@@ -8,10 +8,13 @@ The page has the same shape as a rostered player's (api.player_detail), so
 the site shows both the same way: bio, career totals, and season by season.
 """
 
+import unicodedata
+
 import requests
 
 SEARCH_URL = "https://search.d3.nhle.com/api/v1/search/player"
 LANDING_URL = "https://api-web.nhle.com/v1/player/{player_id}/landing"
+TEAM_LIST_URL = "https://api.nhle.com/stats/rest/en/team"  # every NHL team ever, with its three-letter code
 TIMEOUT = 10
 
 STAT_KEYS = {  # NHL camelCase -> our snake_case (CareerTotalsStats / SeasonHistoryEntry)
@@ -131,7 +134,49 @@ def _combine_season_entries(entries):
     return combined
 
 
-def season_history(landing):
+def _name_key(name):
+    """'Montréal Canadiens' and 'Montreal Canadiens' match."""
+    plain = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode()
+    return " ".join(plain.lower().split())
+
+
+def fetch_team_codes(get=requests.get):
+    """{team full name: code} for every NHL team, past ones too (Hartford Whalers: HFD). {} if the NHL is down."""
+    try:
+        response = get(TEAM_LIST_URL, timeout=TIMEOUT)
+        response.raise_for_status()
+        return {_name_key(t["fullName"]): t["triCode"] for t in response.json()["data"] if t.get("triCode")}
+    except (requests.RequestException, ValueError, KeyError):
+        return {}
+
+
+_team_codes = {}
+
+
+def team_codes(get=requests.get):
+    """fetch_team_codes(), kept in memory once it has worked (the list changes about once a decade)."""
+    global _team_codes
+    if not _team_codes:
+        _team_codes = fetch_team_codes(get)
+    return _team_codes
+
+
+def season_teams(entries, codes):
+    """
+    The team or teams a player played for in one season's entries, in
+    order: "PIT", or "ARI / CHI" after a trade. A name missing from the
+    team list falls back to its short name ("Coyotes"), never a blank.
+    """
+    teams = []
+    for e in sorted(entries, key=lambda e: e.get("sequence", 0)):
+        name = _text(e.get("teamName"))
+        team = codes.get(_name_key(name)) or _text(e.get("teamCommonName")) or name
+        if team and team not in teams:
+            teams.append(team)
+    return " / ".join(teams) or None
+
+
+def season_history(landing, codes=None):
     """NHL seasons only (not junior or international), one row per season and type, trades combined."""
     groups = {}
     for entry in landing.get("seasonTotals", []):
@@ -142,14 +187,15 @@ def season_history(landing):
     rows = []
     for (season_id, season_type), group in groups.items():
         combined = group[0] if len(group) == 1 else _combine_season_entries(group)
-        rows.append({"season_id": season_id, "season_type": season_type, **_stats(combined)})
+        rows.append({"season_id": season_id, "season_type": season_type, "teams": season_teams(group, codes or {}),
+                     **_stats(combined)})
     rows.sort(key=lambda r: r["season_id"], reverse=True)
     return rows
 
 
-def player_detail(landing):
+def player_detail(landing, codes=None):
     """api.player_detail()'s shape from an NHL profile, for a player not on a current roster."""
-    history = season_history(landing)
+    history = season_history(landing, codes)
     if not history:
         raise PlayerNotFound(landing.get("playerId"))  # drafted, never played
     career = landing.get("careerTotals") or {}

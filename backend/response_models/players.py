@@ -256,6 +256,7 @@ class SeasonHistoryEntry(BaseModel):
 
     season_id: int
     season_type: str
+    teams: Optional[str] = None  # "PIT", or "ARI / CHI" after a trade
     games_played: Optional[int] = None
     goals: Optional[int] = None
     assists: Optional[int] = None

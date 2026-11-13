@@ -2470,7 +2470,7 @@ def _nhl_player(player_id):
     import nhl_players
 
     def fetch():
-        return nhl_players.player_detail(nhl_players.fetch_landing(player_id))
+        return nhl_players.player_detail(nhl_players.fetch_landing(player_id), nhl_players.team_codes())
     try:
         return daily_cache.get_or_compute(("nhl_player", player_id), fetch)
     except nhl_players.PlayerNotFound:

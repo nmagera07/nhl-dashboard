@@ -230,6 +230,37 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-11-13 — Retry right away, not at the end
+
+**What happened.** At 06:00 UTC the NHL's API stopped answering for about a minute.
+Standings and expected goals (xG) timed out. The job already retried failed steps, but only
+at the *end* of the run, 24 minutes later. By then WAR had found "0 new games", the playoff
+odds had used yesterday's standings and MoneyPuck's xG, and the day's predictions had missed
+last night's games. Everything succeeded on the retry, but the steps in between had already
+run on stale data. The 08:30 data check caught it (15/16).
+
+**The fix.** A failed step waits 45 seconds and tries again *right away*, before the steps
+that depend on it. If it still fails, it keeps its last try at the end of the run as before.
+
+**The tradeoff: a time budget.** The job is killed at 30 minutes and a normal run takes
+about 24. In a long outage every step would fail, and waiting 45 seconds for each would push
+the slow roster step into that limit. So quick retries share a 2-minute waiting budget. A
+blip gets fixed in place; a long outage falls back to the old end-of-run retry.
+
+**Alternative I skipped.** Retrying each web request inside every script (a retry policy on
+the HTTP session) is more precise, but it means changing about a dozen scripts that call the
+NHL their own way. One change in the runner covers all of them.
+
+**Interview line.** "My nightly pipeline retried failed steps at the end of the run, so a
+one-minute API outage left the steps in between running on stale data. I moved the retry to
+right after the failure, before anything that depends on it, and capped the total waiting so
+a long outage can't push the job past its timeout."
+- *Follow-up: "Why not just retry forever?"* The job has a hard 30-minute limit and
+  the slowest step is last. Unbounded waiting would trade a stale model for a missing roster
+  update, so the budget keeps the worst case the same as before.
+
+---
+
 ## 2026-11-12 — Player pages: which team, every season
 
 **What happened.** The season-by-season table on player pages showed the stats but not the

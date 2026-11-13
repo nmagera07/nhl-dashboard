@@ -50,8 +50,42 @@ class TestRunAll:
             {"ingest_standings.py": 0, "ingest_advanced_stats.py": 1, "war.py": 0, "ingest_xg.py": 0, "simulate_playoff_odds.py": 0, "game_predictions.py": 0, "goalie_starts.py": 0, "market_odds.py": 0, "daily_digest.py": 0, "ingest_player_stats.py": 0, "team_lines.py": 0, "moneypuck_odds.py": 0}
         )
 
-        assert run_all(runner=runner) == ["ingest_advanced_stats.py"]
-        assert len(calls) == 12
+        assert run_all(runner=runner, sleep=lambda s: None) == ["ingest_advanced_stats.py"]
+        assert len(calls) == 13  # 12 scripts + the failed one's quick retry
+
+
+def _flaky_runner(fail_times):
+    """Each script fails its first fail_times[script] runs, then works."""
+    calls = []
+
+    def runner(cmd):
+        calls.append(cmd[-1])
+        left = fail_times.get(cmd[-1], 0)
+        fail_times[cmd[-1]] = left - 1
+        return SimpleNamespace(returncode=1 if left > 0 else 0)
+
+    return runner, calls
+
+
+class TestQuickRetry:
+    def test_a_short_outage_is_retried_before_the_scripts_that_depend_on_it(self):
+        runner, calls = _flaky_runner({"ingest_standings.py": 1, "ingest_xg.py": 1})
+        waits = []
+
+        assert run_all(runner=runner, sleep=waits.append) == []
+        assert calls[:5] == ["ingest_standings.py", "ingest_standings.py", "ingest_xg.py", "ingest_xg.py",
+                             "ingest_advanced_stats.py"]  # 11-13: WAR and the odds now see last night's games
+        assert waits == [run_daily_ingest.QUICK_RETRY_WAIT_SECONDS] * 2
+
+    def test_a_long_outage_stops_waiting_once_the_budget_is_spent(self):
+        runner, calls = _flaky_runner({s: 5 for s in run_daily_ingest.SCRIPTS})
+        waits = []
+
+        failed = run_all(runner=runner, sleep=waits.append)
+
+        assert failed == run_daily_ingest.SCRIPTS  # all left for the end-of-run retry
+        assert sum(waits) <= run_daily_ingest.QUICK_RETRY_BUDGET_SECONDS
+        assert len(calls) == len(run_daily_ingest.SCRIPTS) + len(waits)
 
 
 class TestRetryFailed:

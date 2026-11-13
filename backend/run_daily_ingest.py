@@ -34,7 +34,15 @@ problem shouldn't also leave rosters stale. The process exits non-zero if any
 script failed, so the job execution shows as Failed and the job's retry
 kicks in (re-running is safe, everything is upserts).
 
-Before giving up, the failed scripts get one more try at the end of the
+A failed script is tried again right away, after QUICK_RETRY_WAIT_SECONDS,
+before the scripts that depend on it run. Most NHL API outages last about a
+minute (11-13: standings and xG timed out at 6:00-6:01 UTC, advanced stats
+worked at 6:02), and before this the next try came ~24 minutes later, after
+WAR, the odds, and the predictions had run on the previous day's data. The
+quick retries share QUICK_RETRY_BUDGET_SECONDS of waiting, so a long outage
+can't push the run (~24 min) into the 30-minute replica timeout.
+
+Before giving up, the scripts that still failed get one more try at the end of the
 run. Most failures are the NHL API timing out for a few minutes (11-04:
 predictions, goalie starts, and odds all failed at 1 AM ET), and by the end
 of the run (~25 min) it's usually back. The job's own retry restarts the
@@ -64,6 +72,8 @@ HEALTHCHECK_URL = (os.environ.get("HEALTHCHECK_URL") or "").rstrip("/")
 # The job's replica timeout is 1800s; the scripts that fail on an NHL API
 # hiccup take seconds to a minute or two, so leave ~4 minutes of room.
 RETRY_UNTIL_SECONDS = 26 * 60
+QUICK_RETRY_WAIT_SECONDS = 45
+QUICK_RETRY_BUDGET_SECONDS = 120  # total waiting for quick retries in one run
 
 SCRIPTS = [
     "ingest_standings.py",
@@ -81,16 +91,26 @@ SCRIPTS = [
 ]
 
 
-def run_all(scripts=SCRIPTS, runner=subprocess.run):
+def run_all(scripts=SCRIPTS, runner=subprocess.run, sleep=time.sleep):
+    """Each script in order; a failure gets one quick retry while the waiting budget lasts. Returns what failed."""
     failed = []
+    waited = 0
     for script in scripts:
         logger.info(f"Starting {script}")
         result = runner([sys.executable, script])
         if result.returncode == 0:
             logger.info(f"Finished {script}")
-        else:
-            logger.error(f"{script} exited with code {result.returncode}")
-            failed.append(script)
+            continue
+        logger.error(f"{script} exited with code {result.returncode}")
+        if waited + QUICK_RETRY_WAIT_SECONDS <= QUICK_RETRY_BUDGET_SECONDS:
+            waited += QUICK_RETRY_WAIT_SECONDS
+            logger.info(f"Retrying {script} in {QUICK_RETRY_WAIT_SECONDS}s")
+            sleep(QUICK_RETRY_WAIT_SECONDS)
+            if runner([sys.executable, script]).returncode == 0:
+                logger.info(f"Finished {script} on quick retry")
+                continue
+            logger.error(f"{script} failed again; one more try at the end of the run")
+        failed.append(script)
     return failed
 
 

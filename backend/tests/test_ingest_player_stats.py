@@ -259,7 +259,7 @@ class TestUpsertSeasonHistory:
         assert len(cur.calls) == 1
         _, params = cur.calls[0]
         assert params[1] == 20252026  # season_id
-        assert params[4] == 7  # goals
+        assert params[5] == 7  # goals
 
     def test_unknown_game_type_id_is_skipped(self):
         cur = _RecordingCursor()
@@ -297,8 +297,8 @@ class TestUpsertSeasonHistory:
         query, params = cur.calls[0]
         assert "insert into player_season_history" in query
         assert params[2] == "regular_season"  # season_type
-        assert params[3] == 13  # games_played
-        assert params[10] == pytest.approx(0.148936)  # shooting_pctg passed through as-is
+        assert params[4] == 13  # games_played
+        assert params[11] == pytest.approx(0.148936)  # shooting_pctg passed through as-is
 
     def test_regular_season_and_playoffs_produce_separate_rows(self):
         cur = _RecordingCursor()
@@ -357,18 +357,18 @@ class TestUpsertSeasonHistory:
         assert result is True
         assert len(cur.calls) == 1
         _, params = cur.calls[0]
-        assert params[3] == 25  # games_played summed
+        assert params[4] == 25  # games_played summed
         # column order: player_id, season_id, season_type, games_played,
         # goals, assists, points, plus_minus, pim, shots, shooting_pctg,
         # power_play_goals, power_play_points, shorthanded_goals,
         # shorthanded_points, game_winning_goals, ot_goals,
         # wins, losses, ot_losses, goals_against_avg, save_pctg, shutouts
-        assert params[17] == 12  # wins summed
-        assert params[18] == 9  # losses summed
-        assert params[19] == 2  # ot_losses summed
-        assert params[22] == 1  # shutouts summed
-        assert params[20] == pytest.approx(65 * 3600 / 90000)  # goals_against_avg
-        assert params[21] == pytest.approx((650 - 65) / 650)  # save_pctg
+        assert params[18] == 12  # wins summed
+        assert params[19] == 9  # losses summed
+        assert params[20] == 2  # ot_losses summed
+        assert params[23] == 1  # shutouts summed
+        assert params[21] == pytest.approx(65 * 3600 / 90000)  # goals_against_avg
+        assert params[22] == pytest.approx((650 - 65) / 650)  # save_pctg
 
 
 # ---------------------------------------------------------------------------
@@ -468,3 +468,36 @@ class TestSeasonAvgToi:
         goalie = self._landing({"season": 20262027, "gameTypeId": 2, "leagueAbbrev": "NHL", "gamesPlayed": 5, "avgToi": "60:00"}, position="G")
         assert season_avg_toi_seconds(goalie, 20262027) is None
         assert season_avg_toi_seconds(self._landing(), 20262027) is None
+
+
+class TestSeasonTeams:
+    CODES = {"arizona coyotes": "ARI", "chicago blackhawks": "CHI", "montreal canadiens": "MTL"}
+
+    def test_a_season_with_one_team_stores_its_code(self):
+        cur = _RecordingCursor()
+        landing = {"seasonTotals": [{"season": 20252026, "gameTypeId": 2, "leagueAbbrev": "NHL", "sequence": 1,
+                                     "teamName": {"default": "Montréal Canadiens"}, "goals": 3}]}
+        upsert_season_history(cur, 1, landing, self.CODES)
+        _, params = cur.calls[0]
+        assert params[3] == "MTL"  # accent or not, the name matches
+
+    def test_a_trade_stores_both_teams_in_order(self):
+        cur = _RecordingCursor()
+        landing = {"seasonTotals": [
+            {"season": 20232024, "gameTypeId": 2, "leagueAbbrev": "NHL", "sequence": 2,
+             "teamName": {"default": "Chicago Blackhawks"}, "goals": 2},
+            {"season": 20232024, "gameTypeId": 2, "leagueAbbrev": "NHL", "sequence": 1,
+             "teamName": {"default": "Arizona Coyotes"}, "goals": 5},
+        ]}
+        upsert_season_history(cur, 1, landing, self.CODES)
+        _, params = cur.calls[0]
+        assert params[3] == "ARI / CHI"
+        assert params[5] == 7  # goals still combined
+
+    def test_a_team_missing_from_the_list_shows_its_short_name(self):
+        cur = _RecordingCursor()
+        landing = {"seasonTotals": [{"season": 20252026, "gameTypeId": 2, "leagueAbbrev": "NHL",
+                                     "teamName": {"default": "Some New Club"}, "teamCommonName": {"default": "Club"}}]}
+        upsert_season_history(cur, 1, landing, {})
+        _, params = cur.calls[0]
+        assert params[3] == "Club"

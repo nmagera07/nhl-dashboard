@@ -23,8 +23,8 @@ function skater(overrides = {}) {
       playoffs: { games_played: 186, goals: 72, assists: 134, points: 206, plus_minus: 17, shots: 561, pim: 89 },
     },
     season_history: [
-      season(20262027, "regular_season", { points: 2 }),
-      season(20252026, "regular_season", { points: 74 }),
+      season(20262027, "regular_season", { points: 2, teams: "PIT" }),
+      season(20252026, "regular_season", { points: 74, teams: "ANA / PIT" }),
       season(20242025, "regular_season", { points: 91 }),
       season(20232024, "regular_season", { points: 94 }),
       season(20222023, "regular_season", { points: 93 }),
@@ -66,6 +66,20 @@ describe("PlayerPanel", () => {
     renderPanel(skater({ season_stats: [] }));
 
     expect(screen.getByText("No current-season stats are available yet.")).toBeInTheDocument();
+  });
+
+  it("shows the team for each season, both teams after a trade, and a dash when unknown", () => {
+    renderPanel(skater());
+    const table = within(screen.getByLabelText("Season by season"));
+    expect(table.getByText("TEAM")).toBeInTheDocument();
+    expect(table.getByText("26-27").closest("tr")).toHaveTextContent("PIT");
+    expect(table.getByText("ANA / PIT")).toBeInTheDocument();
+    expect(table.getByText("24-25").closest("tr")).toHaveTextContent("—");
+  });
+
+  it("leaves the team column off the career table", () => {
+    renderPanel(skater());
+    expect(within(screen.getByLabelText("Career totals")).queryByText("TEAM")).not.toBeInTheDocument();
   });
 
   it("shows career totals as a table with regular season and playoff rows", () => {

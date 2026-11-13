@@ -230,6 +230,37 @@ Ready-to-use lines, grouped by theme. Details for each are in the entries below.
 
 ---
 
+## 2026-11-12 — Player pages: which team, every season
+
+**What happened.** The season-by-season table on player pages showed the stats but not the
+team. The NHL's player data has the team for every season; the nightly job just didn't save it.
+
+**The fix.**
+- The nightly job saves each season's team as its three-letter code in a new `teams` column.
+  The NHL's season data only gives full names ("Pittsburgh Penguins"), so the job loads the
+  NHL's list of every team ever (62, including the Hartford Whalers and Phoenix Coyotes) and
+  matches names to codes. Accents are ignored, so "Montréal" and "Montreal" both match.
+- A season with a trade shows both teams in order: Gretzky's 1995-96 is `LAK / STL`.
+- If the list is down or a name isn't in it, the team's short name shows instead of a blank.
+- Retired players' pages are built live from the NHL, so they got teams right away.
+
+**The bug I hit: CSS specificity.** On a 360px phone, the new column made the table 29px too
+wide. Shrinking the cell padding did nothing. The reason: the header cells set the column
+widths, and an existing rule (`.standings-table thead th`) beat mine (`.player-stats-table th`)
+because it's more specific (a class plus two elements vs. a class plus one). Targeting
+`thead th` fixed it. I measured the table's width in a real headless browser at 360 and 390px
+rather than guessing from screenshots.
+
+**Interview line.** "I added team history to player pages by mapping the NHL's team names to
+codes with its own list of every franchise, so even defunct teams resolve. On small phones it
+overflowed, and I tracked that to CSS specificity: the header rule that set the column widths
+outranked mine."
+- *Follow-up: "Why store it instead of fetching it on each page view?"* Storing costs one
+  column and keeps every page fast. Fetching would add an outside call per view and break
+  when the NHL's site does.
+
+---
+
 ## 2026-11-12 — Totals: the model couldn't see how much the league is scoring
 
 **What happened.** The report card showed our over/under picks a little worse than the

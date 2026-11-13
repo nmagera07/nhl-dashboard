@@ -243,6 +243,8 @@ CREATE TABLE IF NOT EXISTS player_season_history (
     updated_at              TIMESTAMP DEFAULT NOW(),
     UNIQUE (player_id, season_id, season_type)
 );
+-- Each season's team(s): "PIT", or "ARI / CHI" after a trade (ingest_player_stats adds it).
+ALTER TABLE player_season_history ADD COLUMN IF NOT EXISTS teams VARCHAR(40);
 
 CREATE INDEX IF NOT EXISTS idx_player_season_history_player
     ON player_season_history (player_id, season_id);

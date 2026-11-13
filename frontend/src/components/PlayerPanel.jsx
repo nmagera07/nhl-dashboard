@@ -195,13 +195,15 @@ function Section({ title, aside, children }) {
   );
 }
 
-function StatsTable({ rows, columns, firstColumn, label }) {
+// showTeams: a TEAM column after the first one (season by season), from each row's `team`.
+function StatsTable({ rows, columns, firstColumn, label, showTeams = false }) {
   return (
     <div className="table-card player-table-card">
       <table className="standings-table player-stats-table" aria-label={label}>
         <thead>
           <tr>
             <th className="col-team">{firstColumn}</th>
+            {showTeams && <th className="col-season-team">TEAM</th>}
             {columns.map((col) => (
               <th key={col.key} className={columnClass(col)}><StatAbbr term={col.label} /></th>
             ))}
@@ -211,6 +213,7 @@ function StatsTable({ rows, columns, firstColumn, label }) {
           {rows.map((row) => (
             <tr key={row.key}>
               <td className="col-team">{row.label}</td>
+              {showTeams && <td className="col-season-team">{row.team || "—"}</td>}
               {columns.map((col) => (
                 <td key={col.key} className={columnClass(col)}>{formatStat(col.key, row.stats[col.key])}</td>
               ))}
@@ -389,11 +392,13 @@ function PlayerPanel({ player, onBack, backLabel }) {
             rows={visibleSeasonHistory.map((entry) => ({
               key: `${entry.season_id}-${entry.season_type}`,
               label: formatSeasonLabel(entry.season_id),
+              team: entry.teams,
               stats: entry,
             }))}
             columns={columns}
             firstColumn="SEASON"
             label="Season by season"
+            showTeams
           />
           {activeSeasonHistory.length > 5 && (
             <button type="button" className="show-more-btn" onClick={() => setShowAllSeasons((prev) => !prev)}>

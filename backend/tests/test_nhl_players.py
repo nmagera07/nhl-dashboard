@@ -35,6 +35,31 @@ def test_a_retired_players_page_has_nhl_seasons_only_with_trades_combined():
     assert d["career_totals"]["regular_season"]["points"] == 2857
 
 
+def test_each_season_shows_its_team_with_the_nhl_team_codes():
+    codes = {"edmonton oilers": "EDM", "los angeles kings": "LAK", "st. louis blues": "STL", "new york rangers": "NYR"}
+    d = nhl_players.player_detail(LANDING, codes)
+    assert [r["teams"] for r in d["season_history"]] == ["NYR", "LAK / STL", "EDM"]
+
+
+def test_team_codes_come_from_the_nhls_list_of_every_team():
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"data": [{"fullName": "Hartford Whalers", "triCode": "HFD"}, {"fullName": "Montréal Canadiens", "triCode": "MTL"}]}
+    codes = nhl_players.fetch_team_codes(get=lambda *a, **k: Response())
+    assert codes == {"hartford whalers": "HFD", "montreal canadiens": "MTL"}
+
+
+def test_team_codes_are_empty_when_the_nhl_is_down():
+    import requests
+
+    def down(*a, **k):
+        raise requests.ConnectionError("down")
+    assert nhl_players.fetch_team_codes(get=down) == {}
+
+
 def test_drafted_but_never_played_is_not_found():
     with pytest.raises(nhl_players.PlayerNotFound):
         nhl_players.player_detail({**LANDING, "seasonTotals": [LANDING["seasonTotals"][0]]})
@@ -62,8 +87,10 @@ class TestApi:
     def test_a_player_not_on_a_roster_comes_from_the_nhl(self, client, db_router, monkeypatch):
         db_router.when("from players p", None)
         monkeypatch.setattr(nhl_players, "fetch_landing", lambda pid: LANDING)
+        monkeypatch.setattr(nhl_players, "team_codes", lambda: {"new york rangers": "NYR"})
         body = client.get("/players/8447400").json()
         assert body["status"] == "retired" and body["team_abbrev"] is None
+        assert body["season_history"][0]["teams"] == "NYR"  # survives the response model
         assert body["career_totals"]["regular_season"]["points"] == 2857
 
     def test_never_played_is_a_404(self, client, db_router, monkeypatch):

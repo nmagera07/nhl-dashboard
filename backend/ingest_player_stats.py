@@ -35,7 +35,7 @@ from dotenv import load_dotenv
 
 from logging_config import setup_logging
 # Shared with nhl_players (retired players' pages), which must import without a database.
-from nhl_players import _combine_season_entries, _parse_time_on_ice_to_seconds  # noqa: F401
+from nhl_players import _combine_season_entries, _parse_time_on_ice_to_seconds, fetch_team_codes, season_teams  # noqa: F401
 
 load_dotenv()
 
@@ -327,7 +327,12 @@ def upsert_career_totals(cur, player_id, landing):
     return upserted_any
 
 
-def upsert_season_history(cur, player_id, landing):
+def ensure_teams_column(cur):
+    """Each season's team(s), e.g. "PIT" or "ARI / CHI" (added 2026-11-12)."""
+    cur.execute("ALTER TABLE player_season_history ADD COLUMN IF NOT EXISTS teams VARCHAR(40)")
+
+
+def upsert_season_history(cur, player_id, landing, codes=None):
     entries = [e for e in landing.get("seasonTotals", []) if e.get("leagueAbbrev") == "NHL"]
     if not entries:
         return False
@@ -352,14 +357,14 @@ def upsert_season_history(cur, player_id, landing):
         cur.execute(
             """
             INSERT INTO player_season_history (
-                player_id, season_id, season_type, games_played,
+                player_id, season_id, season_type, teams, games_played,
                 goals, assists, points, plus_minus, pim, shots, shooting_pctg,
                 power_play_goals, power_play_points, shorthanded_goals,
                 shorthanded_points, game_winning_goals, ot_goals,
                 wins, losses, ot_losses, goals_against_avg, save_pctg, shutouts,
                 updated_at
             ) VALUES (
-                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
@@ -367,6 +372,7 @@ def upsert_season_history(cur, player_id, landing):
                 NOW()
             )
             ON CONFLICT (player_id, season_id, season_type) DO UPDATE SET
+                teams = EXCLUDED.teams,
                 games_played = EXCLUDED.games_played,
                 goals = EXCLUDED.goals,
                 assists = EXCLUDED.assists,
@@ -393,6 +399,7 @@ def upsert_season_history(cur, player_id, landing):
                 player_id,
                 season_id,
                 season_type,
+                season_teams(group, codes or {}),
                 combined.get("gamesPlayed"),
                 combined.get("goals"),
                 combined.get("assists"),
@@ -429,7 +436,11 @@ def main():
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             ensure_toi_column(cur)
+            ensure_teams_column(cur)
             team_abbrevs = fetch_team_abbrevs(cur)
+    codes = fetch_team_codes()
+    if not codes:
+        logger.warning("NHL team list unavailable; season history shows team short names tonight")
 
     total_players = 0
     total_removed = 0
@@ -459,7 +470,7 @@ def main():
                             total_with_stats += 1
                         if upsert_career_totals(cur, player["id"], landing):
                             total_with_career_totals += 1
-                        if upsert_season_history(cur, player["id"], landing):
+                        if upsert_season_history(cur, player["id"], landing, codes):
                             total_with_season_history += 1
 
             total_players += len(roster)
